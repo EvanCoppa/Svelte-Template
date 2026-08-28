@@ -1,32 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { mockEnv, mockSend } = vi.hoisted(() => {
-	const mockEnv: Record<string, string | undefined> = {};
-	const mockSend = vi.fn();
-	return { mockEnv, mockSend };
-});
-
-vi.mock('$env/dynamic/private', () => ({ env: mockEnv }));
-vi.mock('resend', () => ({
-	Resend: class {
-		emails = { send: mockSend };
-	}
-}));
-
-import { emailConfig, isEmailEnabled, sendEmail } from './email';
-
-function setEnv(values: Record<string, string | undefined>) {
-	for (const key of Object.keys(mockEnv)) delete mockEnv[key];
-	Object.assign(mockEnv, values);
-}
+import { emailConfig, isEmailEnabled, sendEmail, type EmailClient, type EmailEnv } from './email';
 
 /** Minimal env where sending is fully configured. */
-function configuredEnv(extra: Record<string, string | undefined> = {}) {
-	setEnv({
+function configuredEnv(extra: EmailEnv = {}): EmailEnv {
+	return {
 		RESEND_API_KEY: 're_test_key',
 		EMAIL_FROM: 'Acme <hello@acme.test>',
 		...extra
-	});
+	};
+}
+
+function clientStub(send?: ReturnType<typeof vi.fn<EmailClient['emails']['send']>>) {
+	const resolvedSend = send ?? vi.fn<EmailClient['emails']['send']>();
+	if (!send)
+		resolvedSend.mockResolvedValue({ data: { id: 'email-1' }, error: null, headers: null });
+	const client: EmailClient = { emails: { send: resolvedSend } };
+	return { client, send: resolvedSend };
 }
 
 const message = {
@@ -37,9 +26,6 @@ const message = {
 };
 
 beforeEach(() => {
-	setEnv({});
-	mockSend.mockReset();
-	mockSend.mockResolvedValue({ data: { id: 'email-1' }, error: null });
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 	vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -50,88 +36,109 @@ afterEach(() => {
 
 describe('emailConfig', () => {
 	it('is disabled by default', () => {
-		expect(emailConfig()).toBeNull();
-		expect(isEmailEnabled()).toBe(false);
+		expect(emailConfig({})).toBeNull();
+		expect(isEmailEnabled({})).toBe(false);
 	});
 
 	it('is enabled with an API key and a sender', () => {
-		configuredEnv();
-		expect(emailConfig()).toEqual({ apiKey: 're_test_key', from: 'Acme <hello@acme.test>' });
-		expect(isEmailEnabled()).toBe(true);
+		expect(emailConfig(configuredEnv())).toEqual({
+			apiKey: 're_test_key',
+			from: 'Acme <hello@acme.test>'
+		});
+		expect(isEmailEnabled(configuredEnv())).toBe(true);
 	});
 
 	it('refuses (loudly) with a key but no sender', () => {
-		configuredEnv({ EMAIL_FROM: undefined });
-		expect(emailConfig()).toBeNull();
+		expect(emailConfig(configuredEnv({ EMAIL_FROM: undefined }))).toBeNull();
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('EMAIL_FROM'));
 	});
 
 	it('picks up the optional reply-to', () => {
-		configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' });
-		expect(emailConfig()).toMatchObject({ replyTo: 'support@acme.test' });
+		expect(emailConfig(configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' }))).toMatchObject({
+			replyTo: 'support@acme.test'
+		});
 	});
 });
 
 describe('sendEmail', () => {
 	it('reports failure and logs the message instead of sending when unconfigured', async () => {
-		const result = await sendEmail(message);
+		const { client, send } = clientStub();
+
+		const result = await sendEmail(message, { createClient: () => client, envSource: {} });
 
 		expect(result).toEqual({ ok: false, error: expect.stringContaining('not configured') });
-		expect(mockSend).not.toHaveBeenCalled();
+		expect(send).not.toHaveBeenCalled();
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('user@example.com'));
 	});
 
 	it('sends with the configured defaults and returns the email id', async () => {
-		configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' });
+		const { client, send } = clientStub();
+		const envSource = configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' });
 
-		const result = await sendEmail(message);
+		const result = await sendEmail(message, { createClient: () => client, envSource });
 
 		expect(result).toEqual({ ok: true, id: 'email-1' });
-		expect(mockSend).toHaveBeenCalledWith(
+		expect(send).toHaveBeenCalledWith(
 			{ from: 'Acme <hello@acme.test>', replyTo: 'support@acme.test', ...message },
 			undefined
 		);
 	});
 
 	it('lets a message override the from and reply-to defaults', async () => {
-		configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' });
+		const { client, send } = clientStub();
+		const envSource = configuredEnv({ EMAIL_REPLY_TO: 'support@acme.test' });
 
-		await sendEmail({ ...message, from: 'Alerts <alerts@acme.test>', replyTo: 'ops@acme.test' });
+		await sendEmail(
+			{ ...message, from: 'Alerts <alerts@acme.test>', replyTo: 'ops@acme.test' },
+			{ createClient: () => client, envSource }
+		);
 
-		expect(mockSend).toHaveBeenCalledWith(
+		expect(send).toHaveBeenCalledWith(
 			expect.objectContaining({ from: 'Alerts <alerts@acme.test>', replyTo: 'ops@acme.test' }),
 			undefined
 		);
 	});
 
 	it('passes the idempotency key as a request option, not a payload field', async () => {
-		configuredEnv();
+		const { client, send } = clientStub();
 
-		await sendEmail({ ...message, idempotencyKey: 'welcome/user-1' });
+		await sendEmail(
+			{ ...message, idempotencyKey: 'welcome/user-1' },
+			{ createClient: () => client, envSource: configuredEnv() }
+		);
 
-		const [payload, options] = mockSend.mock.calls[0] as [Record<string, unknown>, unknown];
+		const [payload, options] = send.mock.calls[0];
 		expect(options).toEqual({ idempotencyKey: 'welcome/user-1' });
 		expect(payload).not.toHaveProperty('idempotencyKey');
 	});
 
 	it('reports a rejection from Resend without throwing', async () => {
-		configuredEnv();
-		mockSend.mockResolvedValue({
+		const send = vi.fn<EmailClient['emails']['send']>().mockResolvedValue({
 			data: null,
-			error: { name: 'validation_error', message: 'Invalid `to` address.' }
+			error: { name: 'validation_error', message: 'Invalid `to` address.', statusCode: 422 },
+			headers: null
 		});
+		const { client } = clientStub(send);
 
-		const result = await sendEmail(message);
+		const result = await sendEmail(message, {
+			createClient: () => client,
+			envSource: configuredEnv()
+		});
 
 		expect(result).toEqual({ ok: false, error: 'Invalid `to` address.' });
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid `to` address.'));
 	});
 
 	it('reports a network failure without throwing', async () => {
-		configuredEnv();
-		mockSend.mockRejectedValue(new Error('fetch failed'));
+		const send = vi
+			.fn<EmailClient['emails']['send']>()
+			.mockRejectedValue(new Error('fetch failed'));
+		const { client } = clientStub(send);
 
-		const result = await sendEmail(message);
+		const result = await sendEmail(message, {
+			createClient: () => client,
+			envSource: configuredEnv()
+		});
 
 		expect(result).toEqual({ ok: false, error: 'fetch failed' });
 	});

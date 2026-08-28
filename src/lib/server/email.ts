@@ -31,28 +31,37 @@ export interface EmailConfig {
 	replyTo?: string;
 }
 
+/** The env vars email config reads, injectable so tests can vary them. */
+export interface EmailEnv {
+	RESEND_API_KEY?: string | undefined;
+	EMAIL_FROM?: string | undefined;
+	EMAIL_REPLY_TO?: string | undefined;
+}
+
 /**
  * Resolve the email configuration, or `null` when sending is off. Partial
  * configuration is logged loudly — a half-set-up integration should never be
  * silent.
  */
-export function emailConfig(): EmailConfig | null {
-	const apiKey = (env.RESEND_API_KEY ?? '').trim();
+export function emailConfig(source: EmailEnv = env): EmailConfig | null {
+	const apiKey = (source.RESEND_API_KEY ?? '').trim();
 	if (!apiKey) return null;
 
-	const from = (env.EMAIL_FROM ?? '').trim();
+	const from = (source.EMAIL_FROM ?? '').trim();
 	if (!from) {
 		console.error('[email] RESEND_API_KEY is set but EMAIL_FROM is not — email disabled.');
 		return null;
 	}
 
-	const replyTo = (env.EMAIL_REPLY_TO ?? '').trim();
-	return { apiKey, from, ...(replyTo ? { replyTo } : {}) };
+	const config: EmailConfig = { apiKey, from };
+	const replyTo = (source.EMAIL_REPLY_TO ?? '').trim();
+	if (replyTo) config.replyTo = replyTo;
+	return config;
 }
 
 /** Cheap check for callers that only need to know whether email is live. */
-export function isEmailEnabled(): boolean {
-	return emailConfig() !== null;
+export function isEmailEnabled(source: EmailEnv = env): boolean {
+	return emailConfig(source) !== null;
 }
 
 export interface EmailMessage {
@@ -87,13 +96,26 @@ export interface EmailMessage {
 
 export type SendEmailResult = { ok: true; id: string } | { ok: false; error: string };
 
+/** The slice of the Resend SDK that `sendEmail` calls. */
+export interface EmailClient {
+	emails: Pick<InstanceType<typeof Resend>['emails'], 'send'>;
+}
+
+export interface SendEmailDeps {
+	createClient?: (apiKey: string) => EmailClient;
+	envSource?: EmailEnv;
+}
+
 /**
  * Send one email. Returns `{ ok: true, id }` on success and `{ ok: false,
  * error }` on any failure (unconfigured, rejected by Resend, or a network
  * error) — it never throws.
  */
-export async function sendEmail(message: EmailMessage): Promise<SendEmailResult> {
-	const config = emailConfig();
+export async function sendEmail(
+	message: EmailMessage,
+	deps: SendEmailDeps = {}
+): Promise<SendEmailResult> {
+	const config = emailConfig(deps.envSource ?? env);
 	const { idempotencyKey, from, replyTo, ...payload } = message;
 
 	if (!config) {
@@ -105,7 +127,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
 		return { ok: false, error: 'Email is not configured (RESEND_API_KEY / EMAIL_FROM).' };
 	}
 
-	const resend = new Resend(config.apiKey);
+	const resend = (deps.createClient ?? ((apiKey) => new Resend(apiKey)))(config.apiKey);
 	try {
 		const { data, error } = await resend.emails.send(
 			{

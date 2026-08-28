@@ -31,5 +31,3 @@ export const newPasswordSchema = z
 		error: 'Passwords do not match.',
 		path: ['confirm_password']
 	});
-
-export type NewPasswordSchema = typeof newPasswordSchema;
