@@ -31,11 +31,20 @@ export interface EmailConfig {
 	replyTo?: string;
 }
 
-/** The env vars email config reads, injectable so tests can vary them. */
+/**
+ * The env vars email config reads, injectable so tests can vary them.
+ *
+ * The index signature matters, not just documents intent: without it this is
+ * a TS "weak type" (every property optional), so passing the real
+ * `$env/dynamic/private` env — whose generated type is a snapshot of
+ * whatever variables happen to be set wherever `svelte-kit sync` last ran —
+ * only type-checks when at least one property name coincidentally matches.
+ */
 export interface EmailEnv {
 	RESEND_API_KEY?: string | undefined;
 	EMAIL_FROM?: string | undefined;
 	EMAIL_REPLY_TO?: string | undefined;
+	[key: string]: string | undefined;
 }
 
 /**

@@ -45,12 +45,23 @@ export interface AutoLoginAdminClient {
 	auth: { admin: Pick<SupabaseClient['auth']['admin'], 'generateLink' | 'createUser'> };
 }
 
-/** The env vars the feature reads, injectable so tests can vary them. */
+/**
+ * The env vars the feature reads, injectable so tests can vary them.
+ *
+ * The index signature matters, not just documents intent: without it this is
+ * a TS "weak type" (every property optional), so passing the real
+ * `$env/dynamic/private` env — whose generated type is a snapshot of
+ * whatever variables happen to be set wherever `svelte-kit sync` last ran —
+ * only type-checks when at least one property name coincidentally matches.
+ * That is exactly the kind of environment-dependent flake this repo's own
+ * anti-slop rules exist to catch.
+ */
 export interface DevAutoLoginEnv {
 	DEV_AUTO_LOGIN?: string | undefined;
 	DEV_AUTO_LOGIN_EMAIL?: string | undefined;
 	SUPABASE_SERVICE_ROLE_KEY?: string | undefined;
 	VERCEL_ENV?: string | undefined;
+	[key: string]: string | undefined;
 }
 
 export interface DevAutoLoginDeps {
