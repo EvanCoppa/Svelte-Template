@@ -11,6 +11,13 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 export default ts.config(
 	includeIgnoreFile(gitignorePath),
+	{
+		// Vendored agent skills are documentation, not project source. Their
+		// example components sit outside tsconfig's include, so the typed
+		// `projectService` below cannot resolve them and errors on every one.
+		// `.prettierignore` skips this directory for the same reason.
+		ignores: ['.claude/skills/**']
+	},
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,
