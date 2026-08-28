@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # $env/static/public needs values at build time; these placeholders are
+  # never contacted. Real values live in Vercel, not in CI.
+  PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (prettier + eslint)
+        run: npm run lint
+
+      - name: Type check (svelte-check)
+        run: npm run check
+
+      - name: Unit tests (vitest)
+        run: npm test
+
+      - name: Build (Vercel adapter)
+        run: npm run build

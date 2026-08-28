@@ -448,7 +448,6 @@
 		</span>
 		<span class="flex shrink-0 items-center gap-1">
 			{#if clearable && hasSelection && !disabled}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<span
 					role="button"
 					tabindex="-1"

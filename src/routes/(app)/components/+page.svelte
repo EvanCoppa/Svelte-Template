@@ -19,6 +19,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import { toast } from 'svelte-sonner';
 
 	// Select (bits-ui) works with plain string values.
 	const FRUIT_LABELS: Record<string, string> = {
@@ -271,6 +272,32 @@
 						a dialog.
 					</Tabs.Content>
 				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Toasts</Card.Title>
+				<Card.Description>
+					svelte-sonner via <code>ui/sonner</code>. House convention: successes toast, validation
+					errors render inline next to the form.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<Button variant="outline" onclick={() => toast('A plain message')}>Default</Button>
+				<Button variant="outline" onclick={() => toast.success('Changes saved')}>Success</Button>
+				<Button variant="outline" onclick={() => toast.error('Something went wrong')}>Error</Button>
+				<Button
+					variant="outline"
+					onclick={() =>
+						toast.promise(new Promise((resolve) => setTimeout(resolve, 1500)), {
+							loading: 'Saving…',
+							success: 'Done',
+							error: 'Failed'
+						})}
+				>
+					Promise
+				</Button>
 			</Card.Content>
 		</Card.Root>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -38,13 +39,6 @@
 					<code>supabase/migrations/</code> (see the README), then reload.
 				</p>
 			{:else}
-				{#if form?.profileSaved}
-					<p
-						class="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
-					>
-						Profile updated.
-					</p>
-				{/if}
 				{#if form?.profileMessage}
 					<p
 						class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
@@ -58,9 +52,11 @@
 					class="grid max-w-sm gap-4"
 					use:enhance={() => {
 						savingProfile = true;
-						return async ({ update }) => {
+						return async ({ result, update }) => {
 							await update({ reset: false });
 							savingProfile = false;
+							// House convention: successes toast, failures render inline.
+							if (result.type === 'success') toast.success('Profile updated');
 						};
 					}}
 				>
@@ -106,13 +102,6 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if form?.changed}
-				<p
-					class="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
-				>
-					Password updated.
-				</p>
-			{/if}
 			{#if form?.message}
 				<p
 					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
@@ -126,9 +115,10 @@
 				class="grid max-w-sm gap-4"
 				use:enhance={() => {
 					submitting = true;
-					return async ({ update }) => {
+					return async ({ result, update }) => {
 						await update();
 						submitting = false;
+						if (result.type === 'success') toast.success('Password updated');
 					};
 				}}
 			>

@@ -34,6 +34,7 @@ extend the rules rather than fighting them.
 npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
+npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run db:types       # regenerate src/lib/database.types.ts from the live schema
 npm run format         # prettier (svelte + tailwind plugins)
@@ -62,9 +63,22 @@ npm run format         # prettier (svelte + tailwind plugins)
   reset action's "if that email has an account…" phrasing.
 - The service-role client (`src/lib/supabase.server.ts`) bypasses RLS: create it per
   request in server files only. RLS stays enabled on every table regardless.
+- Every response carries the security headers from
+  `src/lib/server/security-headers.ts`. The CSP's origins derive from
+  `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
+  as a parameter or documented constant, never a hardcoded project ref.
 - The auth surface has unit tests (`src/routes/auth/confirm/server.test.ts`,
-  `src/routes/reset-password/page.server.test.ts`, `src/routes/login/page.server.test.ts`).
-  Changes to those routes must keep the tests green and extend them.
+  `src/routes/reset-password/page.server.test.ts`, `src/routes/login/page.server.test.ts`,
+  plus `src/lib/server/*.test.ts`). Changes to those routes must keep the tests
+  green and extend them.
+
+**Testing against a dev server without hitting the login page:** set
+`DEV_AUTO_LOGIN=true` and `DEV_AUTO_LOGIN_EMAIL` in `.env` (requires
+`SUPABASE_SERVICE_ROLE_KEY`). `src/lib/server/dev-auto-login.ts` then signs that
+user in on the first request, so `npm run dev` lands straight in the app. It
+refuses to run on production deployments, `/logout` still works (sets an opt-out
+cookie; clear it with `?autologin=1`), and the emailed-link flows under `/auth`
+stay testable as a signed-out browser.
 
 ## Database
 
@@ -125,4 +139,7 @@ components is experimental — it requires `compilerOptions.experimental.async`,
 - Svelte 5 runes only: `$state`/`$derived`/`$props`, snippets + `{@render}`, `page`
   from `$app/state`. Compute with `$derived`, don't sync with `$effect`. Keyed each
   blocks, keyed by identity.
+- Mutation feedback: successes **toast** (`toast.success(...)` from `svelte-sonner`;
+  the `Toaster` from `ui/sonner` is mounted in the root layout), validation errors
+  render **inline** next to the form via `fail(400, { ... })`. Don't mix the two.
 - Do not silence a `check` finding with a cast or ignore comment; fix the contract.

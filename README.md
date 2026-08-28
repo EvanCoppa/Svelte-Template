@@ -112,6 +112,10 @@ Details worth knowing:
   claims without JWT validation. See `docs/sveltekit-best-practices.md` §4.
 - **Keep RLS on.** The route guard protects pages; Row Level Security protects data.
   You want both, independently.
+- **Security headers on every response.** `src/lib/server/security-headers.ts` sets a
+  Content-Security-Policy (origins derived from `PUBLIC_SUPABASE_URL`, never
+  hardcoded), `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`,
+  and a `Permissions-Policy`. Add new external origins there as you adopt services.
 
 ## Database types (generated)
 
@@ -170,6 +174,10 @@ Notable: `ui/combobox` is a house-grown searchable picker (single/multi-select, 
 in forms via hidden inputs) that this codebase prefers over raw native selects for
 anything user-facing.
 
+Feedback convention: successes **toast** (`svelte-sonner`, `Toaster` mounted in the
+root layout); validation errors render **inline** next to the form. The settings page
+shows both halves working together.
+
 ## Testing
 
 The security-critical auth surface is unit-tested with Vitest: the `/auth/confirm`
@@ -183,6 +191,29 @@ npm run test:watch
 
 Tests live next to the code they cover (`*.test.ts`). If you change the auth routes,
 keep these green and extend them — they encode the flows' security properties.
+
+**CI** (`.github/workflows/ci.yml`) runs `lint` (prettier + eslint), `check`,
+the tests, and the production build on every pull request and push to `main`.
+
+## Development auto-login
+
+Automated agents (and humans) spinning the app up to look at a feature hit the auth
+guard before they can see anything. `DEV_AUTO_LOGIN` removes that blocker without any
+committed credentials: it mints a Supabase magic link with the service-role key and
+redeems it server-side, so the request continues as a genuinely authenticated session.
+
+```bash
+# .env
+DEV_AUTO_LOGIN=true
+DEV_AUTO_LOGIN_EMAIL=you@example.com
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Then `npm run dev` lands you straight on the dashboard, signed in. The account is
+created if it doesn't exist. Safety properties (all unit-tested): inert unless the flag
+is set, hard-refuses on `VERCEL_ENV=production`, `/logout` still signs out (an opt-out
+cookie stops instant re-login; clear it by visiting any page with `?autologin=1`), and
+the `/auth` emailed-link flows keep their signed-out behavior.
 
 ## Conventions
 
@@ -207,6 +238,7 @@ npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero
+npm run lint           # prettier --check + eslint — keep at zero
 npm test               # vitest — the auth surface's unit tests
 npm run db:types       # regenerate src/lib/database.types.ts from your live schema
 npm run format         # prettier (svelte + tailwind class sorting)

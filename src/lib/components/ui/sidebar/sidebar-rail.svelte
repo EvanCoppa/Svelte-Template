@@ -29,7 +29,7 @@
 		}
 	}
 
-	function handleMouseUp(e: MouseEvent) {
+	function handleMouseUp() {
 		if (isDragging) {
 			sidebar.setOpen(false);
 		} else {

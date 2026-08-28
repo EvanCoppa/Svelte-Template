@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { Toaster } from '$lib/components/ui/sonner/index.js';
 	import { invalidate } from '$app/navigation';
 	import { QUERY } from '$lib/queries';
 	import { onMount } from 'svelte';
@@ -24,5 +25,7 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<Toaster richColors />
 
 {@render children()}

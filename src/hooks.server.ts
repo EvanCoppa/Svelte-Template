@@ -1,9 +1,24 @@
 import { createServerClient } from '@supabase/ssr';
-import { error, redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
+import {
+	error,
+	redirect,
+	type Handle,
+	type HandleServerError,
+	type RequestEvent
+} from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
+import { dev } from '$app/environment';
 import { PUBLIC_SUPABASE_PUBLISHABLE_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import type { Database } from '$lib/database.types';
+import {
+	DEV_AUTO_LOGIN_OPT_OUT_COOKIE,
+	DEV_AUTO_LOGIN_RESET_PARAM,
+	devAutoLogin,
+	isDevAutoLoginEnabled,
+	shouldAttemptDevAutoLogin
+} from '$lib/server/dev-auto-login';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
+import { applySecurityHeaders } from '$lib/server/security-headers';
 
 /**
  * Server errors get an opaque code the user can report; the detail stays in
@@ -36,6 +51,11 @@ const PUBLIC_PATHS = ['/login', '/auth'];
  * itself, the link handler that starts the flow, and the exit hatch.
  */
 const RECOVERY_ALLOWED_PATHS = ['/reset-password', '/auth/confirm', '/logout'];
+
+/** Outermost handle so every rendered response carries the header set. */
+const securityHeaders: Handle = async ({ event, resolve }) => {
+	return applySecurityHeaders(await resolve(event), PUBLIC_SUPABASE_URL, { dev });
+};
 
 const supabase: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient<Database>(
@@ -85,8 +105,35 @@ const supabase: Handle = async ({ event, resolve }) => {
 	});
 };
 
+/**
+ * When DEV_AUTO_LOGIN is enabled, sign the configured user in instead of
+ * bouncing the request to /login. Off by default and refused in production —
+ * see `$lib/server/dev-auto-login`.
+ */
+async function maybeDevAutoLogin(event: RequestEvent) {
+	if (!isDevAutoLoginEnabled()) return null;
+
+	if (event.url.searchParams.has(DEV_AUTO_LOGIN_RESET_PARAM)) {
+		event.cookies.delete(DEV_AUTO_LOGIN_OPT_OUT_COOKIE, { path: '/' });
+	}
+
+	const optedOut = event.cookies.get(DEV_AUTO_LOGIN_OPT_OUT_COOKIE) === '1';
+	if (!shouldAttemptDevAutoLogin({ pathname: event.url.pathname, optedOut })) return null;
+
+	return devAutoLogin(event.locals.supabase);
+}
+
 const authGuard: Handle = async ({ event, resolve }) => {
-	const { session, user } = await event.locals.safeGetSession();
+	let { session, user } = await event.locals.safeGetSession();
+
+	if (!session || !user) {
+		const bootstrapped = await maybeDevAutoLogin(event);
+		if (bootstrapped) {
+			session = bootstrapped.session;
+			user = bootstrapped.user;
+		}
+	}
+
 	event.locals.session = session;
 	event.locals.user = user;
 
@@ -126,4 +173,4 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle: Handle = sequence(supabase, authGuard);
+export const handle: Handle = sequence(securityHeaders, supabase, authGuard);
