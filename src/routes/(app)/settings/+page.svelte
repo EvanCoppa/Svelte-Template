@@ -1,17 +1,48 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { enhance } from '$app/forms';
+	import { superForm } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { newPasswordSchema } from '$lib/schemas/password';
+	import { profileSchema } from './schema';
 
-	let { data, form } = $props();
+	let { data } = $props();
 
 	let user = $derived(page.data.user);
-	let submitting = $state(false);
-	let savingProfile = $state(false);
+
+	const {
+		form: profileForm,
+		errors: profileErrors,
+		message: profileMessage,
+		constraints: profileConstraints,
+		submitting: savingProfile,
+		enhance: profileEnhance
+	} = superForm(data.profileForm, {
+		validators: zod4Client(profileSchema),
+		resetForm: false,
+		onUpdated({ form }) {
+			// House convention: successes toast, failures render inline.
+			if (form.valid) toast.success('Profile updated');
+		}
+	});
+
+	const {
+		form: passwordForm,
+		errors: passwordErrors,
+		message: passwordMessage,
+		constraints: passwordConstraints,
+		submitting: savingPassword,
+		enhance: passwordEnhance
+	} = superForm(data.passwordForm, {
+		validators: zod4Client(newPasswordSchema),
+		onUpdated({ form }) {
+			if (form.valid) toast.success('Password updated');
+		}
+	});
 </script>
 
 <svelte:head>
@@ -39,39 +70,30 @@
 					<code>supabase/migrations/</code> (see the README), then reload.
 				</p>
 			{:else}
-				{#if form?.profileMessage}
+				{#if $profileMessage}
 					<p
 						class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
 					>
-						{form.profileMessage}
+						{$profileMessage}
 					</p>
 				{/if}
-				<form
-					method="POST"
-					action="?/updateProfile"
-					class="grid max-w-sm gap-4"
-					use:enhance={() => {
-						savingProfile = true;
-						return async ({ result, update }) => {
-							await update({ reset: false });
-							savingProfile = false;
-							// House convention: successes toast, failures render inline.
-							if (result.type === 'success') toast.success('Profile updated');
-						};
-					}}
-				>
+				<form method="POST" action="?/updateProfile" class="grid max-w-sm gap-4" use:profileEnhance>
 					<div class="grid gap-2">
 						<Label for="display_name">Display name</Label>
 						<Input
 							id="display_name"
 							name="display_name"
-							value={data.profile.display_name ?? ''}
 							placeholder="How should we address you?"
-							maxlength={100}
+							aria-invalid={$profileErrors.display_name ? 'true' : undefined}
+							bind:value={$profileForm.display_name}
+							{...$profileConstraints.display_name}
 						/>
+						{#if $profileErrors.display_name}
+							<p class="text-destructive text-sm">{$profileErrors.display_name}</p>
+						{/if}
 					</div>
-					<Button type="submit" class="w-fit" disabled={savingProfile}>
-						{savingProfile ? 'Saving…' : 'Save profile'}
+					<Button type="submit" class="w-fit" disabled={$savingProfile}>
+						{$savingProfile ? 'Saving…' : 'Save profile'}
 					</Button>
 				</form>
 			{/if}
@@ -98,30 +120,19 @@
 		<Card.Header>
 			<Card.Title>Change password</Card.Title>
 			<Card.Description>
-				A form action posting to <code>?/changePassword</code> — the template's default pattern for mutations.
+				A superforms action posting to <code>?/changePassword</code> — the template's default pattern
+				for mutations.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if form?.message}
+			{#if $passwordMessage}
 				<p
 					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
 				>
-					{form.message}
+					{$passwordMessage}
 				</p>
 			{/if}
-			<form
-				method="POST"
-				action="?/changePassword"
-				class="grid max-w-sm gap-4"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ result, update }) => {
-						await update();
-						submitting = false;
-						if (result.type === 'success') toast.success('Password updated');
-					};
-				}}
-			>
+			<form method="POST" action="?/changePassword" class="grid max-w-sm gap-4" use:passwordEnhance>
 				<div class="grid gap-2">
 					<Label for="password">New password</Label>
 					<Input
@@ -129,8 +140,13 @@
 						name="password"
 						type="password"
 						autocomplete="new-password"
-						required
+						aria-invalid={$passwordErrors.password ? 'true' : undefined}
+						bind:value={$passwordForm.password}
+						{...$passwordConstraints.password}
 					/>
+					{#if $passwordErrors.password}
+						<p class="text-destructive text-sm">{$passwordErrors.password}</p>
+					{/if}
 				</div>
 				<div class="grid gap-2">
 					<Label for="confirm_password">Confirm password</Label>
@@ -139,11 +155,16 @@
 						name="confirm_password"
 						type="password"
 						autocomplete="new-password"
-						required
+						aria-invalid={$passwordErrors.confirm_password ? 'true' : undefined}
+						bind:value={$passwordForm.confirm_password}
+						{...$passwordConstraints.confirm_password}
 					/>
+					{#if $passwordErrors.confirm_password}
+						<p class="text-destructive text-sm">{$passwordErrors.confirm_password}</p>
+					{/if}
 				</div>
-				<Button type="submit" class="w-fit" disabled={submitting}>
-					{submitting ? 'Saving…' : 'Update password'}
+				<Button type="submit" class="w-fit" disabled={$savingPassword}>
+					{$savingPassword ? 'Saving…' : 'Update password'}
 				</Button>
 			</form>
 		</Card.Content>
