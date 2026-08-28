@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
@@ -30,13 +31,7 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if form?.message}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{form.message}
-				</p>
-			{/if}
+			<FormAlert message={form?.message} />
 
 			<form
 				method="POST"
