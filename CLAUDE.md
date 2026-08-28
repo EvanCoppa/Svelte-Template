@@ -154,6 +154,9 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
+- An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
+  with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted
+  border/background classes: that loses `role="alert"`, and the class string then gets copied.
 
 Need something not vendored yet? Add it with `npx shadcn-svelte@latest add <name>` rather than
 writing it yourself. These files are project source, so extend one in place — a new variant or
@@ -170,5 +173,6 @@ before you build.
   blocks, keyed by identity.
 - Mutation feedback: successes **toast** (`toast.success(...)` from `svelte-sonner`;
   the `Toaster` from `ui/sonner` is mounted in the root layout), validation errors
-  render **inline** next to the form via `fail(400, { ... })`. Don't mix the two.
+  render **inline** next to the form via `fail(400, { ... })` + `FormAlert`. Don't mix
+  the two.
 - Do not silence a `check` finding with a cast or ignore comment; fix the contract.

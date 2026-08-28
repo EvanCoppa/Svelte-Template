@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -18,6 +19,9 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { toast } from 'svelte-sonner';
 
@@ -272,6 +276,34 @@
 						a dialog.
 					</Tabs.Content>
 				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Alerts</Card.Title>
+				<Card.Description>
+					Inline messages. Validation failures render through <code>FormAlert</code> — one line per form,
+					nothing hand-rolled.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-3">
+				<Alert.Root>
+					<InfoIcon />
+					<Alert.Title>Heads up</Alert.Title>
+					<Alert.Description>Neutral context that isn't tied to a submission.</Alert.Description>
+				</Alert.Root>
+				<Alert.Root variant="destructive">
+					<CircleAlertIcon />
+					<Alert.Title>Couldn't save</Alert.Title>
+					<Alert.Description>Check the highlighted fields and try again.</Alert.Description>
+				</Alert.Root>
+				<Alert.Root variant="success">
+					<CircleCheckIcon />
+					<Alert.Title>Password updated</Alert.Title>
+					<Alert.Description>Sign in with your new password.</Alert.Description>
+				</Alert.Root>
+				<Alert.FormAlert class="mb-0" message="Display name must be 100 characters or fewer." />
 			</Card.Content>
 		</Card.Root>
 
