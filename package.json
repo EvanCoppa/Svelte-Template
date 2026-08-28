@@ -45,6 +45,7 @@
 		"bits-ui": "^2.19.0",
 		"clsx": "^2.1.1",
 		"motion": "^13.1.0",
+		"resend": "^6.25.0",
 		"svelte-sonner": "^1.2.1",
 		"sveltekit-superforms": "^2.30.2",
 		"tailwind-merge": "^3.6.0",
