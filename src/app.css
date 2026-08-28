@@ -1,2 +1,224 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
-@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+:root {
+	/* ── Layout & typography ── */
+	--header-height: 64px;
+	--site-padding: 40px;
+
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', sans-serif;
+	--font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+	--radius: 0.5rem;
+	--accent-primary: #2563eb;
+	--ring: #2563eb;
+
+	/* ── App-shell palette (header, plain-CSS surfaces) ── */
+	--bg-primary: #ffffff;
+	--bg-secondary: #f8f8fa;
+	--bg-tertiary: #f0f0f3;
+	--bg-hover: #e8e8ec;
+
+	--border-primary: #e2e2e7;
+	--border-secondary: #d0d0d8;
+
+	--text-primary: #111114;
+	--text-secondary: #5c5c66;
+	--text-tertiary: #8e8e9a;
+	--text-link: #111114;
+
+	/* ── shadcn-svelte theme (light) ── */
+	--background: #ffffff;
+	--foreground: #111114;
+	--card: #ffffff;
+	--card-foreground: #111114;
+	--popover: #ffffff;
+	--popover-foreground: #111114;
+	--primary: #2563eb;
+	--primary-foreground: #ffffff;
+	--secondary: #f0f0f3;
+	--secondary-foreground: #111114;
+	--muted: #f5f5f7;
+	--muted-foreground: #5c5c66;
+	--accent: #f0f0f3;
+	--accent-foreground: #111114;
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: #e2e2e7;
+	--input: #e2e2e7;
+	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-3: oklch(0.398 0.07 227.392);
+	--chart-4: oklch(0.828 0.189 84.429);
+	--chart-5: oklch(0.769 0.188 70.08);
+	--sidebar: #f8f8fa;
+	--sidebar-foreground: #111114;
+	--sidebar-primary: #2563eb;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #f0f0f3;
+	--sidebar-accent-foreground: #111114;
+	--sidebar-border: #e2e2e7;
+	--sidebar-ring: #2563eb;
+}
+
+/* ── Dark theme ── */
+html.dark {
+	--bg-primary: #09090b;
+	--bg-secondary: #0f0f12;
+	--bg-tertiary: #151518;
+	--bg-hover: #1a1a1e;
+
+	--border-primary: #1e1e23;
+	--border-secondary: #2a2a30;
+
+	--text-primary: #e8e8ed;
+	--text-secondary: #a0a0ab;
+	--text-tertiary: #6b6b76;
+	--text-link: #e8e8ed;
+
+	--background: #09090b;
+	--foreground: #e8e8ed;
+	--card: #111114;
+	--card-foreground: #e8e8ed;
+	--popover: #0f0f12;
+	--popover-foreground: #e8e8ed;
+	--primary: #2563eb;
+	--primary-foreground: #ffffff;
+	--secondary: #1e1e23;
+	--secondary-foreground: #e8e8ed;
+	--muted: #151518;
+	--muted-foreground: #a0a0ab;
+	--accent: #1a1a1e;
+	--accent-foreground: #e8e8ed;
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: #1e1e23;
+	--input: #1e1e23;
+	--sidebar: #0f0f12;
+	--sidebar-foreground: #e8e8ed;
+	--sidebar-accent: #1a1a1e;
+	--sidebar-accent-foreground: #e8e8ed;
+	--sidebar-border: #1e1e23;
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+	body {
+		@apply bg-background text-foreground;
+		min-height: 100vh;
+		min-height: 100dvh;
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		padding-top: env(safe-area-inset-top);
+		padding-bottom: env(safe-area-inset-bottom);
+		padding-left: env(safe-area-inset-left);
+		padding-right: env(safe-area-inset-right);
+	}
+	html {
+		scroll-behavior: smooth;
+	}
+	code {
+		font-family: var(--font-mono);
+		font-size: 0.875em;
+		background: var(--bg-tertiary);
+		padding: 2px 6px;
+		border-radius: var(--radius-sm);
+	}
+	pre {
+		font-family: var(--font-mono);
+		font-size: 0.875rem;
+		line-height: 1.6;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-md);
+		padding: 16px 20px;
+		overflow-x: auto;
+	}
+	pre code {
+		background: none;
+		padding: 0;
+		font-size: inherit;
+	}
+}
+
+/* Override browser autofill background in dark mode */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill:active {
+	-webkit-box-shadow: 0 0 0 30px var(--card) inset !important;
+	-webkit-text-fill-color: var(--text-primary) !important;
+	caret-color: var(--text-primary);
+	transition: background-color 5000s ease-in-out 0s;
+}
+
+@layer utilities {
+	.scrollbar-hide {
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--border-secondary);
+	border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-tertiary);
+}
