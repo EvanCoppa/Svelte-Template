@@ -21,8 +21,9 @@ solved problem. The bar a candidate must clear, in order:
 1. **Already solved here?** Check `package.json` and the codebase first. Supabase (query
    builder — a separate ORM like Drizzle duplicates it and bypasses the generated types),
    bits-ui via the vendored shadcn primitives (any headless UI need), `tailwind-variants`
-   / `clsx` / `tailwind-merge` (styling logic), `svelte-sonner` (feedback), SvelteKit
-   itself (forms, routing, data loading — many "form libraries" reinvent form actions).
+   / `clsx` / `tailwind-merge` (styling logic), `svelte-sonner` (feedback),
+   `sveltekit-superforms` + `zod` (form validation — any other form or schema library
+   duplicates them), SvelteKit itself (routing, data loading, form actions).
    Also check the vendored `ui/` inventory: a missing primitive is a
    `npx shadcn-svelte@latest add <name>` (vendored source), not a new runtime dependency.
 2. **Trivially writable?** If it's under ~100 lines of code this repo would own anyway
