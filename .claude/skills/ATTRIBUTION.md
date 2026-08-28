@@ -16,6 +16,7 @@ Each is verbatim from upstream unless noted, which keeps a re-sync a clean diff.
 | `svelte-template-directives` | same | `2a9d883` | **none stated** |
 | `sveltekit-structure` | same | `2a9d883` | **none stated** |
 | `sveltekit-data-flow` | same | `2a9d883` | **none stated** |
+| `zod` | [anivar/zod-skill](https://github.com/anivar/zod-skill) | `bb0620d` | MIT |
 
 ## Notes
 

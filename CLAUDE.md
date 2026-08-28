@@ -99,12 +99,20 @@ binary/streaming responses. If a mutation is triggered from the page it lives on
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
 input echoed back; `redirect(303, ...)` on success.
 
-Validation is **Superforms + Zod** (`sveltekit-superforms` with the `zod4` adapter —
-zod v4 is installed): schema at module top level in a colocated `schema.ts`,
-`superValidate` in both load and action, `fail(400, { form })` on invalid, `superForm`'s
-`enhance` on the client with errors rendered inline from `$errors`. The pre-Superforms
-auth forms (login, reset-password) validate by hand; converge them when touched, and
-never mix both styles in one form.
+## Forms
+
+Every form is built with **sveltekit-superforms + zod v4** — schema at module top
+level in a colocated `schema.ts` (schemas shared across routes live in
+`src/lib/schemas/`), `superValidate` with the `zod4` adapter in both load and action
+(import from `sveltekit-superforms/server`), `fail(400, { form })` on invalid,
+`superForm` with `zod4Client` validators and its `enhance` on the client, errors
+rendered inline from `$errors` and form-level messages through `FormAlert`. Never
+parse `request.formData()` by hand or hand-roll validation, and blank sensitive
+fields (passwords) before returning a form from an action — superforms echoes
+`form.data` back to the browser. The full convention, including multiple forms per
+page, nested data, and how to test actions, is the `sveltekit-superforms` skill
+(`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
+/settings are the reference implementations.
 
 ## Data loading & invalidation
 

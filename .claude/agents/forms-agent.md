@@ -33,9 +33,10 @@ memory. The pattern:
   guidance on superforms.rocks), using its `enhance` — not a hand-rolled `use:enhance`
   callback — with errors from `$errors` and constraints from `$constraints`.
 
-The pre-Superforms auth forms (login, reset-password) validate by hand; converge them to
-Superforms when a task touches them — never mix both styles within one form, and never
-add a new hand-validated form.
+Every form in the app is already on Superforms (/login, /reset-password and /settings
+are the reference implementations) — never mix validation styles within one form, and
+never add a new hand-validated form. The full house convention is the
+`sveltekit-superforms` skill (`.claude/skills/sveltekit-superforms/SKILL.md`).
 
 ## The feedback contract (from CLAUDE.md — unchanged by Superforms)
 
