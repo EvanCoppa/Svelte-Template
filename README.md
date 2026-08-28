@@ -17,6 +17,22 @@ at `/components` and the house rules at `/best-practices`.
 
 ## Quick start
 
+Two ways to get a database. **Local** needs Docker but no account, gives you a
+throwaway you can reset at will, and seeds a user to sign in as — start there if
+you just want to see the thing run:
+
+```bash
+npm install
+npm run db:start     # boots Postgres + Auth + Studio in Docker
+npm run db:reset     # applies supabase/migrations, then supabase/seed.sql
+npm run db:env       # writes .env.local pointing at the local stack
+npm run dev          # sign in as dev@example.com / password123
+```
+
+**Hosted** is the path to an actual deployment, and is what the rest of this
+section covers. The two coexist: `.env.local` (local) overrides `.env` (hosted)
+while it exists, so `rm .env.local` switches back.
+
 ### 1. Create a Supabase project
 
 At [database.new](https://database.new). Then in the dashboard:
@@ -117,6 +133,49 @@ Details worth knowing:
   hardcoded), `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`,
   and a `Permissions-Policy`. Add new external origins there as you adopt services.
 
+## Local development database
+
+`supabase/config.toml` describes a full Supabase stack — Postgres, Auth, Studio
+and a mail catcher — that runs in Docker on your machine. Nothing in it affects
+your hosted project; hosted settings live in the dashboard.
+
+```bash
+npm run db:start     # boot it (first run pulls images, so it takes a while)
+npm run db:reset     # drop, re-apply every migration, re-run the seed
+npm run db:status    # ports, URLs and keys
+npm run db:env       # write .env.local so the app talks to it
+npm run db:new name  # scaffold supabase/migrations/<timestamp>_name.sql
+npm run db:stop      # shut it down
+```
+
+Worth knowing:
+
+- **Studio** is at <http://127.0.0.1:54323> — browse and edit local rows.
+- **Emails are never delivered.** Password-reset and confirmation mail lands in
+  the catcher at <http://127.0.0.1:54324>, which is how you exercise the
+  `/auth/confirm` flow without a real inbox.
+- **`db:reset` is the point of having this.** Migrations get tested by being
+  applied to an empty database over and over, which is the one thing you cannot
+  safely do to a hosted project.
+- **`npm run db:types` follows whichever database you are pointed at** — it uses
+  `--local` when `PUBLIC_SUPABASE_URL` is on 127.0.0.1 and the project ref
+  otherwise. Force it with `-- --local` or `-- --remote`.
+- **`major_version` in config.toml must match your hosted Postgres**, or a
+  migration can pass locally and fail on deploy.
+
+### Seed data
+
+`supabase/seed.sql` runs after the migrations on every `db:reset`. It creates
+two users — `dev@example.com` and `e2e@example.com`, both with password
+`password123` — by writing the `auth.users` and `auth.identities` rows GoTrue
+expects, then lets the `profiles` trigger from the starter migration do its job.
+
+These credentials are fixed and public on purpose: they only ever exist in a
+throwaway local database. **Never put a real credential in that file** — it is
+committed. Add a row to the `seed_users` list to add a user; add your own tables'
+sample rows underneath, following the same `on conflict do nothing` shape so the
+file stays re-runnable.
+
 ## Database types (generated)
 
 The Supabase client is typed end to end: `locals.supabase`, the layout-load client, and
@@ -192,8 +251,46 @@ npm run test:watch
 Tests live next to the code they cover (`*.test.ts`). If you change the auth routes,
 keep these green and extend them — they encode the flows' security properties.
 
+### End-to-end tests
+
+Playwright drives a real browser against a real dev server. Specs live in
+`tests/` (SvelteKit's generated tsconfig already type-checks that directory, so
+`npm run check` covers them).
+
+```bash
+npx playwright install chromium   # once per machine
+npm run test:e2e
+npm run test:e2e:ui               # pick and watch individual specs
+```
+
+The suite is split by what it needs:
+
+- **`tests/guest.spec.ts` runs anywhere, with no configuration at all.** An
+  unauthenticated request never reaches Supabase — the guard redirects before
+  any network call — so these cover the default-deny contract, the `?next=`
+  round trip, the recovery-link error and the security headers on a bare clone.
+- **`tests/auth.spec.ts` signs in, so it needs a live stack.** Each test skips
+  itself with an explanatory message until one is reachable:
+
+  ```bash
+  npm run db:start && npm run db:env && npm run test:e2e
+  ```
+
+  It uses the seeded `e2e@example.com`; override with `E2E_USER_EMAIL` /
+  `E2E_USER_PASSWORD` to point at a different project.
+
+Two things to copy when writing more specs. **Wait for hydration before
+clicking** — Playwright considers a server-rendered button clickable the moment
+it is visible, which is before Svelte has attached its handlers, and that click
+is silently dropped; `clickWhenLive()` in `tests/auth.spec.ts` retries until the
+effect appears. And **`Card.Title` renders a `<div>`**, so pages built from
+cards have no heading to target — assert on `<title>` or a `data-slot` instead.
+
 **CI** (`.github/workflows/ci.yml`) runs `lint` (prettier + eslint), `check`,
-the tests, and the production build on every pull request and push to `main`.
+the unit tests, and the production build on every pull request and push to
+`main`, plus a second job running the Playwright specs that need no database.
+To cover the signed-in specs there too, add a `npx supabase start && npm run
+db:env` step to the `e2e` job before `npm run test:e2e`.
 
 ## Development auto-login
 
@@ -240,6 +337,10 @@ npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero
 npm run lint           # prettier --check + eslint — keep at zero
 npm test               # vitest — the auth surface's unit tests
-npm run db:types       # regenerate src/lib/database.types.ts from your live schema
+npm run test:e2e       # playwright — the auth surface through a real browser
+npm run db:start       # boot the local Supabase stack (Docker)
+npm run db:reset       # re-apply every migration, then supabase/seed.sql
+npm run db:env         # write .env.local pointing at the local stack
+npm run db:types       # regenerate src/lib/database.types.ts (local or hosted)
 npm run format         # prettier (svelte + tailwind class sorting)
 ```

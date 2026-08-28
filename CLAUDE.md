@@ -36,7 +36,12 @@ npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
 npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
 npm test               # vitest (server-side unit tests)
-npm run db:types       # regenerate src/lib/database.types.ts from the live schema
+npm run test:e2e       # playwright (real browser, tests/) — see "E2E tests" below
+npm run db:start       # boot the local Supabase stack in Docker
+npm run db:reset       # re-apply every migration, then supabase/seed.sql
+npm run db:env         # write .env.local pointing at the local stack
+npm run db:new <name>  # scaffold a migration file
+npm run db:types       # regenerate src/lib/database.types.ts (local or hosted)
 npm run format         # prettier (svelte + tailwind plugins)
 ```
 
@@ -72,6 +77,29 @@ npm run format         # prettier (svelte + tailwind plugins)
   plus `src/lib/server/*.test.ts`). Changes to those routes must keep the tests
   green and extend them.
 
+## E2E tests
+
+Playwright specs live in `tests/` (`*.spec.ts`); vitest owns `src/**` and the two
+never overlap. Split by what a spec needs:
+
+- **No database** → `tests/guest.spec.ts`. An unauthenticated request never reaches
+  Supabase, so these run on a bare clone and in CI. New assertions about the route
+  guard, `?next=` handling or security headers belong here.
+- **Signed in** → `tests/auth.spec.ts`. Gated on `authStackReachable()` from
+  `tests/env.ts`, so it skips with an explanation rather than failing when no stack
+  is up. Run it with `npm run db:start && npm run db:env && npm run test:e2e`.
+
+Two rules that are easy to get wrong:
+
+- **Wait for hydration before clicking.** Playwright treats a server-rendered button
+  as clickable while it is still inert HTML, and the click is silently dropped —
+  which looks exactly like a broken handler. Use `clickWhenLive()` in
+  `tests/auth.spec.ts`; never "fix" this with a bare `waitForTimeout`.
+- **Scope selectors.** The signed-in user's email renders in the page body _and_ in
+  the sidebar user menu, so an unscoped `getByText(email)` trips strict mode. And
+  `Card.Title` renders a `<div>`, so card-based pages expose no heading role —
+  assert on `<title>` or a `data-slot`.
+
 **Testing against a dev server without hitting the login page:** set
 `DEV_AUTO_LOGIN=true` and `DEV_AUTO_LOGIN_EMAIL` in `.env` (requires
 `SUPABASE_SERVICE_ROLE_KEY`). `src/lib/server/dev-auto-login.ts` then signs that
@@ -85,8 +113,19 @@ stay testable as a signed-out browser.
 - Schema changes are SQL migrations in `supabase/migrations/` (see the `profiles`
   migration for the house pattern: create table → enable RLS → policies with
   `(select auth.uid())` → triggers). Never change schema without a migration file.
+- **Develop against the local stack** (`npm run db:start`), not the hosted project.
+  `npm run db:reset` re-applies every migration onto an empty database and re-runs
+  `supabase/seed.sql` — that round trip is how a migration gets proven, and it is the
+  one thing you must never do to a hosted project. `supabase/config.toml` and
+  `supabase/seed.sql` are committed; everything else the CLI writes is ignored.
+- Seed data goes in `supabase/seed.sql`, following the shape already there: fixed
+  ids, `on conflict do nothing`, re-runnable. Its credentials are deliberately
+  public because that database is disposable — **never put a real one there.**
+- `db.major_version` in `config.toml` must match the hosted Postgres, or a migration
+  can pass locally and fail on deploy.
 - After every migration: `npm run db:types` and **commit the regenerated
-  `src/lib/database.types.ts`**. Every Supabase client is `SupabaseClient<Database>`;
+  `src/lib/database.types.ts`**. That script follows whichever database
+  `PUBLIC_SUPABASE_URL` points at. Every Supabase client is `SupabaseClient<Database>`;
   an untyped `.from()` should never exist. Row types come from the `Tables<'name'>`
   aliases in that file.
 
