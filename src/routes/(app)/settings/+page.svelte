@@ -2,6 +2,7 @@
 	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -39,13 +40,7 @@
 					<code>supabase/migrations/</code> (see the README), then reload.
 				</p>
 			{:else}
-				{#if form?.profileMessage}
-					<p
-						class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-					>
-						{form.profileMessage}
-					</p>
-				{/if}
+				<FormAlert message={form?.profileMessage} />
 				<form
 					method="POST"
 					action="?/updateProfile"
@@ -102,13 +97,7 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if form?.message}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{form.message}
-				</p>
-			{/if}
+			<FormAlert message={form?.message} />
 			<form
 				method="POST"
 				action="?/changePassword"

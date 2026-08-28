@@ -99,6 +99,13 @@ binary/streaming responses. If a mutation is triggered from the page it lives on
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
 input echoed back; `redirect(303, ...)` on success.
 
+Validation is **Superforms + Zod** (`sveltekit-superforms` with the `zod4` adapter —
+zod v4 is installed): schema at module top level in a colocated `schema.ts`,
+`superValidate` in both load and action, `fail(400, { form })` on invalid, `superForm`'s
+`enhance` on the client with errors rendered inline from `$errors`. The pre-Superforms
+auth forms (login, reset-password) validate by hand; converge them when touched, and
+never mix both styles in one form.
+
 ## Data loading & invalidation
 
 Server data comes from load functions (never `onMount` fetches), using the load-provided
@@ -168,11 +175,36 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
+- An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
+  with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted
+  border/background classes: that loses `role="alert"`, and the class string then gets copied.
 
 Need something not vendored yet? Add it with `npx shadcn-svelte@latest add <name>` rather than
 writing it yourself. These files are project source, so extend one in place — a new variant or
 prop — before creating a parallel component. `/components` renders the full inventory; check it
 before you build.
+
+### Enhanced primitives
+
+`src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from
+[Solid Core](https://github.com/EvanCoppa/solid-core)'s `src/lib/primitives/interior/` collection.
+`/enhanced` renders the inventory.
+
+**`ui/` first, always.** Reach for `enhanced/` only when `ui/` has no answer for the job — a
+one-time-code field, a tag field, a password meter, a button that owns its own pending state, a
+sliding segmented control. Where the two overlap, `ui/` wins: this shelf exists to cover gaps, not
+to become a second vocabulary for solved problems. That is why the first batch deliberately skips
+the interior takes on tabs, modals, popovers and dropdowns — `ui/` already answers those.
+
+- Every animation goes through `$lib/motion.js`, which is where `prefers-reduced-motion` is
+  honoured. Never call Motion's `animate` straight from a component.
+- These paint from the same `src/app.css` tokens as `ui/`, so they follow the light/dark toggle
+  with no extra wiring. A new one must too — no hardcoded greys, and any raw palette colour
+  (`emerald-500`, `amber-600`) needs its `dark:` pair.
+- To add another: port the folder from Solid Core, point its imports at `$lib/utils.js` and
+  `$lib/motion.js`, add the two lines to the folder's `index.ts` and the barrel, and give it a
+  card on `/enhanced`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
+  Core's PascalCase.
 
 ## Key patterns
 
@@ -184,5 +216,6 @@ before you build.
   blocks, keyed by identity.
 - Mutation feedback: successes **toast** (`toast.success(...)` from `svelte-sonner`;
   the `Toaster` from `ui/sonner` is mounted in the root layout), validation errors
-  render **inline** next to the form via `fail(400, { ... })`. Don't mix the two.
+  render **inline** next to the form via `fail(400, { ... })` + `FormAlert`. Don't mix
+  the two.
 - Do not silence a `check` finding with a cast or ignore comment; fix the contract.

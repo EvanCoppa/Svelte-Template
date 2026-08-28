@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -22,31 +23,10 @@
 		</Card.Header>
 		<Card.Content>
 			{#if data.passwordReset}
-				<p
-					class="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
-				>
-					Password updated. Sign in with your new password.
-				</p>
+				<FormAlert variant="success" message="Password updated. Sign in with your new password." />
 			{/if}
-			{#if data.errorMessage}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{data.errorMessage}
-				</p>
-			{/if}
-			{#if form?.message}
-				<p
-					class={[
-						'mb-4 rounded-md border px-3 py-2 text-sm',
-						form.resetOk
-							? 'border-green-600/30 bg-green-600/10 text-green-700 dark:text-green-400'
-							: 'border-destructive/30 bg-destructive/10 text-destructive'
-					]}
-				>
-					{form.message}
-				</p>
-			{/if}
+			<FormAlert message={data.errorMessage} />
+			<FormAlert message={form?.message} variant={form?.resetOk ? 'success' : 'destructive'} />
 
 			<form
 				method="POST"
