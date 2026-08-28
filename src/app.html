@@ -3,6 +3,17 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// Apply the stored theme before first paint to avoid a flash.
+			// Mirrors the logic in src/lib/theme.svelte.ts (default: dark).
+			try {
+				const stored = localStorage.getItem('theme');
+				const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+				if (stored === 'dark' || (!stored && !prefersLight)) {
+					document.documentElement.classList.add('dark');
+				}
+			} catch {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
