@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isActionFailure, isRedirect } from '@sveltejs/kit';
+import { PASSWORD_MIN_LENGTH } from '$lib/schemas/password';
 import { PASSWORD_RECOVERY_COOKIE } from '$lib/server/password-recovery';
 import { actions, load } from './+page.server';
 
@@ -35,13 +36,17 @@ function harness({
 		auth,
 		jar,
 		loadEvent: { cookies, locals: { session, user } },
-		actionEvent: (fields: Record<string, string>) => ({
-			cookies,
-			locals: { supabase: { auth } },
-			request: {
-				formData: () => Promise.resolve(new Map(Object.entries(fields)))
-			}
-		})
+		// superValidate demands a real Request — a duck-typed mock is treated as
+		// plain data instead of being parsed as a form post.
+		actionEvent: (fields: Record<string, string>) => {
+			const body = new FormData();
+			for (const [name, value] of Object.entries(fields)) body.set(name, value);
+			return {
+				cookies,
+				locals: { supabase: { auth } },
+				request: new Request('https://app.test/reset-password', { method: 'POST', body })
+			};
+		}
 	};
 }
 
@@ -77,8 +82,14 @@ describe('load', () => {
 	it('renders the form for a browser that just verified a recovery link', async () => {
 		const h = harness();
 		const data = await runLoad(h.loadEvent);
+		if (!data) throw new Error('expected load data');
 
-		expect(data).toMatchObject({ email: 'user@example.com', minLength: 8 });
+		expect(data).toMatchObject({ email: 'user@example.com' });
+		// The superform carries the schema's rules down to the inputs.
+		expect(data.form.constraints?.password).toMatchObject({
+			minlength: PASSWORD_MIN_LENGTH,
+			required: true
+		});
 	});
 
 	it('turns away a signed-in session that never went through recovery', async () => {
@@ -129,6 +140,16 @@ describe('default action', () => {
 
 		expect(isActionFailure(result)).toBe(true);
 		expect(h.auth.updateUser).not.toHaveBeenCalled();
+	});
+
+	it('never echoes the passwords back in a failure response', async () => {
+		const h = harness();
+
+		const result = await submit(h.actionEvent({ password: 'short', confirm_password: 'short' }));
+
+		expect(result).toMatchObject({
+			data: { form: { data: { password: '', confirm_password: '' } } }
+		});
 	});
 
 	it('keeps the user on the form and the marker intact when Supabase refuses', async () => {

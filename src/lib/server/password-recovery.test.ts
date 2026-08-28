@@ -2,34 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	endPasswordRecovery,
 	isPasswordRecovery,
-	PASSWORD_MIN_LENGTH,
 	PASSWORD_RECOVERY_COOKIE,
-	startPasswordRecovery,
-	validateNewPassword
+	startPasswordRecovery
 } from './password-recovery';
-
-describe('validateNewPassword', () => {
-	it('accepts a matching pair that meets the rules', () => {
-		expect(validateNewPassword('a-fine-password', 'a-fine-password')).toBeNull();
-	});
-
-	it('rejects a password below the minimum length', () => {
-		const short = 'x'.repeat(PASSWORD_MIN_LENGTH - 1);
-		expect(validateNewPassword(short, short)).toMatch(/at least/);
-	});
-
-	it('rejects a password over 72 bytes, which bcrypt would silently truncate', () => {
-		// 24 four-byte emoji = 96 bytes but only 48 UTF-16 code units, so a
-		// naive .length check would pass it.
-		const emoji = '🔑'.repeat(24);
-		expect(emoji.length).toBeLessThan(72);
-		expect(validateNewPassword(emoji, emoji)).toMatch(/72 bytes/);
-	});
-
-	it('rejects a mismatched confirmation', () => {
-		expect(validateNewPassword('a-fine-password', 'a-fine-passw0rd')).toMatch(/do not match/);
-	});
-});
 
 describe('recovery cookie helpers', () => {
 	function jar() {

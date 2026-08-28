@@ -1,4 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { message, superValidate } from 'sveltekit-superforms/server';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { loginSchema, resetSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Human-readable banners for `?error=` codes set by hooks and /auth/confirm. */
@@ -12,49 +15,49 @@ const ERROR_MESSAGES = new Map([
 
 export const load: PageServerLoad = async ({ url }) => {
 	const errorCode = url.searchParams.get('error');
+	const [loginForm, resetForm] = await Promise.all([
+		superValidate({ next: url.searchParams.get('next') ?? '/' }, zod4(loginSchema), {
+			errors: false
+		}),
+		superValidate(zod4(resetSchema))
+	]);
 	return {
 		errorMessage: errorCode ? (ERROR_MESSAGES.get(errorCode) ?? 'Something went wrong.') : null,
 		passwordReset: url.searchParams.get('reset') === 'success',
-		next: url.searchParams.get('next') ?? '/'
+		loginForm,
+		resetForm
 	};
 };
 
 export const actions: Actions = {
 	login: async ({ request, locals: { supabase } }) => {
-		const form = await request.formData();
-		const email = String(form.get('email') ?? '')
-			.trim()
-			.toLowerCase();
-		const password = String(form.get('password') ?? '');
-		const next = String(form.get('next') ?? '/');
+		const form = await superValidate(request, zod4(loginSchema));
+		// superforms echoes `form.data` back to the browser on failure — never
+		// send the password on that round trip.
+		const password = form.data.password;
+		form.data.password = '';
 
-		if (!email || !password) {
-			return fail(400, { email, message: 'Enter your email and password.' });
-		}
+		if (!form.valid) return fail(400, { form });
 
-		const { error } = await supabase.auth.signInWithPassword({ email, password });
+		const { error } = await supabase.auth.signInWithPassword({ email: form.data.email, password });
 		if (error) {
 			// One generic message for every failure — the difference between "no
 			// such account" and "wrong password" is information an attacker wants.
-			return fail(400, { email, message: 'Invalid email or password.' });
+			return message(form, 'Invalid email or password.', { status: 400 });
 		}
 
 		// `next` round-trips through the form from the URL, so treat it as
 		// untrusted: allow only internal paths.
+		const next = form.data.next;
 		const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
 		throw redirect(303, safeNext);
 	},
 
 	reset: async ({ request, locals: { supabase }, url }) => {
-		const form = await request.formData();
-		const email = String(form.get('email') ?? '')
-			.trim()
-			.toLowerCase();
-		if (!email) {
-			return fail(400, { email, resetOk: false, message: 'Enter your email to reset.' });
-		}
+		const form = await superValidate(request, zod4(resetSchema));
+		if (!form.valid) return fail(400, { form });
 
-		const { error } = await supabase.auth.resetPasswordForEmail(email, {
+		const { error } = await supabase.auth.resetPasswordForEmail(form.data.email, {
 			redirectTo: `${url.origin}/auth/confirm?type=recovery`
 		});
 
@@ -63,10 +66,6 @@ export const actions: Actions = {
 		// been rate limited; the operator still gets the detail in the log.
 		if (error) console.warn('[login/reset] resetPasswordForEmail failed', error.message);
 
-		return {
-			email,
-			resetOk: true,
-			message: 'If that email has an account, a password reset link is on its way.'
-		};
+		return message(form, 'If that email has an account, a password reset link is on its way.');
 	}
 };

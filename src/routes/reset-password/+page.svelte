@@ -1,14 +1,21 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { superForm } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { enhance as kitEnhance } from '$app/forms';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { newPasswordSchema } from '$lib/schemas/password';
 
-	let { data, form } = $props();
+	let { data } = $props();
 
-	let submitting = $state(false);
+	const { form, errors, message, constraints, submitting, enhance } = superForm(data.form, {
+		validators: zod4Client(newPasswordSchema)
+	});
+
 	let showPasswords = $state(false);
 	let inputType = $derived(showPasswords ? 'text' : 'password');
 </script>
@@ -30,25 +37,9 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if form?.message}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{form.message}
-				</p>
-			{/if}
+			<FormAlert message={$message} />
 
-			<form
-				method="POST"
-				class="grid gap-4"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update }) => {
-						await update();
-						submitting = false;
-					};
-				}}
-			>
+			<form method="POST" class="grid gap-4" use:enhance>
 				<div class="grid gap-2">
 					<Label for="password">New password</Label>
 					<Input
@@ -56,9 +47,14 @@
 						name="password"
 						type={inputType}
 						autocomplete="new-password"
-						minlength={data.minLength}
-						required
+						aria-invalid={$errors.password ? 'true' : undefined}
+						aria-describedby={$errors.password ? 'password-error' : undefined}
+						bind:value={$form.password}
+						{...$constraints.password}
 					/>
+					{#if $errors.password}
+						<p id="password-error" class="text-destructive text-sm">{$errors.password}</p>
+					{/if}
 				</div>
 				<div class="grid gap-2">
 					<Label for="confirm_password">Confirm password</Label>
@@ -67,20 +63,27 @@
 						name="confirm_password"
 						type={inputType}
 						autocomplete="new-password"
-						minlength={data.minLength}
-						required
+						aria-invalid={$errors.confirm_password ? 'true' : undefined}
+						aria-describedby={$errors.confirm_password ? 'confirm-password-error' : undefined}
+						bind:value={$form.confirm_password}
+						{...$constraints.confirm_password}
 					/>
+					{#if $errors.confirm_password}
+						<p id="confirm-password-error" class="text-destructive text-sm">
+							{$errors.confirm_password}
+						</p>
+					{/if}
 				</div>
 				<div class="flex items-center gap-2">
 					<Checkbox id="show-passwords" bind:checked={showPasswords} />
 					<Label for="show-passwords" class="font-normal">Show passwords</Label>
 				</div>
-				<Button type="submit" class="w-full" disabled={submitting}>
-					{submitting ? 'Saving…' : 'Set new password'}
+				<Button type="submit" class="w-full" disabled={$submitting}>
+					{$submitting ? 'Saving…' : 'Set new password'}
 				</Button>
 			</form>
 
-			<form method="POST" action="/logout" use:enhance class="mt-4 text-center">
+			<form method="POST" action="/logout" use:kitEnhance class="mt-4 text-center">
 				<button
 					type="submit"
 					class="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"

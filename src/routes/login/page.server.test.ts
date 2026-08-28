@@ -16,13 +16,17 @@ function harness({
 
 	return {
 		auth,
-		event: (fields: Record<string, string>) => ({
-			url: new URL('https://app.test/login'),
-			locals: { supabase: { auth } },
-			request: {
-				formData: () => Promise.resolve(new Map(Object.entries(fields)))
-			}
-		})
+		// superValidate demands a real Request — a duck-typed mock is treated as
+		// plain data instead of being parsed as a form post.
+		event: (fields: Record<string, string>) => {
+			const body = new FormData();
+			for (const [name, value] of Object.entries(fields)) body.set(name, value);
+			return {
+				url: new URL('https://app.test/login'),
+				locals: { supabase: { auth } },
+				request: new Request('https://app.test/login', { method: 'POST', body })
+			};
+		}
 	};
 }
 
@@ -79,6 +83,22 @@ describe('login action', () => {
 		}
 	);
 
+	it('rejects an invalid email without touching Supabase', async () => {
+		const h = harness();
+
+		const result = await run(
+			'login',
+			h.event({ email: 'not-an-email', password: 'pw', next: '/' })
+		);
+
+		expect(isActionFailure(result)).toBe(true);
+		expect(result).toMatchObject({
+			status: 400,
+			data: { form: { valid: false, errors: { email: ['Enter a valid email address.'] } } }
+		});
+		expect(h.auth.signInWithPassword).not.toHaveBeenCalled();
+	});
+
 	it('returns one generic message for any failed sign-in (no user enumeration)', async () => {
 		const h = harness({ signInError: { message: 'User not found' } });
 
@@ -90,8 +110,19 @@ describe('login action', () => {
 		expect(isActionFailure(result)).toBe(true);
 		expect(result).toMatchObject({
 			status: 400,
-			data: { message: 'Invalid email or password.' }
+			data: { form: { message: 'Invalid email or password.' } }
 		});
+	});
+
+	it('never echoes the password back in a failure response', async () => {
+		const h = harness({ signInError: { message: 'nope' } });
+
+		const result = await run(
+			'login',
+			h.event({ email: 'user@example.com', password: 'pw', next: '/' })
+		);
+
+		expect(result).toMatchObject({ data: { form: { data: { password: '' } } } });
 	});
 });
 
@@ -104,7 +135,9 @@ describe('reset action', () => {
 		expect(h.auth.resetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
 			redirectTo: 'https://app.test/auth/confirm?type=recovery'
 		});
-		expect(result).toMatchObject({ resetOk: true });
+		expect(result).toMatchObject({
+			form: { message: 'If that email has an account, a password reset link is on its way.' }
+		});
 	});
 
 	it('reports the same success even when Supabase refuses (no user enumeration)', async () => {
@@ -112,6 +145,17 @@ describe('reset action', () => {
 
 		const result = await run('reset', h.event({ email: 'user@example.com' }));
 
-		expect(result).toMatchObject({ resetOk: true });
+		expect(result).toMatchObject({
+			form: { message: 'If that email has an account, a password reset link is on its way.' }
+		});
+	});
+
+	it('rejects an invalid email without touching Supabase', async () => {
+		const h = harness();
+
+		const result = await run('reset', h.event({ email: '' }));
+
+		expect(isActionFailure(result)).toBe(true);
+		expect(h.auth.resetPasswordForEmail).not.toHaveBeenCalled();
 	});
 });

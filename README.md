@@ -170,13 +170,18 @@ dependency. Browse them live at `/components`. Add more with:
 npx shadcn-svelte@latest add <component>
 ```
 
+(`components.json` at the repo root is what makes that command resolve this project's
+aliases — it does not describe a theme, so the CLI never touches `src/app.css`.)
+
 Notable: `ui/combobox` is a house-grown searchable picker (single/multi-select, posts
 in forms via hidden inputs) that this codebase prefers over raw native selects for
 anything user-facing.
 
 Feedback convention: successes **toast** (`svelte-sonner`, `Toaster` mounted in the
-root layout); validation errors render **inline** next to the form. The settings page
-shows both halves working together.
+root layout); validation errors render **inline** next to the form through
+`FormAlert` (`ui/alert`) — `<FormAlert message={form?.message} />`, which renders
+nothing when there is no message and carries `role="alert"` so failures are
+announced. The settings page shows both halves working together.
 
 ## Testing
 

@@ -9,17 +9,12 @@ import type { Cookies } from '@sveltejs/kit';
  * `hooks.server.ts` pins such a browser to /reset-password until a new
  * password is chosen, otherwise the emailed link quietly works as a standing
  * magic sign-in link.
+ *
+ * The password rules themselves live in `$lib/schemas/password` (shared with
+ * the client for superforms validation).
  */
 export const PASSWORD_RECOVERY_COOKIE = 'sb-password-recovery';
 export const PASSWORD_RECOVERY_MAX_AGE = 60 * 30;
-export const PASSWORD_MIN_LENGTH = 8;
-
-/**
- * bcrypt (what Supabase Auth hashes with) silently truncates at 72 *bytes*.
- * Rejecting longer input beats accepting a passphrase whose tail is never
- * actually read.
- */
-export const PASSWORD_MAX_BYTES = 72;
 
 export function startPasswordRecovery(cookies: Pick<Cookies, 'set'>): void {
 	cookies.set(PASSWORD_RECOVERY_COOKIE, '1', {
@@ -36,17 +31,4 @@ export function isPasswordRecovery(cookies: Pick<Cookies, 'get'>): boolean {
 
 export function endPasswordRecovery(cookies: Pick<Cookies, 'delete'>): void {
 	cookies.delete(PASSWORD_RECOVERY_COOKIE, { path: '/' });
-}
-
-export function validateNewPassword(password: string, confirmation: string): string | null {
-	if (password.length < PASSWORD_MIN_LENGTH) {
-		return `Password must be at least ${String(PASSWORD_MIN_LENGTH)} characters.`;
-	}
-	if (new TextEncoder().encode(password).length > PASSWORD_MAX_BYTES) {
-		return `Password must be at most ${String(PASSWORD_MAX_BYTES)} bytes.`;
-	}
-	if (password !== confirmation) {
-		return 'Passwords do not match.';
-	}
-	return null;
 }
