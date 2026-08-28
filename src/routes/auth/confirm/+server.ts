@@ -17,6 +17,8 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ url, locals: { supabase }, cookies }) => {
 	const tokenHash = url.searchParams.get('token_hash');
 	const code = url.searchParams.get('code');
+	// SAFETY: `type` is untrusted query input; Supabase's verifyOtp validates it
+	// at runtime and an unrecognized value lands in the failure path below.
 	const type = (url.searchParams.get('type') ?? 'recovery') as EmailOtpType;
 	const next = url.searchParams.get('next') ?? '/';
 

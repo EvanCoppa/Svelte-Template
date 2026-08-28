@@ -27,7 +27,12 @@
 
 <script lang="ts">
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { cn, type WithElementRef, type WithoutChildrenOrChild } from '$lib/utils.js';
+	import {
+		cn,
+		type ChildSnippetProps,
+		type WithElementRef,
+		type WithoutChildrenOrChild
+	} from '$lib/utils.js';
 	import { mergeProps } from 'bits-ui';
 	import type { ComponentProps, Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
@@ -50,7 +55,7 @@
 		size?: SidebarMenuButtonSize;
 		tooltipContent?: Snippet | string;
 		tooltipContentProps?: WithoutChildrenOrChild<ComponentProps<typeof Tooltip.Content>>;
-		child?: Snippet<[{ props: Record<string, unknown> }]>;
+		child?: Snippet<[ChildSnippetProps]>;
 	} = $props();
 
 	const sidebar = useSidebar();
@@ -65,7 +70,7 @@
 	});
 </script>
 
-{#snippet Button({ props }: { props?: Record<string, unknown> })}
+{#snippet Button({ props }: Partial<ChildSnippetProps>)}
 	{@const mergedProps = mergeProps(buttonProps, props)}
 	{#if child}
 		{@render child({ props: mergedProps })}

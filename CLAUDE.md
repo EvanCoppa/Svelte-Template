@@ -35,6 +35,8 @@ npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
 npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
+npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-slop) — keep at ZERO
+npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run db:types       # regenerate src/lib/database.types.ts from the live schema
 npm run format         # prettier (svelte + tailwind plugins)

@@ -30,8 +30,13 @@ export interface ComboboxGroup {
 /** Anything a call site can hand to `options`: full option objects or bare strings. */
 export type ComboboxOptionInput = ComboboxOption | string;
 
+/** Bare strings are shorthand for an option whose value and label coincide. */
+function isBareOption(option: ComboboxOptionInput): option is string {
+	return typeof option === 'string';
+}
+
 export function normalizeOption(option: ComboboxOptionInput): ComboboxOption {
-	return typeof option === 'string' ? { value: option, label: option } : option;
+	return isBareOption(option) ? { value: option, label: option } : option;
 }
 
 /**

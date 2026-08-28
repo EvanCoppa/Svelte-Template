@@ -1,0 +1,11 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	// Vendored-verbatim assets and generated files are not project source.
+	"ignore": [".claude/**", "tools/oxlint/anti-slop/**", "src/lib/database.types.ts"],
+	// The shadcn-svelte kit is an opt-in vocabulary: primitives stay available
+	// before any screen uses them, so each kit index is a public entry point.
+	"entry": ["src/lib/components/ui/*/index.ts"],
+	// A helper exported for reuse but so far consumed only by its own module
+	// (NAV_CATEGORIES, PASSWORD_MAX_BYTES, …) is not dead code.
+	"ignoreExportsUsedInFile": true
+}

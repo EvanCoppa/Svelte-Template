@@ -17,7 +17,7 @@ export type BadgeTone =
 	| 'rose'
 	| 'indigo';
 
-export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
+export const BADGE_TONE_CLASSES = {
 	neutral:
 		'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-700',
 	success:
@@ -35,10 +35,10 @@ export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
 	rose: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800',
 	indigo:
 		'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-800'
-};
+} satisfies Record<BadgeTone, string>;
 
 /** Dot color for StatusBadge — a solid saturated fill that reads on both themes. */
-export const BADGE_TONE_DOT_CLASSES: Record<BadgeTone, string> = {
+export const BADGE_TONE_DOT_CLASSES = {
 	neutral: 'bg-slate-400',
 	success: 'bg-emerald-500',
 	info: 'bg-blue-500',
@@ -49,6 +49,9 @@ export const BADGE_TONE_DOT_CLASSES: Record<BadgeTone, string> = {
 	cyan: 'bg-cyan-500',
 	rose: 'bg-rose-500',
 	indigo: 'bg-indigo-500'
-};
+} satisfies Record<BadgeTone, string>;
 
-export const BADGE_TONES = Object.keys(BADGE_TONE_CLASSES) as BadgeTone[];
+export const BADGE_TONES =
+	// SAFETY: BADGE_TONE_CLASSES satisfies Record<BadgeTone, string> with no
+	// extra keys, so its keys are exactly the BadgeTone union.
+	Object.keys(BADGE_TONE_CLASSES) as BadgeTone[];

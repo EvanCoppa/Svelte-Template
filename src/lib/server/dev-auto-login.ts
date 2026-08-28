@@ -35,8 +35,27 @@ export interface DevAutoLoginConfig {
 	email: string;
 }
 
+/** The slice of the request-scoped Supabase client that redeeming a link uses. */
+export interface AutoLoginClient {
+	auth: Pick<SupabaseClient['auth'], 'verifyOtp'>;
+}
+
+/** The slice of the service-role client that minting a link uses. */
+export interface AutoLoginAdminClient {
+	auth: { admin: Pick<SupabaseClient['auth']['admin'], 'generateLink' | 'createUser'> };
+}
+
+/** The env vars the feature reads, injectable so tests can vary them. */
+export interface DevAutoLoginEnv {
+	DEV_AUTO_LOGIN?: string | undefined;
+	DEV_AUTO_LOGIN_EMAIL?: string | undefined;
+	SUPABASE_SERVICE_ROLE_KEY?: string | undefined;
+	VERCEL_ENV?: string | undefined;
+}
+
 export interface DevAutoLoginDeps {
-	createAdminClient: () => SupabaseClient;
+	createAdminClient?: () => AutoLoginAdminClient;
+	envSource?: DevAutoLoginEnv;
 }
 
 function isTruthy(raw: string | undefined): boolean {
@@ -48,10 +67,10 @@ function isTruthy(raw: string | undefined): boolean {
  * unsafe. Refusals are logged loudly — a misconfigured flag should never be
  * silent.
  */
-export function devAutoLoginConfig(): DevAutoLoginConfig | null {
-	if (!isTruthy(env.DEV_AUTO_LOGIN)) return null;
+export function devAutoLoginConfig(source: DevAutoLoginEnv = env): DevAutoLoginConfig | null {
+	if (!isTruthy(source.DEV_AUTO_LOGIN)) return null;
 
-	if ((env.VERCEL_ENV ?? '').trim().toLowerCase() === 'production') {
+	if ((source.VERCEL_ENV ?? '').trim().toLowerCase() === 'production') {
 		console.error(
 			'[dev-auto-login] REFUSING to run: DEV_AUTO_LOGIN is set on a production deployment. ' +
 				'Remove the variable from the production environment immediately.'
@@ -59,14 +78,14 @@ export function devAutoLoginConfig(): DevAutoLoginConfig | null {
 		return null;
 	}
 
-	if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+	if (!source.SUPABASE_SERVICE_ROLE_KEY) {
 		console.error(
 			'[dev-auto-login] DEV_AUTO_LOGIN is set but SUPABASE_SERVICE_ROLE_KEY is missing — auto-login disabled.'
 		);
 		return null;
 	}
 
-	const email = (env.DEV_AUTO_LOGIN_EMAIL ?? '').trim().toLowerCase();
+	const email = (source.DEV_AUTO_LOGIN_EMAIL ?? '').trim().toLowerCase();
 	if (!email) {
 		console.error(
 			'[dev-auto-login] DEV_AUTO_LOGIN is set but DEV_AUTO_LOGIN_EMAIL is not — auto-login disabled.'
@@ -78,8 +97,8 @@ export function devAutoLoginConfig(): DevAutoLoginConfig | null {
 }
 
 /** Cheap check for callers that only need to know whether the feature is live. */
-export function isDevAutoLoginEnabled(): boolean {
-	return devAutoLoginConfig() !== null;
+export function isDevAutoLoginEnabled(source: DevAutoLoginEnv = env): boolean {
+	return devAutoLoginConfig(source) !== null;
 }
 
 /** Whether this particular request should be auto-authenticated. */
@@ -100,7 +119,7 @@ export function shouldAttemptDevAutoLogin(request: {
  * trigger from the starter migration creates the profile row).
  */
 async function mintMagicLink(
-	admin: SupabaseClient,
+	admin: AutoLoginAdminClient,
 	email: string
 ): Promise<{ tokenHash: string } | null> {
 	let link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
@@ -137,15 +156,15 @@ async function mintMagicLink(
  * Returns `null` — leaving the request unauthenticated — on any failure.
  */
 export async function devAutoLogin(
-	client: SupabaseClient,
-	deps: DevAutoLoginDeps = { createAdminClient: createSupabaseAdminClient }
+	client: AutoLoginClient,
+	deps: DevAutoLoginDeps = {}
 ): Promise<{ session: Session; user: User } | null> {
-	const config = devAutoLoginConfig();
+	const config = devAutoLoginConfig(deps.envSource ?? env);
 	if (!config) return null;
 
-	let admin: SupabaseClient;
+	let admin: AutoLoginAdminClient;
 	try {
-		admin = deps.createAdminClient();
+		admin = (deps.createAdminClient ?? createSupabaseAdminClient)();
 	} catch (err) {
 		console.error('[dev-auto-login] Could not create the service-role client:', err);
 		return null;

@@ -12,7 +12,8 @@ env:
   PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
 
 jobs:
-  ci:
+  svelte-check:
+    name: svelte-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,14 +26,56 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Lint (prettier + eslint)
-        run: npm run lint
-
-      - name: Type check (svelte-check)
+      - name: Svelte + TS correctness
         run: npm run check
 
-      - name: Unit tests (vitest)
-        run: npm test
+  oxlint:
+    name: Oxlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build (Vercel adapter)
-        run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Normal lint + anti-slop rules
+        run: npm run lint:oxlint
+
+  knip:
+    name: Knip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unused files, exports, dependencies
+        run: npm run knip
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Behavior (vitest)
+        run: npm test

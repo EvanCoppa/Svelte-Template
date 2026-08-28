@@ -21,7 +21,7 @@ export const PASSWORD_MIN_LENGTH = 8;
  */
 export const PASSWORD_MAX_BYTES = 72;
 
-export function startPasswordRecovery(cookies: Cookies): void {
+export function startPasswordRecovery(cookies: Pick<Cookies, 'set'>): void {
 	cookies.set(PASSWORD_RECOVERY_COOKIE, '1', {
 		path: '/',
 		httpOnly: true,
@@ -34,7 +34,7 @@ export function isPasswordRecovery(cookies: Pick<Cookies, 'get'>): boolean {
 	return cookies.get(PASSWORD_RECOVERY_COOKIE) === '1';
 }
 
-export function endPasswordRecovery(cookies: Cookies): void {
+export function endPasswordRecovery(cookies: Pick<Cookies, 'delete'>): void {
 	cookies.delete(PASSWORD_RECOVERY_COOKIE, { path: '/' });
 }
 

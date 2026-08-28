@@ -26,13 +26,17 @@ function harness({
 	};
 }
 
-function run(name: 'login' | 'reset', event: unknown) {
+type StubEvent = ReturnType<ReturnType<typeof harness>['event']>;
+
+function run(name: 'login' | 'reset', event: StubEvent) {
 	const action = actions[name];
 	if (!action) throw new Error(`login page has no ${name} action`);
+	// SAFETY: the stub event carries every field these actions read (url, locals,
+	// request.formData); the rest of RequestEvent is irrelevant to them.
 	return action(event as never);
 }
 
-async function redirectOf(runIt: () => unknown) {
+async function redirectOf<T>(runIt: () => T) {
 	try {
 		await runIt();
 	} catch (thrown) {

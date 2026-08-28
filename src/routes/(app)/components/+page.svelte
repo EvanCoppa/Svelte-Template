@@ -22,22 +22,25 @@
 	import { toast } from 'svelte-sonner';
 
 	// Select (bits-ui) works with plain string values.
-	const FRUIT_LABELS: Record<string, string> = {
+	const FRUIT_LABELS = {
 		apple: 'Apple',
 		banana: 'Banana',
 		cherry: 'Cherry',
 		grape: 'Grape'
-	};
+	} satisfies Record<string, string>;
+	const FRUIT_OPTIONS = Object.entries(FRUIT_LABELS);
 	let fruit = $state('');
-	let fruitLabel = $derived(fruit ? FRUIT_LABELS[fruit] : 'Pick a fruit');
+	let fruitLabel = $derived(
+		FRUIT_OPTIONS.find(([value]) => value === fruit)?.[1] ?? 'Pick a fruit'
+	);
 
 	// Combobox — the searchable picker this codebase prefers over raw selects.
-	const ROLE_LABELS: Record<string, string> = {
+	const ROLE_LABELS = {
 		admin: 'Administrator',
 		editor: 'Editor',
 		viewer: 'Viewer',
 		billing: 'Billing manager'
-	};
+	} satisfies Record<string, string>;
 	let role = $state('');
 	let tags = $state<string[]>([]);
 	const tagOptions = ['Design', 'Engineering', 'Marketing', 'Sales', 'Support'];
@@ -165,7 +168,7 @@
 					<Select.Root type="single" bind:value={fruit}>
 						<Select.Trigger class="w-56">{fruitLabel}</Select.Trigger>
 						<Select.Content>
-							{#each Object.entries(FRUIT_LABELS) as [value, label] (value)}
+							{#each FRUIT_OPTIONS as [value, label] (value)}
 								<Select.Item {value} {label} />
 							{/each}
 						</Select.Content>
