@@ -1,22 +1,46 @@
 /**
- * PLACEHOLDER — regenerate with `npm run db:types` once your schema exists,
- * and re-run it after every migration. The generated output from the Supabase
- * CLI replaces this file wholesale; commit the result.
+ * Database types for the Supabase client. This committed version matches the
+ * starter schema in `supabase/migrations/` (the `profiles` table).
  *
- * The schema below is intentionally empty: until you generate real types,
- * every `.from('table')` call is a type error. That's the point — it forces
- * the types to exist before queries do, instead of silently typing rows as
- * `any`.
+ * After EVERY migration, regenerate and commit:
+ *
+ *   npm run db:types
+ *
+ * The CLI's output replaces this file wholesale. Until a table exists here,
+ * `.from('that_table')` is a type error — which is the point: types must
+ * exist before queries do, instead of rows silently typing as `any`.
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
 	public: {
-		// `[_ in never]` is what the CLI emits for an empty schema: an object
-		// type with no keys, so `keyof Tables` is `never` and `.from(...)`
-		// rejects every table name until real types are generated.
-		Tables: { [_ in never]: never };
+		Tables: {
+			profiles: {
+				Row: {
+					avatar_url: string | null;
+					created_at: string;
+					display_name: string | null;
+					id: string;
+					updated_at: string;
+				};
+				Insert: {
+					avatar_url?: string | null;
+					created_at?: string;
+					display_name?: string | null;
+					id: string;
+					updated_at?: string;
+				};
+				Update: {
+					avatar_url?: string | null;
+					created_at?: string;
+					display_name?: string | null;
+					id?: string;
+					updated_at?: string;
+				};
+				Relationships: [];
+			};
+		};
 		Views: { [_ in never]: never };
 		Functions: { [_ in never]: never };
 		Enums: { [_ in never]: never };
@@ -26,7 +50,7 @@ export type Database = {
 
 /**
  * Convenience aliases matching the ones the Supabase CLI generates, so code
- * written against the placeholder keeps compiling after real generation.
+ * written against this file keeps compiling after regeneration.
  *
  *   type Profile = Tables<'profiles'>;
  *   type NewProfile = TablesInsert<'profiles'>;

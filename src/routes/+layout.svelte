@@ -2,6 +2,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { invalidate } from '$app/navigation';
+	import { QUERY } from '$lib/queries';
 	import { onMount } from 'svelte';
 
 	let { data, children } = $props();
@@ -13,7 +14,7 @@
 			// token refresh). Comparing expires_at avoids a re-run loop, because
 			// the invalidation itself re-emits the current session.
 			if (newSession?.expires_at !== session?.expires_at) {
-				void invalidate('supabase:auth');
+				void invalidate(QUERY.auth);
 			}
 		});
 		return () => sub.subscription.unsubscribe();

@@ -66,8 +66,8 @@ Action mechanics:
   `src/app.d.ts`).
 - **Database queries are typed from the generated schema.** Every Supabase client is
   `SupabaseClient<Database>`; run `npm run db:types` after each migration and commit
-  `src/lib/database.types.ts`. An untyped `.from()` should never exist — the shipped
-  placeholder schema makes that a compile error rather than a convention.
+  `src/lib/database.types.ts`. An untyped `.from()` should never exist — a table
+  missing from the generated types is a compile error rather than a convention.
 
 ## 4. Auth (the template's contract)
 

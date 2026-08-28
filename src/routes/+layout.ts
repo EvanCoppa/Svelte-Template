@@ -1,6 +1,7 @@
 import { createBrowserClient, createServerClient, isBrowser } from '@supabase/ssr';
 import { PUBLIC_SUPABASE_PUBLISHABLE_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import type { Database } from '$lib/database.types';
+import { QUERY } from '$lib/queries';
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ data, depends, fetch }) => {
@@ -10,7 +11,7 @@ export const load: LayoutLoad = async ({ data, depends, fetch }) => {
 	 * load (and any other load that declares the same dependency).
 	 * See docs/data-invalidation.md for the convention.
 	 */
-	depends('supabase:auth');
+	depends(QUERY.auth);
 
 	const supabase = isBrowser()
 		? createBrowserClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {

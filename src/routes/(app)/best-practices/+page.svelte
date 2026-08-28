@@ -48,7 +48,7 @@
 				'Secrets and privileged clients live in *.server.ts files or src/lib/server/ — SvelteKit refuses to bundle them client-side, which turns a mistake into a build error.',
 				'Private env comes from $env/static/private (or $env/dynamic/private when it may be absent at build time); anything public must be prefixed PUBLIC_.',
 				'Everything returned from a load or action is serialized into the page — audit it. Access tokens and refresh tokens do not belong in PageData.',
-				'Queries are typed from generated schema types: run npm run db:types after every migration and commit src/lib/database.types.ts. Until you generate, .from() is a compile error by design.'
+				'Queries are typed from generated schema types: run npm run db:types after every migration and commit src/lib/database.types.ts. A table missing from the generated types makes .from() a compile error by design.'
 			]
 		},
 		{

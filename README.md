@@ -45,7 +45,22 @@ At [database.new](https://database.new). Then in the dashboard:
   (`/auth/confirm` also accepts the default PKCE `?code=` links, so nothing breaks
   before you change the template — the token-hash form is just more robust.)
 
-### 2. Configure and run
+### 2. Apply the starter schema
+
+`supabase/migrations/20260828000000_profiles.sql` creates a `profiles` table (one row
+per auth user, auto-created by trigger on signup, backfilled for existing users) with
+RLS policies — it's also the reference pattern for every table you add later. Apply it
+either way:
+
+```bash
+npx supabase login                      # once per machine
+npx supabase link --project-ref <ref>   # once per project
+npx supabase db push
+```
+
+…or paste the file into the dashboard's **SQL Editor** and run it.
+
+### 3. Configure and run
 
 ```bash
 cp .env.example .env    # fill in your project URL + publishable key
@@ -53,7 +68,7 @@ npm install
 npm run dev
 ```
 
-### 3. Create a user
+### 4. Create a user
 
 This template deliberately ships **no public signup page** (most internal tools don't
 want one). Create users from the Supabase dashboard (**Authentication → Users → Add
@@ -110,9 +125,12 @@ npm run db:types     # regenerate after every migration, then commit the file
 ```
 
 The script derives your project ref from `PUBLIC_SUPABASE_URL` in `.env` (set
-`SUPABASE_PROJECT_ID` instead if you use a custom domain). The template ships a
-deliberately **empty** placeholder schema, so `.from('anything')` is a type error until
-you generate — better than queries silently typing as `any`.
+`SUPABASE_PROJECT_ID` instead if you use a custom domain). The committed file matches
+the starter migration (the `profiles` table), so the settings page's profile query is
+typed out of the box — and any table that _isn't_ in the generated types makes
+`.from('that_table')` a compile error, which beats rows silently typing as `any`. The
+settings page demonstrates the full loop: migration → generated types → typed load +
+form action behind RLS.
 
 Row types come from the generated aliases:
 
@@ -152,6 +170,20 @@ Notable: `ui/combobox` is a house-grown searchable picker (single/multi-select, 
 in forms via hidden inputs) that this codebase prefers over raw native selects for
 anything user-facing.
 
+## Testing
+
+The security-critical auth surface is unit-tested with Vitest: the `/auth/confirm`
+token exchange, the pinned `/reset-password` flow, the recovery-cookie and password
+helpers, and the login action's open-redirect guard and enumeration defenses.
+
+```bash
+npm test          # run once
+npm run test:watch
+```
+
+Tests live next to the code they cover (`*.test.ts`). If you change the auth routes,
+keep these green and extend them — they encode the flows' security properties.
+
 ## Conventions
 
 - [`docs/sveltekit-best-practices.md`](docs/sveltekit-best-practices.md) — form actions
@@ -175,6 +207,7 @@ npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero
+npm test               # vitest — the auth surface's unit tests
 npm run db:types       # regenerate src/lib/database.types.ts from your live schema
 npm run format         # prettier (svelte + tailwind class sorting)
 ```
