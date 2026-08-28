@@ -131,6 +131,30 @@ Two gotchas worth repeating: slots are deprecated in favour of snippets, and `aw
 components is experimental — it requires `compilerOptions.experimental.async`, which is
 **not** enabled in `svelte.config.js`.
 
+## UI primitives — never hand-roll, never go native
+
+The shadcn-svelte primitives in `src/lib/components/ui/` are the vocabulary for building screens.
+**Never hand-roll a primitive, and never fall back to a native control when one exists.** A bespoke
+div-and-`onclick` widget loses keyboard navigation, focus management, ARIA wiring and portalling,
+and it breaks rule 1 by introducing a second way to do a solved job.
+
+- **Every picker is `Combobox`** (`ui/combobox`), never `<select>`. A native select can't be
+  styled, can't show a second line, can't be searched, and renders as a full-screen wheel on iOS.
+  Combobox grows a search box on its own past `searchThreshold`, and with `name` it posts through
+  a hidden input exactly like a native select would, so it drops into a form action unchanged.
+  `ui/select` is vendored but referenced only by the `/components` showcase — don't start using it
+  for real screens.
+- `<input type="checkbox">` → `ui/checkbox`. A styled `<button>` → `ui/button`. A bare `<input>` or
+  `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`. Hand-built
+  menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
+  `ui/sheet`.
+- Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
+
+Need something not vendored yet? Add it with `npx shadcn-svelte@latest add <name>` rather than
+writing it yourself. These files are project source, so extend one in place — a new variant or
+prop — before creating a parallel component. `/components` renders the full inventory; check it
+before you build.
+
 ## Key patterns
 
 - Server-only code: `*.server.ts` files or `src/lib/server/`
