@@ -108,6 +108,11 @@ Server data comes from load functions (never `onMount` fetches), using the load-
 convention is `docs/data-invalidation.md`; the general rules are
 `docs/sveltekit-best-practices.md`.
 
+The vendored `sveltekit-data-flow` skill reaches for `invalidateAll()` after client-side
+auth. **This rule wins** — reach for a named key instead. The rest of that skill (load
+functions, form actions, `fail`/`redirect`/`error`, `+page.server.ts` vs `+page.ts`)
+matches how this repo already works.
+
 ## Navigation
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette. Adding a page =
