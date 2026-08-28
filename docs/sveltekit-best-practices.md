@@ -64,6 +64,10 @@ Action mechanics:
 - Never store per-request state in module scope on the server — modules are shared
   across requests and users. Request state lives in `event.locals` (typed in
   `src/app.d.ts`).
+- **Database queries are typed from the generated schema.** Every Supabase client is
+  `SupabaseClient<Database>`; run `npm run db:types` after each migration and commit
+  `src/lib/database.types.ts`. An untyped `.from()` should never exist — the shipped
+  placeholder schema makes that a compile error rather than a convention.
 
 ## 4. Auth (the template's contract)
 

@@ -1,12 +1,13 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type { Database } from '$lib/database.types';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 declare global {
 	namespace App {
 		interface Locals {
-			// Once you generate database types (`supabase gen types typescript`),
-			// tighten this to `SupabaseClient<Database>` for fully typed queries.
-			supabase: SupabaseClient;
+			// Typed against the generated schema — run `npm run db:types` after
+			// every migration to keep queries fully typed.
+			supabase: SupabaseClient<Database>;
 			/**
 			 * Validates the JWT with the Auth server before returning the session.
 			 * Always use this (never `getSession()` alone) for server-side auth

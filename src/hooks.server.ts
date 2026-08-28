@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { error, redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { PUBLIC_SUPABASE_PUBLISHABLE_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
+import type { Database } from '$lib/database.types';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
 
 /**
@@ -37,17 +38,21 @@ const PUBLIC_PATHS = ['/login', '/auth'];
 const RECOVERY_ALLOWED_PATHS = ['/reset-password', '/auth/confirm', '/logout'];
 
 const supabase: Handle = async ({ event, resolve }) => {
-	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
-		cookies: {
-			getAll: () => event.cookies.getAll(),
-			setAll: (cookiesToSet) => {
-				cookiesToSet.forEach(({ name, value, options }) => {
-					// SvelteKit requires an explicit path on set cookies.
-					event.cookies.set(name, value, { ...options, path: '/' });
-				});
+	event.locals.supabase = createServerClient<Database>(
+		PUBLIC_SUPABASE_URL,
+		PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+		{
+			cookies: {
+				getAll: () => event.cookies.getAll(),
+				setAll: (cookiesToSet) => {
+					cookiesToSet.forEach(({ name, value, options }) => {
+						// SvelteKit requires an explicit path on set cookies.
+						event.cookies.set(name, value, { ...options, path: '/' });
+					});
+				}
 			}
 		}
-	});
+	);
 
 	/**
 	 * Unlike `getSession()` alone — which returns the cookie's contents without

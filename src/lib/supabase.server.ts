@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import type { Database } from '$lib/database.types';
 
 /**
  * ⚠️ Service-role client — bypasses Row Level Security.
@@ -16,7 +17,7 @@ export function createSupabaseAdminClient() {
 	if (!key) {
 		throw new Error('SUPABASE_SERVICE_ROLE_KEY must be set to use the admin client.');
 	}
-	return createClient(PUBLIC_SUPABASE_URL, key, {
+	return createClient<Database>(PUBLIC_SUPABASE_URL, key, {
 		auth: { autoRefreshToken: false, persistSession: false }
 	});
 }

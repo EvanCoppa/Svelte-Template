@@ -98,6 +98,31 @@ Details worth knowing:
 - **Keep RLS on.** The route guard protects pages; Row Level Security protects data.
   You want both, independently.
 
+## Database types (generated)
+
+The Supabase client is typed end to end: `locals.supabase`, the layout-load client, and
+the admin client are all `SupabaseClient<Database>`, with `Database` generated from your
+real schema into `src/lib/database.types.ts`.
+
+```bash
+npx supabase login   # once per machine
+npm run db:types     # regenerate after every migration, then commit the file
+```
+
+The script derives your project ref from `PUBLIC_SUPABASE_URL` in `.env` (set
+`SUPABASE_PROJECT_ID` instead if you use a custom domain). The template ships a
+deliberately **empty** placeholder schema, so `.from('anything')` is a type error until
+you generate — better than queries silently typing as `any`.
+
+Row types come from the generated aliases:
+
+```ts
+import type { Tables, TablesInsert } from '$lib/database.types';
+
+type Profile = Tables<'profiles'>;
+type NewProfile = TablesInsert<'profiles'>;
+```
+
 ## The app shell
 
 `src/lib/navigation.ts` is the single source of truth: the sidebar sections and the
@@ -150,5 +175,6 @@ npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero
+npm run db:types       # regenerate src/lib/database.types.ts from your live schema
 npm run format         # prettier (svelte + tailwind class sorting)
 ```
