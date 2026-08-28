@@ -1,6 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { message, superValidate } from 'sveltekit-superforms/server';
+import { zod4 } from 'sveltekit-superforms/adapters';
 import { QUERY } from '$lib/queries';
-import { validateNewPassword } from '$lib/server/password-recovery';
+import { newPasswordSchema } from '$lib/schemas/password';
+import { profileSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals: { supabase, user }, depends }) => {
@@ -18,39 +21,45 @@ export const load: PageServerLoad = async ({ locals: { supabase, user }, depends
 		.maybeSingle();
 	if (error) console.warn('[settings] profile lookup failed', error.message);
 
-	return { profile };
+	const [profileForm, passwordForm] = await Promise.all([
+		superValidate({ display_name: profile?.display_name ?? '' }, zod4(profileSchema), {
+			errors: false
+		}),
+		superValidate(zod4(newPasswordSchema))
+	]);
+
+	return { profile, profileForm, passwordForm };
 };
 
 export const actions: Actions = {
 	updateProfile: async ({ request, locals: { supabase, user } }) => {
 		if (!user) throw redirect(303, '/login');
 
-		const form = await request.formData();
-		const displayName = String(form.get('display_name') ?? '').trim();
-		if (displayName.length > 100) {
-			return fail(400, { profileMessage: 'Display name must be 100 characters or fewer.' });
-		}
+		const form = await superValidate(request, zod4(profileSchema));
+		if (!form.valid) return fail(400, { form });
 
 		const { error } = await supabase
 			.from('profiles')
-			.update({ display_name: displayName || null })
+			.update({ display_name: form.data.display_name || null })
 			.eq('id', user.id);
-		if (error) return fail(400, { profileMessage: error.message });
+		if (error) return message(form, error.message, { status: 400 });
 
-		return { profileSaved: true };
+		return { form };
 	},
 
 	changePassword: async ({ request, locals: { supabase } }) => {
-		const form = await request.formData();
-		const password = String(form.get('password') ?? '');
-		const confirmation = String(form.get('confirm_password') ?? '');
+		const form = await superValidate(request, zod4(newPasswordSchema));
+		// superforms echoes `form.data` back to the browser — never send
+		// passwords on that round trip.
+		const password = form.data.password;
+		form.data.password = '';
+		form.data.confirm_password = '';
 
-		const problem = validateNewPassword(password, confirmation);
-		if (problem) return fail(400, { message: problem });
+		if (!form.valid) return fail(400, { form });
 
 		const { error } = await supabase.auth.updateUser({ password });
-		if (error) return fail(400, { message: error.message });
+		if (error) return message(form, error.message, { status: 400 });
 
-		return { changed: true };
+		return { form };
 	}
 };
