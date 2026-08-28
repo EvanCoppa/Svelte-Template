@@ -113,6 +113,20 @@ auth. **This rule wins** — reach for a named key instead. The rest of that ski
 functions, form actions, `fail`/`redirect`/`error`, `+page.server.ts` vs `+page.ts`)
 matches how this repo already works.
 
+## Email
+
+All outgoing email goes through `sendEmail()` in `src/lib/server/email.ts` (Resend;
+server-only, never throws — it returns `{ ok, id | error }`). Every email is a template
+function in `src/lib/server/email-templates.ts` returning `{ subject, html, text }`,
+spread into the send call from a form action or endpoint:
+`await sendEmail({ to, ...welcomeEmail({ name, appName, appUrl }) })`. New email = new
+template function built on `emailLayout()`/`paragraph()`/`button()`; escape every
+interpolated value with `escapeHtml()` in the HTML version, hand-write the `text`
+version, keep styles inline. Set `idempotencyKey` on any send a user can re-trigger.
+Config is env-only (`RESEND_API_KEY`, `EMAIL_FROM`, optional `EMAIL_REPLY_TO` — see
+`.env.example`); unconfigured sends log to the console instead. Both modules have
+tests — keep them green and extend them.
+
 ## Navigation
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette. Adding a page =
