@@ -22,3 +22,9 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 supabase/.temp/
+
+# Tailwind docs snapshot, synced locally by the tailwind-4-docs skill.
+# Upstream (tailwindlabs/tailwindcss.com) is source-available but NOT
+# open-source, so the snapshot stays on the machine that synced it.
+.claude/skills/tailwind-4-docs/references/docs/
+.claude/skills/tailwind-4-docs/references/docs-index.tsx
