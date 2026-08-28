@@ -99,6 +99,13 @@ binary/streaming responses. If a mutation is triggered from the page it lives on
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
 input echoed back; `redirect(303, ...)` on success.
 
+Validation is **Superforms + Zod** (`sveltekit-superforms` with the `zod4` adapter —
+zod v4 is installed): schema at module top level in a colocated `schema.ts`,
+`superValidate` in both load and action, `fail(400, { form })` on invalid, `superForm`'s
+`enhance` on the client with errors rendered inline from `$errors`. The pre-Superforms
+auth forms (login, reset-password) validate by hand; converge them when touched, and
+never mix both styles in one form.
+
 ## Data loading & invalidation
 
 Server data comes from load functions (never `onMount` fetches), using the load-provided
