@@ -160,6 +160,28 @@ writing it yourself. These files are project source, so extend one in place — 
 prop — before creating a parallel component. `/components` renders the full inventory; check it
 before you build.
 
+### Enhanced primitives
+
+`src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from
+[Solid Core](https://github.com/EvanCoppa/solid-core)'s `src/lib/primitives/interior/` collection.
+`/enhanced` renders the inventory.
+
+**`ui/` first, always.** Reach for `enhanced/` only when `ui/` has no answer for the job — a
+one-time-code field, a tag field, a password meter, a button that owns its own pending state, a
+sliding segmented control. Where the two overlap, `ui/` wins: this shelf exists to cover gaps, not
+to become a second vocabulary for solved problems. That is why the first batch deliberately skips
+the interior takes on tabs, modals, popovers and dropdowns — `ui/` already answers those.
+
+- Every animation goes through `$lib/motion.js`, which is where `prefers-reduced-motion` is
+  honoured. Never call Motion's `animate` straight from a component.
+- These paint from the same `src/app.css` tokens as `ui/`, so they follow the light/dark toggle
+  with no extra wiring. A new one must too — no hardcoded greys, and any raw palette colour
+  (`emerald-500`, `amber-600`) needs its `dark:` pair.
+- To add another: port the folder from Solid Core, point its imports at `$lib/utils.js` and
+  `$lib/motion.js`, add the two lines to the folder's `index.ts` and the barrel, and give it a
+  card on `/enhanced`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
+  Core's PascalCase.
+
 ## Key patterns
 
 - Server-only code: `*.server.ts` files or `src/lib/server/`
