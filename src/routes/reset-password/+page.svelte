@@ -2,6 +2,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { enhance as kitEnhance } from '$app/forms';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
@@ -36,13 +37,7 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if $message}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{$message}
-				</p>
-			{/if}
+			<FormAlert message={$message} />
 
 			<form method="POST" class="grid gap-4" use:enhance>
 				<div class="grid gap-2">
@@ -53,11 +48,12 @@
 						type={inputType}
 						autocomplete="new-password"
 						aria-invalid={$errors.password ? 'true' : undefined}
+						aria-describedby={$errors.password ? 'password-error' : undefined}
 						bind:value={$form.password}
 						{...$constraints.password}
 					/>
 					{#if $errors.password}
-						<p class="text-destructive text-sm">{$errors.password}</p>
+						<p id="password-error" class="text-destructive text-sm">{$errors.password}</p>
 					{/if}
 				</div>
 				<div class="grid gap-2">
@@ -68,11 +64,14 @@
 						type={inputType}
 						autocomplete="new-password"
 						aria-invalid={$errors.confirm_password ? 'true' : undefined}
+						aria-describedby={$errors.confirm_password ? 'confirm-password-error' : undefined}
 						bind:value={$form.confirm_password}
 						{...$constraints.confirm_password}
 					/>
 					{#if $errors.confirm_password}
-						<p class="text-destructive text-sm">{$errors.confirm_password}</p>
+						<p id="confirm-password-error" class="text-destructive text-sm">
+							{$errors.confirm_password}
+						</p>
 					{/if}
 				</div>
 				<div class="flex items-center gap-2">

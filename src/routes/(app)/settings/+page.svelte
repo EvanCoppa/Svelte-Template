@@ -3,6 +3,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -70,13 +71,7 @@
 					<code>supabase/migrations/</code> (see the README), then reload.
 				</p>
 			{:else}
-				{#if $profileMessage}
-					<p
-						class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-					>
-						{$profileMessage}
-					</p>
-				{/if}
+				<FormAlert message={$profileMessage} />
 				<form method="POST" action="?/updateProfile" class="grid max-w-sm gap-4" use:profileEnhance>
 					<div class="grid gap-2">
 						<Label for="display_name">Display name</Label>
@@ -85,11 +80,14 @@
 							name="display_name"
 							placeholder="How should we address you?"
 							aria-invalid={$profileErrors.display_name ? 'true' : undefined}
+							aria-describedby={$profileErrors.display_name ? 'display-name-error' : undefined}
 							bind:value={$profileForm.display_name}
 							{...$profileConstraints.display_name}
 						/>
 						{#if $profileErrors.display_name}
-							<p class="text-destructive text-sm">{$profileErrors.display_name}</p>
+							<p id="display-name-error" class="text-destructive text-sm">
+								{$profileErrors.display_name}
+							</p>
 						{/if}
 					</div>
 					<Button type="submit" class="w-fit" disabled={$savingProfile}>
@@ -125,13 +123,7 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if $passwordMessage}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{$passwordMessage}
-				</p>
-			{/if}
+			<FormAlert message={$passwordMessage} />
 			<form method="POST" action="?/changePassword" class="grid max-w-sm gap-4" use:passwordEnhance>
 				<div class="grid gap-2">
 					<Label for="password">New password</Label>
@@ -141,11 +133,12 @@
 						type="password"
 						autocomplete="new-password"
 						aria-invalid={$passwordErrors.password ? 'true' : undefined}
+						aria-describedby={$passwordErrors.password ? 'password-error' : undefined}
 						bind:value={$passwordForm.password}
 						{...$passwordConstraints.password}
 					/>
 					{#if $passwordErrors.password}
-						<p class="text-destructive text-sm">{$passwordErrors.password}</p>
+						<p id="password-error" class="text-destructive text-sm">{$passwordErrors.password}</p>
 					{/if}
 				</div>
 				<div class="grid gap-2">
@@ -156,11 +149,16 @@
 						type="password"
 						autocomplete="new-password"
 						aria-invalid={$passwordErrors.confirm_password ? 'true' : undefined}
+						aria-describedby={$passwordErrors.confirm_password
+							? 'confirm-password-error'
+							: undefined}
 						bind:value={$passwordForm.confirm_password}
 						{...$passwordConstraints.confirm_password}
 					/>
 					{#if $passwordErrors.confirm_password}
-						<p class="text-destructive text-sm">{$passwordErrors.confirm_password}</p>
+						<p id="confirm-password-error" class="text-destructive text-sm">
+							{$passwordErrors.confirm_password}
+						</p>
 					{/if}
 				</div>
 				<Button type="submit" class="w-fit" disabled={$savingPassword}>

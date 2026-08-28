@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -37,40 +38,12 @@
 		</Card.Header>
 		<Card.Content>
 			{#if data.passwordReset}
-				<p
-					class="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
-				>
-					Password updated. Sign in with your new password.
-				</p>
+				<FormAlert variant="success" message="Password updated. Sign in with your new password." />
 			{/if}
-			{#if data.errorMessage}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{data.errorMessage}
-				</p>
-			{/if}
-			{#if $message}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{$message}
-				</p>
-			{/if}
-			{#if $resetMessage}
-				<p
-					class="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
-				>
-					{$resetMessage}
-				</p>
-			{/if}
-			{#if $resetErrors.email}
-				<p
-					class="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
-				>
-					{$resetErrors.email}
-				</p>
-			{/if}
+			<FormAlert message={data.errorMessage} />
+			<FormAlert message={$message} />
+			<FormAlert variant="success" message={$resetMessage} />
+			<FormAlert message={$resetErrors.email?.[0]} />
 
 			<form method="POST" action="?/login" class="grid gap-4" use:enhance>
 				<!-- Round-trips the ?next= destination through the login POST. -->
@@ -85,11 +58,12 @@
 						autocomplete="email"
 						placeholder="you@example.com"
 						aria-invalid={$errors.email ? 'true' : undefined}
+						aria-describedby={$errors.email ? 'email-error' : undefined}
 						bind:value={$form.email}
 						{...$constraints.email}
 					/>
 					{#if $errors.email}
-						<p class="text-destructive text-sm">{$errors.email}</p>
+						<p id="email-error" class="text-destructive text-sm">{$errors.email}</p>
 					{/if}
 				</div>
 				<div class="grid gap-2">
@@ -114,11 +88,12 @@
 						type="password"
 						autocomplete="current-password"
 						aria-invalid={$errors.password ? 'true' : undefined}
+						aria-describedby={$errors.password ? 'password-error' : undefined}
 						bind:value={$form.password}
 						{...$constraints.password}
 					/>
 					{#if $errors.password}
-						<p class="text-destructive text-sm">{$errors.password}</p>
+						<p id="password-error" class="text-destructive text-sm">{$errors.password}</p>
 					{/if}
 				</div>
 				<Button type="submit" class="w-full" disabled={$submitting}>

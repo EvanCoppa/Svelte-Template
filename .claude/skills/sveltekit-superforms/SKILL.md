@@ -85,6 +85,7 @@ Rules:
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { thingSchema } from './schema';
 
 	let { data } = $props();
@@ -94,9 +95,7 @@ Rules:
 	});
 </script>
 
-{#if $message}
-	<p class="border-destructive/30 bg-destructive/10 text-destructive ...">{$message}</p>
-{/if}
+<FormAlert message={$message} />
 
 <form method="POST" action="?/save" class="grid gap-4" use:enhance>
 	<div class="grid gap-2">
