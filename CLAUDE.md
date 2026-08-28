@@ -1,8 +1,32 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this
-repository. This repo is a **reusable template** — when it has been cloned to start a new
-project, these rules still apply; extend them rather than fighting them.
+repository.
+
+## What this repo is
+
+This is a **starter template**. It exists to be cloned and converted into whatever the
+project at hand needs to be — rename the app, add domains, delete sample pages freely.
+The skeleton is disposable; the discipline is not:
+
+1. **The #1 rule of this project is consistency and code quality.** Before writing
+   anything, find how the codebase already does it (a page, a form action, a query, a
+   nav entry, a ui component) and match that pattern exactly. One established way per
+   problem — never introduce a second pattern for something that already has one. If a
+   pattern needs to change, change it everywhere, not in one new spot.
+2. **Stick to the official best practices of SvelteKit, shadcn-svelte, and Supabase —
+   and actually read their documentation rather than answering from memory.** All three
+   move fast; the live docs match the installed versions, your training may not:
+   - SvelteKit / Svelte: the `llms.txt` routes (see "Svelte reference docs" below)
+   - Supabase: <https://supabase.com/docs> — especially the server-side auth guide at
+     <https://supabase.com/docs/guides/auth/server-side> and the RLS docs
+   - shadcn-svelte: <https://shadcn-svelte.com/docs> for component APIs and the CLI
+
+   When this repo's conventions and the official docs conflict, surface it — don't
+   silently pick one.
+
+Every rule below applies with equal force after the template has become a real project;
+extend the rules rather than fighting them.
 
 ## Commands
 
