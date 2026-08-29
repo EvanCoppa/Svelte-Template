@@ -1,0 +1,53 @@
+# The CD half of the suite: run the specs against the deployment itself, not a
+# server started in CI. Vercel reports every deployment through
+# `deployment_status`, so each preview gets the default-deny route guard, the
+# login form and the security headers checked on real infrastructure — behind
+# the real edge, with the real environment variables.
+#
+# Only the no-database specs actually run: `tests/env.ts` finds no reachable
+# Auth server from the runner, so the signed-in half skips itself, exactly as
+# it does in the main CI job. Nothing here needs secrets and nothing writes to
+# a database.
+#
+# Deployment protection makes preview URLs return 401 to anonymous callers.
+# Turn it off for previews, or add a bypass token, or this never gets past the
+# first request.
+name: E2E against deployment
+
+on:
+  deployment_status:
+
+jobs:
+  e2e:
+    name: E2E (deployed)
+    # `deployment_status` fires for every state transition; only a live
+    # deployment is worth testing.
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    env:
+      # Set, so playwright.config.ts skips starting a dev server and points the
+      # same specs at the deployment.
+      E2E_BASE_URL: ${{ github.event.deployment_status.environment_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Behavior through a real browser (playwright)
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-deployment
+          path: playwright-report/
+          retention-days: 7

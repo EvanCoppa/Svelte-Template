@@ -273,7 +273,8 @@ The suite is split by what it needs:
 - **`tests/guest.spec.ts` runs anywhere, with no configuration at all.** An
   unauthenticated request never reaches Supabase — the guard redirects before
   any network call — so these cover the default-deny contract, the `?next=`
-  round trip, the recovery-link error and the security headers on a bare clone.
+  round trip, the recovery-link error, the login form's validation and the
+  security headers on a bare clone.
 - **`tests/auth.spec.ts` signs in, so it needs a live stack.** Each test skips
   itself with an explanatory message until one is reachable:
 
@@ -284,12 +285,37 @@ The suite is split by what it needs:
   It uses the seeded `e2e@example.com`; override with `E2E_USER_EMAIL` /
   `E2E_USER_PASSWORD` to point at a different project.
 
-Two things to copy when writing more specs. **Wait for hydration before
+Both files open with the same **whole-app sweep**: `tests/routes.ts` reads the
+route list off the filesystem, and every page it finds is checked once signed
+out (bounces to `/login`) and once signed in (200, a title, an `<h1>`, the app
+shell, no request that 4xx-ed). Add a page under `(app)` and it is covered
+immediately — there is no list to update. Depth lives in the describes after
+it: the login form, the shell, `/settings`.
+
+Every test also fails if the page **logged an error or threw**, via the
+`consoleErrors` fixture in `tests/fixtures.ts` — which is why specs import
+`test` and `expect` from there rather than from `@playwright/test`. That guard
+is the highest-value assertion in the suite: it catches effects that throw,
+double hydration, CSP violations and attributes the browser rejects, none of
+which any visible assertion would notice. Failures loading a _third-party_
+asset are ignored (the `/components` avatar demo pulls one from github.com);
+everything from the app's own origin counts, and the fix is to fix the error.
+A test that provokes one on purpose — a sign-in with the wrong password, a
+navigation to a 404 — says so with `consoleGuard.allow(/…/)`.
+
+Three more things to copy when writing more specs. **Wait for hydration before
 clicking** — Playwright considers a server-rendered button clickable the moment
 it is visible, which is before Svelte has attached its handlers, and that click
-is silently dropped; `clickWhenLive()` in `tests/auth.spec.ts` retries until the
-effect appears. And **`Card.Title` renders a `<div>`**, so pages built from
-cards have no heading to target — assert on `<title>` or a `data-slot` instead.
+is silently dropped or submits the form the old-fashioned way; `clickWhenLive()`
+retries until the effect appears, and `submitWhenLive()` does the same for a
+form whose inputs a native submit would have cleared. **`Card.Title` renders a
+`<div>`**, so pages built from cards have no heading to target — assert on
+`<title>` or a `data-slot` instead. And **don't assert on which layer rejected
+bad input**: superforms puts the schema's constraints on the inputs, but whether
+`minlength` fires depends on a "modified by user" flag that Svelte's
+`bind:value` clears on re-assign, so the same assertion passes alone and fails
+under load. Assert that the attribute reached the input, and leave the rule to
+vitest.
 
 **CI** (`.github/workflows/ci.yml`) runs five parallel jobs on every pull
 request and push to `main`: `check` (svelte-check — Svelte + TS correctness),
@@ -300,6 +326,14 @@ Playwright specs that need no database). `lint` (prettier + eslint) and the
 production build remain local commands. To cover the signed-in specs in CI too,
 add a `npx supabase start && npm run db:env` step to the `e2e` job before
 `npm run test:e2e`.
+
+**CD** (`.github/workflows/e2e-deployment.yml`) reruns the same specs against
+every successful deployment, by setting `E2E_BASE_URL` to the deployment URL —
+which makes `playwright.config.ts` skip starting a dev server. Only the
+no-database half actually runs there, since no stack is reachable from the
+runner. Note that Vercel's deployment protection returns 401 to anonymous
+callers, so previews need it disabled or a bypass token, or the run never gets
+past the first request.
 
 ## Development auto-login
 

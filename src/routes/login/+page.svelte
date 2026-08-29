@@ -10,6 +10,17 @@
 
 	let { data } = $props();
 
+	/**
+	 * Drops the `pattern` superforms derives from zod's email regex. HTML
+	 * compiles `pattern` with the regex `v` flag, which rejects that regex
+	 * outright: Chrome logs "Pattern attribute value ... is not a valid regular
+	 * expression" on every render and then ignores the attribute, so it never
+	 * validated anything here anyway. `type="email"` plus the server's own
+	 * `superValidate` are the real checks. Remove this once the constraint no
+	 * longer emits an incompatible pattern.
+	 */
+	const emailPatternFix = { pattern: undefined };
+
 	const { form, errors, message, constraints, submitting, enhance } = superForm(data.loginForm, {
 		validators: zod4Client(loginSchema)
 	});
@@ -61,6 +72,7 @@
 						aria-describedby={$errors.email ? 'email-error' : undefined}
 						bind:value={$form.email}
 						{...$constraints.email}
+						{...emailPatternFix}
 					/>
 					{#if $errors.email}
 						<p id="email-error" class="text-destructive text-sm">{$errors.email}</p>

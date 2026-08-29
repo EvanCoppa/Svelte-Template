@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { guardedRoutes } from './routes';
 
 /**
  * The default-deny contract, from the outside.
@@ -9,21 +10,26 @@ import { expect, test } from '@playwright/test';
  * that runs anywhere, including on a fresh clone with no .env at all.
  */
 test.describe('unauthenticated visitor', () => {
-	test('is redirected from the dashboard to /login', async ({ page }) => {
-		await page.goto('/');
+	// The route list comes from src/routes, so a page added under `(app)` is
+	// swept here the moment it exists — nothing to add below.
+	for (const pathname of guardedRoutes()) {
+		test(`is redirected from ${pathname} to /login`, async ({ page }) => {
+			await page.goto(pathname);
 
-		await expect(page).toHaveURL('/login?next=%2F');
-		// Asserted via <title>: Card.Title renders a <div>, so there is no
-		// heading role on this page to target.
-		await expect(page).toHaveTitle('Sign in');
-	});
+			await expect(page).toHaveURL(`/login?next=${encodeURIComponent(pathname)}`);
+			// Asserted via <title>: Card.Title renders a <div>, so there is no
+			// heading role on this page to target.
+			await expect(page).toHaveTitle('Sign in');
+		});
+	}
 
 	test('keeps the requested path in ?next= so login can return there', async ({ page }) => {
-		await page.goto('/settings');
+		await page.goto('/settings?tab=profile');
 
-		await expect(page).toHaveURL('/login?next=%2Fsettings');
+		// The query string is part of the destination, not just the path.
+		await expect(page).toHaveURL(`/login?next=${encodeURIComponent('/settings?tab=profile')}`);
 		// The value has to survive the POST, so it round-trips through the form.
-		await expect(page.locator('input[name="next"]')).toHaveValue('/settings');
+		await expect(page.locator('input[name="next"]')).toHaveValue('/settings?tab=profile');
 	});
 
 	test('guards routes that do not exist, rather than leaking a 404', async ({ page }) => {
@@ -53,6 +59,79 @@ test.describe('unauthenticated visitor', () => {
 	});
 });
 
+/**
+ * The login form in detail — still no database, because none of it gets as far
+ * as a request. Note where validation surfaces: superforms projects the zod
+ * schema onto the inputs as HTML constraints, so a single-field violation is
+ * refused by the *browser* and never reaches superforms' own validators.
+ * There is no inline message to assert on, only an invalid input and a form
+ * that did not submit. The action's own behaviour — the enumeration-safe
+ * failure message, the `next` open-redirect guard — is unit-tested in
+ * src/routes/login/page.server.test.ts.
+ */
+test.describe('the login form', () => {
+	test('refuses an empty submit without leaving the page', async ({ page }) => {
+		await page.goto('/login');
+
+		await page.getByRole('button', { name: 'Sign in' }).click();
+
+		await expect(page.locator('#email:invalid')).toBeVisible();
+		await expect(page).toHaveURL('/login');
+	});
+
+	test('refuses a malformed email, and accepts it once fixed', async ({ page }) => {
+		await page.goto('/login');
+
+		await page.getByLabel('Email').fill('not-an-email');
+		await page.getByLabel('Password').fill('hunter2hunter2');
+		await page.getByRole('button', { name: 'Sign in' }).click();
+
+		await expect(page.locator('#email:invalid')).toBeVisible();
+		await expect(page).toHaveURL('/login');
+
+		await page.getByLabel('Email').fill('someone@example.com');
+		await expect(page.locator('#email:invalid')).toBeHidden();
+	});
+
+	test('is wired for password managers', async ({ page }) => {
+		await page.goto('/login');
+
+		await expect(page.getByLabel('Email')).toHaveAttribute('autocomplete', 'email');
+		await expect(page.getByLabel('Password')).toHaveAttribute('autocomplete', 'current-password');
+	});
+
+	test('carries the typed email into the reset action', async ({ page }) => {
+		await page.goto('/login');
+
+		await page.getByLabel('Email').fill('someone@example.com');
+
+		// The reset form has no visible input of its own — it mirrors the login
+		// form's email through a hidden field. If that binding breaks, "forgot
+		// password" silently posts an empty address.
+		await expect(page.locator('#reset-form input[name="email"]')).toHaveValue(
+			'someone@example.com'
+		);
+	});
+
+	test('explains an emailed link that has expired', async ({ page }) => {
+		await page.goto('/login?error=link_invalid');
+
+		await expect(page.getByRole('alert')).toContainText('invalid or has expired');
+	});
+
+	test('says something even for an error code it does not know', async ({ page }) => {
+		await page.goto('/login?error=wat');
+
+		await expect(page.getByRole('alert')).toContainText('Something went wrong.');
+	});
+
+	test('confirms a completed password reset on the way back in', async ({ page }) => {
+		await page.goto('/login?reset=success');
+
+		await expect(page.getByRole('alert')).toContainText('Password updated.');
+	});
+});
+
 test.describe('security headers', () => {
 	test('are set on every response', async ({ page }) => {
 		const response = await page.goto('/login');
@@ -61,6 +140,7 @@ test.describe('security headers', () => {
 		expect(headers['x-frame-options']).toBe('DENY');
 		expect(headers['x-content-type-options']).toBe('nosniff');
 		expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+		expect(headers['permissions-policy']).toBe('camera=(), microphone=(), geolocation=()');
 
 		const csp = headers['content-security-policy'];
 		expect(csp).toContain("default-src 'self'");

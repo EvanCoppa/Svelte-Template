@@ -39,6 +39,7 @@ npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-sl
 npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run test:e2e       # playwright (real browser, tests/) — see "E2E tests" below
+npm run test:e2e:ui    # ... the Playwright UI, for writing specs
 npm run db:start       # boot the local Supabase stack in Docker
 npm run db:reset       # re-apply every migration, then supabase/seed.sql
 npm run db:env         # write .env.local pointing at the local stack
@@ -86,17 +87,43 @@ never overlap. Split by what a spec needs:
 
 - **No database** → `tests/guest.spec.ts`. An unauthenticated request never reaches
   Supabase, so these run on a bare clone and in CI. New assertions about the route
-  guard, `?next=` handling or security headers belong here.
+  guard, `?next=` handling, the login form or security headers belong here.
 - **Signed in** → `tests/auth.spec.ts`. Gated on `authStackReachable()` from
   `tests/env.ts`, so it skips with an explanation rather than failing when no stack
   is up. Run it with `npm run db:start && npm run db:env && npm run test:e2e`.
 
-Two rules that are easy to get wrong:
+Two files, not one per page. Within each, **broad then deep**: both open with a
+sweep over `guardedRoutes()` from `tests/routes.ts`, which reads the route list off
+the filesystem — so a page added under `(app)` is checked signed out _and_ signed in
+the moment it exists, and there is nothing to add here for it. The sweep asserts only
+what must be true of any page (200, a title, an `<h1>`, the shell, no request that
+4xx-ed). Everything that needs a second click goes in a `describe` below it, named for
+the area.
 
+Rules that are easy to get wrong:
+
+- **Import `test` and `expect` from `tests/fixtures.ts`**, never from
+  `@playwright/test`, or the spec loses the console guard: every test fails if the
+  page logged an error or threw. That is the assertion that catches effects that
+  throw, double hydration, CSP violations and attributes the browser rejects. A
+  third-party asset failing to load is excluded (the `/components` avatar demo).
+  Anything from the app's own origin is a bug to fix — the only exception is an error
+  a test provokes deliberately, declared in that test with `consoleGuard.allow(/…/)`.
+- **Know where validation surfaces**, because it is not one place. superforms turns
+  the zod schema into HTML constraints on the inputs and the browser enforces them
+  itself, so a `maxlength` field simply cannot be over-filled and there is no message
+  to assert on. `minlength` is worse: whether it fires depends on the element's
+  "modified by user" flag, which Svelte clears every time `bind:value` re-assigns —
+  so the browser blocks a short password before hydration and superforms answers
+  after it, and the same assertion passes alone and fails under load. Never assert on
+  either outcome; assert that the constraint reached the input, and leave the rule to
+  vitest, which owns the schema.
 - **Wait for hydration before clicking.** Playwright treats a server-rendered button
   as clickable while it is still inert HTML, and the click is silently dropped —
   which looks exactly like a broken handler. Use `clickWhenLive()` in
-  `tests/auth.spec.ts`; never "fix" this with a bare `waitForTimeout`.
+  `tests/fixtures.ts`; never "fix" this with a bare `waitForTimeout`. For a form, use
+  `submitWhenLive()`: a click that beats hydration submits it natively, which
+  navigates and clears the inputs, so a plain retry posts an empty form.
 - **Scope selectors.** The signed-in user's email renders in the page body _and_ in
   the sidebar user menu, so an unscoped `getByText(email)` trips strict mode. And
   `Card.Title` renders a `<div>`, so card-based pages expose no heading role —
