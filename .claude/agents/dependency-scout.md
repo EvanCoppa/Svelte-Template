@@ -23,7 +23,9 @@ solved problem. The bar a candidate must clear, in order:
    bits-ui via the vendored shadcn primitives (any headless UI need), `tailwind-variants`
    / `clsx` / `tailwind-merge` (styling logic), `svelte-sonner` (feedback),
    `sveltekit-superforms` + `zod` (form validation — any other form or schema library
-   duplicates them), SvelteKit itself (routing, data loading, form actions).
+   duplicates them), `@playwright/test` (browser E2E — specs live in `tests/`), the
+   Supabase CLI's local stack (`npm run db:start` — a throwaway Postgres, so no separate
+   test-database tooling), SvelteKit itself (routing, data loading, form actions).
    Also check the vendored `ui/` inventory: a missing primitive is a
    `npx shadcn-svelte@latest add <name>` (vendored source), not a new runtime dependency.
 2. **Trivially writable?** If it's under ~100 lines of code this repo would own anyway

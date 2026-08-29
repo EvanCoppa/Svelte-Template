@@ -1,0 +1,122 @@
+# Local development stack for this template.
+#
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+#
+# Everything here describes the LOCAL stack that `npm run db:start` boots in
+# Docker. It has no effect on your hosted project — hosted settings live in the
+# Supabase dashboard. Keys that must match production are called out below.
+#
+# This file is deliberately trimmed to the settings this template actually
+# uses. Anything not listed keeps the CLI's default; run `npx supabase init`
+# in a scratch directory to see the full annotated set.
+
+project_id = "sveltekit-supabase-template"
+
+[api]
+enabled = true
+port = 54321
+# `public` is where the template's migrations live. Add a schema here before
+# querying it from the client, or PostgREST will not expose it.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+# Caps accidental full-table selects. Matches the hosted default.
+max_rows = 1000
+
+[db]
+port = 54322
+# Used by `supabase db diff` to build a shadow database.
+shadow_port = 54320
+# MUST match your hosted project, or migrations can pass locally and fail on
+# deploy. Check with `SHOW server_version;` against the remote database.
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+# Applied by `npm run db:reset`, after every migration in supabase/migrations.
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+# Browse and edit local data at http://127.0.0.1:54323
+port = 54323
+
+[local_smtp]
+# Local mail catcher. Password-reset and confirmation emails are never
+# delivered — they land here, which is how you test the /auth/confirm flow
+# without a real inbox. Web UI at http://127.0.0.1:54324
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# The SvelteKit dev server's origin. Supabase builds emailed links against
+# this, so a mismatch produces links that 404.
+site_url = "http://localhost:5173"
+# Exact URLs auth is allowed to redirect back to. `/auth/confirm` is this
+# template's link handler (src/routes/auth/confirm/+server.ts); 4173 is
+# `vite preview`, which the Playwright suite can also run against.
+additional_redirect_urls = [
+	"http://localhost:5173/auth/confirm",
+	"http://localhost:4173/auth/confirm"
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# The template ships no public signup page on purpose (see README). Users come
+# from the seed file, Studio, or the service-role admin API — none of which go
+# through this flag. Flip it to true if you add a signup route.
+enable_signup = false
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# Keep in step with validateNewPassword() in src/lib/server/password-recovery.ts
+# so a password the app accepts is not then rejected by the Auth server.
+minimum_password_length = 8
+password_requirements = ""
+
+[auth.rate_limit]
+# The hosted default (2/hour) makes the password-reset flow tedious to test
+# against a mail catcher that nobody else can see. Local only.
+email_sent = 100
+# Left at the hosted defaults so local behaviour stays representative.
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+
+[auth.email]
+# Signup is disabled above; this only governs the route if you enable it.
+enable_signup = false
+double_confirm_changes = true
+# Local users (including the seeded one) can sign in immediately instead of
+# needing a confirmation click. The hosted project should keep this ON.
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[storage]
+# Nothing in the template uploads yet, but profiles.avatar_url is the obvious
+# first use. Set enabled = false to shave time off `npm run db:start`.
+enabled = true
+file_size_limit = "50MiB"
+
+[realtime]
+# The CSP in src/lib/server/security-headers.ts already allows the Supabase
+# websocket origin, so subscriptions work as soon as you write one.
+enabled = true
+
+[edge_runtime]
+# No functions in this template. Enable when you add supabase/functions.
+enabled = false
+
+[analytics]
+# Logflare. Off by default here — it is the heaviest container in the stack
+# and nothing in the template reads it.
+enabled = false
+
+[experimental.pgdelta]
+# Schema-diff engine used by `supabase db diff`. Set false for legacy migra.
+enabled = true

@@ -21,7 +21,17 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Supabase CLI local state. config.toml and seed.sql ARE committed — they
+# describe the local stack; everything else here is per-machine scratch.
 supabase/.temp/
+supabase/.branches/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # Tailwind docs snapshot, synced locally by the tailwind-4-docs skill.
 # Upstream (tailwindlabs/tailwindcss.com) is source-available but NOT
