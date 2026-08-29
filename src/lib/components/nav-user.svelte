@@ -12,16 +12,22 @@
 
 	let { user }: { user: User | null } = $props();
 
+	// user_metadata is free-form JSON written by auth providers, so its fields
+	// arrive as `any`; this guard is the boundary parse into a usable string.
+	function isNonBlankString(value: string | undefined): value is string {
+		return typeof value === 'string' && value.trim() !== '';
+	}
+
 	// Supabase stores optional profile fields in user_metadata; fall back to the
 	// email so the menu is never blank.
 	let displayName = $derived.by(() => {
 		const name = user?.user_metadata?.full_name ?? user?.user_metadata?.name;
-		if (typeof name === 'string' && name.trim()) return name;
+		if (isNonBlankString(name)) return name;
 		return user?.email?.split('@')[0] ?? 'User';
 	});
 	let avatarUrl = $derived.by(() => {
 		const url = user?.user_metadata?.avatar_url;
-		return typeof url === 'string' ? url : null;
+		return isNonBlankString(url) ? url : null;
 	});
 	let initials = $derived(
 		displayName

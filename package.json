@@ -15,11 +15,14 @@
 		"db:types": "node scripts/gen-db-types.mjs",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"lint:oxlint": "oxlint",
+		"knip": "knip"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.1.0",
 		"@eslint/js": "^10.0.1",
+		"@oxlint/plugins": "^1.80.0",
 		"@sveltejs/adapter-vercel": "^6.3.4",
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
@@ -27,6 +30,8 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.23.0",
 		"globals": "^17.11.0",
+		"knip": "^6.33.0",
+		"oxlint": "^1.80.0",
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",

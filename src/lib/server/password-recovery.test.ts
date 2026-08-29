@@ -27,15 +27,15 @@ describe('recovery cookie helpers', () => {
 		const { cookies } = jar();
 
 		expect(isPasswordRecovery(cookies)).toBe(false);
-		startPasswordRecovery(cookies as never);
+		startPasswordRecovery(cookies);
 		expect(isPasswordRecovery(cookies)).toBe(true);
-		endPasswordRecovery(cookies as never);
+		endPasswordRecovery(cookies);
 		expect(isPasswordRecovery(cookies)).toBe(false);
 	});
 
 	it('sets a scoped, HTTP-only, expiring cookie', () => {
 		const { cookies } = jar();
-		startPasswordRecovery(cookies as never);
+		startPasswordRecovery(cookies);
 
 		expect(cookies.set).toHaveBeenCalledWith(
 			PASSWORD_RECOVERY_COOKIE,

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type ChildSnippetProps, type WithElementRef } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAnchorAttributes } from 'svelte/elements';
 
@@ -12,7 +12,7 @@
 		isActive = false,
 		...restProps
 	}: WithElementRef<HTMLAnchorAttributes> & {
-		child?: Snippet<[{ props: Record<string, unknown> }]>;
+		child?: Snippet<[ChildSnippetProps]>;
 		size?: 'sm' | 'md';
 		isActive?: boolean;
 	} = $props();

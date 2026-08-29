@@ -16,7 +16,7 @@
 		'children' | 'disabled' | 'onclick'
 	> {
 		/** Runs on click. Sync throws and rejected promises settle into the error state. */
-		onAction: () => unknown;
+		onAction: () => void;
 		/** The idle label. A string because it also becomes the button's accessible name. */
 		label: string;
 		pendingLabel?: string;
@@ -25,7 +25,7 @@
 		/** Milliseconds the settled state is held before reverting to idle. */
 		resetAfter?: number;
 		disabled?: boolean;
-		onError?: (error: unknown) => void;
+		onError?: (cause: unknown) => void;
 	}
 
 	let {
@@ -76,8 +76,8 @@
 			.then(() => onAction())
 			.then(
 				() => settle(id, 'success'),
-				(error: unknown) => {
-					onError?.(error);
+				(cause: unknown) => {
+					onError?.(cause);
 					settle(id, 'error');
 				}
 			);

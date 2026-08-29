@@ -34,12 +34,12 @@
 
 	type Tone = { bar: string; text: string };
 
-	const TONES: Record<'none' | 'danger' | 'caution' | 'safe', Tone> = {
+	const TONES = {
 		none: { bar: 'bg-muted-foreground/50', text: 'text-muted-foreground' },
 		danger: { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' },
 		caution: { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
 		safe: { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' }
-	};
+	} satisfies Record<'none' | 'danger' | 'caution' | 'safe', Tone>;
 
 	function toneFor(score: number, max: number): Tone {
 		if (score === 0) return TONES.none;

@@ -6,7 +6,7 @@ function createTheme() {
 	let current = $state<Theme>('dark');
 
 	if (browser) {
-		const stored = localStorage.getItem('theme') as Theme | null;
+		const stored = localStorage.getItem('theme');
 		if (stored === 'light' || stored === 'dark') {
 			current = stored;
 		} else if (window.matchMedia('(prefers-color-scheme: light)').matches) {

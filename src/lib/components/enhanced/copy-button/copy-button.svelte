@@ -26,7 +26,7 @@
 		/** Milliseconds the tick is held before reverting. Each copy restarts the clock. */
 		timeout?: number;
 		onCopy?: (value: string) => void;
-		onError?: (reason: unknown) => void;
+		onError?: (cause: unknown) => void;
 		disabled?: boolean;
 	}
 
@@ -83,10 +83,10 @@
 		if (!value) return;
 
 		let ok = false;
-		let reason: unknown = null;
+		let reason: unknown;
 
 		try {
-			if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+			if ('navigator' in globalThis && navigator.clipboard?.writeText) {
 				await navigator.clipboard.writeText(value);
 				ok = true;
 			} else {

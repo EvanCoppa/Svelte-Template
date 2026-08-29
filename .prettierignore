@@ -9,3 +9,7 @@ src/lib/database.types.ts
 # Vendored verbatim from Jakubantalik/transitions.dev — kept byte-identical
 # to upstream so re-syncing stays a clean diff
 .claude/skills/
+
+# Vendored verbatim from dmmulroy/anti-slop — kept byte-identical to upstream
+# so re-syncing stays a clean diff
+tools/oxlint/anti-slop/

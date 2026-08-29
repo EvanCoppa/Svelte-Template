@@ -50,14 +50,25 @@ function harness({
 	};
 }
 
+type Stub = ReturnType<typeof harness>;
+
+/** `load` from './$types' wants a full ServerLoadEvent; the stub covers what it reads. */
+function runLoad(event: Stub['loadEvent']) {
+	// SAFETY: the stub event carries the cookies and locals the load reads; the
+	// rest of ServerLoadEvent is irrelevant to it.
+	return load(event as never);
+}
+
 /** `actions` is an index-signature map, so pull the handler out once, typed. */
-function submit(event: unknown) {
+function submit(event: ReturnType<Stub['actionEvent']>) {
 	const action = actions['default'];
 	if (!action) throw new Error('reset-password has no default action');
+	// SAFETY: the stub event carries every field the action reads (cookies,
+	// locals, request.formData); the rest of RequestEvent is irrelevant to it.
 	return action(event as never);
 }
 
-async function redirectOf(run: () => unknown) {
+async function redirectOf<T>(run: () => T) {
 	try {
 		await run();
 	} catch (thrown) {
@@ -70,7 +81,7 @@ async function redirectOf(run: () => unknown) {
 describe('load', () => {
 	it('renders the form for a browser that just verified a recovery link', async () => {
 		const h = harness();
-		const data = await load(h.loadEvent as never);
+		const data = await runLoad(h.loadEvent);
 		if (!data) throw new Error('expected load data');
 
 		expect(data).toMatchObject({ email: 'user@example.com' });
@@ -84,14 +95,14 @@ describe('load', () => {
 	it('turns away a signed-in session that never went through recovery', async () => {
 		const h = harness({ cookieJar: {} });
 
-		const redirect = await redirectOf(() => load(h.loadEvent as never));
+		const redirect = await redirectOf(() => runLoad(h.loadEvent));
 		expect(redirect.location).toBe('/login?error=recovery_link_invalid');
 	});
 
 	it('turns away a recovery marker with no session behind it', async () => {
 		const h = harness({ session: null });
 
-		const redirect = await redirectOf(() => load(h.loadEvent as never));
+		const redirect = await redirectOf(() => runLoad(h.loadEvent));
 		expect(redirect.location).toBe('/login?error=recovery_link_invalid');
 	});
 });

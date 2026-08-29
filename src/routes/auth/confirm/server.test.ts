@@ -8,12 +8,12 @@ interface AuthStub {
 	exchangeCodeForSession: ReturnType<typeof vi.fn>;
 }
 
-function authStub(overrides: Partial<Record<keyof AuthStub, unknown>> = {}): AuthStub {
+function authStub(overrides: Partial<AuthStub> = {}): AuthStub {
 	return {
 		verifyOtp: vi.fn().mockResolvedValue({ error: null }),
 		exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
 		...overrides
-	} as AuthStub;
+	};
 }
 
 function callGet(search: string, auth: AuthStub) {
@@ -32,11 +32,13 @@ function callGet(search: string, auth: AuthStub) {
 		locals: { supabase: { auth } }
 	};
 
+	// SAFETY: the stub event carries every field the handler reads (url, cookies,
+	// locals.supabase); the rest of RequestEvent is irrelevant to it.
 	return { cookies, jar, run: () => GET(event as never) };
 }
 
 /** The handler always finishes by throwing a redirect; unwrap it. */
-async function redirectOf(run: () => unknown) {
+async function redirectOf<T>(run: () => T) {
 	try {
 		await run();
 	} catch (thrown) {

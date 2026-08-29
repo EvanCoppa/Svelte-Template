@@ -34,10 +34,10 @@
 		class?: string;
 	}
 
-	const ALLOW: Record<OtpMode, RegExp> = {
+	const ALLOW = {
 		numeric: /^[0-9]$/,
 		alphanumeric: /^[0-9a-zA-Z]$/
-	};
+	} satisfies Record<OtpMode, RegExp>;
 
 	let {
 		class: className,
