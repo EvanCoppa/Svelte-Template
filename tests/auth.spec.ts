@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
 import { NO_STACK_REASON, TEST_USER, authStackReachable } from './env';
+import { clickWhenLive, expect, signIn, submitWhenLive, test } from './fixtures';
+import { guardedRoutes } from './routes';
 
 /**
  * The signed-in half of the suite. Everything here needs a real Auth server,
@@ -14,30 +15,6 @@ test.beforeEach(async () => {
 	test.skip(!(await authStackReachable()), NO_STACK_REASON);
 });
 
-/**
- * Click something whose behaviour only exists once Svelte has hydrated.
- *
- * Playwright treats a server-rendered button as clickable the moment it is
- * visible, which is well before the client bundle has attached its handlers —
- * especially in dev, and especially right after the login redirect. Such a
- * click lands on inert HTML and is silently dropped. Retrying until the
- * expected effect shows up is the documented remedy, and it keeps these tests
- * about the app's behaviour rather than about load timing.
- */
-async function clickWhenLive(target: Locator, expected: () => Promise<void>) {
-	await expect(async () => {
-		await target.click();
-		await expected();
-	}).toPass({ timeout: 20_000 });
-}
-
-async function signIn(page: Page, { next }: { next?: string } = {}) {
-	await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : '/login');
-	await page.getByLabel('Email').fill(TEST_USER.email);
-	await page.getByLabel('Password').fill(TEST_USER.password);
-	await page.getByRole('button', { name: 'Sign in' }).click();
-}
-
 test.describe('signing in', () => {
 	test('lands on the dashboard as the seeded user', async ({ page }) => {
 		await signIn(page);
@@ -48,7 +25,10 @@ test.describe('signing in', () => {
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
 	});
 
-	test('rejects a wrong password with a non-committal message', async ({ page }) => {
+	test('rejects a wrong password with a non-committal message', async ({ page, consoleGuard }) => {
+		// The rejected sign-in is a 400 from the Auth server, on purpose.
+		consoleGuard.allow(/400 \(Bad Request\)/);
+
 		await page.goto('/login');
 		await page.getByLabel('Email').fill(TEST_USER.email);
 		await page.getByLabel('Password').fill('not-the-right-password');
@@ -89,6 +69,59 @@ test.describe('signing in', () => {
 	});
 });
 
+/**
+ * The broad pass: every page the app renders, signed in. Deliberately shallow
+ * and deliberately automatic — the route list is read from src/routes, so a
+ * page added under `(app)` is covered the moment it exists. What it catches is
+ * the breakage that is easy to ship and easy to miss: a load function that
+ * throws, a component that fails to hydrate, a rune misuse that only surfaces
+ * in the browser, a deleted asset. Depth belongs in the describes below.
+ */
+test.describe('every page renders', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	for (const pathname of guardedRoutes()) {
+		test(pathname, async ({ page, baseURL }) => {
+			const broken: string[] = [];
+			page.on('response', (response) => {
+				const url = response.url();
+				// Same-origin only — the /components avatar demo pulls an image
+				// from github.com — and never the dev server's own plumbing.
+				if (!baseURL || !url.startsWith(baseURL)) return;
+				if (url.includes('/@vite/') || url.includes('/@fs/') || url.includes('/.vite/')) return;
+				if (response.status() >= 400) broken.push(`${String(response.status())} ${url}`);
+			});
+
+			const response = await page.goto(pathname);
+
+			expect(response?.status(), `${pathname} did not return 200`).toBe(200);
+			await expect(page).toHaveURL(pathname);
+			// Every page names itself, in the tab and on the screen.
+			await expect(page).toHaveTitle(/\S/);
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+			// The shell came with it, so the whole layout chain resolved.
+			await expect(page.locator('[data-slot="sidebar"]')).toBeVisible();
+
+			expect(broken, 'the page requested something that 4xx-ed').toEqual([]);
+		});
+	}
+
+	test('an unknown path is a 404, not a redirect', async ({ page, consoleGuard }) => {
+		// The whole point of the test is a document that is not there.
+		consoleGuard.allow(/404 \(Not Found\)/);
+
+		const response = await page.goto('/no-such-page');
+
+		expect(response?.status()).toBe(404);
+		// The root error page, not the `(app)` one: an unmatched path never
+		// entered the group. Its title is a Card.Title, so a div, not a heading.
+		await expect(page.getByText('Page not found')).toBeVisible();
+	});
+});
+
 test.describe('the app shell', () => {
 	test.beforeEach(async ({ page }) => {
 		await signIn(page);
@@ -101,6 +134,29 @@ test.describe('the app shell', () => {
 		for (const label of ['Dashboard', 'Settings', 'Components', 'Best Practices']) {
 			await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
 		}
+	});
+
+	test('offers the same pages in the sidebar and the palette', async ({ page }) => {
+		// Scoped to the nav section: the header's team switcher and the footer's
+		// user menu are sidebar menu buttons too, and neither is a page.
+		// Sidebar.MenuButton renders through a child snippet here, so the button
+		// itself carries no data-slot — the menu item around it does.
+		const navItems = page.locator('[data-slot="sidebar-content"] [data-slot="sidebar-menu-item"]');
+		// allInnerTexts() does not auto-wait; settle on something that does.
+		await expect(navItems.first()).toBeVisible();
+		const sidebarLabels = await navItems.allInnerTexts();
+
+		await clickWhenLive(page.locator('.search-bar'), () =>
+			expect(page.getByRole('dialog')).toBeVisible()
+		);
+		// Same for the palette: cmdk builds its list after the dialog opens, so
+		// settle on the count, which auto-waits.
+		const options = page.getByRole('dialog').getByRole('option');
+		await expect(options).toHaveCount(sidebarLabels.length);
+		const paletteLabels = await options.allInnerTexts();
+
+		const tidy = (labels: string[]) => labels.map((label) => label.trim()).sort();
+		expect(tidy(paletteLabels)).toEqual(tidy(sidebarLabels));
 	});
 
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
@@ -126,6 +182,19 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/best-practices');
 	});
 
+	test('finds a page by an alias that is not its label', async ({ page }) => {
+		await clickWhenLive(page.locator('.search-bar'), () =>
+			expect(page.getByRole('dialog')).toBeVisible()
+		);
+
+		// "kitchen sink" is an alias on the Components entry in navigation.ts;
+		// if aliases stop reaching the palette, only this notices.
+		const palette = page.getByRole('dialog');
+		await palette.getByRole('combobox').fill('kitchen sink');
+
+		await expect(palette.getByRole('option', { name: /components/i })).toBeVisible();
+	});
+
 	test('opens the palette with the keyboard shortcut', async ({ page }) => {
 		await expect(async () => {
 			await page.keyboard.press('ControlOrMeta+k');
@@ -135,12 +204,120 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('combobox')).toBeVisible();
 	});
 
-	test('shows the signed-in user their profile on /settings', async ({ page }) => {
-		await page.goto('/settings');
+	test('remembers the theme across a reload', async ({ page }) => {
+		const html = page.locator('html');
+		const wasDark = await html.evaluate((element) => element.classList.contains('dark'));
 
+		await clickWhenLive(page.getByRole('button', { name: 'Toggle theme' }), async () => {
+			await expect
+				.poll(() => html.evaluate((element) => element.classList.contains('dark')))
+				.toBe(!wasDark);
+		});
+
+		// The choice is stored, so a reload must not flash back to the old one.
+		await page.reload();
+		await expect
+			.poll(() => html.evaluate((element) => element.classList.contains('dark')))
+			.toBe(!wasDark);
+	});
+});
+
+/**
+ * /settings in detail — the template's reference page for the two mutation
+ * patterns: a form action writing a typed, RLS-protected row, and one calling
+ * Supabase Auth.
+ *
+ * Note where validation surfaces, because it is not one place. superforms
+ * turns the zod schema into HTML constraints on the inputs, and the browser
+ * enforces those itself: `maxlength` caps a field while it is being typed, so
+ * an over-long value cannot be entered at all.
+ *
+ * `minlength` is the awkward one and is deliberately *not* tested through the
+ * browser here. Whether it fires depends on the element's "modified by user"
+ * flag, which Svelte clears whenever `bind:value` re-assigns the same
+ * value — so after hydration the browser lets a short password through and
+ * superforms answers, while before it the browser blocks the submit silently.
+ * A test that asserts either outcome passes alone and fails under load. What
+ * is stable is that the constraint reached the input; the rule itself belongs
+ * to vitest, which owns the schema.
+ *
+ * A cross-field refinement has no HTML equivalent at all, so superforms always
+ * answers that one — hence the message assertion below.
+ */
+test.describe('settings', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+		await page.goto('/settings');
+	});
+
+	test('shows the signed-in user their profile', async ({ page }) => {
 		// Loaded through RLS, so this row can only be the caller's own. Matches
 		// the page body and the sidebar user menu, hence first().
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
+	});
+
+	test('saves the profile, toasts, and survives a reload', async ({ page }) => {
+		// Writes to the seeded user's row. That is fine: this only runs against
+		// the local stack, which `npm run db:reset` restores.
+		const displayName = `E2E ${String(Date.now())}`;
+
+		await submitWhenLive(
+			async () => {
+				await page.getByLabel('Display name').fill(displayName);
+				await page.getByRole('button', { name: 'Save profile' }).click();
+			},
+			// House convention: successes toast, they do not render a banner.
+			() => expect(page.getByText('Profile updated')).toBeVisible({ timeout: 2000 })
+		);
+
+		await page.reload();
+		await expect(page.getByLabel('Display name')).toHaveValue(displayName);
+	});
+
+	test('caps the display name at the length the schema allows', async ({ page }) => {
+		const field = page.getByLabel('Display name');
+		await field.fill('x'.repeat(101));
+
+		// superforms turns the schema's `.max(100)` into maxlength, and the
+		// browser enforces that while typing — so an over-long name cannot be
+		// entered at all, let alone submitted.
+		await expect(field).toHaveAttribute('maxlength', '100');
+		await expect(field).toHaveValue('x'.repeat(100));
+	});
+
+	// The password form is exercised only through its failure paths on purpose:
+	// actually changing the password would break every later run against the
+	// same stack. src/routes/reset-password/page.server.test.ts covers a
+	// successful change.
+	test('catches a mismatched password confirmation inline', async ({ page, consoleGuard }) => {
+		// Before hydration the form posts the old-fashioned way and the server
+		// answers fail(400) — progressive enhancement working, not a regression.
+		// After it, zod4Client stops the submit and no request goes out. Both
+		// end with the same message, which is the point.
+		consoleGuard.allow(/400 \(Bad Request\)/);
+
+		await submitWhenLive(
+			async () => {
+				await page.getByLabel('New password').fill('correct-horse-battery');
+				await page.getByLabel('Confirm password').fill('correct-horse-batteries');
+				await page.getByRole('button', { name: 'Update password' }).click();
+			},
+			// No HTML constraint can express "these two must match", so once
+			// hydrated this is the zod refinement running through zod4Client.
+			() => expect(page.getByText('Passwords do not match.')).toBeVisible({ timeout: 2000 })
+		);
+	});
+
+	test('carries the shared password rules onto the input', async ({ page }) => {
+		const field = page.getByLabel('New password');
+
+		// PASSWORD_MIN_LENGTH from $lib/schemas/password, via superforms. If the
+		// constraint stops reaching the DOM, the only thing left enforcing the
+		// rule is the server — which is a regression worth a failing test even
+		// though the app still rejects the password.
+		await expect(field).toHaveAttribute('minlength', '8');
+		await expect(field).toHaveAttribute('required', '');
 	});
 });
 

@@ -26,10 +26,19 @@ suite green.
   so `npm run check` type-checks them). Split a new spec by what it needs: no database →
   `tests/guest.spec.ts`, which must keep running on a bare clone; signed in →
   `tests/auth.spec.ts`, which skips itself via `authStackReachable()` until a stack is
-  up. Test user-visible flows through real pages, never implementation details, and never
-  reach into the database mid-flow. Two traps: clicks land before Svelte hydrates and are
-  silently dropped (use `clickWhenLive()`), and the user's email renders in both the page
-  body and the sidebar menu, so scope those selectors. See CLAUDE.md → "E2E tests".
+  up. Two files, not one per page. Test user-visible flows through real pages, never
+  implementation details, and never reach into the database mid-flow.
+  **A new page under `(app)` needs no new spec for basic coverage** — both files sweep
+  `guardedRoutes()` from `tests/routes.ts`, which reads the route list off the
+  filesystem. Add a `describe` only for behaviour a sweep cannot assert.
+  **Import `test`/`expect` from `tests/fixtures.ts`**, never `@playwright/test`, or the
+  spec loses the console guard that fails any test whose page logged an error or threw;
+  a console error it catches is a bug in the app — fix it or report it, never allowlist
+  it. Three traps: clicks land before Svelte hydrates and are silently dropped (use
+  `clickWhenLive()`); the user's email renders in both the page body and the sidebar
+  menu, so scope those selectors; and superforms turns the zod schema into HTML
+  constraints, so most invalid input is refused by the browser with no inline message to
+  assert on. See CLAUDE.md → "E2E tests".
 - Component/DOM tests are **not set up** (no jsdom). If a task truly needs them, report
   that adopting `@testing-library/svelte` + jsdom is a dependency decision (route it
   through `dependency-scout`) instead of hacking around it.
@@ -56,7 +65,8 @@ password-recovery cookie pinning, and security headers on every response.
 1. Read the code under test and its existing sibling tests fully.
 2. Write tests for observable behavior, not implementation details. Cover the sad paths —
    invalid input, missing session, tampered redirect params — not just the happy one.
-3. Run `npm test` and iterate until green. If a test you didn't write fails, investigate
-   and report; never delete, skip, or weaken it to get green.
+3. Run `npm test` (and `npm run test:e2e` when you touched `tests/`) and iterate until
+   green. If a test you didn't write fails, investigate and report; never delete, skip,
+   or weaken it to get green.
 4. Finish with `npm run check` and `npm run lint` at zero, and report coverage of what you
    added in one short list.

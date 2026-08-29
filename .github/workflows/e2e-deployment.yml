@@ -1,14 +1,13 @@
-# The CD half of the regression suite: run the signed-out sweep against the
-# deployment itself, not a build made in CI. Vercel reports every deployment
-# through `deployment_status`, so each preview gets the auth guard, the login
-# form and the security headers checked on real infrastructure — behind the
-# real edge, with the real environment variables.
+# The CD half of the suite: run the specs against the deployment itself, not a
+# server started in CI. Vercel reports every deployment through
+# `deployment_status`, so each preview gets the default-deny route guard, the
+# login form and the security headers checked on real infrastructure — behind
+# the real edge, with the real environment variables.
 #
-# Nothing here needs secrets, and nothing here writes to the database. To
-# extend it to the signed-in tier, give the job the four Supabase variables
-# from docs/e2e-testing.md and swap the command for `npm run e2e:app` —
-# knowing that it signs a real user in and updates their profile row, so it
-# wants a test account, not a real one.
+# Only the no-database specs actually run: `tests/env.ts` finds no reachable
+# Auth server from the runner, so the signed-in half skips itself, exactly as
+# it does in the main CI job. Nothing here needs secrets and nothing writes to
+# a database.
 #
 # Deployment protection makes preview URLs return 401 to anonymous callers.
 # Turn it off for previews, or add a bypass token, or this never gets past the
@@ -20,12 +19,14 @@ on:
 
 jobs:
   e2e:
-    name: e2e (signed out, deployed)
+    name: E2E (deployed)
     # `deployment_status` fires for every state transition; only a live
     # deployment is worth testing.
     if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
     env:
+      # Set, so playwright.config.ts skips starting a dev server and points the
+      # same specs at the deployment.
       E2E_BASE_URL: ${{ github.event.deployment_status.environment_url }}
     steps:
       - uses: actions/checkout@v4
@@ -38,29 +39,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Resolve Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache browsers
-        id: browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-
-      - name: Install browser
-        if: steps.browsers.outputs.cache-hit != 'true'
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Install browser system deps
-        if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
-      # E2E_BASE_URL is set, so Playwright skips the build-and-preview step
-      # and points the same specs at the deployment.
-      - name: Regression sweep against the deployment
-        run: npm run e2e:guest
+      - name: Behavior through a real browser (playwright)
+        run: npm run test:e2e
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
