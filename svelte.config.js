@@ -8,18 +8,7 @@ const config = {
 	kit: {
 		// Deploys to Vercel. Swap for another adapter if you host elsewhere:
 		// https://svelte.dev/docs/kit/adapters
-		adapter: adapter(),
-
-		typescript: {
-			// The generated tsconfig only covers `src/`, which would leave the
-			// Playwright suite and its config unchecked by `npm run check`.
-			// Extending the generated `include` is the supported way to widen it
-			// without copying SvelteKit's list into tsconfig.json by hand.
-			config(config) {
-				config.include.push('../e2e/**/*.ts', '../playwright.config.ts');
-				return config;
-			}
-		}
+		adapter: adapter()
 	}
 };
 

@@ -80,12 +80,8 @@ jobs:
       - name: Behavior (vitest)
         run: npm test
 
-  # Playwright, tier 1: everything a browser can check without a backend —
-  # the default-deny auth guard over every route, the login form, the
-  # security headers on the built app. Needs no secrets, so it also runs on
-  # pull requests from forks.
-  e2e-guest:
-    name: e2e (signed out)
+  e2e:
+    name: E2E (Playwright)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,110 +94,21 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Resolve Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache browsers
-        id: browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-
-      - name: Install browser
-        if: steps.browsers.outputs.cache-hit != 'true'
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Install browser system deps
-        if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
-      - name: Regression sweep (signed out)
-        run: npm run e2e:guest
+      # Runs the specs that never touch Supabase: the default-deny route
+      # guard, the ?next= round trip and the security headers. They rely on
+      # the workflow-level PUBLIC_SUPABASE_* placeholders above. The signed-in
+      # specs skip themselves here because no stack is reachable — to run
+      # those too, boot one first (`npx supabase start && npm run db:env`);
+      # see README → "End-to-end tests".
+      - name: Behavior through a real browser (playwright)
+        run: npm run test:e2e
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-guest
-          path: playwright-report/
-          retention-days: 7
-
-  # `secrets` is not readable from a job-level `if`, so the gate has to be a
-  # job of its own that turns "are the secrets set?" into an output.
-  supabase-secrets:
-    name: Supabase credentials
-    runs-on: ubuntu-latest
-    outputs:
-      available: ${{ steps.check.outputs.available }}
-    steps:
-      - id: check
-        env:
-          SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-          SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
-        run: |
-          if [ -n "$SERVICE_ROLE_KEY" ] && [ -n "$USER_EMAIL" ] && [ -n "$SUPABASE_URL" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Signed-in E2E skipped. Add PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY and E2E_USER_EMAIL as repository secrets to enable it (see docs/e2e-testing.md)."
-          fi
-
-  # Playwright, tier 2: the app itself, signed in. Needs a Supabase project,
-  # so it is skipped — not failed — on a checkout that has no secrets, and on
-  # pull requests from forks, which never receive them.
-  e2e-app:
-    name: e2e (signed in)
-    runs-on: ubuntu-latest
-    needs: supabase-secrets
-    if: needs.supabase-secrets.outputs.available == 'true'
-    env:
-      PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
-      PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Resolve Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache browsers
-        id: browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-
-      - name: Install browser
-        if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install browser system deps
-        if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
-      - name: Regression sweep (signed in)
-        run: npm run e2e:app
-
-      # Opt-in, and only once baselines are committed — see docs/e2e-testing.md.
-      - name: Visual regression
-        if: hashFiles('e2e/visual/__screenshots__/**') != ''
-        run: npm run e2e:visual
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report-app
+          name: playwright-report
           path: playwright-report/
           retention-days: 7
