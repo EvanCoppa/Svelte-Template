@@ -38,6 +38,10 @@ npm run lint           # prettier --check + eslint (flat config) — keep at ZER
 npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-slop) — keep at ZERO
 npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
+npm run e2e            # playwright — full regression suite (see docs/e2e-testing.md)
+npm run e2e:guest      # the tier that needs no Supabase credentials
+npm run e2e:app        # the signed-in tier
+npm run e2e:ui         # playwright's UI mode, for writing specs
 npm run db:types       # regenerate src/lib/database.types.ts from the live schema
 npm run format         # prettier (svelte + tailwind plugins)
 ```
@@ -81,6 +85,30 @@ user in on the first request, so `npm run dev` lands straight in the app. It
 refuses to run on production deployments, `/logout` still works (sets an opt-out
 cookie; clear it with `?autologin=1`), and the emailed-link flows under `/auth`
 stay testable as a signed-out browser.
+
+## End-to-end tests
+
+Playwright drives the built app in a real browser; vitest keeps the server-side unit
+tests. The convention is `docs/e2e-testing.md` — read it before adding a spec. The
+short version:
+
+- **Two tiers.** `e2e/guest/` needs no backend and runs everywhere, CI and forks
+  included; `e2e/app/` signs in and only exists when Supabase credentials are present.
+  `npm run e2e` on a credential-less clone runs the first tier and passes.
+- **Broad then deep.** `route-sweep.spec.ts` / `auth-guard.spec.ts` visit _every_ page —
+  the list is read from `src/routes`, so a new page under `(app)` is covered the moment
+  it exists, with nothing to add here. Depth goes in an area spec beside them
+  (`login.spec.ts`, `navigation.spec.ts`, `settings.spec.ts`), one file per area.
+- **Import `test`/`expect` from `e2e/support/fixtures`**, never `@playwright/test`
+  directly, or the spec loses the console guard that fails any test whose page logged an
+  error or threw.
+- Locate by role and accessible name; a CSS selector needs a comment saying why the DOM
+  offered no semantics. Never assert on a Tailwind class, never read the database
+  mid-test to check a write landed — reload and look at the page.
+- If Supabase has to be stubbed to test it, it is a vitest test, not an E2E one.
+
+CI runs both tiers (`.github/workflows/ci.yml`) plus the signed-out tier against every
+successful deployment (`.github/workflows/e2e-deployment.yml`).
 
 ## Database
 

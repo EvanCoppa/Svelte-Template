@@ -197,12 +197,32 @@ npm run test:watch
 Tests live next to the code they cover (`*.test.ts`). If you change the auth routes,
 keep these green and extend them — they encode the flows' security properties.
 
-**CI** (`.github/workflows/ci.yml`) runs four parallel jobs on every pull
+**End-to-end**, with Playwright against the production build, in two tiers:
+
+```bash
+npm run e2e         # everything this checkout is configured for
+npm run e2e:guest   # the tier that needs no credentials
+npm run e2e:ui      # Playwright's UI mode, for writing specs
+```
+
+`e2e/guest/` needs no backend at all — it sweeps _every_ route through the default-deny
+auth guard, exercises the login form, and checks the security headers survive the build.
+`e2e/app/` signs a real Supabase user in (via a service-role magic link, so no credential
+is committed) and renders every page, the sidebar, the ⌘K palette and the settings forms.
+Both sweeps read the route list from `src/routes`, so a page you add under `(app)` is
+covered the moment it exists. Set `SUPABASE_SERVICE_ROLE_KEY` and `E2E_USER_EMAIL` to
+enable the second tier; without them `npm run e2e` runs the first and passes.
+[`docs/e2e-testing.md`](docs/e2e-testing.md) is the full convention.
+
+**CI** (`.github/workflows/ci.yml`) runs six parallel jobs on every pull
 request and push to `main`: `check` (svelte-check — Svelte + TS correctness),
 `lint:oxlint` (oxlint's standard rules plus the vendored
 [anti-slop](https://github.com/dmmulroy/anti-slop) rules), `knip` (unused
-files, exports, and dependencies), and the tests. `lint` (prettier + eslint)
-and the production build remain local commands.
+files, exports, and dependencies), the unit tests, and the two E2E tiers — the
+signed-in one skipping itself with a notice when the repository has no Supabase
+secrets. A second workflow (`e2e-deployment.yml`) reruns the signed-out tier
+against every successful Vercel deployment. `lint` (prettier + eslint) and the
+production build remain local commands.
 
 ## Development auto-login
 
@@ -249,6 +269,11 @@ npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero
 npm run lint           # prettier --check + eslint — keep at zero
 npm test               # vitest — the auth surface's unit tests
+npm run e2e            # playwright — full regression suite
+npm run e2e:guest      # ... the tier that needs no Supabase credentials
+npm run e2e:app        # ... the signed-in tier
+npm run e2e:ui         # playwright UI mode
+npm run e2e:report     # open the report from the last run
 npm run db:types       # regenerate src/lib/database.types.ts from your live schema
 npm run format         # prettier (svelte + tailwind class sorting)
 ```

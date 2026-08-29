@@ -8,7 +8,10 @@
 	"entry": [
 		"src/lib/components/ui/*/index.ts",
 		"src/lib/components/enhanced/index.ts",
-		"src/lib/components/enhanced/*/index.ts"
+		"src/lib/components/enhanced/*/index.ts",
+		// Playwright reaches this through a `testMatch` inside a conditional
+		// project list, which knip cannot resolve statically.
+		"e2e/auth.setup.ts"
 	],
 	// A helper exported for reuse but so far consumed only by its own module
 	// (NAV_CATEGORIES, PASSWORD_MAX_BYTES, …) is not dead code.
