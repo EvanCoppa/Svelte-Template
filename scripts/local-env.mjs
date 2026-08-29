@@ -14,21 +14,38 @@
  */
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { z } from 'zod';
 
 const OUT_FILE = '.env.local';
 
 /**
- * `supabase status -o json` key names have moved around across CLI versions
- * (and the publishable/secret pair only exists on newer ones), so take the
- * first key that is actually present rather than pinning to one spelling.
+ * A field this script can use, or nothing.
+ *
+ * `.catch(undefined)` rather than a bare `.optional()`: a CLI version that
+ * emits `null` for a key it no longer populates should fall through to the
+ * next spelling below, not fail the whole parse.
  */
-function pick(status, candidates) {
-	for (const key of candidates) {
-		const value = status[key];
-		if (typeof value === 'string' && value.length > 0) return value;
-	}
-	return null;
-}
+const optionalValue = () => z.string().min(1).optional().catch(undefined);
+
+/**
+ * The shape this script needs out of `supabase status -o json`, parsed at the
+ * boundary so everything downstream is a known domain value.
+ *
+ * Key names have moved around across CLI versions, and the publishable/secret
+ * pair only exists on newer ones, so each spelling is declared and the reads
+ * below take the first one this CLI actually emitted. `z.object()` strips
+ * every other key, which is the rest of the status payload.
+ */
+const statusSchema = z.object({
+	API_URL: optionalValue(),
+	api_url: optionalValue(),
+	PUBLISHABLE_KEY: optionalValue(),
+	ANON_KEY: optionalValue(),
+	anon_key: optionalValue(),
+	SECRET_KEY: optionalValue(),
+	SERVICE_ROLE_KEY: optionalValue(),
+	service_role_key: optionalValue()
+});
 
 let raw;
 try {
@@ -44,19 +61,25 @@ try {
 	process.exit(1);
 }
 
-let status;
+let parsed;
 try {
-	status = JSON.parse(raw);
+	parsed = statusSchema.safeParse(JSON.parse(raw));
 } catch {
 	console.error(`Could not parse \`supabase status -o json\`:\n${raw}`);
 	process.exit(1);
 }
 
-const url = pick(status, ['API_URL', 'api_url', 'apiUrl']);
+if (!parsed.success) {
+	console.error(`\`supabase status -o json\` was not the expected shape:\n${raw}`);
+	process.exit(1);
+}
+
+const status = parsed.data;
+const url = status.API_URL ?? status.api_url;
 // Newer CLIs mint sb_publishable_/sb_secret_ keys; older ones only the JWTs.
 // Either works with @supabase/ssr, so prefer the modern pair and fall back.
-const publishableKey = pick(status, ['PUBLISHABLE_KEY', 'ANON_KEY', 'anon_key']);
-const serviceRoleKey = pick(status, ['SECRET_KEY', 'SERVICE_ROLE_KEY', 'service_role_key']);
+const publishableKey = status.PUBLISHABLE_KEY ?? status.ANON_KEY ?? status.anon_key;
+const serviceRoleKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY ?? status.service_role_key;
 
 if (!url || !publishableKey) {
 	console.error(

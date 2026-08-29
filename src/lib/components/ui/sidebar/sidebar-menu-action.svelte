@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type ChildSnippetProps, type WithElementRef } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 
@@ -11,7 +11,7 @@
 		child,
 		...restProps
 	}: WithElementRef<HTMLButtonAttributes> & {
-		child?: Snippet<[{ props: Record<string, unknown> }]>;
+		child?: Snippet<[ChildSnippetProps]>;
 		showOnHover?: boolean;
 	} = $props();
 

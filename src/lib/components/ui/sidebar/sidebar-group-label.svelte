@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type ChildSnippetProps, type WithElementRef } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 
@@ -10,7 +10,7 @@
 		class: className,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLElement>> & {
-		child?: Snippet<[{ props: Record<string, unknown> }]>;
+		child?: Snippet<[ChildSnippetProps]>;
 	} = $props();
 
 	const mergedProps = $derived({

@@ -16,7 +16,9 @@ export default ts.config(
 		// example components sit outside tsconfig's include, so the typed
 		// `projectService` below cannot resolve them and errors on every one.
 		// `.prettierignore` skips this directory for the same reason.
-		ignores: ['.claude/skills/**']
+		// The vendored anti-slop oxlint plugin is likewise kept byte-identical
+		// to upstream (it lints itself with oxlint's rules there).
+		ignores: ['.claude/skills/**', 'tools/oxlint/anti-slop/**']
 	},
 	js.configs.recommended,
 	...ts.configs.recommended,

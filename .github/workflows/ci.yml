@@ -12,7 +12,8 @@ env:
   PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
 
 jobs:
-  ci:
+  svelte-check:
+    name: svelte-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,17 +26,59 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Lint (prettier + eslint)
-        run: npm run lint
-
-      - name: Type check (svelte-check)
+      - name: Svelte + TS correctness
         run: npm run check
 
-      - name: Unit tests (vitest)
-        run: npm test
+  oxlint:
+    name: Oxlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build (Vercel adapter)
-        run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Normal lint + anti-slop rules
+        run: npm run lint:oxlint
+
+  knip:
+    name: Knip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unused files, exports, dependencies
+        run: npm run knip
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Behavior (vitest)
+        run: npm test
 
   e2e:
     name: E2E (Playwright)
@@ -55,11 +98,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Runs the specs that never touch Supabase: the default-deny route
-      # guard, the ?next= round trip and the security headers. The signed-in
+      # guard, the ?next= round trip and the security headers. They rely on
+      # the workflow-level PUBLIC_SUPABASE_* placeholders above. The signed-in
       # specs skip themselves here because no stack is reachable — to run
       # those too, boot one first (`npx supabase start && npm run db:env`);
       # see README → "End-to-end tests".
-      - name: E2E
+      - name: Behavior through a real browser (playwright)
         run: npm run test:e2e
 
       - uses: actions/upload-artifact@v4

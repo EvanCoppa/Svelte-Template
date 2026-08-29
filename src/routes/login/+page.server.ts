@@ -5,11 +5,13 @@ import { loginSchema, resetSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Human-readable banners for `?error=` codes set by hooks and /auth/confirm. */
-const ERROR_MESSAGES: Record<string, string> = {
-	link_invalid: 'That link is invalid or has expired. Request a new one below.',
-	recovery_link_invalid:
+const ERROR_MESSAGES = new Map([
+	['link_invalid', 'That link is invalid or has expired. Request a new one below.'],
+	[
+		'recovery_link_invalid',
 		'That password reset link is invalid or has expired. Request a new one below.'
-};
+	]
+]);
 
 export const load: PageServerLoad = async ({ url }) => {
 	const errorCode = url.searchParams.get('error');
@@ -20,7 +22,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		superValidate(zod4(resetSchema))
 	]);
 	return {
-		errorMessage: errorCode ? (ERROR_MESSAGES[errorCode] ?? 'Something went wrong.') : null,
+		errorMessage: errorCode ? (ERROR_MESSAGES.get(errorCode) ?? 'Something went wrong.') : null,
 		passwordReset: url.searchParams.get('reset') === 'success',
 		loginForm,
 		resetForm

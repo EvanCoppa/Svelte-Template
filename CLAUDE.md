@@ -35,6 +35,8 @@ npm run dev            # dev server
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
 npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
+npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-slop) — keep at ZERO
+npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run test:e2e       # playwright (real browser, tests/) — see "E2E tests" below
 npm run db:start       # boot the local Supabase stack in Docker
