@@ -30,14 +30,15 @@ export type QueryResult = {
 	count?: number | null;
 };
 
+type Builder = Promise<Required<QueryResult>> & Record<BuilderMethod, ReturnType<typeof vi.fn>>;
+
 export function supabaseMock(result: QueryResult = {}) {
 	const resolved: Required<QueryResult> = { data: null, error: null, count: null, ...result };
-	// SAFETY: the loop below fills in every BuilderMethod key immediately, so
-	// the record is complete by the time any test touches it.
-	const methods = {} as Record<BuilderMethod, ReturnType<typeof vi.fn>>;
 	// A real (already-settled) Promise carrying the chainable methods — the
 	// same thenable-builder shape postgrest-js queries have.
-	const builder = Object.assign(Promise.resolve(resolved), methods);
+	// SAFETY: the loop below puts every BuilderMethod key on the promise
+	// before the builder is handed to any test.
+	const builder = Promise.resolve(resolved) as Builder;
 	for (const method of METHODS) {
 		builder[method] = vi.fn(() => builder);
 	}

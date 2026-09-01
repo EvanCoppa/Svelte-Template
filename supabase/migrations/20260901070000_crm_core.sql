@@ -104,11 +104,16 @@ create table public.deals (
 	amount numeric(12, 2),
 	stage public.deal_stage not null default 'lead',
 	expected_close_date date,
-	assigned_to uuid references auth.users (id) on delete set null,
+	assigned_to uuid,
 	created_by uuid references auth.users (id) on delete set null default auth.uid(),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now(),
-	foreign key (client_id, org_id) references public.clients (id, org_id) on delete cascade
+	foreign key (client_id, org_id) references public.clients (id, org_id) on delete cascade,
+	-- Assignees must be members of this org — the composite FK makes
+	-- cross-org assignment impossible at the constraint level, and losing
+	-- membership clears the assignment instead of dangling it.
+	foreign key (org_id, assigned_to) references public.organization_members (org_id, user_id)
+		on delete set null (assigned_to)
 );
 
 comment on table public.deals is
@@ -135,14 +140,17 @@ create table public.tasks (
 	due_at timestamptz,
 	-- A timestamp doubles as the "done" flag and records when.
 	completed_at timestamptz,
-	assigned_to uuid references auth.users (id) on delete set null,
+	assigned_to uuid,
 	created_by uuid references auth.users (id) on delete set null default auth.uid(),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now(),
 	-- PG15+ column list: deleting the client detaches the task (client_id
 	-- alone goes null) instead of deleting it or nulling org_id.
 	foreign key (client_id, org_id) references public.clients (id, org_id)
-		on delete set null (client_id)
+		on delete set null (client_id),
+	-- Same org-membership guarantee as deals.assigned_to.
+	foreign key (org_id, assigned_to) references public.organization_members (org_id, user_id)
+		on delete set null (assigned_to)
 );
 
 comment on table public.tasks is
@@ -197,13 +205,16 @@ create table public.support_tickets (
 	description text,
 	status public.ticket_status not null default 'open',
 	priority public.ticket_priority not null default 'normal',
-	assigned_to uuid references auth.users (id) on delete set null,
+	assigned_to uuid,
 	created_by uuid references auth.users (id) on delete set null default auth.uid(),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now(),
 	-- Deleting a client keeps its ticket history, detached.
 	foreign key (client_id, org_id) references public.clients (id, org_id)
 		on delete set null (client_id),
+	-- Same org-membership guarantee as deals.assigned_to.
+	foreign key (org_id, assigned_to) references public.organization_members (org_id, user_id)
+		on delete set null (assigned_to),
 	-- Composite target for ticket_comments, same trick as clients.
 	unique (id, org_id)
 );
@@ -254,18 +265,25 @@ create trigger ticket_comments_set_updated_at
 create table public.notifications (
 	id uuid not null primary key default gen_random_uuid(),
 	org_id uuid not null references public.organizations (id) on delete cascade,
-	user_id uuid not null references auth.users (id) on delete cascade,
+	user_id uuid not null,
 	-- Free-text discriminator ('ticket_assigned', 'mention', …): notification
 	-- kinds change too often to be worth an enum migration each time.
 	type text not null,
 	title text not null,
 	body text,
-	-- App-relative destination only, same guard as `next` redirect params.
+	-- App-relative destination only. Slightly stricter than the `next` guard:
+	-- it also rejects a leading '/\', which browsers normalize to '//'.
 	link text,
 	read_at timestamptz,
 	created_at timestamptz not null default now(),
+	-- Recipients must be members of this org, so even service-role code
+	-- cannot deliver one org's data to an outsider; leaving the org (or
+	-- deleting the user, which cascades through memberships) clears the
+	-- inbox rows carrying that org's data.
+	foreign key (org_id, user_id) references public.organization_members (org_id, user_id)
+		on delete cascade,
 	constraint notifications_link_is_relative
-		check (link is null or (link like '/%' and link not like '//%'))
+		check (link is null or link ~ '^/($|[^/\\])')
 );
 
 comment on table public.notifications is

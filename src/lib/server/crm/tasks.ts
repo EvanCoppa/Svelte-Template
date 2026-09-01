@@ -1,13 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
-import { ensure, unwrap } from './unwrap';
+import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `tasks`. Same contract as clients.ts. "Done" is
- * `completed_at` being set — there is no separate status flag.
+ * `completed_at` being set — there is no separate status flag, and the
+ * column is update-only (a task is never born completed; the insert grant
+ * excludes it).
  */
 
 export type Task = Tables<'tasks'>;
+
+type TaskInsertColumn = 'client_id' | 'title' | 'details' | 'due_at' | 'assigned_to';
+type TaskUpdateColumn = TaskInsertColumn | 'completed_at';
 
 export async function listTasks(
 	supabase: SupabaseClient<Database>,
@@ -29,7 +34,7 @@ export async function listTasks(
 export async function createTask(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	values: Omit<TablesInsert<'tasks'>, 'org_id' | 'created_by'>
+	values: Pick<TablesInsert<'tasks'>, TaskInsertColumn>
 ): Promise<Task> {
 	return unwrap(
 		await supabase
@@ -44,7 +49,7 @@ export async function updateTask(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	taskId: string,
-	values: TablesUpdate<'tasks'>
+	values: Pick<TablesUpdate<'tasks'>, TaskUpdateColumn>
 ): Promise<Task> {
 	return unwrap(
 		await supabase
@@ -74,5 +79,8 @@ export async function deleteTask(
 	orgId: string,
 	taskId: string
 ): Promise<void> {
-	ensure(await supabase.from('tasks').delete().eq('org_id', orgId).eq('id', taskId));
+	unwrapDeleted(
+		await supabase.from('tasks').delete().eq('org_id', orgId).eq('id', taskId).select('id'),
+		'Task'
+	);
 }

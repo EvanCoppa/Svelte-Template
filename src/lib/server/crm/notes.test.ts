@@ -35,16 +35,27 @@ describe('notes data access', () => {
 		});
 	});
 
-	it('updates and deletes scoped to org and id', async () => {
+	it('updates scoped to org and id', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: NOTE_ID } });
 
 		await updateNote(supabase, ORG_ID, NOTE_ID, { body: 'Edited.' });
 		expect(builder.update).toHaveBeenCalledWith({ body: 'Edited.' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', NOTE_ID);
+	});
 
-		await deleteNote(supabase, ORG_ID, NOTE_ID);
-		expect(builder.delete).toHaveBeenCalled();
+	it('deletes scoped to org and id, with evidence, throwing on zero rows', async () => {
+		const deleted = supabaseMock({ data: [{ id: NOTE_ID }] });
+		await deleteNote(deleted.supabase, ORG_ID, NOTE_ID);
+		expect(deleted.builder.delete).toHaveBeenCalled();
+		expect(deleted.builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(deleted.builder.eq).toHaveBeenCalledWith('id', NOTE_ID);
+		expect(deleted.builder.select).toHaveBeenCalledWith('id');
+
+		const filtered = supabaseMock({ data: [] });
+		await expect(deleteNote(filtered.supabase, ORG_ID, NOTE_ID)).rejects.toThrow(
+			'Note was not deleted'
+		);
 	});
 
 	it('throws the PostgREST message when a query fails', async () => {

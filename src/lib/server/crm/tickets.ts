@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
-import { ensure, unwrap } from './unwrap';
+import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `support_tickets` and `ticket_comments`. Same contract as
  * clients.ts. The human-facing `number` is assigned by the database and never
- * written from here; `created_by`/`author_id` default to the caller.
+ * written from here; `created_by`/`author_id` default to the caller. A
+ * ticket's status is update-only — new tickets always open as 'open'.
  */
 
 export type Ticket = Tables<'support_tickets'>;
@@ -19,6 +20,10 @@ export type TicketWithClient = Ticket & {
 
 /** A full ticket thread, for detail screens. */
 export type TicketThread = TicketWithClient & { ticket_comments: TicketComment[] };
+
+type TicketInsertColumn = 'client_id' | 'subject' | 'description' | 'priority' | 'assigned_to';
+type TicketUpdateColumn = TicketInsertColumn | 'status';
+type CommentColumn = 'body' | 'is_internal';
 
 export async function listTickets(
 	supabase: SupabaseClient<Database>,
@@ -55,7 +60,7 @@ export async function getTicket(
 export async function createTicket(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	values: Omit<TablesInsert<'support_tickets'>, 'org_id' | 'created_by'>
+	values: Pick<TablesInsert<'support_tickets'>, TicketInsertColumn>
 ): Promise<Ticket> {
 	return unwrap(
 		await supabase
@@ -70,7 +75,7 @@ export async function updateTicket(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	ticketId: string,
-	values: TablesUpdate<'support_tickets'>
+	values: Pick<TablesUpdate<'support_tickets'>, TicketUpdateColumn>
 ): Promise<Ticket> {
 	return unwrap(
 		await supabase
@@ -88,13 +93,21 @@ export async function deleteTicket(
 	orgId: string,
 	ticketId: string
 ): Promise<void> {
-	ensure(await supabase.from('support_tickets').delete().eq('org_id', orgId).eq('id', ticketId));
+	unwrapDeleted(
+		await supabase
+			.from('support_tickets')
+			.delete()
+			.eq('org_id', orgId)
+			.eq('id', ticketId)
+			.select('id'),
+		'Ticket'
+	);
 }
 
 export async function addTicketComment(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	values: { ticket_id: string; body: string; is_internal?: boolean }
+	values: Pick<TablesInsert<'ticket_comments'>, 'ticket_id' | CommentColumn>
 ): Promise<TicketComment> {
 	return unwrap(
 		await supabase
@@ -105,10 +118,35 @@ export async function addTicketComment(
 	);
 }
 
+export async function updateTicketComment(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	commentId: string,
+	values: Pick<TablesUpdate<'ticket_comments'>, CommentColumn>
+): Promise<TicketComment> {
+	return unwrap(
+		await supabase
+			.from('ticket_comments')
+			.update(values)
+			.eq('org_id', orgId)
+			.eq('id', commentId)
+			.select()
+			.single()
+	);
+}
+
 export async function deleteTicketComment(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	commentId: string
 ): Promise<void> {
-	ensure(await supabase.from('ticket_comments').delete().eq('org_id', orgId).eq('id', commentId));
+	unwrapDeleted(
+		await supabase
+			.from('ticket_comments')
+			.delete()
+			.eq('org_id', orgId)
+			.eq('id', commentId)
+			.select('id'),
+		'Comment'
+	);
 }

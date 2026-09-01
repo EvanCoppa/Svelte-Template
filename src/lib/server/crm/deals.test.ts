@@ -49,16 +49,27 @@ describe('deals data access', () => {
 		});
 	});
 
-	it('updates and deletes scoped to org and id', async () => {
+	it('updates scoped to org and id', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: DEAL_ID } });
 
 		await updateDeal(supabase, ORG_ID, DEAL_ID, { stage: 'won' });
 		expect(builder.update).toHaveBeenCalledWith({ stage: 'won' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
+	});
 
-		await deleteDeal(supabase, ORG_ID, DEAL_ID);
-		expect(builder.delete).toHaveBeenCalled();
+	it('deletes scoped to org and id, with evidence, throwing on zero rows', async () => {
+		const deleted = supabaseMock({ data: [{ id: DEAL_ID }] });
+		await deleteDeal(deleted.supabase, ORG_ID, DEAL_ID);
+		expect(deleted.builder.delete).toHaveBeenCalled();
+		expect(deleted.builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(deleted.builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
+		expect(deleted.builder.select).toHaveBeenCalledWith('id');
+
+		const filtered = supabaseMock({ data: [] });
+		await expect(deleteDeal(filtered.supabase, ORG_ID, DEAL_ID)).rejects.toThrow(
+			'Deal was not deleted'
+		);
 	});
 
 	it('throws the PostgREST message when a query fails', async () => {

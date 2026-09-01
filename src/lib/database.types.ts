@@ -162,6 +162,13 @@ export type Database = {
             referencedColumns: ["id", "org_id"]
           },
           {
+            foreignKeyName: "deals_org_id_assigned_to_fkey"
+            columns: ["org_id", "assigned_to"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
             foreignKeyName: "deals_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -256,6 +263,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_org_id_user_id_fkey"
+            columns: ["org_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
           },
         ]
       }
@@ -396,6 +410,13 @@ export type Database = {
             referencedColumns: ["id", "org_id"]
           },
           {
+            foreignKeyName: "support_tickets_org_id_assigned_to_fkey"
+            columns: ["org_id", "assigned_to"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
             foreignKeyName: "support_tickets_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -451,6 +472,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "tasks_org_id_assigned_to_fkey"
+            columns: ["org_id", "assigned_to"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
           },
           {
             foreignKeyName: "tasks_org_id_fkey"

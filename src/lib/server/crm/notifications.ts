@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, Tables } from '$lib/database.types';
-import { ensure, unwrap } from './unwrap';
+import type { Database, Tables, TablesInsert } from '$lib/database.types';
+import { ensure, unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `notifications`.
@@ -36,13 +36,13 @@ export async function unreadNotificationCount(
 	supabase: SupabaseClient<Database>,
 	orgId: string
 ): Promise<number> {
-	const { count, error } = await supabase
+	const response = await supabase
 		.from('notifications')
 		.select('*', { count: 'exact', head: true })
 		.eq('org_id', orgId)
 		.is('read_at', null);
-	if (error) throw new Error(error.message, { cause: error });
-	return count ?? 0;
+	ensure(response);
+	return response.count ?? 0;
 }
 
 export async function markNotificationRead(
@@ -76,25 +76,25 @@ export async function deleteNotification(
 	supabase: SupabaseClient<Database>,
 	notificationId: string
 ): Promise<void> {
-	ensure(await supabase.from('notifications').delete().eq('id', notificationId));
+	unwrapDeleted(
+		await supabase.from('notifications').delete().eq('id', notificationId).select('id'),
+		'Notification'
+	);
 }
 
 /**
  * Creates a notification for one member. `serviceRole` MUST be the
- * service-role client — the request-scoped one has no INSERT policy and
- * will be rejected by RLS.
+ * service-role client (`createSupabaseAdminClient()`) — the request-scoped
+ * one has no INSERT policy and will be rejected by RLS. The recipient must
+ * be a member of `org_id` and `link` must be app-relative ('/tickets/…');
+ * the schema rejects both violations.
  */
 export async function createNotification(
 	serviceRole: SupabaseClient<Database>,
-	values: {
-		org_id: string;
-		user_id: string;
-		type: string;
-		title: string;
-		body?: string | null;
-		/** App-relative destination ('/tickets/…'); the schema rejects anything else. */
-		link?: string | null;
-	}
+	values: Pick<
+		TablesInsert<'notifications'>,
+		'org_id' | 'user_id' | 'type' | 'title' | 'body' | 'link'
+	>
 ): Promise<AppNotification> {
 	return unwrap(await serviceRole.from('notifications').insert(values).select().single());
 }

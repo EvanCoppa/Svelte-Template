@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, Tables, TablesUpdate } from '$lib/database.types';
-import { ensure, unwrap } from './unwrap';
+import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
+import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `notes`. Same contract as clients.ts. `author_id` is
  * filled by the database (defaults to the caller) and RLS only lets authors
- * or owners/admins change a note afterwards.
+ * or owners/admins change or delete a note afterwards.
  */
 
 export type Note = Tables<'notes'>;
@@ -27,7 +27,7 @@ export async function listNotes(
 export async function createNote(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	values: { body: string; client_id?: string | null }
+	values: Pick<TablesInsert<'notes'>, 'body' | 'client_id'>
 ): Promise<Note> {
 	return unwrap(
 		await supabase
@@ -60,5 +60,8 @@ export async function deleteNote(
 	orgId: string,
 	noteId: string
 ): Promise<void> {
-	ensure(await supabase.from('notes').delete().eq('org_id', orgId).eq('id', noteId));
+	unwrapDeleted(
+		await supabase.from('notes').delete().eq('org_id', orgId).eq('id', noteId).select('id'),
+		'Note'
+	);
 }

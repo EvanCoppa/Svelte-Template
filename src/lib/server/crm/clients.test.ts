@@ -45,16 +45,31 @@ describe('clients data access', () => {
 		});
 	});
 
-	it('scopes updates and deletes to org and id', async () => {
+	it('scopes updates to org and id', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: CLIENT_ID } });
 
 		await updateClient(supabase, ORG_ID, CLIENT_ID, { status: 'active' });
 		expect(builder.update).toHaveBeenCalledWith({ status: 'active' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', CLIENT_ID);
+	});
+
+	it('deletes scoped to org and id, selecting the row back as evidence', async () => {
+		const { supabase, builder } = supabaseMock({ data: [{ id: CLIENT_ID }] });
 
 		await deleteClient(supabase, ORG_ID, CLIENT_ID);
 		expect(builder.delete).toHaveBeenCalled();
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', CLIENT_ID);
+		expect(builder.select).toHaveBeenCalledWith('id');
+	});
+
+	it('throws when a delete matches no rows (RLS filtered it)', async () => {
+		const { supabase } = supabaseMock({ data: [] });
+
+		await expect(deleteClient(supabase, ORG_ID, CLIENT_ID)).rejects.toThrow(
+			'Client was not deleted'
+		);
 	});
 
 	it('adds contacts under the given org', async () => {
@@ -69,7 +84,7 @@ describe('clients data access', () => {
 		});
 	});
 
-	it('updates and removes contacts scoped to org and id', async () => {
+	it('updates contacts scoped to org and id', async () => {
 		const { supabase, from, builder } = supabaseMock({ data: { id: 'contact-1' } });
 
 		await updateContact(supabase, ORG_ID, 'contact-1', { title: 'CTO' });
@@ -77,9 +92,16 @@ describe('clients data access', () => {
 		expect(builder.update).toHaveBeenCalledWith({ title: 'CTO' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', 'contact-1');
+	});
+
+	it('removes contacts scoped to org and id, with evidence', async () => {
+		const { supabase, builder } = supabaseMock({ data: [{ id: 'contact-1' }] });
 
 		await deleteContact(supabase, ORG_ID, 'contact-1');
 		expect(builder.delete).toHaveBeenCalled();
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', 'contact-1');
+		expect(builder.select).toHaveBeenCalledWith('id');
 	});
 
 	it('throws the PostgREST message when a query fails', async () => {

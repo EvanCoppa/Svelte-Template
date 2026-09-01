@@ -81,9 +81,29 @@ describe('notifications data access', () => {
 		});
 	});
 
-	it('throws the PostgREST message when a query fails', async () => {
-		const { supabase } = supabaseMock({ error: { message: 'no insert policy' } });
+	it('deletes with evidence, throwing on zero rows', async () => {
+		const deleted = supabaseMock({ data: [{ id: NOTIFICATION_ID }] });
+		await deleteNotification(deleted.supabase, NOTIFICATION_ID);
+		expect(deleted.builder.delete).toHaveBeenCalled();
+		expect(deleted.builder.eq).toHaveBeenCalledWith('id', NOTIFICATION_ID);
+		expect(deleted.builder.select).toHaveBeenCalledWith('id');
 
-		await expect(deleteNotification(supabase, NOTIFICATION_ID)).rejects.toThrow('no insert policy');
+		const filtered = supabaseMock({ data: [] });
+		await expect(deleteNotification(filtered.supabase, NOTIFICATION_ID)).rejects.toThrow(
+			'Notification was not deleted'
+		);
+	});
+
+	it('throws the PostgREST message when a query fails', async () => {
+		const { supabase } = supabaseMock({ error: { message: 'permission denied' } });
+
+		await expect(
+			createNotification(supabase, {
+				org_id: ORG_ID,
+				user_id: USER_ID,
+				type: 'x',
+				title: 'x'
+			})
+		).rejects.toThrow('permission denied');
 	});
 });

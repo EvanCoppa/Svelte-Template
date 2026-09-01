@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
-import { ensure, unwrap } from './unwrap';
+import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `deals` (the sales pipeline). Same contract as clients.ts:
- * request-scoped client + active org id, generated row types, created_by
- * filled by the database.
+ * request-scoped client + active org id, write params Picked to the columns
+ * the migration grants, `created_by` filled by the database, deletes gated
+ * to owner/admin by RLS and verified by `unwrapDeleted`.
  */
 
 export type Deal = Tables<'deals'>;
@@ -13,6 +14,9 @@ export type DealStage = Enums<'deal_stage'>;
 
 /** A deal with the client name it belongs to, for pipeline/list screens. */
 export type DealWithClient = Deal & { clients: Pick<Tables<'clients'>, 'id' | 'name'> };
+
+type DealColumn =
+	'client_id' | 'title' | 'amount' | 'stage' | 'expected_close_date' | 'assigned_to';
 
 export async function listDeals(
 	supabase: SupabaseClient<Database>,
@@ -47,7 +51,7 @@ export async function getDeal(
 export async function createDeal(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	values: Omit<TablesInsert<'deals'>, 'org_id' | 'created_by'>
+	values: Pick<TablesInsert<'deals'>, DealColumn>
 ): Promise<Deal> {
 	return unwrap(
 		await supabase
@@ -62,7 +66,7 @@ export async function updateDeal(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	dealId: string,
-	values: TablesUpdate<'deals'>
+	values: Pick<TablesUpdate<'deals'>, DealColumn>
 ): Promise<Deal> {
 	return unwrap(
 		await supabase
@@ -80,5 +84,8 @@ export async function deleteDeal(
 	orgId: string,
 	dealId: string
 ): Promise<void> {
-	ensure(await supabase.from('deals').delete().eq('org_id', orgId).eq('id', dealId));
+	unwrapDeleted(
+		await supabase.from('deals').delete().eq('org_id', orgId).eq('id', dealId).select('id'),
+		'Deal'
+	);
 }

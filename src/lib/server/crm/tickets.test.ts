@@ -6,7 +6,8 @@ import {
 	deleteTicketComment,
 	getTicket,
 	listTickets,
-	updateTicket
+	updateTicket,
+	updateTicketComment
 } from './tickets';
 import { ORG_ID, supabaseMock } from './test-support';
 
@@ -81,18 +82,40 @@ describe('tickets data access', () => {
 		});
 	});
 
-	it('deletes tickets and comments scoped to org and id', async () => {
-		const { supabase, from, builder } = supabaseMock({});
+	it('edits a comment scoped to org and id', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: 'comment-1' } });
 
-		await deleteTicket(supabase, ORG_ID, TICKET_ID);
-		expect(from).toHaveBeenCalledWith('support_tickets');
-		expect(builder.delete).toHaveBeenCalled();
+		await updateTicketComment(supabase, ORG_ID, 'comment-1', { body: 'Edited.' });
+		expect(from).toHaveBeenCalledWith('ticket_comments');
+		expect(builder.update).toHaveBeenCalledWith({ body: 'Edited.' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
-		expect(builder.eq).toHaveBeenCalledWith('id', TICKET_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', 'comment-1');
+	});
+
+	it('deletes tickets scoped to org and id, with evidence, throwing on zero rows', async () => {
+		const deleted = supabaseMock({ data: [{ id: TICKET_ID }] });
+		await deleteTicket(deleted.supabase, ORG_ID, TICKET_ID);
+		expect(deleted.from).toHaveBeenCalledWith('support_tickets');
+		expect(deleted.builder.delete).toHaveBeenCalled();
+		expect(deleted.builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(deleted.builder.eq).toHaveBeenCalledWith('id', TICKET_ID);
+		expect(deleted.builder.select).toHaveBeenCalledWith('id');
+
+		const filtered = supabaseMock({ data: [] });
+		await expect(deleteTicket(filtered.supabase, ORG_ID, TICKET_ID)).rejects.toThrow(
+			'Ticket was not deleted'
+		);
+	});
+
+	it('deletes comments scoped to org and id, with evidence', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [{ id: 'comment-1' }] });
 
 		await deleteTicketComment(supabase, ORG_ID, 'comment-1');
 		expect(from).toHaveBeenCalledWith('ticket_comments');
+		expect(builder.delete).toHaveBeenCalled();
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', 'comment-1');
+		expect(builder.select).toHaveBeenCalledWith('id');
 	});
 
 	it('throws the PostgREST message when a mutation fails', async () => {

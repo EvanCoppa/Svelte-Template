@@ -41,6 +41,20 @@ describe('tasks data access', () => {
 		expect(builder.update).toHaveBeenCalledWith({ completed_at: null });
 	});
 
+	it('deletes scoped to org and id, with evidence, throwing on zero rows', async () => {
+		const deleted = supabaseMock({ data: [{ id: TASK_ID }] });
+		await deleteTask(deleted.supabase, ORG_ID, TASK_ID);
+		expect(deleted.builder.delete).toHaveBeenCalled();
+		expect(deleted.builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(deleted.builder.eq).toHaveBeenCalledWith('id', TASK_ID);
+		expect(deleted.builder.select).toHaveBeenCalledWith('id');
+
+		const filtered = supabaseMock({ data: [] });
+		await expect(deleteTask(filtered.supabase, ORG_ID, TASK_ID)).rejects.toThrow(
+			'Task was not deleted'
+		);
+	});
+
 	it('throws the PostgREST message when a query fails', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'boom' } });
 
