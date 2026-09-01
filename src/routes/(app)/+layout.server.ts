@@ -17,8 +17,11 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 
 	// RLS scopes this to the signed-in user's memberships; the joins pull the
 	// org row and its tier in the same round trip. The embed names its foreign
-	// key explicitly: `member_roles` also points at both tables, so a bare
-	// `organizations(...)` is an ambiguous relationship to PostgREST (PGRST201).
+	// key explicitly: deals, tasks, support_tickets, notifications and
+	// member_roles all point at both tables, so PostgREST reads each of them as
+	// a junction and a bare `organizations(...)` is an ambiguous relationship
+	// (PGRST201). Any future table scoped to both an org and a member adds
+	// another candidate path, so the hint has to stay.
 	const { data: memberships, error: orgError } = await locals.supabase
 		.from('organization_members')
 		.select(
@@ -27,6 +30,10 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		.eq('user_id', locals.user.id);
 
 	if (orgError) {
+		// Surfacing the cause matters: every failure here renders the same vague
+		// banner, so without this line a schema-level fault is indistinguishable
+		// from an outage. The operator gets the detail, the browser does not.
+		console.error('[(app)/layout] failed to load organizations', orgError);
 		throw error(500, 'Could not load your organizations.');
 	}
 
