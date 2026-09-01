@@ -109,9 +109,12 @@ on conflict (id) do update set display_name = excluded.display_name;
 -- Two shared organizations on top of the personal orgs the signup trigger /
 -- backfill created. Acme is the multi-member fixture; Globex exists so the
 -- E2E user has an org they are deliberately NOT in (tenant-isolation checks).
-insert into public.organizations (id, name, tier_id) values
-	('10000000-0000-0000-0000-000000000001', 'Acme Inc', 'pro'),
-	('10000000-0000-0000-0000-000000000002', 'Globex', 'free')
+-- Industries are spelled out for determinism: Acme keeps the 'general'
+-- default, Globex is 'construction' so the two orgs draw from different
+-- role sets (see the member_roles fixture below).
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000001', 'Acme Inc', 'pro', 'general'),
+	('10000000-0000-0000-0000-000000000002', 'Globex', 'free', 'construction')
 on conflict (id) do nothing;
 
 -- Memberships. `do update` keeps roles deterministic across re-seeds.
@@ -184,30 +187,19 @@ insert into public.notifications (id, org_id, user_id, type, title, body, link) 
 		'Send renewal quote', '/tasks')
 on conflict (id) do nothing;
 
--- Roles & permissions fixtures. Both orgs get a role named 'Support' with
--- different grants on purpose — the cross-org divergence fixture proving that
--- same-named roles are independent per org. Each is assigned to that org's
--- plain member (owners/admins hold implicit 'manage' and need no role).
---   Acme 'Support':   tickets → manage, clients → read; held by e2e
---   Globex 'Support': clients → manage;                 held by dev
-insert into public.roles (id, org_id, name, description) values
-	('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'Support', 'Works the ticket queue; can look clients up.'),
-	('a0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002',
-		'Support', 'Manages the client list.')
-on conflict (id) do nothing;
-
-insert into public.role_permissions (org_id, role_id, permission_id, level) values
-	('10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'tickets', 'manage'),
-	('10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'clients', 'read'),
-	('10000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'clients', 'manage')
-on conflict (role_id, permission_id) do nothing;
-
+-- Role assignments only — the roles themselves and their grants are
+-- industry-scoped reference data shipped by the roles_permissions migration
+-- (the b0000000-… ids). Each org's plain member gets its industry's
+-- 'Support' role: same name, different grants per industry — the
+-- cross-industry divergence fixture. Owners/admins hold implicit 'manage'
+-- on everything and need no role.
+--   Acme (general):        e2e holds general 'Support' (tickets manage, clients read)
+--   Globex (construction): dev holds construction 'Support' (clients manage)
 insert into public.member_roles (org_id, user_id, role_id) values
 	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
-		'a0000000-0000-0000-0000-000000000001'),
+		'b0000000-0000-0000-0000-000000000001'),
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001',
-		'a0000000-0000-0000-0000-000000000002')
+		'b0000000-0000-0000-0000-000000000003')
 on conflict (org_id, user_id, role_id) do nothing;
 
 drop table seed_users;
