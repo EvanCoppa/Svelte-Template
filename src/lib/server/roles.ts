@@ -42,7 +42,7 @@ export type PermissionGrant = Pick<Tables<'role_permissions'>, 'permission_id' |
 export type RoleWithPermissions = Role & { role_permissions: PermissionGrant[] };
 
 /** Union of a user's grants: permission key → strongest level held. */
-export type PermissionGrants = Partial<Record<string, PermissionLevel>>;
+export type PermissionGrants = ReadonlyMap<string, PermissionLevel>;
 
 /** Everything access-related about one user in one org, in one shape. */
 export type UserAccess = {
@@ -80,9 +80,9 @@ export async function getUserAccess(
 
 /** Folds grant lists from several roles into one map; `manage` wins. */
 export function unionGrants(grantLists: PermissionGrant[][]): PermissionGrants {
-	const grants: PermissionGrants = {};
+	const grants = new Map<string, PermissionLevel>();
 	for (const { permission_id, level } of grantLists.flat()) {
-		if (grants[permission_id] !== 'manage') grants[permission_id] = level;
+		if (grants.get(permission_id) !== 'manage') grants.set(permission_id, level);
 	}
 	return grants;
 }
@@ -97,7 +97,7 @@ export function can(
 	level: PermissionLevel = 'read'
 ): boolean {
 	if (access.role === 'owner' || access.role === 'admin') return true;
-	const held = access.grants[permission];
+	const held = access.grants.get(permission);
 	return held !== undefined && (level === 'read' || held === 'manage');
 }
 

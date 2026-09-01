@@ -184,4 +184,30 @@ insert into public.notifications (id, org_id, user_id, type, title, body, link) 
 		'Send renewal quote', '/tasks')
 on conflict (id) do nothing;
 
+-- Roles & permissions fixtures. Both orgs get a role named 'Support' with
+-- different grants on purpose — the cross-org divergence fixture proving that
+-- same-named roles are independent per org. Each is assigned to that org's
+-- plain member (owners/admins hold implicit 'manage' and need no role).
+--   Acme 'Support':   tickets → manage, clients → read; held by e2e
+--   Globex 'Support': clients → manage;                 held by dev
+insert into public.roles (id, org_id, name, description) values
+	('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Support', 'Works the ticket queue; can look clients up.'),
+	('a0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002',
+		'Support', 'Manages the client list.')
+on conflict (id) do nothing;
+
+insert into public.role_permissions (org_id, role_id, permission_id, level) values
+	('10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'tickets', 'manage'),
+	('10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'clients', 'read'),
+	('10000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'clients', 'manage')
+on conflict (role_id, permission_id) do nothing;
+
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
+		'a0000000-0000-0000-0000-000000000001'),
+	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001',
+		'a0000000-0000-0000-0000-000000000002')
+on conflict (org_id, user_id, role_id) do nothing;
+
 drop table seed_users;

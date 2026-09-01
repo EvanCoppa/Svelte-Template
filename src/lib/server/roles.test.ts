@@ -13,6 +13,7 @@ import {
 	unassignRole,
 	unionGrants,
 	updateRole,
+	type PermissionLevel,
 	type UserAccess
 } from './roles';
 import { ORG_ID, supabaseMock } from './crm/test-support';
@@ -20,10 +21,10 @@ import { ORG_ID, supabaseMock } from './crm/test-support';
 const USER_ID = '00000000-0000-0000-0000-000000000002';
 const ROLE_ID = 'a0000000-0000-0000-0000-000000000001';
 
-const member = (grants: UserAccess['grants']): UserAccess => ({
+const member = (grants: [string, PermissionLevel][]): UserAccess => ({
 	role: 'member',
 	roles: [{ id: ROLE_ID, name: 'Support' }],
-	grants
+	grants: new Map(grants)
 });
 
 describe('getUserAccess', () => {
@@ -60,14 +61,20 @@ describe('getUserAccess', () => {
 			{ id: ROLE_ID, name: 'Support' },
 			{ id: 'a0000000-0000-0000-0000-000000000002', name: 'Sales' }
 		]);
-		expect(access.grants).toEqual({ tickets: 'manage', clients: 'manage', deals: 'read' });
+		expect(access.grants).toEqual(
+			new Map([
+				['tickets', 'manage'],
+				['clients', 'manage'],
+				['deals', 'read']
+			])
+		);
 	});
 
 	it('returns empty grants for a user holding no roles', async () => {
 		const { supabase } = supabaseMock({ data: [] });
 
 		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member');
-		expect(access).toEqual({ role: 'member', roles: [], grants: {} });
+		expect(access).toEqual({ role: 'member', roles: [], grants: new Map() });
 	});
 });
 
@@ -78,35 +85,35 @@ describe('unionGrants', () => {
 				[{ permission_id: 'clients', level: 'manage' }],
 				[{ permission_id: 'clients', level: 'read' }]
 			])
-		).toEqual({ clients: 'manage' });
+		).toEqual(new Map([['clients', 'manage']]));
 		expect(
 			unionGrants([
 				[{ permission_id: 'clients', level: 'read' }],
 				[{ permission_id: 'clients', level: 'manage' }]
 			])
-		).toEqual({ clients: 'manage' });
+		).toEqual(new Map([['clients', 'manage']]));
 	});
 });
 
 describe('can', () => {
 	it('hides everything from a member with no grant', () => {
-		expect(can(member({}), 'clients')).toBe(false);
-		expect(can(member({}), 'clients', 'manage')).toBe(false);
+		expect(can(member([]), 'clients')).toBe(false);
+		expect(can(member([]), 'clients', 'manage')).toBe(false);
 	});
 
 	it('read grants read but not manage; manage implies read', () => {
-		const reader = member({ clients: 'read' });
+		const reader = member([['clients', 'read']]);
 		expect(can(reader, 'clients')).toBe(true);
 		expect(can(reader, 'clients', 'manage')).toBe(false);
 
-		const manager = member({ clients: 'manage' });
+		const manager = member([['clients', 'manage']]);
 		expect(can(manager, 'clients')).toBe(true);
 		expect(can(manager, 'clients', 'manage')).toBe(true);
 	});
 
 	it('owners and admins bypass grants entirely', () => {
 		for (const role of ['owner', 'admin'] as const) {
-			const access: UserAccess = { role, roles: [], grants: {} };
+			const access: UserAccess = { role, roles: [], grants: new Map() };
 			expect(can(access, 'anything', 'manage')).toBe(true);
 		}
 	});
@@ -114,13 +121,13 @@ describe('can', () => {
 
 describe('requirePermission', () => {
 	it('passes silently when access suffices', () => {
-		expect(() => requirePermission(member({ clients: 'read' }), 'clients')).not.toThrow();
+		expect(() => requirePermission(member([['clients', 'read']]), 'clients')).not.toThrow();
 	});
 
 	it('throws a 403 HttpError when it does not', () => {
 		let thrown: unknown;
 		try {
-			requirePermission(member({}), 'clients');
+			requirePermission(member([]), 'clients');
 		} catch (err) {
 			thrown = err;
 		}
