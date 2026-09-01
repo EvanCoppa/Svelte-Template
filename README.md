@@ -206,14 +206,19 @@ type NewProfile = TablesInsert<'profiles'>;
 
 ## The app shell
 
-`src/lib/navigation.ts` is the single source of truth: the sidebar sections and the
-⌘K palette both render from it. Adding a page:
+The sidebar sections and the ⌘K palette both render from the **feature registry**
+(`features` table, resolved per org in `src/lib/server/org-context.ts` and filtered by
+`buildNav()` in `src/lib/navigation.ts`). Adding a page:
 
 1. Create `src/routes/(app)/reports/+page.svelte` — it's automatically protected and
    gets the sidebar/header shell.
-2. Add one entry to `navItems` with a one-per-file lucide icon import.
+2. Register the feature in a migration: its row in `features` (route, icon slug,
+   category), which industries include it, which tiers unlock it. Add its id to
+   `FEATURE_IDS` in `src/lib/features/types.ts`.
 
-That's the whole checklist.
+That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
+plan lacks it is sent to `/upgrade`, one whose industry lacks it gets a 404, and the
+org can switch it off for itself under `/settings/features`. See `docs/features.md`.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
 or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it

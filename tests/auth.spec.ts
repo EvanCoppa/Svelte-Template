@@ -95,12 +95,35 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
-	test('renders every navigation entry in the sidebar', async ({ page }) => {
-		// navItems drives both the sidebar and the palette, so this is really a
-		// check that src/lib/navigation.ts reached the shell.
-		for (const label of ['Dashboard', 'Settings', 'Components', 'Best Practices']) {
+	test('renders every navigation entry the session may see', async ({ page }) => {
+		// The static pages plus the features resolved for the active org and
+		// readable by the user (seed.sql: e2e is an Acme member holding the
+		// general 'Support' role). Tasks is switched off by the org and Deals
+		// carries no grant for Support, so neither may appear.
+		for (const label of [
+			'Dashboard',
+			'Clients',
+			'Tickets',
+			'Settings',
+			'Components',
+			'Best Practices'
+		]) {
 			await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
 		}
+		await expect(page.getByRole('button', { name: 'Tasks' })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
+	});
+
+	test('marks a feature outside the plan as locked and sends it to the upgrade page', async ({
+		page
+	}) => {
+		// Best Practices is enterprise-only; Acme is on Pro -> locked_visible.
+		const entry = page.getByRole('button', { name: /Best Practices/ }).first();
+		await expect(entry.locator('..').locator('[data-slot="sidebar-menu-badge"]')).toBeVisible();
+
+		await clickWhenLive(entry, () => expect(page).toHaveURL('/upgrade?feature=best-practices'));
+		await expect(page).toHaveTitle('Upgrade');
+		await expect(page.getByText(/Best Practices isn't included in the Pro plan/)).toBeVisible();
 	});
 
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
@@ -117,13 +140,13 @@ test.describe('the app shell', () => {
 		);
 
 		const palette = page.getByRole('dialog');
-		await palette.getByRole('combobox').fill('best');
+		await palette.getByRole('combobox').fill('shadcn');
 		await palette
-			.getByRole('option', { name: /best practices/i })
+			.getByRole('option', { name: /components/i })
 			.first()
 			.click();
 
-		await expect(page).toHaveURL('/best-practices');
+		await expect(page).toHaveURL('/components');
 	});
 
 	test('opens the palette with the keyboard shortcut', async ({ page }) => {
@@ -133,6 +156,35 @@ test.describe('the app shell', () => {
 		}).toPass({ timeout: 20_000 });
 
 		await expect(page.getByRole('combobox')).toBeVisible();
+	});
+
+	test('bounces a locked feature route to the upgrade page', async ({ page }) => {
+		// Gated in hooks.server.ts before any load runs — typing the URL is no
+		// way around a missing plan.
+		await page.goto('/best-practices');
+		await expect(page).toHaveURL('/upgrade?feature=best-practices');
+	});
+
+	test('sends a feature the org switched off to the feature settings', async ({ page }) => {
+		// seed.sql: Acme turned Tasks off. A member sees why, read-only.
+		await page.goto('/tasks');
+		await expect(page).toHaveURL('/settings/features?feature=tasks');
+		await expect(page.getByText(/Tasks is turned off for this organization/)).toBeVisible();
+		await expect(page.locator('[data-slot="switch"]').first()).toBeDisabled();
+	});
+
+	test('answers 403 for a feature the user holds no grant on', async ({ page }) => {
+		// Deals is enabled for Acme (Pro), but the Support role grants nothing
+		// on it. The gate refuses before the route exists as far as the client
+		// can tell.
+		const response = await page.goto('/deals');
+		expect(response?.status()).toBe(403);
+	});
+
+	test('lists a readable feature page with its seeded rows', async ({ page }) => {
+		await page.goto('/clients');
+		await expect(page).toHaveTitle('Clients');
+		await expect(page.getByRole('cell', { name: 'Wayne Enterprises' })).toBeVisible();
 	});
 
 	test('shows the signed-in user their profile on /settings', async ({ page }) => {

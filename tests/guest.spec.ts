@@ -26,6 +26,16 @@ test.describe('unauthenticated visitor', () => {
 		await expect(page.locator('input[name="next"]')).toHaveValue('/settings');
 	});
 
+	test('asks for a login before the feature gate can answer', async ({ page }) => {
+		// Feature routes and the upgrade page are behind the same default-deny
+		// guard: an anonymous visitor learns nothing about what the org has.
+		await page.goto('/clients');
+		await expect(page).toHaveURL('/login?next=%2Fclients');
+
+		await page.goto('/upgrade?feature=deals');
+		await expect(page).toHaveURL('/login?next=%2Fupgrade%3Ffeature%3Ddeals');
+	});
+
 	test('guards routes that do not exist, rather than leaking a 404', async ({ page }) => {
 		// Default-deny happens in hooks, before routing — so an unknown path is
 		// indistinguishable from a real private one to an anonymous visitor.

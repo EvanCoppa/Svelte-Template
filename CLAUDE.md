@@ -61,7 +61,10 @@ npm run format         # prettier (svelte + tailwind plugins)
 
 - `src/hooks.server.ts` is **default-deny**: every route requires a verified session
   unless its prefix is in `PUBLIC_PATHS` (currently `/login`, `/auth`). New protected
-  pages go under the `(app)` route group and need zero auth wiring.
+  pages go under the `(app)` route group and need zero auth wiring. Signed-in page
+  requests then pass the **feature gate** (see "Multi-tenancy"): a registered
+  route is served only when its feature is enabled for the active org and the
+  user can read it. Errors thrown there render `src/error.html`.
 - Server-side auth decisions use `locals.safeGetSession()` (validates the JWT via
   `getUser()`). Never trust `getSession()` alone in server code, and never put access
   or refresh tokens into data returned from a load or action.
@@ -139,34 +142,53 @@ application data is scoped to an organization, never to a bare user. The
   authenticated user, written only by billing/service-role code. Members can never
   change their own org's `tier_id` (column-level grants enforce this — org writes
   from the browser are limited to `name`).
-- **Fine-grained page access is roles + permissions** (`roles_permissions`
-  migration + `src/lib/server/roles.ts`). Roles are industry-scoped reference
-  data: `industries`, `roles` and `role_permissions` are all tiers-style tables
-  whose rows ship by migration, and an org's `industry_id` (default `general`,
-  set by onboarding/service-role code like `tier_id`) decides which roles its
-  owners/admins can hand out — so onboarding an org needs zero role setup, and
-  two industries can each have a same-named role granting different things.
-  Custom per-org roles are a deliberate future extension, not built yet.
-  Members can hold several roles and access is the union of their grants —
+- **Features are the registry of what the product is** (`features` migration +
+  `src/lib/features/`). A feature is one navigable capability owning a route
+  prefix, and four tiers-style tables map it: `features`, `industry_features`
+  (which verticals include it at all), `tier_features` (which plans unlock it),
+  `organization_feature_overrides` (per-org escape hatch, operator/SQL only) —
+  plus `organization_disabled_features`, the org's own opt-outs (owner/admin via
+  RLS). The pure resolver (`resolve.ts`, mirrored by `private.feature_mode()`)
+  folds them into one mode per feature per session: `enabled`, `locked_visible`
+  (industry has it, plan doesn't — the tier axis, shown with an upgrade prompt),
+  `disabled` (the org switched it off), `hidden` (not in the industry — does not
+  exist). **`hooks.server.ts` enforces the mode** next to the auth check via
+  `featureGateFor()` (locked → `/upgrade?feature=`, disabled →
+  `/settings/features?feature=`, hidden → 404), so a page is gated by being
+  registered, never by a check in its load. Adding a page = the route + one
+  migration inserting its rows (the migration's closing comment is the
+  checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
+  the registry, and `/settings` and `/upgrade` are the gate's exempt surfaces.
+- **Roles grant read/manage on features** (`roles_permissions` migration +
+  `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
+  are the keys). Roles are industry-scoped reference data: `industries`, `roles`
+  and `role_permissions` ship by migration, and an org's `industry_id` (default
+  `general`, set by onboarding/service-role code like `tier_id`) decides which
+  roles its owners/admins can hand out — so onboarding an org needs zero role
+  setup, and two industries can each have a same-named role granting different
+  things. Custom per-org roles are a deliberate future extension, not built
+  yet. Members can hold several roles and access is the union of their grants —
   `manage` implies `read`, owner/admin implicitly hold `manage` on everything.
-  The `permissions` table is one key per gated page/feature, rows added by
-  migration as pages are built — mirror each new key in the `PermissionId`
-  union so typos are `check` errors. Gate a page in its load with
-  `getUserAccess()` + `requirePermission()` (a page is hidden without `read`;
-  add/edit/delete needs `manage`); this is app-level gating like tier gating —
-  use `private.permission_level(org_id, 'key')` in a policy only when a
-  permission is a real security boundary. Assigning/unassigning roles is
-  owner/admin via RLS (only roles from the org's industry), never a
-  permission itself.
+  Access is the **intersection** of the feature's mode and the grant: the hook
+  also refuses (403) an enabled feature the user cannot `read`, so loads need
+  no check; writes open with `requirePermission(locals.org.access, 'key',
+'manage')`. This is app-level gating like tier gating — use
+  `private.feature_enabled()` / `private.feature_level()` in a policy only when
+  a feature is a real security boundary. Assigning/unassigning roles is
+  owner/admin via RLS (only roles from the org's industry), never a feature.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.
 - **The active org is a cookie** (`src/lib/server/active-org.ts`), resolved and
-  repaired in `src/routes/(app)/+layout.server.ts`, which gives every `(app)` page
-  `{ organizations, activeOrg }` (`activeOrg` carries `role` + tier) under
-  `QUERY.org`. Child loads filter by `locals.activeOrgId`; it is a UI preference,
-  not an auth decision — RLS is the boundary, a forged cookie yields zero rows.
-  Switching goes through `PUT /api/org` (the team switcher) + `invalidate(QUERY.org)`.
+  repaired once per request in `hooks.server.ts` via `loadOrgContext()`
+  (`src/lib/server/org-context.ts`), which puts `{ organizations, activeOrg,
+features, access }` on `locals.org` — the hook gates the route on it, and
+  `src/routes/(app)/+layout.server.ts` hands every `(app)` page `organizations`,
+  `activeOrg` (`role` + tier + industry) and the filtered `nav` under `QUERY.org`
+  and `QUERY.features` (grants never reach the browser). Child loads filter by
+  `locals.activeOrgId`; it is a UI preference, not an auth decision — RLS is the
+  boundary, a forged cookie yields zero rows. Switching goes through `PUT
+/api/org` (the team switcher) + `invalidate(QUERY.org)`.
 - **CRM working data is member-writable** — a documented extension of the canonical
   shape, not a drift. The `crm_core` migration is the reference: members create and
   edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
@@ -275,9 +297,15 @@ tests — keep them green and extend them.
 
 ## Navigation
 
-`src/lib/navigation.ts` drives both the sidebar and the ⌘K palette. Adding a page =
-create the route under `(app)` + add one `navItems` entry. Icons are one-per-file
-imports (`@lucide/svelte/icons/<name>`) — never the barrel import.
+`src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
+come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
+`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
+that is `enabled` or `locked_visible` for the active org and readable by the user.
+Adding a page = create the route under `(app)` + register the feature by migration;
+nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
+clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
+only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
+when a feature needs it; never the barrel import.
 
 ## Svelte reference docs
 

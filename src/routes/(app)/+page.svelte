@@ -19,7 +19,7 @@
 		{
 			icon: PaletteIcon,
 			title: 'App shell',
-			body: 'Collapsible sidebar with hover-peek, sticky blurred header, ⌘K palette, dark mode — all driven by one navigation config.'
+			body: 'Collapsible sidebar with hover-peek, sticky blurred header, ⌘K palette, dark mode — every entry resolved from the feature registry for the active org.'
 		},
 		{
 			icon: BlocksIcon,
