@@ -16,6 +16,14 @@ declare global {
 			safeGetSession: () => Promise<{ session: Session | null; user: User | null }>;
 			session: Session | null;
 			user: User | null;
+			/**
+			 * The active-organization cookie's value, when it parses as a UUID.
+			 * A convenience for child loads (filter tenant data without an
+			 * `await parent()` waterfall) — never an auth decision: RLS returns
+			 * zero rows for an org the user is not a member of, and the (app)
+			 * layout load repairs a stale cookie.
+			 */
+			activeOrgId: string | null;
 		}
 		interface PageData {
 			session: Session | null;

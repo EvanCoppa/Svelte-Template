@@ -2,11 +2,11 @@
 	import type { ComponentProps } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import AppLogo from '$lib/components/app-logo.svelte';
 	import NavUser from '$lib/components/nav-user.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { groupNav, isNavItemActive, navItems } from '$lib/navigation';
+	import type { OrgMembership } from '$lib/org';
 
 	let {
 		ref = $bindable(null),
@@ -14,15 +14,17 @@
 		...restProps
 	}: ComponentProps<typeof Sidebar.Root> = $props();
 
-	const teams = [{ name: 'Acme Inc', logo: AppLogo, plan: 'Template' }];
-
+	// These come from the (app) layout load, which App.PageData doesn't declare
+	// globally — the annotations keep the derived values fully typed.
+	let organizations: OrgMembership[] = $derived(page.data.organizations);
+	let activeOrg: OrgMembership = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
 	let groups = $derived(groupNav(navItems));
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
 	<Sidebar.Header>
-		<TeamSwitcher {teams} />
+		<TeamSwitcher {organizations} {activeOrg} />
 	</Sidebar.Header>
 	<Sidebar.Content class="scrollable-sidebar group-data-[peek=true]:pr-2">
 		{#each groups as group (group.key)}

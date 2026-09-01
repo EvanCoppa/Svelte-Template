@@ -28,6 +28,7 @@ the patterns as requirements for new code, and as the rubric for auditing old co
 ## The app's performance architecture — use these, never rebuild them
 
 **Server-side caching**
+
 - `$lib/server/cache.ts` — `cached(key, ttlMs, fn)` with in-flight dedupe and
   stale-on-error, plus `bust(prefix)`. The generic TTL primitive is
   `$lib/server/ttl-cache.ts` (`TtlCache`), used by the hooks session pipeline.
@@ -41,6 +42,7 @@ the patterns as requirements for new code, and as the rubric for auditing old co
   signal. Never add a sequential query to this path; join the batch.
 
 **Client-side caching & streaming**
+
 - `$lib/cache/cached-resource.svelte.ts` — `CachedResource<T>` (SWR: `freshForMs` /
   `ttlMs`, `user:org` scope keying via `cacheScopeFrom`, single-flight, abortable,
   `mutate()` for optimistic patches, self-registered for `clearAllCaches()` on
@@ -48,12 +50,13 @@ the patterns as requirements for new code, and as the rubric for auditing old co
   opt-in, non-PHI reference data ONLY), `memory`.
 - The **streamed-load + cache-seed pattern** is documented in `src/lib/cache/README.md`
   and live on `/treatment-plans`: the server load awaits auth gates but returns heavy
-  queries as *unawaited* promises under a `streamed` key; the page renders the cached
+  queries as _unawaited_ promises under a `streamed` key; the page renders the cached
   seed instantly and a supersession-guarded effect awaits the promise and re-seeds.
 - `$lib/cache/optimistic.ts` — `optimistic()` for mutations that should paint before
   the server confirms.
 
 **Invalidation**
+
 - Named query keys, shape `app:<entity>[:<id>]`, declared with `event.depends('app:…')`
   in the load and refreshed with `invalidate('app:…')` at the event source. The full
   convention (and the key list — reuse keys, don't mint near-duplicates) is
@@ -61,12 +64,14 @@ the patterns as requirements for new code, and as the rubric for auditing old co
   auth-flow exceptions; `window.location.reload()` is worse.
 
 **Bundle**
+
 - Icons: deep-import per icon (`@lucide/svelte/icons/x`). Runtime/DB-resolved icons go
   through the lazy `LazyIcon` in `$lib/features/icon-resolver`. The barrel + eager
   glob combination once cost ~2 MB of eager JS on every page (4.3 MB → 1.0 MB when
   fixed) — that is the scale of mistake you are guarding against.
 
 **Motion**
+
 - The root layout already plays a fade-and-lift on every navigation; per-page nav
   transitions are redundant. New in-page motion goes through the
   `transitions-dev`/`transitions-polish` skills: `transform`/`opacity` only,
@@ -116,7 +121,7 @@ corners.
    loops. The reports page (`src/routes/reports/`) is the worked example.
 9. **Cache misuse** — anything org-mutable (organization_settings, the profile,
    feature overrides) or `null`/error results being cached; a cache key that omits the
-   org/user scope (cross-tenant leak — this is a correctness *and* security finding);
+   org/user scope (cross-tenant leak — this is a correctness _and_ security finding);
    PHI in the `local` storage tier; a hand-rolled module-level `let cache = …` where
    `cached()` / `TtlCache` / `CachedResource` should be used.
 10. **Streaming misapplied** — a heavy in-app page whose navigation blocks on its
@@ -135,8 +140,8 @@ corners.
 ## Write mode — a new page, performant by default
 
 1. **Classify the page.** Reached from inside the app and query-heavy → streamed load
-   + `CachedResource` seed (README pattern). Cold landing page → `await` everything;
-   no skeleton theater. Light page → plain awaited load, no cache needed.
+   - `CachedResource` seed (README pattern). Cold landing page → `await` everything;
+     no skeleton theater. Light page → plain awaited load, no cache needed.
 2. **One batch per dependency level.** Auth/org gates first (awaited), then every
    independent query in a single `Promise.all`; child rows via nested selects. Select
    only needed columns; counts via head requests; filters and date windows in SQL.
