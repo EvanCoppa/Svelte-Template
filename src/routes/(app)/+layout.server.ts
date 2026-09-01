@@ -16,17 +16,12 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	depends(QUERY.org);
 
 	// RLS scopes this to the signed-in user's memberships; the joins pull the
-	// org row and its tier in the same round trip.
-	//
-	// The `!organization_members_org_id_fkey` hint is load-bearing, not
-	// decoration. Every tenant-scoped table that composite-FKs back to
-	// organization_members (deals, tasks, support_tickets, notifications,
-	// member_roles) also references organizations, so PostgREST reads each of
-	// them as a junction table and finds six candidate paths from
-	// organization_members to organizations. Faced with more than one it
-	// refuses to guess and fails the whole request with PGRST201 — naming the
-	// constraint pins the direct org_id path. Any future table scoped to both
-	// an org and a member adds another candidate, so this hint has to stay.
+	// org row and its tier in the same round trip. The embed names its foreign
+	// key explicitly: deals, tasks, support_tickets, notifications and
+	// member_roles all point at both tables, so PostgREST reads each of them as
+	// a junction and a bare `organizations(...)` is an ambiguous relationship
+	// (PGRST201). Any future table scoped to both an org and a member adds
+	// another candidate path, so the hint has to stay.
 	const { data: memberships, error: orgError } = await locals.supabase
 		.from('organization_members')
 		.select(
