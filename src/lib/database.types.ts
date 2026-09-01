@@ -177,6 +177,24 @@ export type Database = {
           },
         ]
       }
+      industries: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       member_roles: {
         Row: {
           created_at: string
@@ -212,11 +230,11 @@ export type Database = {
             referencedColumns: ["org_id", "user_id"]
           },
           {
-            foreignKeyName: "member_roles_role_id_org_id_fkey"
-            columns: ["role_id", "org_id"]
+            foreignKeyName: "member_roles_role_id_fkey"
+            columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
-            referencedColumns: ["id", "org_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -349,6 +367,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          industry_id: string
           name: string
           tier_id: string
           updated_at: string
@@ -356,6 +375,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          industry_id?: string
           name: string
           tier_id?: string
           updated_at?: string
@@ -363,11 +383,19 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          industry_id?: string
           name?: string
           tier_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "organizations_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organizations_tier_id_fkey"
             columns: ["tier_id"]
@@ -423,32 +451,22 @@ export type Database = {
         Row: {
           created_at: string
           level: Database["public"]["Enums"]["permission_level"]
-          org_id: string
           permission_id: string
           role_id: string
         }
         Insert: {
           created_at?: string
           level?: Database["public"]["Enums"]["permission_level"]
-          org_id: string
           permission_id: string
           role_id: string
         }
         Update: {
           created_at?: string
           level?: Database["public"]["Enums"]["permission_level"]
-          org_id?: string
           permission_id?: string
           role_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "role_permissions_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "role_permissions_permission_id_fkey"
             columns: ["permission_id"]
@@ -457,11 +475,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "role_permissions_role_id_org_id_fkey"
-            columns: ["role_id", "org_id"]
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
-            referencedColumns: ["id", "org_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -470,32 +488,32 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          industry_id: string
           name: string
-          org_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           description?: string | null
           id?: string
+          industry_id: string
           name: string
-          org_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           description?: string | null
           id?: string
+          industry_id?: string
           name?: string
-          org_id?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "roles_org_id_fkey"
-            columns: ["org_id"]
+            foreignKeyName: "roles_industry_id_fkey"
+            columns: ["industry_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "industries"
             referencedColumns: ["id"]
           },
         ]
