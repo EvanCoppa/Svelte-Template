@@ -7,6 +7,10 @@
  * something `ui/` has no answer for — a one-time-code field, a tag field, a
  * password meter, a button that owns its own pending state.
  *
+ * A few are not Solid Core ports — `UntitledButton` wears the Untitled UI button
+ * skin over the `ui/button` element. Those are alternate skins, chosen on purpose
+ * at a call site; `ui/button` is still the default answer for a button.
+ *
  * Every one of them paints from the theme tokens in `src/app.css`, so they
  * follow the light/dark toggle in `src/lib/theme.svelte.ts` with no extra
  * wiring, and every animation is routed through `$lib/motion.js` so a
@@ -164,6 +168,13 @@ export {
 } from './tooltip-group/index.js';
 export { TreeView, type TreeViewProps, type TreeNode, type TreeRow } from './tree-view/index.js';
 export { TypingIndicator, type TypingIndicatorProps } from './typing-indicator/index.js';
+export {
+	UntitledButton,
+	untitledButtonVariants,
+	type UntitledButtonProps,
+	type UntitledButtonColor,
+	type UntitledButtonSize
+} from './untitled-button/index.js';
 export { ValueFlash, type ValueFlashProps, type FlashDirection } from './value-flash/index.js';
 export {
 	WizardSteps,

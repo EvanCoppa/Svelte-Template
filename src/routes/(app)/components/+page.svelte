@@ -63,6 +63,7 @@
 		TreeView,
 		type TreeNode,
 		TypingIndicator,
+		UntitledButton,
 		ValueFlash,
 		WizardSteps,
 		type WizardStep
@@ -91,6 +92,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
@@ -281,6 +283,16 @@
 	async function failToSave() {
 		await wait(1200);
 		throw new Error('The server said no');
+	}
+
+	// Untitled UI button — `loading` is a plain prop, so the page owns the flag.
+	let untitledLoading = $state(false);
+
+	async function runUntitledDemo() {
+		if (untitledLoading) return;
+		untitledLoading = true;
+		await wait(1600);
+		untitledLoading = false;
 	}
 	// Self-contained demo "photos" — inline SVGs instead of a third-party image host,
 	// since the CSP's img-src only allows this app's own origin plus a short allowlist.
@@ -1107,6 +1119,77 @@
 				/>
 				<CopyButton value="sb_publishable_example_key" />
 				<CopyButton value="npx shadcn-svelte@latest add button" label="Copy command" />
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Untitled UI buttons (enhanced)</Card.Title>
+				<Card.Description>
+					The <a
+						href="https://www.untitledui.com/react/components/buttons"
+						target="_blank"
+						rel="noreferrer">Untitled UI</a
+					>
+					skin — skeuomorphic edge, faded inner border, offset focus outline — painted from this app's
+					tokens onto the same <code>ui/button</code> element. Nine
+					<code>color</code>s and five <code>size</code>s, plus <code>loading</code> and leading/trailing
+					icon snippets.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton>Primary</UntitledButton>
+					<UntitledButton color="secondary">Secondary</UntitledButton>
+					<UntitledButton color="tertiary">Tertiary</UntitledButton>
+					<UntitledButton color="link-color">Link color</UntitledButton>
+					<UntitledButton color="link-gray">Link gray</UntitledButton>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton color="primary-destructive">Delete</UntitledButton>
+					<UntitledButton color="secondary-destructive">Delete</UntitledButton>
+					<UntitledButton color="tertiary-destructive">Delete</UntitledButton>
+					<UntitledButton color="link-destructive">Delete</UntitledButton>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton size="xs">Extra small</UntitledButton>
+					<UntitledButton size="sm">Small</UntitledButton>
+					<UntitledButton size="md">Medium</UntitledButton>
+					<UntitledButton size="lg">Large</UntitledButton>
+					<UntitledButton size="xl">Extra large</UntitledButton>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton color="secondary">
+						{#snippet iconLeading()}<PlusIcon />{/snippet}
+						New deal
+					</UntitledButton>
+					<UntitledButton color="secondary">
+						Continue
+						{#snippet iconTrailing()}<ArrowRightIcon />{/snippet}
+					</UntitledButton>
+					<UntitledButton color="secondary" aria-label="Add">
+						{#snippet iconLeading()}<PlusIcon />{/snippet}
+					</UntitledButton>
+					<UntitledButton href="/settings" color="link-color">
+						Settings
+						{#snippet iconTrailing()}<ArrowRightIcon />{/snippet}
+					</UntitledButton>
+					<UntitledButton disabled>Disabled</UntitledButton>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton loading={untitledLoading} onclick={runUntitledDemo}>
+						Save changes
+					</UntitledButton>
+					<UntitledButton
+						color="secondary"
+						loading={untitledLoading}
+						showTextWhileLoading
+						onclick={runUntitledDemo}
+					>
+						{#snippet iconLeading()}<PlusIcon />{/snippet}
+						Save changes
+					</UntitledButton>
+				</div>
 			</Card.Content>
 		</Card.Root>
 

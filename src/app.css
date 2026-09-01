@@ -30,6 +30,15 @@
 	--text-tertiary: #8e8e9a;
 	--text-link: #111114;
 
+	/*
+	 * Skeuomorphic button shadow: a hairline inset ring, a darker bottom edge and
+	 * a soft drop shadow, so a filled surface reads as a physical key rather than
+	 * a flat rectangle. Exposed as `shadow-skeuomorphic` via `@theme inline`.
+	 */
+	--skeuomorphic:
+		0 0 0 1px rgb(0 0 0 / 0.18) inset, 0 -2px 0 0 rgb(0 0 0 / 0.05) inset,
+		0 1px 2px 0 rgb(0 0 0 / 0.05);
+
 	/* ── shadcn-svelte theme (light) ── */
 	--background: #ffffff;
 	--foreground: #111114;
@@ -77,6 +86,11 @@ html.dark {
 	--text-secondary: #a0a0ab;
 	--text-tertiary: #6b6b76;
 	--text-link: #e8e8ed;
+
+	/* On a dark surface the edge reads as a top highlight, not a bottom shade. */
+	--skeuomorphic:
+		0 1px 0 0 rgb(255 255 255 / 0.08) inset, 0 0 0 1px rgb(0 0 0 / 0.4) inset,
+		0 1px 2px 0 rgb(0 0 0 / 0.4);
 
 	--background: #09090b;
 	--foreground: #e8e8ed;
@@ -138,6 +152,7 @@ html.dark {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--shadow-skeuomorphic: var(--skeuomorphic);
 }
 
 @layer base {
