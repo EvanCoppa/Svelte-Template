@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import SearchDialog from '$lib/components/search-dialog.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { theme } from '$lib/theme.svelte';
@@ -39,7 +38,7 @@
 					<SunIcon size={18} />
 				{/if}
 			</button>
-			<form method="POST" action="/logout" use:enhance style="display: contents;">
+			<form method="POST" action="/logout" style="display: contents;">
 				<button type="submit" class="icon-btn" aria-label="Log out">
 					<LogOutIcon size={18} />
 				</button>

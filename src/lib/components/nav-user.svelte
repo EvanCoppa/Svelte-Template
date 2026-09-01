@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { User } from '@supabase/supabase-js';
 	import { goto } from '$app/navigation';
-	import { enhance } from '$app/forms';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -95,7 +94,7 @@
 					</DropdownMenu.Item>
 				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
-				<form method="POST" action="/logout" use:enhance>
+				<form method="POST" action="/logout">
 					<DropdownMenu.Item
 						onclick={(e) => {
 							e.preventDefault();
