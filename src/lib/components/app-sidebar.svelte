@@ -11,13 +11,14 @@
 	let {
 		ref = $bindable(null),
 		collapsible = 'offcanvas',
+		organizations,
+		activeOrg,
 		...restProps
-	}: ComponentProps<typeof Sidebar.Root> = $props();
+	}: ComponentProps<typeof Sidebar.Root> & {
+		organizations: OrgMembership[];
+		activeOrg: OrgMembership;
+	} = $props();
 
-	// These come from the (app) layout load, which App.PageData doesn't declare
-	// globally — the annotations keep the derived values fully typed.
-	let organizations: OrgMembership[] = $derived(page.data.organizations);
-	let activeOrg: OrgMembership = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
 	let groups = $derived(groupNav(navItems));
 </script>

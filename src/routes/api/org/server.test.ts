@@ -7,7 +7,11 @@ const USER_ID = '20000000-0000-0000-0000-000000000001';
 
 type MembershipRow = { org_id: string } | null;
 
-function event(body: string, membership: MembershipRow) {
+function event(
+	body: string,
+	membership: MembershipRow,
+	user: { id: string } | null = { id: USER_ID }
+) {
 	const maybeSingle = vi.fn(async () => ({ data: membership, error: null }));
 	const query = {
 		select: vi.fn().mockReturnThis(),
@@ -18,7 +22,7 @@ function event(body: string, membership: MembershipRow) {
 	return {
 		request: new Request('http://localhost/api/org', { method: 'PUT', body }),
 		locals: {
-			user: { id: USER_ID },
+			user,
 			supabase: { from: vi.fn(() => query) }
 		},
 		cookies,
@@ -44,6 +48,12 @@ async function status(e: ReturnType<typeof event>): Promise<number> {
 }
 
 describe('PUT /api/org', () => {
+	it('401s when no user is on locals (defense in depth behind the hook)', async () => {
+		const e = event(JSON.stringify({ orgId: ORG_ID }), { org_id: ORG_ID }, null);
+		expect(await status(e)).toBe(401);
+		expect(e.cookies.set).not.toHaveBeenCalled();
+	});
+
 	it('rejects a non-JSON body', async () => {
 		expect(await status(event('not json', { org_id: ORG_ID }))).toBe(400);
 	});

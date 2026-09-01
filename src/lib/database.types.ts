@@ -117,7 +117,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_organization: { Args: { org_name: string }; Returns: string }
     }
     Enums: {
       org_role: "owner" | "admin" | "member"

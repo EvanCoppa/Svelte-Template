@@ -140,8 +140,8 @@ corners.
 ## Write mode — a new page, performant by default
 
 1. **Classify the page.** Reached from inside the app and query-heavy → streamed load
-   - `CachedResource` seed (README pattern). Cold landing page → `await` everything;
-     no skeleton theater. Light page → plain awaited load, no cache needed.
+   with a `CachedResource` seed (README pattern). Cold landing page → `await`
+   everything; no skeleton theater. Light page → plain awaited load, no cache needed.
 2. **One batch per dependency level.** Auth/org gates first (awaited), then every
    independent query in a single `Promise.all`; child rows via nested selects. Select
    only needed columns; counts via head requests; filters and date windows in SQL.

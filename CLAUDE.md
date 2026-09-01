@@ -145,9 +145,11 @@ application data is scoped to an organization, never to a bare user. The
 - **The active org is a cookie** (`src/lib/server/active-org.ts`), resolved and
   repaired in `src/routes/(app)/+layout.server.ts`, which gives every `(app)` page
   `{ organizations, activeOrg }` (`activeOrg` carries `role` + tier) under
-  `QUERY.org`. Child loads filter by `locals.activeOrgId`; it is a UI preference,
-  not an auth decision — RLS is the boundary, a forged cookie yields zero rows.
-  Switching goes through `PUT /api/org` (the team switcher) + `invalidate(QUERY.org)`.
+  `QUERY.org`. Child loads filter by `locals.activeOrgId` — and any load that reads
+  it must also declare `depends(QUERY.org)`, or it keeps serving the previous org's
+  rows after a switch. It is a UI preference, not an auth decision — RLS is the
+  boundary, a forged cookie yields zero rows. Switching goes through `PUT /api/org`
+  (the team switcher) + `invalidate(QUERY.org)`.
 
 ## Database
 
@@ -212,7 +214,8 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 ## Data loading & invalidation
 
 Server data comes from load functions (never `onMount` fetches), using the load-provided
-`fetch`. Loads are side-effect free. Freshness uses **named query keys** — constants in
+`fetch`. Loads are side-effect free (the one sanctioned exception: the `(app)` layout
+load repairing a stale active-org cookie). Freshness uses **named query keys** — constants in
 `src/lib/queries.ts`, declared with `depends(QUERY.x)` and refreshed with
 `invalidate(QUERY.x)` at the event source. `invalidateAll()` is a code smell. The full
 convention is `docs/data-invalidation.md`; the general rules are

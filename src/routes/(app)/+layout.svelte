@@ -7,7 +7,7 @@
 </script>
 
 <Sidebar.Provider open={data.sidebarOpen}>
-	<AppSidebar />
+	<AppSidebar organizations={data.organizations} activeOrg={data.activeOrg} />
 	<Sidebar.Inset>
 		<AppHeader />
 		<div class="app-content">

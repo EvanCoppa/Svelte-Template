@@ -14,6 +14,12 @@ import type { RequestHandler } from './$types';
 const bodySchema = z.object({ orgId: z.guid() });
 
 export const PUT: RequestHandler = async ({ request, locals, cookies }) => {
+	// The hook guards /api/*; this re-check is the same defense in depth the
+	// (app) layout applies, and it types `locals.user` without an assertion.
+	if (!locals.user) {
+		throw error(401, 'Not signed in.');
+	}
+
 	const parsed = bodySchema.safeParse(await request.json().catch(() => null));
 	if (!parsed.success) {
 		throw error(400, 'Expected a JSON body with an organization id.');
@@ -26,7 +32,7 @@ export const PUT: RequestHandler = async ({ request, locals, cookies }) => {
 		.from('organization_members')
 		.select('org_id')
 		.eq('org_id', orgId)
-		.eq('user_id', locals.user!.id)
+		.eq('user_id', locals.user.id)
 		.maybeSingle();
 
 	if (memberError) {

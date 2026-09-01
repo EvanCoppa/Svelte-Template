@@ -17,14 +17,17 @@
 
 	async function switchOrg(org: OrgMembership) {
 		if (org.id === activeOrg.id) return;
-		const res = await fetch('/api/org', {
-			method: 'PUT',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ orgId: org.id })
-		});
-		if (res.ok) {
+		// fetch itself rejects on network failure (not just !res.ok), and onSelect
+		// floats this promise — so both failure shapes must land on the toast.
+		try {
+			const res = await fetch('/api/org', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ orgId: org.id })
+			});
+			if (!res.ok) throw new Error(`switch failed: ${String(res.status)}`);
 			await invalidate(QUERY.org);
-		} else {
+		} catch {
 			toast.error('Could not switch workspace.');
 		}
 	}
