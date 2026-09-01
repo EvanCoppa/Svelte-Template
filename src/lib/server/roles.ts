@@ -1,34 +1,39 @@
 import { error } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, Enums, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
+import type { Database, Enums, Tables } from '$lib/database.types';
 import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 
 /**
  * Roles & permissions: what a user may see and do inside the active org.
  *
- * Roles are org-scoped (two orgs can each have a "Support" role granting
- * different things), a member can hold several, and access is the UNION of
- * everything those roles grant — `manage` beats `read` wherever they overlap.
- * Org owners and admins implicitly hold `manage` on every permission, so a
- * fresh org (or this template before any roles exist) is never locked out.
- * The database mirrors the same rule in `private.permission_level()` for
- * policies that need it.
+ * Roles are industry-scoped reference data — defined once per industry by
+ * migration (like `tiers`), so onboarding a new org needs zero role setup:
+ * the org's `industry_id` decides which roles its owners/admins can hand
+ * out. Two industries can each have a "Support" role granting different
+ * things. Custom per-org roles are a deliberate future extension, not built
+ * yet. A member can hold several roles, and access is the UNION of
+ * everything they grant — `manage` beats `read` wherever they overlap. Org
+ * owners and admins implicitly hold `manage` on every permission, so a
+ * fresh org is never locked out. The database mirrors the same rules in
+ * `private.permission_level()` for policies that need it.
  *
- * Every function takes the request-scoped client (`locals.supabase`) and the
- * active org id (`locals.activeOrgId`) — the same contract as the crm
- * modules. RLS gates the writes (role management is owner/admin only), so
- * these helpers never re-check org_role themselves.
+ * Every function takes the request-scoped client (`locals.supabase`) plus
+ * ids from layout data — the same contract as the crm modules. RLS gates
+ * the writes (assigning roles is owner/admin only, and only from the org's
+ * own industry), so these helpers never re-check org_role themselves.
  *
  * Gating a page is two lines in its `+page.server.ts` load:
  *
- *   const access = await getUserAccess(supabase, orgId, userId, activeOrg.role);
+ *   const access = await getUserAccess(
+ *     supabase, activeOrg.id, user.id, activeOrg.role, activeOrg.industryId
+ *   );
  *   requirePermission(access, 'clients');            // hide the page: read
  *   requirePermission(access, 'clients', 'manage');  // add/edit/delete
  *
  * This is app-level gating in the tier-gating tradition: RLS remains the
  * security boundary, these decide what a screen offers. The permission keys
- * live in the `permissions` catalog table and grow by migration, usually one
- * per page.
+ * live in the `permissions` catalog table and grow by migration, usually
+ * one per page.
  */
 
 export type PermissionLevel = Enums<'permission_level'>;
@@ -44,10 +49,10 @@ export type Role = Tables<'roles'>;
  */
 export type PermissionId = 'clients' | 'deals' | 'tasks' | 'tickets';
 
-/** One grant on a role, as edited by a role-management screen. */
+/** One grant on a role. */
 export type PermissionGrant = Pick<Tables<'role_permissions'>, 'permission_id' | 'level'>;
 
-/** A role with everything it grants, for role-management screens. */
+/** A role with everything it grants, for role-assignment screens. */
 export type RoleWithPermissions = Role & { role_permissions: PermissionGrant[] };
 
 /** Union of a user's grants: permission key → strongest level held. */
@@ -62,25 +67,28 @@ export type UserAccess = {
 	grants: PermissionGrants;
 };
 
-type RoleColumn = 'name' | 'description';
-
 /**
  * The one query pages need: the user's roles in the org and the unioned
- * grants they add up to. `role` comes from layout data (`activeOrg.role`) —
- * it is already loaded there, so this stays a single round trip.
+ * grants they add up to. `role` and `industryId` come from layout data
+ * (`activeOrg`) — already loaded there, so this stays a single round trip.
+ * Filtering to the org's current industry mirrors `private.permission_level`:
+ * if an org's industry ever changes, assignments pointing at another
+ * industry's roles go inert instead of still granting.
  */
 export async function getUserAccess(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	userId: string,
-	role: Enums<'org_role'>
+	role: Enums<'org_role'>,
+	industryId: string
 ): Promise<UserAccess> {
 	const held = unwrap(
 		await supabase
 			.from('member_roles')
-			.select('roles(id, name, role_permissions(permission_id, level))')
+			.select('roles!inner(id, name, role_permissions(permission_id, level))')
 			.eq('org_id', orgId)
 			.eq('user_id', userId)
+			.eq('roles.industry_id', industryId)
 	);
 
 	const roles = held.map(({ roles: r }) => ({ id: r.id, name: r.name }));
@@ -121,93 +129,26 @@ export function requirePermission(
 	}
 }
 
-/** The full permission catalog, for role-management screens. */
+/** The full permission catalog, for role-assignment screens. */
 export async function listPermissions(supabase: SupabaseClient<Database>): Promise<Permission[]> {
 	return unwrap(await supabase.from('permissions').select('*').order('name'));
 }
 
+/**
+ * The roles an org can hand out — its industry's catalog, with what each
+ * grants. Reference data; defining or editing roles is a migration, not UI.
+ */
 export async function listRoles(
 	supabase: SupabaseClient<Database>,
-	orgId: string
+	industryId: string
 ): Promise<RoleWithPermissions[]> {
 	return unwrap(
 		await supabase
 			.from('roles')
 			.select('*, role_permissions(permission_id, level)')
-			.eq('org_id', orgId)
+			.eq('industry_id', industryId)
 			.order('name')
 	);
-}
-
-export async function createRole(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	values: Pick<TablesInsert<'roles'>, RoleColumn>
-): Promise<Role> {
-	return unwrap(
-		await supabase
-			.from('roles')
-			.insert({ ...values, org_id: orgId })
-			.select()
-			.single()
-	);
-}
-
-export async function updateRole(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	roleId: string,
-	values: Pick<TablesUpdate<'roles'>, RoleColumn>
-): Promise<Role> {
-	return unwrap(
-		await supabase
-			.from('roles')
-			.update(values)
-			.eq('org_id', orgId)
-			.eq('id', roleId)
-			.select()
-			.single()
-	);
-}
-
-export async function deleteRole(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	roleId: string
-): Promise<void> {
-	unwrapDeleted(
-		await supabase.from('roles').delete().eq('org_id', orgId).eq('id', roleId).select('id'),
-		'Role'
-	);
-}
-
-/**
- * Replaces a role's grants wholesale — the shape a role-edit form submits.
- * Delete-then-insert keeps it a dumb, predictable save (removals included)
- * instead of a diff dance. Grants are deduped by key first (`manage` wins)
- * so a duplicate in the payload can never trip the primary key after the
- * delete has already run. The two writes are separate requests, so a save
- * that still fails between them (an unknown permission key) fails CLOSED —
- * the role is left with no grants until a valid re-save.
- */
-export async function setRolePermissions(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	roleId: string,
-	grants: PermissionGrant[]
-): Promise<void> {
-	const deduped = [...unionGrants([grants])].map(([permission_id, level]) => ({
-		permission_id,
-		level,
-		org_id: orgId,
-		role_id: roleId
-	}));
-	ensure(
-		await supabase.from('role_permissions').delete().eq('org_id', orgId).eq('role_id', roleId)
-	);
-	if (deduped.length > 0) {
-		ensure(await supabase.from('role_permissions').insert(deduped));
-	}
 }
 
 export async function assignRole(

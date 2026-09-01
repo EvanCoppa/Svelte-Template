@@ -3,23 +3,20 @@ import { isHttpError } from '@sveltejs/kit';
 import {
 	assignRole,
 	can,
-	createRole,
-	deleteRole,
 	getUserAccess,
 	listPermissions,
 	listRoles,
 	requirePermission,
-	setRolePermissions,
 	unassignRole,
 	unionGrants,
-	updateRole,
 	type PermissionLevel,
 	type UserAccess
 } from './roles';
 import { ORG_ID, supabaseMock } from './crm/test-support';
 
 const USER_ID = '00000000-0000-0000-0000-000000000002';
-const ROLE_ID = 'a0000000-0000-0000-0000-000000000001';
+const ROLE_ID = 'b0000000-0000-0000-0000-000000000001';
+const INDUSTRY_ID = 'general';
 
 const member = (grants: [string, PermissionLevel][]): UserAccess => ({
 	role: 'member',
@@ -42,7 +39,7 @@ describe('getUserAccess', () => {
 			},
 			{
 				roles: {
-					id: 'a0000000-0000-0000-0000-000000000002',
+					id: 'b0000000-0000-0000-0000-000000000002',
 					name: 'Sales',
 					role_permissions: [
 						{ permission_id: 'clients', level: 'manage' },
@@ -53,13 +50,13 @@ describe('getUserAccess', () => {
 		];
 		const { supabase, from, builder } = supabaseMock({ data: held });
 
-		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member');
+		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member', INDUSTRY_ID);
 		expect(from).toHaveBeenCalledWith('member_roles');
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('user_id', USER_ID);
 		expect(access.roles).toEqual([
 			{ id: ROLE_ID, name: 'Support' },
-			{ id: 'a0000000-0000-0000-0000-000000000002', name: 'Sales' }
+			{ id: 'b0000000-0000-0000-0000-000000000002', name: 'Sales' }
 		]);
 		expect(access.grants).toEqual(
 			new Map([
@@ -70,10 +67,20 @@ describe('getUserAccess', () => {
 		);
 	});
 
+	it('filters roles to the org industry, mirroring private.permission_level', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await getUserAccess(supabase, ORG_ID, USER_ID, 'member', INDUSTRY_ID);
+		expect(builder.select).toHaveBeenCalledWith(
+			'roles!inner(id, name, role_permissions(permission_id, level))'
+		);
+		expect(builder.eq).toHaveBeenCalledWith('roles.industry_id', INDUSTRY_ID);
+	});
+
 	it('returns empty grants for a user holding no roles', async () => {
 		const { supabase } = supabaseMock({ data: [] });
 
-		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member');
+		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member', INDUSTRY_ID);
 		expect(access).toEqual({ role: 'member', roles: [], grants: new Map() });
 	});
 });
@@ -145,73 +152,14 @@ describe('roles data access', () => {
 		expect(builder.order).toHaveBeenCalledWith('name');
 	});
 
-	it('lists roles with their grants, scoped to the org', async () => {
+	it('lists an industry catalog of roles with their grants', async () => {
 		const { supabase, from, builder } = supabaseMock({ data: [] });
 
-		await listRoles(supabase, ORG_ID);
+		await listRoles(supabase, INDUSTRY_ID);
 		expect(from).toHaveBeenCalledWith('roles');
 		expect(builder.select).toHaveBeenCalledWith('*, role_permissions(permission_id, level)');
-		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('industry_id', INDUSTRY_ID);
 		expect(builder.order).toHaveBeenCalledWith('name');
-	});
-
-	it('creates a role under the given org', async () => {
-		const { supabase, builder } = supabaseMock({ data: { id: ROLE_ID } });
-
-		await createRole(supabase, ORG_ID, { name: 'Support', description: 'Works tickets' });
-		expect(builder.insert).toHaveBeenCalledWith({
-			name: 'Support',
-			description: 'Works tickets',
-			org_id: ORG_ID
-		});
-	});
-
-	it('scopes updates to org and id', async () => {
-		const { supabase, builder } = supabaseMock({ data: { id: ROLE_ID } });
-
-		await updateRole(supabase, ORG_ID, ROLE_ID, { name: 'Helpdesk' });
-		expect(builder.update).toHaveBeenCalledWith({ name: 'Helpdesk' });
-		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
-		expect(builder.eq).toHaveBeenCalledWith('id', ROLE_ID);
-	});
-
-	it('throws when a delete matches no rows (RLS filtered it)', async () => {
-		const { supabase } = supabaseMock({ data: [] });
-
-		await expect(deleteRole(supabase, ORG_ID, ROLE_ID)).rejects.toThrow('Role was not deleted');
-	});
-
-	it('replaces grants wholesale: delete then insert', async () => {
-		const { supabase, from, builder } = supabaseMock({ data: [] });
-
-		await setRolePermissions(supabase, ORG_ID, ROLE_ID, [
-			{ permission_id: 'tickets', level: 'manage' }
-		]);
-		expect(from).toHaveBeenCalledWith('role_permissions');
-		expect(builder.delete).toHaveBeenCalled();
-		expect(builder.insert).toHaveBeenCalledWith([
-			{ permission_id: 'tickets', level: 'manage', org_id: ORG_ID, role_id: ROLE_ID }
-		]);
-	});
-
-	it('dedupes grants before writing so the PK cannot trip after the delete', async () => {
-		const { supabase, builder } = supabaseMock({ data: [] });
-
-		await setRolePermissions(supabase, ORG_ID, ROLE_ID, [
-			{ permission_id: 'clients', level: 'read' },
-			{ permission_id: 'clients', level: 'manage' }
-		]);
-		expect(builder.insert).toHaveBeenCalledWith([
-			{ permission_id: 'clients', level: 'manage', org_id: ORG_ID, role_id: ROLE_ID }
-		]);
-	});
-
-	it('clearing every grant skips the insert', async () => {
-		const { supabase, builder } = supabaseMock({ data: [] });
-
-		await setRolePermissions(supabase, ORG_ID, ROLE_ID, []);
-		expect(builder.delete).toHaveBeenCalled();
-		expect(builder.insert).not.toHaveBeenCalled();
 	});
 
 	it('assigns a role to a member of the org', async () => {
@@ -243,6 +191,6 @@ describe('roles data access', () => {
 	it('throws the PostgREST message when a query fails', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'permission denied' } });
 
-		await expect(listRoles(supabase, ORG_ID)).rejects.toThrow('permission denied');
+		await expect(listRoles(supabase, INDUSTRY_ID)).rejects.toThrow('permission denied');
 	});
 });

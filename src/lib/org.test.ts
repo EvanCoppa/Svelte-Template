@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { resolveActiveOrg, type OrgMembership } from './org';
 
 function org(id: string, name: string, overrides: Partial<OrgMembership> = {}): OrgMembership {
-	return { id, name, role: 'member', tierId: 'free', tierName: 'Free', ...overrides };
+	return {
+		id,
+		name,
+		role: 'member',
+		tierId: 'free',
+		tierName: 'Free',
+		industryId: 'general',
+		...overrides
+	};
 }
 
 const acme = org('10000000-0000-0000-0000-000000000001', 'Acme Inc', {

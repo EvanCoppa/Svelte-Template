@@ -19,7 +19,7 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// org row and its tier in the same round trip.
 	const { data: memberships, error: orgError } = await locals.supabase
 		.from('organization_members')
-		.select('role, organizations(id, name, tier_id, tiers(name))')
+		.select('role, organizations(id, name, tier_id, industry_id, tiers(name))')
 		.eq('user_id', locals.user.id);
 
 	if (orgError) {
@@ -32,7 +32,8 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 			name: org.name,
 			role,
 			tierId: org.tier_id,
-			tierName: org.tiers.name
+			tierName: org.tiers.name,
+			industryId: org.industry_id
 		}))
 		.sort((a, b) => a.name.localeCompare(b.name));
 
