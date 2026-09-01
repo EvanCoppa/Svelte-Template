@@ -173,6 +173,13 @@ application data is scoped to an organization, never to a bare user. The
 - Seed data goes in `supabase/seed.sql`, following the shape already there: fixed
   ids, `on conflict do nothing`, re-runnable. Its credentials are deliberately
   public because that database is disposable — **never put a real one there.**
+- **Quickstart for testing locally or in a cloud/web session:**
+  `npm run db:start && npm run db:env && npm run db:reset && npm run dev`, then sign
+  in as a seeded user — e.g. `evancoppa@gmail.com` / `password123` (also
+  `dev@example.com` and `e2e@example.com`, same password). These are local-only
+  fixture credentials from `supabase/seed.sql`, not a real account's password, and
+  `db:reset` re-runs after every migration so the seeded users/orgs/CRM fixtures
+  always match the current schema.
 - `db.major_version` in `config.toml` must match the hosted Postgres, or a migration
   can pass locally and fail on deploy.
 - After every migration: `npm run db:types` and **commit the regenerated
