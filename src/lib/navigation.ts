@@ -12,9 +12,9 @@ import SettingsIcon from '@lucide/svelte/icons/settings';
  * the bundle. Categories render as labeled sidebar sections in the order
  * declared in NAV_CATEGORIES; empty categories are omitted.
  *
- * If your app grows roles/permissions, add a `requiredRoles?: string[]` field
- * here and filter in one place before grouping — never scatter per-item
- * role checks through components.
+ * To hide pages by permission (`src/lib/server/roles.ts`), add a
+ * `permission?: string` field here and filter in one place before grouping —
+ * never scatter per-item permission checks through components.
  */
 
 export type NavCategoryKey = 'platform' | 'library';

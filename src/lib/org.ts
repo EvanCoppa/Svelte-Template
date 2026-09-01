@@ -14,6 +14,8 @@ export type OrgMembership = {
 	role: OrgRole;
 	tierId: string;
 	tierName: string;
+	/** Decides which industry's roles the org can hand out (see roles.ts). */
+	industryId: string;
 };
 
 /**

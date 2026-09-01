@@ -177,6 +177,67 @@ export type Database = {
           },
         ]
       }
+      industries: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      member_roles: {
+        Row: {
+          created_at: string
+          org_id: string
+          role_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          org_id: string
+          role_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          org_id?: string
+          role_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_roles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_roles_org_id_user_id_fkey"
+            columns: ["org_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
+            foreignKeyName: "member_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           author_id: string | null
@@ -306,6 +367,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          industry_id: string
           name: string
           tier_id: string
           updated_at: string
@@ -313,6 +375,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          industry_id?: string
           name: string
           tier_id?: string
           updated_at?: string
@@ -320,11 +383,19 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          industry_id?: string
           name?: string
           tier_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "organizations_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organizations_tier_id_fkey"
             columns: ["tier_id"]
@@ -333,6 +404,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      permissions: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -357,6 +446,77 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          created_at: string
+          level: Database["public"]["Enums"]["permission_level"]
+          permission_id: string
+          role_id: string
+        }
+        Insert: {
+          created_at?: string
+          level?: Database["public"]["Enums"]["permission_level"]
+          permission_id: string
+          role_id: string
+        }
+        Update: {
+          created_at?: string
+          level?: Database["public"]["Enums"]["permission_level"]
+          permission_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          industry_id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          industry_id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          industry_id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roles_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_tickets: {
         Row: {
@@ -572,6 +732,7 @@ export type Database = {
         | "won"
         | "lost"
       org_role: "owner" | "admin" | "member"
+      permission_level: "read" | "manage"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
@@ -711,6 +872,7 @@ export const Constants = {
         "lost",
       ],
       org_role: ["owner", "admin", "member"],
+      permission_level: ["read", "manage"],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
