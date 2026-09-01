@@ -4,6 +4,7 @@ import {
 	emailLayout,
 	escapeHtml,
 	notificationEmail,
+	orgInviteEmail,
 	paragraph,
 	welcomeEmail
 } from './email-templates';
@@ -64,6 +65,33 @@ describe('welcomeEmail', () => {
 		expect(email.html).toContain('&lt;b&gt;Evan &amp; Co&lt;/b&gt;');
 		expect(email.html).not.toContain('<b>Evan');
 		expect(email.text).toContain('<b>Evan & Co</b>');
+	});
+});
+
+describe('orgInviteEmail', () => {
+	it('produces subject, html with the accept link, and hand-written text', () => {
+		const email = orgInviteEmail({
+			orgName: 'Acme Inc',
+			inviterName: 'Evan',
+			inviteUrl: 'https://app.test/invite/tok123'
+		});
+		expect(email.subject).toBe("You're invited to join Acme Inc");
+		expect(email.html).toContain('https://app.test/invite/tok123');
+		expect(email.html).toContain('Evan');
+		expect(email.text).toContain('https://app.test/invite/tok123');
+		expect(email.text).toContain('Evan has invited you to join Acme Inc.');
+	});
+
+	it('escapes the org and inviter names in the html only', () => {
+		const email = orgInviteEmail({
+			orgName: 'A & B <Co>',
+			inviterName: '<script>',
+			inviteUrl: 'https://app.test/invite/t'
+		});
+		expect(email.html).toContain('A &amp; B &lt;Co&gt;');
+		expect(email.html).toContain('&lt;script&gt;');
+		expect(email.html).not.toContain('<script>');
+		expect(email.text).toContain('A & B <Co>');
 	});
 });
 

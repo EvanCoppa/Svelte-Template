@@ -147,17 +147,32 @@ application data is scoped to an organization, never to a bare user. The
   owners/admins can hand out — so onboarding an org needs zero role setup, and
   two industries can each have a same-named role granting different things.
   Custom per-org roles are a deliberate future extension, not built yet.
-  Members can hold several roles and access is the union of their grants —
-  `manage` implies `read`, owner/admin implicitly hold `manage` on everything.
-  The `permissions` table is one key per gated page/feature, rows added by
-  migration as pages are built — mirror each new key in the `PermissionId`
-  union so typos are `check` errors. Gate a page in its load with
-  `getUserAccess()` + `requirePermission()` (a page is hidden without `read`;
-  add/edit/delete needs `manage`); this is app-level gating like tier gating —
-  use `private.permission_level(org_id, 'key')` in a policy only when a
-  permission is a real security boundary. Assigning/unassigning roles is
-  owner/admin via RLS (only roles from the org's industry), never a
-  permission itself.
+  Members can hold several roles and access is the union of their grants.
+  Levels are a ladder — `read` < `manage` < `delete`, each implying the ones
+  below — and owner/admin implicitly hold `delete` on everything. A policy
+  gating on a level therefore compares with `in ('manage','delete')`, never
+  `= 'manage'`. The `permissions` table is one key per gated page/feature,
+  rows added by migration as pages are built — mirror each new key in the
+  `PermissionId` union in `src/lib/permissions.ts` so typos are `check`
+  errors. Gate a page in its load with `getUserAccess()` +
+  `requirePermission()` (a page is hidden without `read`; add/edit needs
+  `manage`; destructive actions take `delete`); this is app-level gating like
+  tier gating — use `private.permission_level(org_id, 'key')` in a policy
+  only when a permission is a real security boundary (the `staff` key is:
+  invite rows carry join tokens). Assigning/unassigning roles is owner/admin
+  via RLS (only roles from the org's industry), never a permission itself.
+- **Staff management is the reference gated page** (`staff_management`
+  migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
+  all three levels: `read` shows the roster, `manage` invites people and
+  assigns roles, `delete` removes a member. Invitations are rows in
+  `organization_invites` — single-use, database-generated tokens, 7-day
+  expiry, either addressed to an email or shareable as a link — consumed at
+  `/invite/[token]`, which lives outside `(app)` because the person accepting
+  is not a member yet and goes through the service-role client for the same
+  reason. `profiles.email` is a trigger-maintained copy of the auth email
+  (column grants keep it out of reach of the browser), and members can read
+  the profiles of people they share an org with, which is what lets a roster
+  name anyone.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.
@@ -280,6 +295,13 @@ tests — keep them green and extend them.
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette. Adding a page =
 create the route under `(app)` + add one `navItems` entry. Icons are one-per-file
 imports (`@lucide/svelte/icons/<name>`) — never the barrel import.
+
+A permission-gated page carries its key as `permission` on the nav item, and both
+consumers filter with `visibleNavItems()` against `page.data.permissions` — the
+readable keys resolved once by the `(app)` layout load (add the key to its
+`GATED_PERMISSIONS` list too). Never check a permission inside a nav component:
+one filter, one place. Hiding the link is navigation only — the page's own load
+still calls `requirePermission()`.
 
 ## Svelte reference docs
 

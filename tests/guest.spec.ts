@@ -26,6 +26,16 @@ test.describe('unauthenticated visitor', () => {
 		await expect(page.locator('input[name="next"]')).toHaveValue('/settings');
 	});
 
+	test('sends an invite link through login and back again', async ({ page }) => {
+		// /invite/[token] is protected like everything else, so an invitee who
+		// is not signed in reaches the login page with the invitation preserved
+		// in ?next= — accepting is a decision only an account can make.
+		await page.goto('/invite/some-token');
+
+		await expect(page).toHaveURL('/login?next=%2Finvite%2Fsome-token');
+		await expect(page.locator('input[name="next"]')).toHaveValue('/invite/some-token');
+	});
+
 	test('guards routes that do not exist, rather than leaking a 404', async ({ page }) => {
 		// Default-deny happens in hooks, before routing — so an unknown path is
 		// indistinguishable from a real private one to an anonymous visitor.

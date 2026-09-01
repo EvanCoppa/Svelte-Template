@@ -5,8 +5,9 @@
 	import NavUser from '$lib/components/nav-user.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { groupNav, isNavItemActive, navItems } from '$lib/navigation';
+	import { groupNav, isNavItemActive, navItems, visibleNavItems } from '$lib/navigation';
 	import type { OrgMembership } from '$lib/org';
+	import type { PermissionId } from '$lib/permissions';
 
 	let {
 		ref = $bindable(null),
@@ -19,7 +20,8 @@
 	let organizations: OrgMembership[] = $derived(page.data.organizations);
 	let activeOrg: OrgMembership = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
-	let groups = $derived(groupNav(navItems));
+	let permissions: PermissionId[] = $derived(page.data.permissions ?? []);
+	let groups = $derived(groupNav(visibleNavItems(navItems, permissions)));
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>

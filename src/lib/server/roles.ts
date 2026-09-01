@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables } from '$lib/database.types';
+import type { PermissionId } from '$lib/permissions';
 import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 
 /**
@@ -12,8 +13,11 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
  * out. Two industries can each have a "Support" role granting different
  * things. Custom per-org roles are a deliberate future extension, not built
  * yet. A member can hold several roles, and access is the UNION of
- * everything they grant — `manage` beats `read` wherever they overlap. Org
- * owners and admins implicitly hold `manage` on every permission, so a
+ * everything they grant — the strongest level wins wherever they overlap.
+ * Levels form a ladder, `read` < `manage` < `delete`, each implying the ones
+ * below it: `read` shows a page, `manage` allows add/edit, `delete` gates
+ * destructive actions (the staff page's remove-member is the reference). Org
+ * owners and admins implicitly hold `delete` on every permission, so a
  * fresh org is never locked out. The database mirrors the same rules in
  * `private.permission_level()` for policies that need it.
  *
@@ -40,14 +44,14 @@ export type PermissionLevel = Enums<'permission_level'>;
 export type Permission = Tables<'permissions'>;
 export type Role = Tables<'roles'>;
 
-/**
- * The permission keys the app knows at build time, in lockstep with the
- * `permissions` catalog: the migration adding a page's row also adds its key
- * here. Checks take this union so a typo'd key is a `check` error — with a
- * bare string it would silently pass for owners/admins (the bypass) while
- * denying every member.
- */
-export type PermissionId = 'clients' | 'deals' | 'tasks' | 'tickets';
+// The key union lives in $lib/permissions (client code — the nav filter —
+// needs it too); checks take it so a typo'd key is a `check` error — with a
+// bare string it would silently pass for owners/admins (the bypass) while
+// denying every member.
+export type { PermissionId } from '$lib/permissions';
+
+/** The ladder, low to high. Index = privilege; higher grants imply lower. */
+const LEVEL_RANK = { read: 0, manage: 1, delete: 2 } satisfies Record<PermissionLevel, number>;
 
 /** One grant on a role. */
 export type PermissionGrant = Pick<Tables<'role_permissions'>, 'permission_id' | 'level'>;
@@ -95,18 +99,21 @@ export async function getUserAccess(
 	return { role, roles, grants: unionGrants(held.map(({ roles: r }) => r.role_permissions)) };
 }
 
-/** Folds grant lists from several roles into one map; `manage` wins. */
+/** Folds grant lists from several roles into one map; the strongest wins. */
 export function unionGrants(grantLists: PermissionGrant[][]): PermissionGrants {
 	const grants = new Map<string, PermissionLevel>();
 	for (const { permission_id, level } of grantLists.flat()) {
-		if (grants.get(permission_id) !== 'manage') grants.set(permission_id, level);
+		const held = grants.get(permission_id);
+		if (held === undefined || LEVEL_RANK[level] > LEVEL_RANK[held]) {
+			grants.set(permission_id, level);
+		}
 	}
 	return grants;
 }
 
 /**
  * Does this user reach `level` on `permission`? Owners and admins always do;
- * everyone else needs a role granting it (`manage` implies `read`).
+ * everyone else needs a role granting it at that level or above.
  */
 export function can(
 	access: UserAccess,
@@ -115,7 +122,7 @@ export function can(
 ): boolean {
 	if (access.role === 'owner' || access.role === 'admin') return true;
 	const held = access.grants.get(permission);
-	return held !== undefined && (level === 'read' || held === 'manage');
+	return held !== undefined && LEVEL_RANK[held] >= LEVEL_RANK[level];
 }
 
 /** `can()` or a 403 — the guard a gated load or action opens with. */
