@@ -5,10 +5,15 @@
 	// The shadcn-svelte kit and the enhanced primitives shelf are both opt-in
 	// vocabularies: primitives stay available before any screen uses them, so
 	// each kit index (and its per-primitive index) is a public entry point.
+	// App-level compound components (src/lib/components/<name>/index.ts) are
+	// composed in markup through a namespace import (`<DataTable.Root>`), which
+	// knip cannot trace through a Svelte template, so their indexes are entry
+	// points for the same reason.
 	"entry": [
 		"src/lib/components/ui/*/index.ts",
 		"src/lib/components/enhanced/index.ts",
-		"src/lib/components/enhanced/*/index.ts"
+		"src/lib/components/enhanced/*/index.ts",
+		"src/lib/components/*/index.ts"
 	],
 	// A helper exported for reuse but so far consumed only by its own module
 	// (NAV_CATEGORIES, PASSWORD_MAX_BYTES, …) is not dead code.

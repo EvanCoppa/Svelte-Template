@@ -60,6 +60,7 @@
 		"@supabase/ssr": "^0.12.5",
 		"@supabase/supabase-js": "^2.112.4",
 		"@tailwindcss/vite": "^4.1.11",
+		"@tanstack/svelte-table": "^9.2.4",
 		"bits-ui": "^2.19.0",
 		"clsx": "^2.1.1",
 		"motion": "^13.1.0",

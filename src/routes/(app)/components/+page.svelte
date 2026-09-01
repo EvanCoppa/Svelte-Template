@@ -67,6 +67,7 @@
 		WizardSteps,
 		type WizardStep
 	} from '$lib/components/enhanced/index.js';
+	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -95,6 +96,15 @@
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import {
+		createColumnHelper,
+		createTable,
+		createTableState,
+		renderComponent,
+		renderSnippet,
+		type RowSelectionState
+	} from '@tanstack/svelte-table';
+	import { createRawSnippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	// Select (bits-ui) works with plain string values.
@@ -136,6 +146,94 @@
 		{ id: 'INV-002', status: 'Pending', method: 'PayPal', amount: '$150.00' },
 		{ id: 'INV-003', status: 'Unpaid', method: 'Bank transfer', amount: '$350.00' }
 	];
+
+	// Data table — the page owns the rows, the columns and the table instance;
+	// the DataTable parts only render it.
+	type Payment = {
+		id: string;
+		email: string;
+		status: 'Paid' | 'Pending' | 'Refunded';
+		amount: number;
+	};
+
+	const payments: Payment[] = [
+		{ id: 'PAY-001', email: 'ken99@yahoo.com', status: 'Paid', amount: 316 },
+		{ id: 'PAY-002', email: 'abe45@gmail.com', status: 'Paid', amount: 242 },
+		{ id: 'PAY-003', email: 'monserrat44@gmail.com', status: 'Pending', amount: 837 },
+		{ id: 'PAY-004', email: 'silas22@gmail.com', status: 'Paid', amount: 874 },
+		{ id: 'PAY-005', email: 'carmella@hotmail.com', status: 'Refunded', amount: 721 },
+		{ id: 'PAY-006', email: 'lulu.runolfsdottir@example.com', status: 'Pending', amount: 129 },
+		{ id: 'PAY-007', email: 'esteban.torp@example.com', status: 'Paid', amount: 458 },
+		{ id: 'PAY-008', email: 'jailyn.walter@example.com', status: 'Paid', amount: 390 },
+		{ id: 'PAY-009', email: 'ottilie.mertz@example.com', status: 'Refunded', amount: 65 },
+		{ id: 'PAY-010', email: 'derick.koss@example.com', status: 'Pending', amount: 512 },
+		{ id: 'PAY-011', email: 'name.mcglynn@example.com', status: 'Paid', amount: 283 },
+		{ id: 'PAY-012', email: 'wilber.veum@example.com', status: 'Paid', amount: 947 }
+	];
+
+	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+	const amountCell = createRawSnippet<[{ amount: number }]>((getAmount) => {
+		const { amount } = getAmount();
+		return {
+			render: () => `<div class="font-medium tabular-nums">${usd.format(amount)}</div>`
+		};
+	});
+
+	const paymentColumnHelper = createColumnHelper<DataTable.DataTableFeatures, Payment>();
+
+	const paymentColumns = paymentColumnHelper.columns([
+		paymentColumnHelper.display({
+			id: 'select',
+			header: ({ table }) =>
+				renderComponent(Checkbox, {
+					checked: table.getIsAllPageRowsSelected(),
+					indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+					onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
+					'aria-label': 'Select all'
+				}),
+			cell: ({ row }) =>
+				renderComponent(Checkbox, {
+					checked: row.getIsSelected(),
+					onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
+					'aria-label': 'Select row'
+				}),
+			enableSorting: false,
+			enableHiding: false
+		}),
+		paymentColumnHelper.accessor('email', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' })
+		}),
+		paymentColumnHelper.accessor('status', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' })
+		}),
+		paymentColumnHelper.accessor('amount', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Amount' }),
+			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.amount })
+		})
+	]);
+
+	// Row selection lives outside the table so the page can read or reset it.
+	const [paymentSelection, setPaymentSelection] = createTableState<RowSelectionState>({});
+
+	const paymentsTable = createTable({
+		features: DataTable.features,
+		get data() {
+			return payments;
+		},
+		columns: paymentColumns,
+		initialState: { pagination: { pageIndex: 0, pageSize: 5 } },
+		state: {
+			get rowSelection() {
+				return paymentSelection();
+			}
+		},
+		onRowSelectionChange: setPaymentSelection
+	});
+
+	const paymentEmailFilter = $derived(
+		String(paymentsTable.getColumn('email')?.getFilterValue() ?? '')
+	);
 
 	// Segmented control — a radiogroup, so the value is a plain string.
 	const ranges: SegmentedOption[] = [
@@ -2561,8 +2659,8 @@
 		<Card.Header>
 			<Card.Title>Table</Card.Title>
 			<Card.Description>
-				For data grids with sorting/pagination, build on these primitives per page — resist a
-				universal table abstraction until you truly need one.
+				The bare table primitives, for static rows. Once a grid needs sorting, filtering or
+				pagination, reach for the <code>DataTable</code> compound below instead of wiring these by hand.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
@@ -2590,6 +2688,35 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Data table</Card.Title>
+			<Card.Description>
+				The <code>DataTable</code> compound in <code>src/lib/components/data-table/</code>, built on
+				<code>@tanstack/svelte-table</code> and the table primitives above. The page owns the rows,
+				builds its columns with <code>createColumnHelper</code> and creates the table with
+				<code>createTable</code> against the shared <code>DataTable.features</code> preset; the
+				parts render it. The toolbar row here is page markup — search inputs and
+				<code>ViewOptions</code> compose per page.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<DataTable.Root table={paymentsTable}>
+				<div class="flex items-center gap-2">
+					<Input
+						placeholder="Filter emails…"
+						value={paymentEmailFilter}
+						oninput={(e) => paymentsTable.getColumn('email')?.setFilterValue(e.currentTarget.value)}
+						class="max-w-sm"
+					/>
+					<DataTable.ViewOptions class="ms-auto" />
+				</div>
+				<DataTable.Content />
+				<DataTable.Pagination pageSizeOptions={[5, 10, 20, 30, 50]} />
+			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>
 
