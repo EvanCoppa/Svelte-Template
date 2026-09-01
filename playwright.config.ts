@@ -35,7 +35,11 @@ export default defineConfig({
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
 	webServer: {
-		command: `npm run dev -- --port ${String(PORT)} --strictPort`,
+		// `--skip-db`: `npm run dev` normally boots and seeds the local stack, and
+		// a test run must never reset the database out from under itself. Bring
+		// the stack up first (`npm run db:start && npm run db:env`) for the specs
+		// that sign in; the rest need no database at all.
+		command: `npm run dev -- --skip-db --port ${String(PORT)} --strictPort`,
 		url: `http://localhost:${String(PORT)}`,
 		reuseExistingServer: !process.env.CI,
 		// Cold start compiles the whole app.

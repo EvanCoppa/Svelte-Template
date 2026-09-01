@@ -31,7 +31,7 @@ extend the rules rather than fighting them.
 ## Commands
 
 ```bash
-npm run dev            # dev server
+npm run dev            # db:start + db:env + db:reset (when owed) + vite dev
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
 npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
@@ -39,7 +39,7 @@ npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-sl
 npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run test:e2e       # playwright (real browser, tests/) — see "E2E tests" below
-npm run db:start       # boot the local Supabase stack in Docker
+npm run db:start       # boot the local Supabase stack in Docker (npm run dev does this)
 npm run db:reset       # re-apply every migration, then supabase/seed.sql
 npm run db:env         # write .env.local pointing at the local stack
 npm run db:new <name>  # scaffold a migration file
@@ -192,9 +192,11 @@ application data is scoped to an organization, never to a bare user. The
 - Seed data goes in `supabase/seed.sql`, following the shape already there: fixed
   ids, `on conflict do nothing`, re-runnable. Its credentials are deliberately
   public because that database is disposable — **never put a real one there.**
-- **Quickstart for testing locally or in a cloud/web session:**
-  `npm run db:start && npm run db:env && npm run db:reset && npm run dev`, then sign
-  in as a seeded user — e.g. `evancoppa@gmail.com` / `password123` (also
+- **Quickstart for testing locally or in a cloud/web session:** `npm run dev`.
+  `scripts/dev.mjs` boots the stack, writes `.env.local`, applies the migrations and
+  seed when they have changed, then starts Vite — `-- --fresh` forces the reset,
+  `-- --skip-db` leaves the stack alone. Then sign in as a seeded user — e.g.
+  `evancoppa@gmail.com` / `password123` (also
   `dev@example.com` and `e2e@example.com`, same password). These are local-only
   fixture credentials from `supabase/seed.sql`, not a real account's password, and
   `db:reset` re-runs after every migration so the seeded users/orgs/CRM fixtures
