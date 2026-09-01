@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureMap, FeatureMode } from './features/types';
-import { buildNav, groupNav, isNavItemActive, navItemTarget, staticNavItems } from './navigation';
+import {
+	buildNav,
+	groupNav,
+	isNavItemActive,
+	navItemFor,
+	navItemTarget,
+	staticNavItems,
+	type NavItem
+} from './navigation';
 
 function map(
 	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
@@ -103,6 +111,51 @@ describe('navItemTarget', () => {
 		expect(navItemTarget(item('clients'))).toBe('/clients');
 		expect(navItemTarget(item('best-practices'))).toBe('/upgrade?feature=best-practices');
 		expect(navItemTarget(staticNavItems[0])).toBe('/');
+	});
+});
+
+describe('navItemFor', () => {
+	const nav = buildNav(
+		map([
+			['clients', 'enabled'],
+			['best-practices', 'locked_visible']
+		]),
+		readAll
+	);
+
+	it('returns the entry that owns a path, nested paths included', () => {
+		expect(navItemFor(nav, '/clients')?.featureId).toBe('clients');
+		expect(navItemFor(nav, '/clients/42')?.featureId).toBe('clients');
+		expect(navItemFor(nav, '/settings/features')?.label).toBe('Settings');
+	});
+
+	it('matches the root page exactly and never a partial segment', () => {
+		expect(navItemFor(nav, '/')?.label).toBe('Dashboard');
+		expect(navItemFor(nav, '/clientsx')).toBeNull();
+	});
+
+	it('prefers the longest href when entries nest', () => {
+		const pipeline: NavItem = {
+			label: 'Pipeline',
+			href: '/clients/pipeline',
+			category: 'platform',
+			icon: 'handshake',
+			sortOrder: 1,
+			featureId: 'pipeline'
+		};
+		expect(navItemFor([...nav, pipeline], '/clients/pipeline/7')?.featureId).toBe('pipeline');
+		expect(navItemFor([pipeline, ...nav], '/clients/7')?.featureId).toBe('clients');
+	});
+
+	it('returns a locked entry as-is — navItemTarget decides where it goes', () => {
+		const locked = navItemFor(nav, '/best-practices');
+		expect(locked?.locked).toBe(true);
+		expect(navItemTarget(locked!)).toBe('/upgrade?feature=best-practices');
+	});
+
+	it('answers null for a page this session has no entry for', () => {
+		expect(navItemFor(nav, '/deals')).toBeNull();
+		expect(navItemFor([], '/')).toBeNull();
 	});
 });
 

@@ -1,12 +1,17 @@
 import type { FeatureMap } from '$lib/features/types';
 
 /**
- * The single source of truth for the sidebar and the ⌘K palette.
+ * The single source of truth for the sidebar and the ⌘K palette — derived,
+ * never declared.
  *
  * Feature pages come from the feature registry (the `features` table): the
- * (app) layout calls `buildNav()` with the org's resolved feature map, so an
+ * (app) layout calls `navFor()` (`$lib/server/route-access`, which feeds
+ * `buildNav()` the org's resolved feature map and the user's grants), so an
  * entry is linkable (enabled), locked with an upgrade prompt
- * (locked_visible), or absent (disabled, hidden, or no read grant). To add a
+ * (locked_visible), or absent (disabled, hidden, or no read grant). That is
+ * the one place filtering happens; everything downstream — the sidebar, the
+ * palette, and any page linking to a feature via `navItemFor()` — consumes
+ * the filtered list and never checks a mode or a grant itself. To add a
  * page: create the route, then register the feature by migration — see the
  * features migration's closing comment. Nothing here changes.
  *
@@ -110,10 +115,35 @@ export function groupNav(items: NavItem[]): NavGroup[] {
 	})).filter((group) => group.items.length > 0);
 }
 
+/** Does `href` own `pathname`? Exact for the root page, by path segment otherwise. */
+function ownsPath(href: string, pathname: string): boolean {
+	if (href === '/') return pathname === '/';
+	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 /** Exact match for the root page, prefix match for everything else. */
 export function isNavItemActive(item: NavItem, pathname: string): boolean {
-	if (item.href === '/') return pathname === '/';
-	return pathname === item.href || pathname.startsWith(`${item.href}/`);
+	return ownsPath(item.href, pathname);
+}
+
+/**
+ * The entry that owns a path — the browser's answer to "may I link there?".
+ * The nav is the server's filtered projection of `canVisitRoute()`, so an
+ * entry coming back means the page is open (or locked, in which case
+ * `navItemTarget()` sends to the upgrade page) and null means this session
+ * has no link to offer: hidden, switched off, or no read grant — the browser
+ * is not told which. Longest href wins, like the server's matcher, so a
+ * nested feature beats its parent. Use it for CTAs, empty states and
+ * onboarding steps; never hardcode a feature route in markup.
+ */
+export function navItemFor(items: NavItem[], pathname: string): NavItem | null {
+	let owner: NavItem | null = null;
+	for (const item of items) {
+		if (ownsPath(item.href, pathname) && (owner === null || item.href.length > owner.href.length)) {
+			owner = item;
+		}
+	}
+	return owner;
 }
 
 /** The upgrade page for a locked entry, or the entry's own page. */

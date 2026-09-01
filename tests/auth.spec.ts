@@ -128,6 +128,22 @@ test.describe('the app shell', () => {
 		await expect(page.getByText(/Best Practices isn't included in the Pro plan/)).toBeVisible();
 	});
 
+	test('derives the dashboard call-to-actions from the nav, lock included', async ({ page }) => {
+		// The "Start here" card links to feature pages, so it renders from the
+		// same filtered nav as the sidebar: Components is open for this user,
+		// Best Practices is locked (enterprise-only; Acme is on Pro) and so
+		// points at the upgrade page instead of a route the gate would bounce.
+		const card = page.locator('[data-slot="card"]', { hasText: 'Start here' });
+		await expect(card.getByRole('link', { name: 'Browse components' })).toHaveAttribute(
+			'href',
+			'/components'
+		);
+		await expect(card.getByRole('link', { name: /Read the conventions/ })).toHaveAttribute(
+			'href',
+			'/upgrade?feature=best-practices'
+		);
+	});
+
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
 		// Sidebar entries are Sidebar.MenuButton (a <button> calling goto), not
 		// anchors — see src/lib/components/app-sidebar.svelte.

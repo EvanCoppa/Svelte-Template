@@ -17,11 +17,10 @@ import {
 	isDevAutoLoginEnabled,
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
-import { featureGateFor } from '$lib/features/gate';
 import { readActiveOrg } from '$lib/server/active-org';
 import { loadOrgContext } from '$lib/server/org-context';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
-import { hasGrant } from '$lib/server/roles';
+import { routeGateFor } from '$lib/server/route-access';
 import { applySecurityHeaders } from '$lib/server/security-headers';
 
 /**
@@ -50,8 +49,8 @@ export const handleError: HandleServerError = ({ error: err, event, status, mess
  *
  * Signed-in requests then pass the feature gate: the route's feature must
  * be enabled for the active org and readable by the user — see
- * `$lib/features/gate` and the features migration. A page is gated by being
- * registered, not by remembering a check in its load.
+ * `$lib/server/route-access` and the features migration. A page is gated by
+ * being registered, not by remembering a check in its load.
  */
 const PUBLIC_PATHS = ['/login', '/auth'];
 
@@ -189,8 +188,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	// identically.
 	if (!isPublic && !isApi && pathname !== '/logout') {
 		event.locals.org = await loadOrgContext(event);
-		const { features, access } = event.locals.org;
-		const gate = featureGateFor(pathname, features, (featureId) => hasGrant(access, featureId));
+		const gate = routeGateFor(pathname, event.locals.org);
 		if (gate) {
 			if ('redirectTo' in gate) throw redirect(303, gate.redirectTo);
 			throw error(gate.status, gate.message);

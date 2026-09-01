@@ -68,8 +68,15 @@ feature owning a path (longest route prefix wins, `/` is exact-only) and answers
 `/settings`, `/upgrade`, `/api/` and `/logout` are exempt so a user can always respond
 to a decision; unregistered paths pass through. Errors thrown from the hook render
 `src/error.html` (no route has matched yet); client-side navigations get the in-shell
-`+error.svelte`. The same matcher builds the nav, so nothing is ever linked that the
-server would bounce.
+`+error.svelte`.
+
+App code never calls `featureGateFor` directly. `src/lib/server/route-access.ts` binds
+it to `locals.org` so the two axes are composed in one place: `routeGateFor(pathname, org)`
+is what the hook calls, `canVisitRoute(pathname, org)` is its boolean for a load or action
+choosing a redirect target, and `navFor(org)` builds the sidebar and palette entries from
+the same answer. The nav is the browser's only projection of it — `navItemFor()` in
+`src/lib/navigation.ts` looks a page up there, so a client-side link to a feature page is
+either open, locked (→ `/upgrade`) or absent, never a route the gate would bounce.
 
 ## Adding a feature
 

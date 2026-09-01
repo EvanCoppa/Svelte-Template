@@ -8,9 +8,11 @@ import type { FeatureMap, ResolvedFeature } from './types';
  * it, and does that feature's mode (plus the caller's read grant) let the
  * request through?
  *
- * Client-safe on purpose. `hooks.server.ts` enforces the decision; the nav
- * uses the same matcher, so nothing can advertise or navigate to a page the
- * server would bounce.
+ * Pure on purpose: the mode and the grant arrive as arguments, so this file
+ * has no server imports and its tests need no fixtures. App code never calls
+ * it directly — `$lib/server/route-access` binds it to `locals.org`
+ * (`routeGateFor`, `canVisitRoute`, `navFor`), so the hook, the nav and any
+ * redirect decision answer from the same two axes.
  */
 
 /**
@@ -74,15 +76,6 @@ export function featureGateFor(
 				? null
 				: { status: 403, message: 'You do not have access to this page.' };
 	}
-}
-
-/** Boolean form of `featureGateFor` — can this session open the path? */
-export function passesFeatureGate(
-	pathname: string,
-	features: FeatureMap,
-	canRead: (featureId: string) => boolean
-): boolean {
-	return featureGateFor(pathname, features, canRead) === null;
 }
 
 function isExempt(pathname: string): boolean {

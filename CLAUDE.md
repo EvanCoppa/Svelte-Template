@@ -315,15 +315,29 @@ tests — keep them green and extend them.
 
 ## Navigation
 
-`src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
-come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
-`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
-that is `enabled` or `locked_visible` for the active org and readable by the user.
-Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
-clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
-only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
-when a feature needs it; never the barrel import.
+Navigation is **derived, not declared**. `src/lib/navigation.ts` drives both the
+sidebar and the ⌘K palette, and the entries come from the feature registry:
+`navFor(locals.org)` (`src/lib/server/route-access.ts`, called once in the `(app)`
+layout load) merges `staticNavItems` (Dashboard, Settings — the pages every org has)
+with every feature that is `enabled` or `locked_visible` for the active org and
+readable by the user. That is the one place filtering happens: everything downstream
+consumes `page.data.nav`, and no component checks a mode or a grant itself — the moment
+two components each do their own check, they disagree, and a user sees a link that
+403s. Adding a page = create the route under `(app)` + register the feature by
+migration; nothing in `navigation.ts` changes. A locked entry renders with a lock and
+sends clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and
+resolved only through the one-per-file map in `src/lib/features/icons.ts` — add a slug
+there when a feature needs it; never the barrel import.
+
+"Can this user open X?" has exactly one answer: `canVisitRoute(pathname, locals.org)`
+in `src/lib/server/route-access.ts`, which intersects every axis (feature mode and read
+grant — the same call the hook's `routeGateFor()` makes). Use it in a load or action
+that picks a redirect target; never compose `features` and `hasGrant()` at a call site.
+The browser never receives the axes, so client code that links to a feature page — a
+CTA, an empty state, an onboarding step — looks the entry up with
+`navItemFor(page.data.nav, pathname)` and renders it through `navItemTarget()`: absent
+means no link, locked means the upgrade page. A hardcoded `href="/clients"` in markup
+is a bug; the dashboard's "Start here" card is the reference.
 
 ## Svelte reference docs
 
