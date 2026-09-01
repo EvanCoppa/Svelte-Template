@@ -1,51 +1,117 @@
 import { describe, expect, it } from 'vitest';
-import UsersIcon from '@lucide/svelte/icons/users';
-import { groupNav, isNavItemActive, navItems, visibleNavItems, type NavItem } from './navigation';
+import type { FeatureMap, FeatureMode } from './features/types';
+import { buildNav, groupNav, isNavItemActive, navItemTarget, staticNavItems } from './navigation';
 
-// A real icon component: the filter never renders, but using the genuine
-// type keeps these fixtures honest NavItems.
-const icon = UsersIcon;
+function map(
+	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
+): FeatureMap {
+	return Object.fromEntries(
+		entries.map(([id, mode, extra]) => [
+			id,
+			{
+				mode,
+				feature: {
+					id,
+					name: id[0].toUpperCase() + id.slice(1),
+					description: null,
+					route: `/${id}`,
+					icon: 'users',
+					category: extra?.category ?? 'platform',
+					sort_order: extra?.sort ?? 0,
+					created_at: ''
+				}
+			}
+		])
+	);
+}
 
-const dashboard: NavItem = { label: 'Dashboard', href: '/', category: 'platform', icon };
-const staff: NavItem = {
-	label: 'Staff',
-	href: '/staff',
-	category: 'platform',
-	icon,
-	permission: 'staff'
-};
+const readAll = () => true;
 
-describe('visibleNavItems', () => {
-	it('keeps ungated items regardless of what the user holds', () => {
-		expect(visibleNavItems([dashboard], [])).toEqual([dashboard]);
+describe('buildNav', () => {
+	it('lists enabled and locked features and drops disabled and hidden ones', () => {
+		const nav = buildNav(
+			map([
+				['clients', 'enabled'],
+				['deals', 'locked_visible'],
+				['tasks', 'disabled'],
+				['tickets', 'hidden']
+			]),
+			readAll
+		);
+		const features = nav.filter((i) => i.featureId);
+		expect(features.map((i) => [i.featureId, i.locked])).toEqual([
+			['clients', false],
+			['deals', true]
+		]);
 	});
 
-	it('hides a gated item from a user without its permission', () => {
-		expect(visibleNavItems([dashboard, staff], [])).toEqual([dashboard]);
+	it('hides features the user has no read grant on, locked ones included', () => {
+		const nav = buildNav(
+			map([
+				['clients', 'enabled'],
+				['deals', 'locked_visible']
+			]),
+			(id) => id === 'clients'
+		);
+		expect(nav.filter((i) => i.featureId).map((i) => i.featureId)).toEqual(['clients']);
 	});
 
-	it('shows a gated item to a user holding its permission', () => {
-		expect(visibleNavItems([dashboard, staff], ['staff'])).toEqual([dashboard, staff]);
+	it('keeps the static pages and orders by category, then sortOrder, then label', () => {
+		const nav = buildNav(
+			map([
+				['zeta', 'enabled', { sort: 10 }],
+				['alpha', 'enabled', { sort: 10 }],
+				['docs', 'enabled', { category: 'library', sort: 1 }],
+				['early', 'enabled', { sort: 5 }]
+			]),
+			readAll
+		);
+		expect(nav.map((i) => i.label)).toEqual([
+			'Dashboard',
+			'Early',
+			'Alpha',
+			'Zeta',
+			'Settings',
+			'Docs'
+		]);
+		expect(groupNav(nav).map((g) => [g.key, g.items.length])).toEqual([
+			['platform', 5],
+			['library', 1]
+		]);
 	});
 
-	it('leaves the real nav list intact for a user with every permission', () => {
-		expect(visibleNavItems(navItems, ['staff'])).toHaveLength(navItems.length);
+	it('falls back to the platform section for an unknown category', () => {
+		const nav = buildNav(map([['odd', 'enabled', { category: 'mystery' }]]), readAll);
+		expect(nav.find((i) => i.featureId === 'odd')?.category).toBe('platform');
 	});
 
-	it('drops /staff from the real nav list for a user with none', () => {
-		expect(visibleNavItems(navItems, []).map((item) => item.href)).not.toContain('/staff');
+	it('returns only the static pages for an empty map', () => {
+		expect(buildNav({}, readAll)).toEqual(staticNavItems);
 	});
 });
 
-describe('groupNav', () => {
-	it('omits a category whose only item was filtered out', () => {
-		const libraryOnly: NavItem = { label: 'Docs', href: '/docs', category: 'library', icon };
-		const groups = groupNav(visibleNavItems([staff, libraryOnly], []));
-		expect(groups.map((g) => g.key)).toEqual(['library']);
+describe('navItemTarget', () => {
+	it('sends locked entries to the upgrade page and the rest to their own', () => {
+		const nav = buildNav(
+			map([
+				['clients', 'enabled'],
+				['best-practices', 'locked_visible']
+			]),
+			readAll
+		);
+		const item = (id: string) => nav.find((i) => i.featureId === id)!;
+		expect(navItemTarget(item('clients'))).toBe('/clients');
+		expect(navItemTarget(item('best-practices'))).toBe('/upgrade?feature=best-practices');
+		expect(navItemTarget(staticNavItems[0])).toBe('/');
 	});
 });
 
 describe('isNavItemActive', () => {
+	const [dashboard] = staticNavItems;
+	const staff = buildNav(map([['staff', 'enabled']]), readAll).find(
+		(i) => i.featureId === 'staff'
+	)!;
+
 	it('matches the root item exactly, never as a prefix', () => {
 		expect(isNavItemActive(dashboard, '/')).toBe(true);
 		expect(isNavItemActive(dashboard, '/staff')).toBe(false);

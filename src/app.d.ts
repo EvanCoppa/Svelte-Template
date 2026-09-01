@@ -1,5 +1,8 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
+import type { NavItem } from '$lib/navigation';
+import type { OrgMembership } from '$lib/org';
+import type { OrgContext } from '$lib/server/org-context';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 declare global {
@@ -24,10 +27,23 @@ declare global {
 			 * layout load repairs a stale cookie.
 			 */
 			activeOrgId: string | null;
+			/**
+			 * The signed-in user's organizations, the active one, its resolved
+			 * feature map and the user's grants — loaded once per request by
+			 * `hooks.server.ts` (see `$lib/server/org-context`), which also gates
+			 * the route on it. Null on public, `/api/*` and `/logout` requests;
+			 * the (app) layout re-checks before rendering the shell.
+			 */
+			org: OrgContext | null;
 		}
 		interface PageData {
 			session: Session | null;
 			user: User | null;
+			/** From the (app) layout: absent on public routes. */
+			organizations?: OrgMembership[];
+			activeOrg?: OrgMembership;
+			/** The sidebar/palette entries this session may see, from the (app) layout. */
+			nav?: NavItem[];
 		}
 		interface Error {
 			message: string;

@@ -5,6 +5,7 @@ import Pagination from './data-table-pagination.svelte';
 import ViewOptions from './data-table-view-options.svelte';
 
 export { features, type DataTableFeatures } from './features.js';
+export { statusCell } from './cells.js';
 
 export {
 	Root,

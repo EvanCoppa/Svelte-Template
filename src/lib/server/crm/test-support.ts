@@ -16,6 +16,7 @@ const METHODS = [
 	'update',
 	'delete',
 	'eq',
+	'in',
 	'is',
 	'order',
 	'limit',
@@ -33,7 +34,7 @@ export type QueryResult = {
 
 type Builder = Promise<Required<QueryResult>> & Record<BuilderMethod, ReturnType<typeof vi.fn>>;
 
-export function supabaseMock(result: QueryResult = {}) {
+function makeBuilder(result: QueryResult): Builder {
 	const resolved: Required<QueryResult> = { data: null, error: null, count: null, ...result };
 	// A real (already-settled) Promise carrying the chainable methods — the
 	// same thenable-builder shape postgrest-js queries have.
@@ -43,12 +44,31 @@ export function supabaseMock(result: QueryResult = {}) {
 	for (const method of METHODS) {
 		builder[method] = vi.fn(() => builder);
 	}
+	return builder;
+}
 
+export function supabaseMock(result: QueryResult = {}) {
+	const builder = makeBuilder(result);
 	const from = vi.fn(() => builder);
 	// SAFETY: the crm modules only call `.from()` and the chained builder
 	// methods stubbed above; the rest of SupabaseClient is never touched.
 	const supabase: SupabaseClient<Database> = { from } as never;
 	return { supabase, from, builder };
+}
+
+/**
+ * The same double for code that queries several tables in one call
+ * (the org context loader): one builder per table name, each with its own
+ * result. A table not listed resolves to an empty result.
+ */
+export function supabaseTablesMock(results: Record<string, QueryResult>) {
+	const builders = Object.fromEntries(
+		Object.entries(results).map(([table, result]) => [table, makeBuilder(result)])
+	);
+	const from = vi.fn((table: string) => builders[table] ?? makeBuilder({}));
+	// SAFETY: see supabaseMock.
+	const supabase: SupabaseClient<Database> = { from } as never;
+	return { supabase, from, builders };
 }
 
 /**

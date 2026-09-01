@@ -17,8 +17,11 @@ import {
 	isDevAutoLoginEnabled,
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
+import { featureGateFor } from '$lib/features/gate';
 import { readActiveOrg } from '$lib/server/active-org';
+import { loadOrgContext } from '$lib/server/org-context';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
+import { hasGrant } from '$lib/server/roles';
 import { applySecurityHeaders } from '$lib/server/security-headers';
 
 /**
@@ -44,6 +47,11 @@ export const handleError: HandleServerError = ({ error: err, event, status, mess
 /**
  * Everything is private by default. List the routes an anonymous visitor may
  * reach; a new page is protected unless you add it here. Prefix match.
+ *
+ * Signed-in requests then pass the feature gate: the route's feature must
+ * be enabled for the active org and readable by the user — see
+ * `$lib/features/gate` and the features migration. A page is gated by being
+ * registered, not by remembering a check in its load.
  */
 const PUBLIC_PATHS = ['/login', '/auth'];
 
@@ -139,6 +147,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	event.locals.user = user;
 	// UI preference, not an auth decision — see the Locals doc in app.d.ts.
 	event.locals.activeOrgId = user ? readActiveOrg(event.cookies) : null;
+	event.locals.org = null;
 
 	const pathname = event.url.pathname;
 	const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -171,6 +180,21 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	// Signed-in users have no business on the login page.
 	if (pathname === '/login') {
 		throw redirect(303, '/');
+	}
+
+	// Sign-out and the auth callbacks need no org, and API endpoints verify
+	// membership themselves (RLS is the boundary there); every other page
+	// request resolves the org context and is gated on it. `pathname` is
+	// already stripped of `/__data.json`, so client-side navigations are gated
+	// identically.
+	if (!isPublic && !isApi && pathname !== '/logout') {
+		event.locals.org = await loadOrgContext(event);
+		const { features, access } = event.locals.org;
+		const gate = featureGateFor(pathname, features, (featureId) => hasGrant(access, featureId));
+		if (gate) {
+			if ('redirectTo' in gate) throw redirect(303, gate.redirectTo);
+			throw error(gate.status, gate.message);
+		}
 	}
 
 	return resolve(event);

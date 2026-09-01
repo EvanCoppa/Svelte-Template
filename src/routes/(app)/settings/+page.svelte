@@ -116,6 +116,18 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title>Features</Card.Title>
+			<Card.Description>
+				Which parts of the product this organization uses, and what your plan unlocks.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Button href="/settings/features" variant="outline">Manage features</Button>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title>Change password</Card.Title>
 			<Card.Description>
 				A superforms action posting to <code>?/changePassword</code> — the template's default pattern

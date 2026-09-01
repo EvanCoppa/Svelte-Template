@@ -2,12 +2,13 @@
 	import type { ComponentProps } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import NavUser from '$lib/components/nav-user.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { groupNav, isNavItemActive, navItems, visibleNavItems } from '$lib/navigation';
+	import { iconFor } from '$lib/features/icons';
+	import { groupNav, isNavItemActive, navItemTarget } from '$lib/navigation';
 	import type { OrgMembership } from '$lib/org';
-	import type { PermissionId } from '$lib/permissions';
 
 	let {
 		ref = $bindable(null),
@@ -15,18 +16,21 @@
 		...restProps
 	}: ComponentProps<typeof Sidebar.Root> = $props();
 
-	// These come from the (app) layout load, which App.PageData doesn't declare
-	// globally — the annotations keep the derived values fully typed.
-	let organizations: OrgMembership[] = $derived(page.data.organizations);
-	let activeOrg: OrgMembership = $derived(page.data.activeOrg);
+	// These come from the (app) layout load, which App.PageData declares as
+	// optional (public routes have no org) — the annotations keep the derived
+	// values fully typed for the shell, which only ever renders signed in.
+	let organizations: OrgMembership[] = $derived(page.data.organizations ?? []);
+	let activeOrg = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
-	let permissions: PermissionId[] = $derived(page.data.permissions ?? []);
-	let groups = $derived(groupNav(visibleNavItems(navItems, permissions)));
+	// Already filtered by mode and grant on the server; nothing to check here.
+	let groups = $derived(groupNav(page.data.nav ?? []));
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
 	<Sidebar.Header>
-		<TeamSwitcher {organizations} {activeOrg} />
+		{#if activeOrg}
+			<TeamSwitcher {organizations} {activeOrg} />
+		{/if}
 	</Sidebar.Header>
 	<Sidebar.Content class="scrollable-sidebar group-data-[peek=true]:pr-2">
 		{#each groups as group (group.key)}
@@ -34,16 +38,22 @@
 				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
 				<Sidebar.Menu>
 					{#each group.items as item (item.href)}
-						{@const active = isNavItemActive(item, page.url.pathname)}
+						{@const Icon = iconFor(item.icon)}
+						{@const active = !item.locked && isNavItemActive(item, page.url.pathname)}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
-								class={['nav-hover-effect', active && 'nav-active']}
-								tooltipContent={item.label}
-								onclick={() => goto(item.href)}
+								class={['nav-hover-effect', active && 'nav-active', item.locked && 'opacity-60']}
+								tooltipContent={item.locked ? `${item.label} — upgrade required` : item.label}
+								onclick={() => goto(navItemTarget(item))}
 							>
-								<item.icon class="h-6 w-6" />
+								<Icon class="h-6 w-6" />
 								<span class="sidebar-text">{item.label}</span>
 							</Sidebar.MenuButton>
+							{#if item.locked}
+								<Sidebar.MenuBadge>
+									<LockIcon class="size-3.5" aria-label="Upgrade required" />
+								</Sidebar.MenuBadge>
+							{/if}
 						</Sidebar.MenuItem>
 					{/each}
 				</Sidebar.Menu>

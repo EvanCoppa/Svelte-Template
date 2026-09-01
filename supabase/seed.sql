@@ -193,7 +193,7 @@ on conflict (id) do nothing;
 -- 'Support' role: same name, different grants per industry — the
 -- cross-industry divergence fixture. Owners/admins hold implicit 'manage'
 -- on everything and need no role.
---   Acme (general):        e2e holds general 'Support' (tickets manage, clients read)
+--   Acme (general):        e2e holds general 'Support' (tickets manage, clients read, library pages read)
 --   Globex (construction): dev holds construction 'Support' (clients manage)
 insert into public.member_roles (org_id, user_id, role_id) values
 	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
@@ -201,6 +201,21 @@ insert into public.member_roles (org_id, user_id, role_id) values
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001',
 		'b0000000-0000-0000-0000-000000000003')
 on conflict (org_id, user_id, role_id) do nothing;
+
+-- Feature fixtures, one per escape hatch, so the seeded orgs show every mode
+-- (the registry and its industry/tier maps ship by migration):
+--   Acme (pro, general):      tasks switched off by the org itself -> disabled;
+--                             best-practices is enterprise-only     -> locked_visible
+--   Globex (free, construction): deals is outside both its industry and its
+--                             tier, an operator override enables it  -> a pilot;
+--                             best-practices is not in construction -> hidden
+insert into public.organization_disabled_features (org_id, feature_id) values
+	('10000000-0000-0000-0000-000000000001', 'tasks')
+on conflict (org_id, feature_id) do nothing;
+
+insert into public.organization_feature_overrides (org_id, feature_id, mode, note) values
+	('10000000-0000-0000-0000-000000000002', 'deals', 'enabled', 'Pilot: deals outside the construction catalog.')
+on conflict (org_id, feature_id) do nothing;
 
 -- A pending shareable-link invite into Acme with a fixed token, so the accept
 -- flow (/invite/<token>) is exercisable straight after a reset. Personal

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>%sveltekit.status%</title>
+		<!--
+			The fallback page SvelteKit renders when an error is thrown before a
+			route matched — the route gate in hooks.server.ts answering 404/403.
+			No app CSS is available here, so the styling is inline and minimal;
+			it mirrors src/routes/+error.svelte, which handles errors inside the
+			app shell.
+		-->
+		<style>
+			:root {
+				color-scheme: light dark;
+			}
+			body {
+				margin: 0;
+				min-height: 100svh;
+				display: grid;
+				place-items: center;
+				font-family:
+					system-ui,
+					-apple-system,
+					'Segoe UI',
+					sans-serif;
+				background: light-dark(#f8fafc, #0b0f14);
+				color: light-dark(#0f172a, #e5e7eb);
+			}
+			main {
+				max-width: 28rem;
+				padding: 2rem;
+				border: 1px solid light-dark(#e2e8f0, #1f2937);
+				border-radius: 0.75rem;
+				background: light-dark(#ffffff, #111827);
+				text-align: center;
+			}
+			p.status {
+				margin: 0 0 0.5rem;
+				font-size: 0.875rem;
+				color: light-dark(#64748b, #9ca3af);
+			}
+			h1 {
+				margin: 0 0 0.5rem;
+				font-size: 1.5rem;
+			}
+			a {
+				display: inline-block;
+				margin-top: 1.5rem;
+				padding: 0.5rem 1rem;
+				border-radius: 0.5rem;
+				background: light-dark(#0f172a, #e5e7eb);
+				color: light-dark(#ffffff, #0f172a);
+				text-decoration: none;
+				font-size: 0.875rem;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<p class="status">%sveltekit.status%</p>
+			<h1>%sveltekit.error.message%</h1>
+			<a href="/">Back to the app</a>
+		</main>
+	</body>
+</html>

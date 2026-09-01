@@ -1,20 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import * as Command from '$lib/components/ui/command/index.js';
-	import { groupNav, navItems, visibleNavItems } from '$lib/navigation';
-	import type { PermissionId } from '$lib/permissions';
+	import { iconFor } from '$lib/features/icons';
+	import { groupNav, navItemTarget, type NavItem } from '$lib/navigation';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
-	// Same filter as the sidebar, from the same layout data — the palette must
-	// never offer a page the server would refuse.
-	let permissions: PermissionId[] = $derived(page.data.permissions ?? []);
-	let groups = $derived(groupNav(visibleNavItems(navItems, permissions)));
+	// Derived, not const: the entries change with the active org.
+	let groups = $derived(groupNav(page.data.nav ?? []));
 
-	function handleSelect(href: string) {
+	function handleSelect(item: NavItem) {
 		open = false;
-		goto(href);
+		goto(navItemTarget(item));
 	}
 </script>
 
@@ -25,13 +24,20 @@
 		{#each groups as group (group.key)}
 			<Command.Group heading={group.label}>
 				{#each group.items as item (item.href)}
+					{@const Icon = iconFor(item.icon)}
 					<Command.LinkItem
-						href={item.href}
+						href={navItemTarget(item)}
 						value={[item.label, ...(item.aliases ?? [])].join(' ')}
-						onSelect={() => handleSelect(item.href)}
+						onSelect={() => handleSelect(item)}
 					>
-						<item.icon class="mr-2 size-4 shrink-0 opacity-60" />
+						<Icon class="mr-2 size-4 shrink-0 opacity-60" />
 						{item.label}
+						{#if item.locked}
+							<LockIcon
+								class="text-muted-foreground ml-auto size-3.5"
+								aria-label="Upgrade required"
+							/>
+						{/if}
 					</Command.LinkItem>
 				{/each}
 			</Command.Group>

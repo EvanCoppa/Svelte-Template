@@ -4,7 +4,7 @@ import {
 	assignRole,
 	can,
 	getUserAccess,
-	listPermissions,
+	hasGrant,
 	listRoles,
 	requirePermission,
 	unassignRole,
@@ -32,8 +32,8 @@ describe('getUserAccess', () => {
 					id: ROLE_ID,
 					name: 'Support',
 					role_permissions: [
-						{ permission_id: 'tickets', level: 'manage' },
-						{ permission_id: 'clients', level: 'read' }
+						{ feature_id: 'tickets', level: 'manage' },
+						{ feature_id: 'clients', level: 'read' }
 					]
 				}
 			},
@@ -42,8 +42,8 @@ describe('getUserAccess', () => {
 					id: 'b0000000-0000-0000-0000-000000000002',
 					name: 'Sales',
 					role_permissions: [
-						{ permission_id: 'clients', level: 'manage' },
-						{ permission_id: 'deals', level: 'read' }
+						{ feature_id: 'clients', level: 'manage' },
+						{ feature_id: 'deals', level: 'read' }
 					]
 				}
 			}
@@ -67,12 +67,12 @@ describe('getUserAccess', () => {
 		);
 	});
 
-	it('filters roles to the org industry, mirroring private.permission_level', async () => {
+	it('filters roles to the org industry, mirroring private.feature_level', async () => {
 		const { supabase, builder } = supabaseMock({ data: [] });
 
 		await getUserAccess(supabase, ORG_ID, USER_ID, 'member', INDUSTRY_ID);
 		expect(builder.select).toHaveBeenCalledWith(
-			'roles!inner(id, name, role_permissions(permission_id, level))'
+			'roles!inner(id, name, role_permissions(feature_id, level))'
 		);
 		expect(builder.eq).toHaveBeenCalledWith('roles.industry_id', INDUSTRY_ID);
 	});
@@ -89,14 +89,14 @@ describe('unionGrants', () => {
 	it('keeps manage over read regardless of order', () => {
 		expect(
 			unionGrants([
-				[{ permission_id: 'clients', level: 'manage' }],
-				[{ permission_id: 'clients', level: 'read' }]
+				[{ feature_id: 'clients', level: 'manage' }],
+				[{ feature_id: 'clients', level: 'read' }]
 			])
 		).toEqual(new Map([['clients', 'manage']]));
 		expect(
 			unionGrants([
-				[{ permission_id: 'clients', level: 'read' }],
-				[{ permission_id: 'clients', level: 'manage' }]
+				[{ feature_id: 'clients', level: 'read' }],
+				[{ feature_id: 'clients', level: 'manage' }]
 			])
 		).toEqual(new Map([['clients', 'manage']]));
 	});
@@ -104,14 +104,14 @@ describe('unionGrants', () => {
 	it('keeps delete over manage regardless of order', () => {
 		expect(
 			unionGrants([
-				[{ permission_id: 'staff', level: 'delete' }],
-				[{ permission_id: 'staff', level: 'manage' }]
+				[{ feature_id: 'staff', level: 'delete' }],
+				[{ feature_id: 'staff', level: 'manage' }]
 			])
 		).toEqual(new Map([['staff', 'delete']]));
 		expect(
 			unionGrants([
-				[{ permission_id: 'staff', level: 'manage' }],
-				[{ permission_id: 'staff', level: 'delete' }]
+				[{ feature_id: 'staff', level: 'manage' }],
+				[{ feature_id: 'staff', level: 'delete' }]
 			])
 		).toEqual(new Map([['staff', 'delete']]));
 	});
@@ -152,6 +152,14 @@ describe('can', () => {
 	});
 });
 
+describe('hasGrant', () => {
+	it('checks any feature id, for ids that come from the registry', () => {
+		expect(hasGrant(member([['clients', 'read']]), 'clients')).toBe(true);
+		expect(hasGrant(member([['clients', 'read']]), 'not-a-feature')).toBe(false);
+		expect(hasGrant({ role: 'admin', roles: [], grants: new Map() }, 'not-a-feature')).toBe(true);
+	});
+});
+
 describe('requirePermission', () => {
 	it('passes silently when access suffices', () => {
 		expect(() => requirePermission(member([['clients', 'read']]), 'clients')).not.toThrow();
@@ -170,20 +178,12 @@ describe('requirePermission', () => {
 });
 
 describe('roles data access', () => {
-	it('lists the permission catalog ordered by name', async () => {
-		const { supabase, from, builder } = supabaseMock({ data: [] });
-
-		await listPermissions(supabase);
-		expect(from).toHaveBeenCalledWith('permissions');
-		expect(builder.order).toHaveBeenCalledWith('name');
-	});
-
 	it('lists an industry catalog of roles with their grants', async () => {
 		const { supabase, from, builder } = supabaseMock({ data: [] });
 
 		await listRoles(supabase, INDUSTRY_ID);
 		expect(from).toHaveBeenCalledWith('roles');
-		expect(builder.select).toHaveBeenCalledWith('*, role_permissions(permission_id, level)');
+		expect(builder.select).toHaveBeenCalledWith('*, role_permissions(feature_id, level)');
 		expect(builder.eq).toHaveBeenCalledWith('industry_id', INDUSTRY_ID);
 		expect(builder.order).toHaveBeenCalledWith('name');
 	});

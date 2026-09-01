@@ -177,6 +177,39 @@ export type Database = {
           },
         ]
       }
+      features: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          route: string
+          sort_order: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id: string
+          name: string
+          route: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          route?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       industries: {
         Row: {
           created_at: string
@@ -194,6 +227,39 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      industry_features: {
+        Row: {
+          created_at: string
+          feature_id: string
+          industry_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          industry_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          industry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "industry_features_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       member_roles: {
         Row: {
@@ -334,6 +400,78 @@ export type Database = {
           },
         ]
       }
+      organization_disabled_features: {
+        Row: {
+          created_at: string
+          feature_id: string
+          org_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          org_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_disabled_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_disabled_features_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_feature_overrides: {
+        Row: {
+          created_at: string
+          feature_id: string
+          mode: Database["public"]["Enums"]["feature_mode"]
+          note: string | null
+          org_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          mode: Database["public"]["Enums"]["feature_mode"]
+          note?: string | null
+          org_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          mode?: Database["public"]["Enums"]["feature_mode"]
+          note?: string | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_feature_overrides_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_feature_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invites: {
         Row: {
           created_at: string
@@ -450,24 +588,6 @@ export type Database = {
           },
         ]
       }
-      permissions: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -499,27 +619,27 @@ export type Database = {
         Row: {
           created_at: string
           level: Database["public"]["Enums"]["permission_level"]
-          permission_id: string
+          feature_id: string
           role_id: string
         }
         Insert: {
           created_at?: string
           level?: Database["public"]["Enums"]["permission_level"]
-          permission_id: string
+          feature_id: string
           role_id: string
         }
         Update: {
           created_at?: string
           level?: Database["public"]["Enums"]["permission_level"]
-          permission_id?: string
+          feature_id?: string
           role_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "role_permissions_permission_id_fkey"
-            columns: ["permission_id"]
+            foreignKeyName: "role_permissions_feature_id_fkey"
+            columns: ["feature_id"]
             isOneToOne: false
-            referencedRelation: "permissions"
+            referencedRelation: "features"
             referencedColumns: ["id"]
           },
           {
@@ -745,6 +865,39 @@ export type Database = {
           },
         ]
       }
+      tier_features: {
+        Row: {
+          created_at: string
+          feature_id: string
+          tier_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          tier_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          tier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tier_features_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tiers: {
         Row: {
           created_at: string
@@ -779,6 +932,7 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
+      feature_mode: "enabled" | "locked_visible" | "disabled" | "hidden"
       org_role: "owner" | "admin" | "member"
       permission_level: "read" | "manage" | "delete"
       ticket_priority: "low" | "normal" | "high" | "urgent"
@@ -919,6 +1073,7 @@ export const Constants = {
         "won",
         "lost",
       ],
+      feature_mode: ["enabled", "locked_visible", "disabled", "hidden"],
       org_role: ["owner", "admin", "member"],
       permission_level: ["read", "manage", "delete"],
       ticket_priority: ["low", "normal", "high", "urgent"],

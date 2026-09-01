@@ -1,70 +1,57 @@
 import { error } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables } from '$lib/database.types';
-import type { PermissionId } from '$lib/permissions';
+import type { FeatureId } from '$lib/features/types';
 import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 
 /**
- * Roles & permissions: what a user may see and do inside the active org.
+ * Roles & grants: what a user may see and do inside the active org.
  *
  * Roles are industry-scoped reference data — defined once per industry by
  * migration (like `tiers`), so onboarding a new org needs zero role setup:
  * the org's `industry_id` decides which roles its owners/admins can hand
  * out. Two industries can each have a "Support" role granting different
  * things. Custom per-org roles are a deliberate future extension, not built
- * yet. A member can hold several roles, and access is the UNION of
- * everything they grant — the strongest level wins wherever they overlap.
- * Levels form a ladder, `read` < `manage` < `delete`, each implying the ones
- * below it: `read` shows a page, `manage` allows add/edit, `delete` gates
- * destructive actions (the staff page's remove-member is the reference). Org
- * owners and admins implicitly hold `delete` on every permission, so a
- * fresh org is never locked out. The database mirrors the same rules in
- * `private.permission_level()` for policies that need it.
+ * yet. A role grants `read` or `manage` on a FEATURE (the registry in
+ * `src/lib/features/`), not on a page — one catalog drives navigation, the
+ * route gate and grants. A member can hold several roles, and access is the
+ * UNION of everything they grant — `manage` beats `read` wherever they
+ * overlap. Org owners and admins implicitly hold `manage` on every feature,
+ * so a fresh org is never locked out. The database mirrors the same rules
+ * in `private.feature_level()` for policies that need it.
  *
  * Every function takes the request-scoped client (`locals.supabase`) plus
  * ids from layout data — the same contract as the crm modules. RLS gates
  * the writes (assigning roles is owner/admin only, and only from the org's
  * own industry), so these helpers never re-check org_role themselves.
  *
- * Gating a page is two lines in its `+page.server.ts` load:
+ * Access is the intersection of two axes: the feature's mode for the org
+ * (tier/industry/override, resolved in `src/lib/server/org-context.ts`) and
+ * the caller's grant. `hooks.server.ts` enforces both for `read` on every
+ * feature route, so a page load needs no check of its own. Writes still
+ * gate themselves inside the action:
  *
- *   const access = await getUserAccess(
- *     supabase, activeOrg.id, user.id, activeOrg.role, activeOrg.industryId
- *   );
- *   requirePermission(access, 'clients');            // hide the page: read
- *   requirePermission(access, 'clients', 'manage');  // add/edit/delete
- *
- * This is app-level gating in the tier-gating tradition: RLS remains the
- * security boundary, these decide what a screen offers. The permission keys
- * live in the `permissions` catalog table and grow by migration, usually
- * one per page.
+ *   requirePermission(locals.org.access, 'clients', 'manage');
  */
 
 export type PermissionLevel = Enums<'permission_level'>;
-export type Permission = Tables<'permissions'>;
 export type Role = Tables<'roles'>;
-
-// The key union lives in $lib/permissions (client code — the nav filter —
-// needs it too); checks take it so a typo'd key is a `check` error — with a
-// bare string it would silently pass for owners/admins (the bypass) while
-// denying every member.
-export type { PermissionId } from '$lib/permissions';
 
 /** The ladder, low to high. Index = privilege; higher grants imply lower. */
 const LEVEL_RANK = { read: 0, manage: 1, delete: 2 } satisfies Record<PermissionLevel, number>;
 
 /** One grant on a role. */
-export type PermissionGrant = Pick<Tables<'role_permissions'>, 'permission_id' | 'level'>;
+export type PermissionGrant = Pick<Tables<'role_permissions'>, 'feature_id' | 'level'>;
 
 /** A role with everything it grants, for role-assignment screens. */
 export type RoleWithPermissions = Role & { role_permissions: PermissionGrant[] };
 
-/** Union of a user's grants: permission key → strongest level held. */
+/** Union of a user's grants: feature id → strongest level held. */
 export type PermissionGrants = ReadonlyMap<string, PermissionLevel>;
 
 /** Everything access-related about one user in one org, in one shape. */
 export type UserAccess = {
-	/** The org-level role (owner/admin bypass permission checks entirely). */
+	/** The org-level role (owner/admin bypass grant checks entirely). */
 	role: Enums<'org_role'>;
 	/** The named roles this user holds in the org. */
 	roles: Pick<Role, 'id' | 'name'>[];
@@ -73,11 +60,11 @@ export type UserAccess = {
 
 /**
  * The one query pages need: the user's roles in the org and the unioned
- * grants they add up to. `role` and `industryId` come from layout data
- * (`activeOrg`) — already loaded there, so this stays a single round trip.
- * Filtering to the org's current industry mirrors `private.permission_level`:
- * if an org's industry ever changes, assignments pointing at another
- * industry's roles go inert instead of still granting.
+ * grants they add up to. `role` and `industryId` come from the org context
+ * — already loaded there, so this stays a single round trip. Filtering to
+ * the org's current industry mirrors `private.feature_level`: if an org's
+ * industry ever changes, assignments pointing at another industry's roles
+ * go inert instead of still granting.
  */
 export async function getUserAccess(
 	supabase: SupabaseClient<Database>,
@@ -89,7 +76,7 @@ export async function getUserAccess(
 	const held = unwrap(
 		await supabase
 			.from('member_roles')
-			.select('roles!inner(id, name, role_permissions(permission_id, level))')
+			.select('roles!inner(id, name, role_permissions(feature_id, level))')
 			.eq('org_id', orgId)
 			.eq('user_id', userId)
 			.eq('roles.industry_id', industryId)
@@ -102,43 +89,49 @@ export async function getUserAccess(
 /** Folds grant lists from several roles into one map; the strongest wins. */
 export function unionGrants(grantLists: PermissionGrant[][]): PermissionGrants {
 	const grants = new Map<string, PermissionLevel>();
-	for (const { permission_id, level } of grantLists.flat()) {
-		const held = grants.get(permission_id);
+	for (const { feature_id, level } of grantLists.flat()) {
+		const held = grants.get(feature_id);
 		if (held === undefined || LEVEL_RANK[level] > LEVEL_RANK[held]) {
-			grants.set(permission_id, level);
+			grants.set(feature_id, level);
 		}
 	}
 	return grants;
 }
 
 /**
- * Does this user reach `level` on `permission`? Owners and admins always do;
- * everyone else needs a role granting it at that level or above.
+ * Does this user reach `level` on a feature? Owners and admins always do;
+ * everyone else needs a role granting it at that level or above. Takes any
+ * string because the gate and the nav check ids that come from the registry
+ * rows; app code should call `can()` for a typed key.
  */
-export function can(
+export function hasGrant(
 	access: UserAccess,
-	permission: PermissionId,
+	featureId: string,
 	level: PermissionLevel = 'read'
 ): boolean {
 	if (access.role === 'owner' || access.role === 'admin') return true;
-	const held = access.grants.get(permission);
+	const held = access.grants.get(featureId);
 	return held !== undefined && LEVEL_RANK[held] >= LEVEL_RANK[level];
 }
 
-/** `can()` or a 403 — the guard a gated load or action opens with. */
-export function requirePermission(
+/** `hasGrant()` for a key the app knows at build time — typos are `check` errors. */
+export function can(
 	access: UserAccess,
-	permission: PermissionId,
+	feature: FeatureId,
 	level: PermissionLevel = 'read'
-): void {
-	if (!can(access, permission, level)) {
-		throw error(403, 'You do not have access to this page.');
-	}
+): boolean {
+	return hasGrant(access, feature, level);
 }
 
-/** The full permission catalog, for role-assignment screens. */
-export async function listPermissions(supabase: SupabaseClient<Database>): Promise<Permission[]> {
-	return unwrap(await supabase.from('permissions').select('*').order('name'));
+/** `can()` or a 403 — the guard a write action opens with. */
+export function requirePermission(
+	access: UserAccess,
+	feature: FeatureId,
+	level: PermissionLevel = 'read'
+): void {
+	if (!can(access, feature, level)) {
+		throw error(403, 'You do not have access to this page.');
+	}
 }
 
 /**
@@ -152,7 +145,7 @@ export async function listRoles(
 	return unwrap(
 		await supabase
 			.from('roles')
-			.select('*, role_permissions(permission_id, level)')
+			.select('*, role_permissions(feature_id, level)')
 			.eq('industry_id', industryId)
 			.order('name')
 	);

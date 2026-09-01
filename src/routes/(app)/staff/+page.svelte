@@ -25,7 +25,8 @@
 	type Member = (typeof data)['staff'][number];
 
 	let user = $derived(page.data.user);
-	let activeOrg = $derived(page.data.activeOrg);
+	// From the (app) layout via this page's own typed data, never optional here.
+	let activeOrg = $derived(data.activeOrg);
 
 	/** Org role is a rank, not a status: three fixed tones, one per rank. */
 	const ORG_ROLE_TONES = {
