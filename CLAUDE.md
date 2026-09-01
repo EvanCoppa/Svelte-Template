@@ -271,6 +271,25 @@ the interior takes on tabs, modals, popovers and dropdowns — `ui/` already ans
   card on `/enhanced`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
   Core's PascalCase.
 
+## Compound components — the preferred shape for reusable multi-part UI
+
+When a reusable component has more than one visual region, build it as a **compound
+component**: a folder of small parts exported as a namespace and composed directly in
+page markup, like `Card.Root` / `Card.Header` / `Card.Content`. The point of the
+pattern is that **the page owns all the data** — it arrives from the load function and
+flows into each part as a visible prop right where that part is rendered, so reading
+`+page.svelte` tells you what data exists, which region shows it, and what every
+handler does. Never build the two alternatives: a monolithic component that drills
+props into private children, or a config-object "god prop" that encodes structure as
+data.
+
+The full convention — the two tiers (structural like `ui/card` vs. stateful with a
+runes-class context like `ui/sidebar`), file anatomy, `index.ts` namespace exports,
+and the page-owns-data rules — is the `compound-components` skill
+(`.claude/skills/compound-components/SKILL.md`); the `compound-component-builder`
+agent owns this work. App-level compounds live in `src/lib/components/<name>/`;
+context carries coordination state only (open/active/selection), never fetched data.
+
 ## Key patterns
 
 - Server-only code: `*.server.ts` files or `src/lib/server/`
