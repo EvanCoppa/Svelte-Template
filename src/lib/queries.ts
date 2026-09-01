@@ -10,5 +10,6 @@
  */
 export const QUERY = {
 	auth: 'supabase:auth',
-	profile: 'app:profile'
+	profile: 'app:profile',
+	org: 'app:org'
 } as const;

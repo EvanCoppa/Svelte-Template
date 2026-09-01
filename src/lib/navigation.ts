@@ -3,7 +3,6 @@ import BlocksIcon from '@lucide/svelte/icons/blocks';
 import BookOpenIcon from '@lucide/svelte/icons/book-open';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import SettingsIcon from '@lucide/svelte/icons/settings';
-import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
 /**
  * The single source of truth for the sidebar and the ⌘K palette.
@@ -60,14 +59,19 @@ export const navItems: NavItem[] = [
 		href: '/components',
 		category: 'library',
 		icon: BlocksIcon,
-		aliases: ['ui', 'shadcn', 'showcase', 'kitchen sink']
-	},
-	{
-		label: 'Enhanced',
-		href: '/enhanced',
-		category: 'library',
-		icon: SparklesIcon,
-		aliases: ['primitives', 'interior', 'motion', 'solid core', 'otp', 'tags']
+		aliases: [
+			'ui',
+			'shadcn',
+			'showcase',
+			'kitchen sink',
+			'enhanced',
+			'primitives',
+			'interior',
+			'motion',
+			'solid core',
+			'otp',
+			'tags'
+		]
 	},
 	{
 		label: 'Best Practices',

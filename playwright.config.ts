@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import { SUPABASE_KEY, SUPABASE_URL } from './tests/env';
 
-const PORT = 5173;
+// Overridable so a run can dodge an unrelated dev server already on 5173 —
+// with `reuseExistingServer` below, a stranger on the default port would
+// otherwise be tested in this app's place: `E2E_PORT=4173 npm run test:e2e`.
+const PORT = Number(process.env.E2E_PORT ?? 5173);
 
 /**
  * End-to-end tests. Unit tests (vitest) live next to the code in `src/`; these

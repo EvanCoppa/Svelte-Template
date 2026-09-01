@@ -112,11 +112,59 @@ refuses to run on production deployments, `/logout` still works (sets an opt-out
 cookie; clear it with `?autologin=1`), and the emailed-link flows under `/auth`
 stay testable as a signed-out browser.
 
+## Multi-tenancy (the default data model)
+
+This template is **multi-tenant by default**: `organizations` is the root entity, and
+application data is scoped to an organization, never to a bare user. The
+`organizations` migration is the reference; the moving parts:
+
+- **Tables**: `organizations` (with `tier_id` → the `tiers` lookup table),
+  `organization_members` (`org_id`, `user_id`, `role public.org_role` —
+  owner/admin/member). `profiles` stays per-user identity (display name, avatar) —
+  the one deliberate exception.
+- **Every new tenant-scoped table copies the canonical shape** (also in the comment
+  block at the bottom of the organizations migration):
+  `org_id uuid not null references public.organizations (id) on delete cascade`,
+  RLS enabled, select policy `using (private.org_role(org_id) is not null)`, write
+  policies `with check (private.org_role(org_id) in ('owner','admin'))`, and an
+  index on `org_id`. Never write a policy that queries `organization_members`
+  directly — that recurses; always go through the `private.*` helpers.
+- **Role checks live in RLS, always**, via `private.org_role(org_id)` (SECURITY
+  DEFINER, not API-exposed). **Tier gating lives in app code by default** — loads
+  and actions read `activeOrg.tierId` from layout data and branch (upsell states,
+  limits, disabled buttons). Add `private.org_tier(org_id) in (...)` to a policy
+  only when a tier boundary is a _security_ boundary. Quota counting belongs in the
+  form action, never in a per-row policy subquery.
+- **`tiers` is reference data**: rows are inserted by migration, readable by every
+  authenticated user, written only by billing/service-role code. Members can never
+  change their own org's `tier_id` (column-level grants enforce this — org writes
+  from the browser are limited to `name`).
+- **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
+  with an owner membership on signup, so no screen needs an empty-org state. Don't
+  break that invariant without building onboarding to replace it.
+- **The active org is a cookie** (`src/lib/server/active-org.ts`), resolved and
+  repaired in `src/routes/(app)/+layout.server.ts`, which gives every `(app)` page
+  `{ organizations, activeOrg }` (`activeOrg` carries `role` + tier) under
+  `QUERY.org`. Child loads filter by `locals.activeOrgId`; it is a UI preference,
+  not an auth decision — RLS is the boundary, a forged cookie yields zero rows.
+  Switching goes through `PUT /api/org` (the team switcher) + `invalidate(QUERY.org)`.
+- **CRM working data is member-writable** — a documented extension of the canonical
+  shape, not a drift. The `crm_core` migration is the reference: members create and
+  edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
+  comments) is editable by its author or owner/admin, deletes stay owner/admin, and
+  notifications belong to their recipient (created server-side only, via
+  `src/lib/server/crm/notifications.ts` + the service-role client). Column-level
+  grants keep `org_id`, authorship columns and ticket numbers immutable from the
+  browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
+  actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
+  never through ad-hoc `.from()` chains in routes.
+
 ## Database
 
 - Schema changes are SQL migrations in `supabase/migrations/` (see the `profiles`
-  migration for the house pattern: create table → enable RLS → policies with
-  `(select auth.uid())` → triggers). Never change schema without a migration file.
+  and `organizations` migrations for the house pattern: create table → enable RLS →
+  policies with `(select auth.uid())` / `private.org_role()` → triggers). Never
+  change schema without a migration file.
 - **Develop against the local stack** (`npm run db:start`), not the hosted project.
   `npm run db:reset` re-applies every migration onto an empty database and re-runs
   `supabase/seed.sql` — that round trip is how a migration gets proven, and it is the
@@ -253,7 +301,9 @@ before you build.
 
 `src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from
 [Solid Core](https://github.com/EvanCoppa/solid-core)'s `src/lib/primitives/interior/` collection.
-`/enhanced` renders the inventory.
+`/components` renders the full inventory of both shelves together, grouped so a `ui/` primitive
+and its `enhanced/` counterpart sit next to each other for comparison — there is no separate
+`/enhanced` route.
 
 **`ui/` first, always.** Reach for `enhanced/` only when `ui/` has no answer for the job — a
 one-time-code field, a tag field, a password meter, a button that owns its own pending state, a
@@ -268,7 +318,7 @@ the interior takes on tabs, modals, popovers and dropdowns — `ui/` already ans
   (`emerald-500`, `amber-600`) needs its `dark:` pair.
 - To add another: port the folder from Solid Core, point its imports at `$lib/utils.js` and
   `$lib/motion.js`, add the two lines to the folder's `index.ts` and the barrel, and give it a
-  card on `/enhanced`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
+  card on `/components`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
   Core's PascalCase.
 
 ## Compound components — the preferred shape for reusable multi-part UI
