@@ -20,6 +20,7 @@ export const FEATURE_IDS = [
 	'deals',
 	'tasks',
 	'tickets',
+	'staff',
 	'components',
 	'best-practices'
 ] as const;

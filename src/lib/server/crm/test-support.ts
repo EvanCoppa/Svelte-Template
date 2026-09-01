@@ -12,6 +12,7 @@ import type { Database } from '$lib/database.types';
 const METHODS = [
 	'select',
 	'insert',
+	'upsert',
 	'update',
 	'delete',
 	'eq',
@@ -68,6 +69,45 @@ export function supabaseTablesMock(results: Record<string, QueryResult>) {
 	// SAFETY: see supabaseMock.
 	const supabase: SupabaseClient<Database> = { from } as never;
 	return { supabase, from, builders };
+}
+
+/**
+ * Like `supabaseMock`, but for a function running SEVERAL queries in
+ * sequence (a lookup then a write, say). Each `.from()` starts a new query,
+ * so the nth call gets the nth result — the last one repeats if a function
+ * queries more times than the test supplied. The chainable methods are
+ * shared across the sequence, so assertions read exactly as they do with
+ * `supabaseMock`.
+ */
+export function supabaseMockSequence(results: QueryResult[]) {
+	const queue = results.map((result): Required<QueryResult> => ({
+		data: null,
+		error: null,
+		count: null,
+		...result
+	}));
+	let issued = 0;
+	let current: Builder;
+
+	// Every method returns whichever builder `.from()` handed out last, which
+	// is the one the chain under test is building on.
+	const methods = Object.fromEntries(METHODS.map((name) => [name, vi.fn(() => current)]));
+
+	const from = vi.fn(() => {
+		// SAFETY: the loop below puts every BuilderMethod key on the promise
+		// before it is returned to the caller.
+		const builder = Promise.resolve(queue[Math.min(issued++, queue.length - 1)]) as Builder;
+		for (const method of METHODS) {
+			builder[method] = methods[method];
+		}
+		current = builder;
+		return builder;
+	});
+
+	// SAFETY: same as supabaseMock — only `.from()` and the stubbed builder
+	// methods are ever reached.
+	const supabase: SupabaseClient<Database> = { from } as never;
+	return { supabase, from, builder: methods };
 }
 
 export const ORG_ID = '10000000-0000-0000-0000-000000000001';

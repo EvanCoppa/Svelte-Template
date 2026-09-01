@@ -12,6 +12,7 @@ export const QUERY = {
 	auth: 'supabase:auth',
 	profile: 'app:profile',
 	org: 'app:org',
+	staff: 'app:staff',
 	/** The resolved feature map — the org's own opt-outs change it. */
 	features: 'app:features',
 	clients: 'app:clients',

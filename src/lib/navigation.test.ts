@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureMap, FeatureMode } from './features/types';
-import { buildNav, groupNav, navItemTarget, staticNavItems } from './navigation';
+import { buildNav, groupNav, isNavItemActive, navItemTarget, staticNavItems } from './navigation';
 
 function map(
 	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
@@ -103,5 +103,23 @@ describe('navItemTarget', () => {
 		expect(navItemTarget(item('clients'))).toBe('/clients');
 		expect(navItemTarget(item('best-practices'))).toBe('/upgrade?feature=best-practices');
 		expect(navItemTarget(staticNavItems[0])).toBe('/');
+	});
+});
+
+describe('isNavItemActive', () => {
+	const [dashboard] = staticNavItems;
+	const staff = buildNav(map([['staff', 'enabled']]), readAll).find(
+		(i) => i.featureId === 'staff'
+	)!;
+
+	it('matches the root item exactly, never as a prefix', () => {
+		expect(isNavItemActive(dashboard, '/')).toBe(true);
+		expect(isNavItemActive(dashboard, '/staff')).toBe(false);
+	});
+
+	it('matches a section item on its own path and its children', () => {
+		expect(isNavItemActive(staff, '/staff')).toBe(true);
+		expect(isNavItemActive(staff, '/staff/123')).toBe(true);
+		expect(isNavItemActive(staff, '/staffing')).toBe(false);
 	});
 });

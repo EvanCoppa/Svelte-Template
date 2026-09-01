@@ -111,4 +111,4 @@ if (serviceRoleKey) {
 
 writeFileSync(OUT_FILE, `${lines.join('\n')}\n`);
 console.log(`Wrote ${OUT_FILE} → ${url}`);
-console.log('Run `npm run dev` and sign in as dev@example.com / password123.');
+console.log('Sign in as dev@example.com / password123.');

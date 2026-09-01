@@ -23,9 +23,11 @@ Overrides are the escape hatch for pilots and one-off deals; a trial is just ano
 per-org tables, and column grants make sure the browser can only ever insert or delete
 an opt-out row.
 
-`role_permissions` grants `read` or `manage` on a **feature** (the old `permissions`
-catalog is gone). So one catalog drives navigation, the gate, plan/industry
-availability and role grants.
+`role_permissions` grants a level on a **feature** (the old `permissions` catalog is gone):
+`read` < `manage` < `delete`, each implying the ones below, owner/admin holding `delete`
+on everything. So one catalog drives navigation, the gate, plan/industry availability and
+role grants. `staff` (the roster and invitations) is a feature like any other — in every
+industry and every tier, so what a member sees of it is decided by their grant alone.
 
 ## Resolution
 
@@ -80,13 +82,13 @@ server would bounce.
 4. `npm run db:types`, commit `src/lib/database.types.ts`.
 
 No nav edit, no per-page check. Writes inside the page still open with
-`requirePermission(locals.org.access, '<id>', 'manage')`.
+`requirePermission(locals.org.access, '<id>', 'manage')`, destructive ones with `'delete'`.
 
 ## Seed fixtures
 
 `supabase/seed.sql` makes every mode visible locally:
 
-- **Acme Inc** (pro, general): clients, deals, tickets, components enabled; **tasks**
+- **Acme Inc** (pro, general): clients, deals, tickets, staff, components enabled; **tasks**
   switched off by the org (`disabled`); **best-practices** enterprise-only
   (`locked_visible`). `e2e@example.com` holds general Support, which grants nothing on
   deals — so `/deals` answers 403 for that user.

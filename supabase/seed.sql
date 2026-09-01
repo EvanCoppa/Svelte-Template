@@ -217,4 +217,14 @@ insert into public.organization_feature_overrides (org_id, feature_id, mode, not
 	('10000000-0000-0000-0000-000000000002', 'deals', 'enabled', 'Pilot: deals outside the construction catalog.')
 on conflict (org_id, feature_id) do nothing;
 
+-- A pending shareable-link invite into Acme with a fixed token, so the accept
+-- flow (/invite/<token>) is exercisable straight after a reset. Personal
+-- invites created from /staff get random database-generated tokens; a fixed
+-- one is fine here because the local stack is disposable.
+insert into public.organization_invites (id, org_id, email, token, invited_by) values
+	('e0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		null, 'seed0000seed0000seed0000seed0000seed0000seed0000',
+		'00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
 drop table seed_users;

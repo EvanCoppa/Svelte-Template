@@ -31,7 +31,7 @@ extend the rules rather than fighting them.
 ## Commands
 
 ```bash
-npm run dev            # dev server
+npm run dev            # db:start + db:env + db:reset (when owed) + vite dev
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
 npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
@@ -39,7 +39,7 @@ npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-sl
 npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
 npm run test:e2e       # playwright (real browser, tests/) — see "E2E tests" below
-npm run db:start       # boot the local Supabase stack in Docker
+npm run db:start       # boot the local Supabase stack in Docker (npm run dev does this)
 npm run db:reset       # re-apply every migration, then supabase/seed.sql
 npm run db:env         # write .env.local pointing at the local stack
 npm run db:new <name>  # scaffold a migration file
@@ -167,15 +167,31 @@ application data is scoped to an organization, never to a bare user. The
   roles its owners/admins can hand out — so onboarding an org needs zero role
   setup, and two industries can each have a same-named role granting different
   things. Custom per-org roles are a deliberate future extension, not built
-  yet. Members can hold several roles and access is the union of their grants —
-  `manage` implies `read`, owner/admin implicitly hold `manage` on everything.
-  Access is the **intersection** of the feature's mode and the grant: the hook
-  also refuses (403) an enabled feature the user cannot `read`, so loads need
-  no check; writes open with `requirePermission(locals.org.access, 'key',
-'manage')`. This is app-level gating like tier gating — use
+  yet. Members can hold several roles and access is the union of their grants.
+  Levels are a ladder — `read` < `manage` < `delete`, each implying the ones
+  below — and owner/admin implicitly hold `delete` on everything. A policy
+  gating on a level therefore compares with `in ('manage','delete')`, never
+  `= 'manage'`. Access is the **intersection** of the feature's mode and the
+  grant: the hook also refuses (403) an enabled feature the user cannot
+  `read`, so loads need no check; add/edit opens with
+  `requirePermission(locals.org.access, 'key', 'manage')` and destructive
+  actions take `delete`. This is app-level gating like tier gating — use
   `private.feature_enabled()` / `private.feature_level()` in a policy only when
-  a feature is a real security boundary. Assigning/unassigning roles is
-  owner/admin via RLS (only roles from the org's industry), never a feature.
+  a feature is a real security boundary (the `staff` feature is: invite rows
+  carry join tokens). Assigning/unassigning roles is owner/admin via RLS (only
+  roles from the org's industry), never a feature.
+- **Staff management is the reference gated page** (`staff_management`
+  migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
+  all three levels: `read` shows the roster, `manage` invites people and
+  assigns roles, `delete` removes a member. Invitations are rows in
+  `organization_invites` — single-use, database-generated tokens, 7-day
+  expiry, either addressed to an email or shareable as a link — consumed at
+  `/invite/[token]`, which lives outside `(app)` because the person accepting
+  is not a member yet and goes through the service-role client for the same
+  reason. `profiles.email` is a trigger-maintained copy of the auth email
+  (column grants keep it out of reach of the browser), and members can read
+  the profiles of people they share an org with, which is what lets a roster
+  name anyone.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.
@@ -214,9 +230,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
 - Seed data goes in `supabase/seed.sql`, following the shape already there: fixed
   ids, `on conflict do nothing`, re-runnable. Its credentials are deliberately
   public because that database is disposable — **never put a real one there.**
-- **Quickstart for testing locally or in a cloud/web session:**
-  `npm run db:start && npm run db:env && npm run db:reset && npm run dev`, then sign
-  in as a seeded user — e.g. `evancoppa@gmail.com` / `password123` (also
+- **Quickstart for testing locally or in a cloud/web session:** `npm run dev`.
+  `scripts/dev.mjs` boots the stack, writes `.env.local`, applies the migrations and
+  seed when they have changed, then starts Vite — `-- --fresh` forces the reset,
+  `-- --skip-db` leaves the stack alone. Then sign in as a seeded user — e.g.
+  `evancoppa@gmail.com` / `password123` (also
   `dev@example.com` and `e2e@example.com`, same password). These are local-only
   fixture credentials from `supabase/seed.sql`, not a real account's password, and
   `db:reset` re-runs after every migration so the seeded users/orgs/CRM fixtures
@@ -364,6 +382,16 @@ one-time-code field, a tag field, a password meter, a button that owns its own p
 sliding segmented control. Where the two overlap, `ui/` wins: this shelf exists to cover gaps, not
 to become a second vocabulary for solved problems. That is why the first batch deliberately skips
 the interior takes on tabs, modals, popovers and dropdowns — `ui/` already answers those.
+
+**Alternate skins are the one exception**, and they earn it by reusing the `ui/` element rather
+than replacing it. `UntitledButton` (`enhanced/untitled-button`) wears the
+[Untitled UI](https://www.untitledui.com/react/components/buttons) button look — skeuomorphic
+edge, faded inner border, offset focus outline, nine `color`s × five `size`s, `loading`, icon
+snippets — but renders `ui/button` with `variant="unstyled"`, so the `<button>`/`<a>` switch,
+`ref` binding and disabled handling stay in one place. `ui/button` is still the default answer for
+a button; reach for a skin when a screen deliberately wants that look, and pick one skin per
+screen rather than mixing them. A further skin follows the same rule: `variant="unstyled"` plus a
+`tv` recipe painted from `app.css` tokens — never a second `<button>` element.
 
 - Every animation goes through `$lib/motion.js`, which is where `prefers-reduced-motion` is
   honoured. Never call Motion's `animate` straight from a component.

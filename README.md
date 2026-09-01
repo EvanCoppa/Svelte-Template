@@ -23,15 +23,19 @@ you just want to see the thing run:
 
 ```bash
 npm install
-npm run db:start     # boots Postgres + Auth + Studio in Docker
-npm run db:reset     # applies supabase/migrations, then supabase/seed.sql
-npm run db:env       # writes .env.local pointing at the local stack
 npm run dev          # sign in as dev@example.com / password123
 ```
 
+`npm run dev` does the whole local loop: it boots the Supabase stack in Docker,
+writes `.env.local` pointing at it, applies every migration and `supabase/seed.sql`,
+then starts Vite. Steps it has already done are skipped, so every run after the
+first goes straight to Vite — see [Local development database](#local-development-database)
+for the flags.
+
 **Hosted** is the path to an actual deployment, and is what the rest of this
 section covers. The two coexist: `.env.local` (local) overrides `.env` (hosted)
-while it exists, so `rm .env.local` switches back.
+while it exists, so `rm .env.local` switches back — and with a hosted URL
+configured, `npm run dev` leaves Docker alone and just starts Vite.
 
 ### 1. Create a Supabase project
 
@@ -139,6 +143,25 @@ Details worth knowing:
 and a mail catcher — that runs in Docker on your machine. Nothing in it affects
 your hosted project; hosted settings live in the dashboard.
 
+**`npm run dev` drives all of it** (`scripts/dev.mjs`): boot the stack, write
+`.env.local`, apply the schema, start Vite. It only does the work that is owed —
+the stack is started when it isn't running, and the database is reset when a file
+in `supabase/migrations/` or `supabase/seed.sql` has changed since the last one
+(the fingerprint it compares lives in `node_modules/.cache/`). Flags, with
+everything else forwarded to Vite:
+
+```bash
+npm run dev -- --fresh      # reset even though nothing changed
+npm run dev -- --no-reset   # never reset, however stale
+npm run dev -- --skip-db    # don't touch Docker at all, just start Vite
+npm run dev -- --local      # manage the stack whatever PUBLIC_SUPABASE_URL says
+npm run dev -- --hosted     # the opposite
+```
+
+It decides between the two by what the checkout is already pointed at: no
+`PUBLIC_SUPABASE_URL`, or one on 127.0.0.1, means the local stack; a hosted URL
+(or `CI`) means Vite alone. The steps also stand on their own:
+
 ```bash
 npm run db:start     # boot it (first run pulls images, so it takes a while)
 npm run db:reset     # drop, re-apply every migration, re-run the seed
@@ -150,6 +173,9 @@ npm run db:stop      # shut it down
 
 Worth knowing:
 
+- **Nothing stops the stack for you.** `npm run dev` leaves it running between
+  sessions, which is what makes the second run fast; `npm run db:stop` when you
+  want the containers back.
 - **Studio** is at <http://127.0.0.1:54323> — browse and edit local rows.
 - **Emails are never delivered.** Password-reset and confirmation mail lands in
   the catcher at <http://127.0.0.1:54324>, which is how you exercise the
@@ -345,7 +371,7 @@ to the Supabase redirect-URL allowlist (step 1 above).
 ## Scripts
 
 ```bash
-npm run dev            # dev server
+npm run dev            # local stack + .env.local + migrations + seed, then Vite
 npm run build          # production build (Vercel adapter)
 npm run preview        # preview the production build
 npm run check          # svelte-check: strict types, a11y, unused CSS — keep at zero

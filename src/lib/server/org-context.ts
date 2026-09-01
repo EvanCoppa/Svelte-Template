@@ -37,12 +37,15 @@ export async function loadOrgContext(event: Event): Promise<OrgContext> {
 	if (!user) throw error(401, 'Not signed in.');
 
 	// RLS scopes memberships to the signed-in user; the embeds pull each
-	// org, its tier and its feature rows in the same round trip.
+	// org, its tier and its feature rows in the same round trip. The org
+	// embed names its foreign key: member_roles, deals, tasks, tickets and
+	// notifications all reference both tables, so a bare `organizations(...)`
+	// is an ambiguous relationship to PostgREST (PGRST201).
 	const [membershipsResult, registry] = await Promise.all([
 		supabase
 			.from('organization_members')
 			.select(
-				'role, organizations(id, name, tier_id, industry_id, tiers(name), organization_feature_overrides(feature_id, mode), organization_disabled_features(feature_id))'
+				'role, organizations!organization_members_org_id_fkey(id, name, tier_id, industry_id, tiers(name), organization_feature_overrides(feature_id, mode), organization_disabled_features(feature_id))'
 			)
 			.eq('user_id', user.id),
 		loadFeatureRegistry(supabase).catch((cause: unknown) => {

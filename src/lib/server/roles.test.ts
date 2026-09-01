@@ -100,6 +100,21 @@ describe('unionGrants', () => {
 			])
 		).toEqual(new Map([['clients', 'manage']]));
 	});
+
+	it('keeps delete over manage regardless of order', () => {
+		expect(
+			unionGrants([
+				[{ feature_id: 'staff', level: 'delete' }],
+				[{ feature_id: 'staff', level: 'manage' }]
+			])
+		).toEqual(new Map([['staff', 'delete']]));
+		expect(
+			unionGrants([
+				[{ feature_id: 'staff', level: 'manage' }],
+				[{ feature_id: 'staff', level: 'delete' }]
+			])
+		).toEqual(new Map([['staff', 'delete']]));
+	});
 });
 
 describe('can', () => {
@@ -118,10 +133,21 @@ describe('can', () => {
 		expect(can(manager, 'clients', 'manage')).toBe(true);
 	});
 
-	it('owners and admins bypass grants entirely', () => {
+	it('delete is the top of the ladder and implies manage and read', () => {
+		const manager = member([['staff', 'manage']]);
+		expect(can(manager, 'staff', 'delete')).toBe(false);
+
+		const remover = member([['staff', 'delete']]);
+		expect(can(remover, 'staff')).toBe(true);
+		expect(can(remover, 'staff', 'manage')).toBe(true);
+		expect(can(remover, 'staff', 'delete')).toBe(true);
+	});
+
+	it('owners and admins bypass grants entirely, delete included', () => {
 		for (const role of ['owner', 'admin'] as const) {
 			const access: UserAccess = { role, roles: [], grants: new Map() };
 			expect(can(access, 'clients', 'manage')).toBe(true);
+			expect(can(access, 'staff', 'delete')).toBe(true);
 		}
 	});
 });

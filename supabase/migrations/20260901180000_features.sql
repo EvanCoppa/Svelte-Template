@@ -46,13 +46,15 @@ comment on table public.features is
 	'Registry of navigable capabilities. Reference data owned by migrations / the service role; clients only read it. Grows by migration as pages are built.';
 
 -- The reference rows ship with the schema, not seed.sql — production needs
--- them too. Idempotent so a re-apply is a no-op. The four CRM rows carry the
--- ids the roles migration granted on, so the FK swap below keeps every grant.
+-- them too. Idempotent so a re-apply is a no-op. The CRM rows and 'staff'
+-- carry the ids the roles and staff_management migrations granted on, so the
+-- FK swap below keeps every grant.
 insert into public.features (id, name, description, route, icon, category, sort_order) values
-	('clients', 'Clients', 'The companies and people you work with.', '/clients', 'users', 'platform', 10),
+	('clients', 'Clients', 'The companies and people you work with.', '/clients', 'contact', 'platform', 10),
 	('deals', 'Deals', 'Pipeline of opportunities, by stage and value.', '/deals', 'handshake', 'platform', 20),
 	('tasks', 'Tasks', 'Follow-ups and to-dos, with due dates and owners.', '/tasks', 'list-checks', 'platform', 30),
 	('tickets', 'Tickets', 'Support requests and their threads.', '/tickets', 'ticket', 'platform', 40),
+	('staff', 'Staff', 'The people in your organization, their roles and invitations.', '/staff', 'users', 'platform', 50),
 	('components', 'Components', 'The UI primitive inventory, for building screens.', '/components', 'blocks', 'library', 10),
 	('best-practices', 'Best Practices', 'The conventions this codebase follows.', '/best-practices', 'book-open', 'library', 20)
 on conflict (id) do nothing;
@@ -73,8 +75,7 @@ alter table public.role_permissions
 comment on table public.role_permissions is
 	'One feature granted by one role, at read or manage level. Reference data; rows live and die with their role.';
 
--- Replaced by private.feature_level below. No policy or app code calls it.
-drop function private.permission_level(uuid, text);
+-- The permissions catalog itself goes; its policy goes with it.
 drop table public.permissions;
 
 -- Plain members should reach the library pages too, so the starter roles
@@ -106,11 +107,13 @@ insert into public.industry_features (industry_id, feature_id) values
 	('general', 'deals'),
 	('general', 'tasks'),
 	('general', 'tickets'),
+	('general', 'staff'),
 	('general', 'components'),
 	('general', 'best-practices'),
 	('construction', 'clients'),
 	('construction', 'tasks'),
 	('construction', 'tickets'),
+	('construction', 'staff'),
 	('construction', 'components')
 on conflict (industry_id, feature_id) do nothing;
 
@@ -131,20 +134,24 @@ comment on table public.tier_features is
 create index tier_features_feature_id_idx on public.tier_features (feature_id);
 
 -- Tiers nest: pro is free plus deals, enterprise is pro plus best-practices.
+-- Staff is in every tier — it is universal, gated by role grants alone.
 -- A trial tier is one more row in tiers plus its rows here.
 insert into public.tier_features (tier_id, feature_id) values
 	('free', 'clients'),
 	('free', 'tasks'),
 	('free', 'tickets'),
+	('free', 'staff'),
 	('free', 'components'),
 	('pro', 'clients'),
 	('pro', 'tasks'),
 	('pro', 'tickets'),
+	('pro', 'staff'),
 	('pro', 'components'),
 	('pro', 'deals'),
 	('enterprise', 'clients'),
 	('enterprise', 'tasks'),
 	('enterprise', 'tickets'),
+	('enterprise', 'staff'),
 	('enterprise', 'components'),
 	('enterprise', 'deals'),
 	('enterprise', 'best-practices')
@@ -198,12 +205,14 @@ create index organization_disabled_features_feature_id_idx
 -- private.feature_level — what the caller's roles grant on a feature
 -- ---------------------------------------------------------------------------
 
--- The roles migration's permission_level, keyed by feature. Same schema
--- (never exposed as RPC), SECURITY DEFINER so it reads member_roles /
+-- The staff_management migration's permission_level, keyed by feature. Same
+-- schema (never exposed as RPC), SECURITY DEFINER so it reads member_roles /
 -- role_permissions without tripping their own RLS, empty search_path forcing
--- qualified names. Owners and admins implicitly hold 'manage' on everything;
+-- qualified names. Levels are a ladder, read < manage < delete, and owners
+-- and admins implicitly hold 'delete' (the top rung) on everything;
 -- otherwise the strongest level across the caller's roles in the org's
--- CURRENT industry wins; null means no access at all.
+-- CURRENT industry wins; null means no access at all. Because the ladder is
+-- ordered, policies compare with `in (...)` or `>=`, never `= 'manage'`.
 create function private.feature_level(org uuid, feature text)
 returns public.permission_level
 language sql stable
@@ -211,7 +220,7 @@ security definer
 set search_path = ''
 as $$
 	select case
-		when private.org_role(org) in ('owner', 'admin') then 'manage'::public.permission_level
+		when private.org_role(org) in ('owner', 'admin') then 'delete'::public.permission_level
 		else (
 			select max(rp.level)
 			from public.member_roles mr
@@ -223,6 +232,52 @@ as $$
 		)
 	end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- The policies that called private.permission_level move to feature_level
+-- ---------------------------------------------------------------------------
+
+-- Same bodies as the staff_management migration, keyed by the 'staff'
+-- feature. Postgres refuses to drop a function a policy depends on, so the
+-- policies are re-created first and the old function dropped last.
+drop policy "Staff managers can view their org's invites" on public.organization_invites;
+drop policy "Staff managers can create invites" on public.organization_invites;
+drop policy "Staff managers can revoke invites" on public.organization_invites;
+drop policy "Members can leave and managers can remove members" on public.organization_members;
+
+create policy "Staff managers can view their org's invites"
+	on public.organization_invites
+	for select
+	to authenticated
+	using (private.feature_level(org_id, 'staff') in ('manage', 'delete'));
+
+create policy "Staff managers can create invites"
+	on public.organization_invites
+	for insert
+	to authenticated
+	with check (
+		private.feature_level(org_id, 'staff') in ('manage', 'delete')
+		and invited_by = (select auth.uid())
+	);
+
+create policy "Staff managers can revoke invites"
+	on public.organization_invites
+	for delete
+	to authenticated
+	using (private.feature_level(org_id, 'staff') in ('manage', 'delete'));
+
+create policy "Members can leave and managers can remove members"
+	on public.organization_members
+	for delete
+	to authenticated
+	using (
+		user_id = (select auth.uid())
+		or private.org_role(org_id) = 'owner'
+		or (private.org_role(org_id) = 'admin' and role <> 'owner')
+		or (private.feature_level(org_id, 'staff') = 'delete' and role = 'member')
+	);
+
+drop function private.permission_level(uuid, text);
 
 -- ---------------------------------------------------------------------------
 -- private.feature_mode — the resolver, for policies that need it
@@ -355,8 +410,9 @@ grant insert (org_id, feature_id) on table public.organization_disabled_features
 --
 -- Gating stays in app code by default (the hook enforces the mode and the
 -- read grant; actions call requirePermission(access, 'key', 'manage')).
--- When a feature is a real security boundary, wire its tables' RLS like:
+-- When a feature is a real security boundary, wire its tables' RLS like
+-- (the ladder is ordered, so compare with `in (...)`, never `= 'manage'`):
 --   select: using (private.feature_enabled(org_id, '<key>')
 --                  and private.feature_level(org_id, '<key>') is not null)
 --   write:  with check (private.feature_enabled(org_id, '<key>')
---                       and private.feature_level(org_id, '<key>') = 'manage')
+--                       and private.feature_level(org_id, '<key>') in ('manage', 'delete'))

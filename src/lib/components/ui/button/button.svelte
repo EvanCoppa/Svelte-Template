@@ -14,7 +14,16 @@
 					'bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 border',
 				secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
 				ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-				link: 'text-primary underline-offset-4 hover:underline'
+				link: 'text-primary underline-offset-4 hover:underline',
+				/**
+				 * The null skin: no base, no variant, no size — only the `class` the caller
+				 * passes. It exists so a differently-styled button (see
+				 * `enhanced/untitled-button`) can reuse this element's `<button>`/`<a>`
+				 * switch, `ref` binding and disabled handling instead of re-implementing
+				 * them, without fighting the shadcn look through `tailwind-merge`.
+				 * `size` is ignored. Reach for a real variant everywhere else.
+				 */
+				unstyled: ''
 			},
 			size: {
 				default: 'h-9 px-4 py-2 has-[>svg]:px-3',
@@ -51,13 +60,18 @@
 		children,
 		...restProps
 	}: ButtonProps = $props();
+
+	// `unstyled` skips the recipe entirely — see the variant's comment above.
+	const classes = $derived(
+		variant === 'unstyled' ? cn(className) : cn(buttonVariants({ variant, size }), className)
+	);
 </script>
 
 {#if href}
 	<a
 		bind:this={ref}
 		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
+		class={classes}
 		href={disabled ? undefined : href}
 		aria-disabled={disabled}
 		role={disabled ? 'link' : undefined}
@@ -67,14 +81,7 @@
 		{@render children?.()}
 	</a>
 {:else}
-	<button
-		bind:this={ref}
-		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
-		{type}
-		{disabled}
-		{...restProps}
-	>
+	<button bind:this={ref} data-slot="button" class={classes} {type} {disabled} {...restProps}>
 		{@render children?.()}
 	</button>
 {/if}

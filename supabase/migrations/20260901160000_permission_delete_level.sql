@@ -1,0 +1,12 @@
+-- The permission ladder grows a third rung: 'read' < 'manage' < 'delete'.
+-- 'delete' gates destructive actions a plain manager should not have (the
+-- first user: removing members from the org on /staff). Each level implies
+-- the ones below it, and appending keeps the enum's sort order aligned with
+-- privilege, so max() over the enum still picks the strongest grant in
+-- private.permission_level().
+--
+-- This lives in its own migration on purpose: Postgres refuses to reference
+-- a new enum value inside the transaction that added it, and every migration
+-- file runs as one transaction. The staff_management migration that follows
+-- is the first to use it.
+alter type public.permission_level add value 'delete';

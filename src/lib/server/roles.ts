@@ -37,6 +37,9 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 export type PermissionLevel = Enums<'permission_level'>;
 export type Role = Tables<'roles'>;
 
+/** The ladder, low to high. Index = privilege; higher grants imply lower. */
+const LEVEL_RANK = { read: 0, manage: 1, delete: 2 } satisfies Record<PermissionLevel, number>;
+
 /** One grant on a role. */
 export type PermissionGrant = Pick<Tables<'role_permissions'>, 'feature_id' | 'level'>;
 
@@ -83,20 +86,23 @@ export async function getUserAccess(
 	return { role, roles, grants: unionGrants(held.map(({ roles: r }) => r.role_permissions)) };
 }
 
-/** Folds grant lists from several roles into one map; `manage` wins. */
+/** Folds grant lists from several roles into one map; the strongest wins. */
 export function unionGrants(grantLists: PermissionGrant[][]): PermissionGrants {
 	const grants = new Map<string, PermissionLevel>();
 	for (const { feature_id, level } of grantLists.flat()) {
-		if (grants.get(feature_id) !== 'manage') grants.set(feature_id, level);
+		const held = grants.get(feature_id);
+		if (held === undefined || LEVEL_RANK[level] > LEVEL_RANK[held]) {
+			grants.set(feature_id, level);
+		}
 	}
 	return grants;
 }
 
 /**
  * Does this user reach `level` on a feature? Owners and admins always do;
- * everyone else needs a role granting it (`manage` implies `read`). Takes
- * any string because the gate and the nav check ids that come from the
- * registry rows; app code should call `can()` for a typed key.
+ * everyone else needs a role granting it at that level or above. Takes any
+ * string because the gate and the nav check ids that come from the registry
+ * rows; app code should call `can()` for a typed key.
  */
 export function hasGrant(
 	access: UserAccess,
@@ -105,7 +111,7 @@ export function hasGrant(
 ): boolean {
 	if (access.role === 'owner' || access.role === 'admin') return true;
 	const held = access.grants.get(featureId);
-	return held !== undefined && (level === 'read' || held === 'manage');
+	return held !== undefined && LEVEL_RANK[held] >= LEVEL_RANK[level];
 }
 
 /** `hasGrant()` for a key the app knows at build time — typos are `check` errors. */
