@@ -10,6 +10,10 @@ src/lib/database.types.ts
 # to upstream so re-syncing stays a clean diff
 .claude/skills/
 
+# Claude Code worktrees: checkouts of this repo nested inside it. Git already
+# excludes them; without this, `npm run lint` reports another branch's files.
+.claude/worktrees/
+
 # Vendored verbatim from dmmulroy/anti-slop — kept byte-identical to upstream
 # so re-syncing stays a clean diff
 tools/oxlint/anti-slop/

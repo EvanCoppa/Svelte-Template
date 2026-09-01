@@ -25,7 +25,9 @@
 		"db:status": "npx supabase status",
 		"db:new": "npx supabase migration new",
 		"db:env": "node scripts/local-env.mjs",
-		"db:types": "node scripts/gen-db-types.mjs"
+		"db:types": "node scripts/gen-db-types.mjs",
+		"db:types:check": "node scripts/gen-db-types.mjs --check",
+		"db:lint": "npx supabase db lint --level warning"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.1.0",
@@ -45,6 +47,7 @@
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
+		"supabase": "2.116.0",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
 		"typescript": "^5.0.0",

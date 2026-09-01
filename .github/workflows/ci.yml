@@ -112,3 +112,31 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Replays every migration from scratch against a disposable Postgres, so
+      # a migration that only applies against today's production schema fails
+      # here instead of on deploy. Free — this never touches a cloud project.
+      - name: Apply migrations to a disposable database
+        run: npx supabase db start
+
+      - name: Schema lint
+        run: npm run db:lint
+
+      # database.types.ts is a pure function of supabase/migrations/, so a diff
+      # here means a schema change landed without regenerating the types.
+      - name: database.types.ts matches the migrations
+        run: npm run db:types:check

@@ -1,0 +1,71 @@
+# Applies pending migrations to the production Supabase project when a PR is
+# merged into main. This workflow is the only sanctioned path to production:
+# `supabase db push` from a laptop leaves the migration history and the repo
+# disagreeing, and nothing else catches that.
+#
+# The Supabase GitHub integration has its own "Deploy to production" toggle
+# that does the same job. Leave it OFF — two mechanisms racing on the same
+# migration history is the one thing worse than none.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   personal access token, supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_ID     production project ref
+#   SUPABASE_DB_PASSWORD    production database password
+name: Deploy migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/db-deploy.yml'
+  workflow_dispatch:
+
+# Never let two deploys interleave on one migration history. Queue instead of
+# cancelling: a cancelled push can leave migrations half applied.
+concurrency:
+  group: db-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: supabase db push
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in repo settings to gate
+    # production schema changes behind a human.
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Link production project
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: What would be applied
+        run: npx supabase db push --dry-run
+
+      - name: Apply
+        run: npx supabase db push
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Migrations deployed to \`$SUPABASE_PROJECT_ID\`"
+            echo
+            echo '```'
+            npx supabase migration list --linked 2>&1 | tail -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

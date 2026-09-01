@@ -86,8 +86,12 @@ sign_in_sign_ups = 30
 token_verifications = 30
 
 [auth.email]
-# Signup is disabled above; this only governs the route if you enable it.
-enable_signup = false
+# This is NOT the signup switch — the CLI maps it to GOTRUE_EXTERNAL_EMAIL_ENABLED,
+# which turns the whole email provider off, password sign-in included. Setting it
+# false makes every seeded user fail to log in with "Email logins are disabled".
+# Signups are blocked by `enable_signup = false` under [auth] above; this stays on
+# so email/password sign-in keeps working.
+enable_signup = true
 double_confirm_changes = true
 # Local users (including the seeded one) can sign in immediately instead of
 # needing a confirmation click. The hosted project should keep this ON.

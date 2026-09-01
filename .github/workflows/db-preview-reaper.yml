@@ -1,0 +1,108 @@
+# Deletes Supabase preview branches that nobody is using any more.
+#
+# db-preview.yml already deletes a branch when its label is removed or its PR
+# closes, but neither fires if the workflow errored, the label was never
+# removed, or someone made a branch by hand in the dashboard. Branch compute is
+# excluded from the org spend cap, so "we'll notice on the invoice" is not a
+# control. This is the control.
+#
+# A branch is reaped when it is older than MAX_HOURS, or when the PR that
+# justified it is closed or has dropped the db:preview label. Persistent
+# branches (staging, QA) are never touched — that is what persistent means.
+name: Reap DB preview branches
+
+on:
+  schedule:
+    # Every three hours. Worst case a forgotten branch bills for three extra
+    # hours (~$0.04) instead of until someone opens the billing page.
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      max_hours:
+        description: 'Delete preview branches older than this many hours'
+        required: false
+        default: '24'
+      dry_run:
+        description: 'Report what would be deleted without deleting it'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  reap:
+    name: Reap
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pull-requests: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      GH_TOKEN: ${{ github.token }}
+      MAX_HOURS: ${{ inputs.max_hours || vars.SUPABASE_PREVIEW_MAX_HOURS || '24' }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Reap stale preview branches
+        run: |
+          set -euo pipefail
+
+          branches=$(npx supabase --experimental branches list \
+            --project-ref "$SUPABASE_PROJECT_ID" -o json 2>/dev/null || echo 'null')
+
+          # `branches list` returns null, not [], when a project has none.
+          rows=$(echo "$branches" | jq -c '(. // []) | map(select(.persistent != true and .is_default != true))[]')
+
+          if [ -z "$rows" ]; then
+            echo "No ephemeral preview branches. Nothing billing." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "### Preview branch reaper" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | Age (h) | PR | Verdict |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+          now=$(date -u +%s)
+          while IFS= read -r row; do
+            name=$(echo "$row" | jq -r '.name')
+            created=$(echo "$row" | jq -r '.created_at')
+            pr=$(echo "$row" | jq -r '.pr_number // empty')
+            age=$(( (now - $(date -u -d "$created" +%s)) / 3600 ))
+
+            reason=""
+            if [ "$age" -ge "$MAX_HOURS" ]; then
+              reason="older than ${MAX_HOURS}h"
+            elif [ -n "$pr" ]; then
+              state=$(gh pr view "$pr" --json state,labels 2>/dev/null || echo '{}')
+              if [ "$(echo "$state" | jq -r '.state // "UNKNOWN"')" != "OPEN" ]; then
+                reason="PR #$pr is closed"
+              elif [ "$(echo "$state" | jq '[.labels[]?.name] | index("db:preview") // empty')" = "" ]; then
+                reason="PR #$pr dropped the db:preview label"
+              fi
+            fi
+
+            if [ -z "$reason" ]; then
+              echo "| \`$name\` | $age | ${pr:+#$pr} | kept |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "| \`$name\` | $age | ${pr:+#$pr} | would delete — $reason |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            echo "Deleting $name: $reason"
+            npx supabase --experimental branches delete "$name" \
+              --project-ref "$SUPABASE_PROJECT_ID" --yes
+            echo "| \`$name\` | $age | ${pr:+#$pr} | **deleted** — $reason |" >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$rows"
