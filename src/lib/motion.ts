@@ -106,6 +106,39 @@ export function motionFlip(
 	return { duration: durationOf(controls) };
 }
 
+/**
+ * A Motion-driven collapse, for blocks whose open height is `auto`.
+ *
+ * Motion cannot animate to `auto` outside its React components, so the height
+ * is measured off the node the moment the transition starts and the animation
+ * runs between that and zero. The inline height is cleared once an opening
+ * settles, so the block goes back to sizing itself and content that grows later
+ * is not clipped to the height it happened to have when it opened.
+ */
+export function motionCollapse(
+	node: Element,
+	params: { transition?: AnimationOptions } = {},
+	options: { direction?: 'in' | 'out' | 'both' } = {}
+): TransitionConfig {
+	if (reducedMotion.current) return { duration: 0 };
+
+	// SAFETY: this transition only ever runs on block elements passed in:out/in from markup,
+	// never on SVG nodes, so the CSSOM `style.height` write below is always valid.
+	const el = node as HTMLElement;
+	const closing = options.direction === 'out';
+	const open = `${el.scrollHeight}px`;
+
+	const controls = animate(
+		el,
+		{ height: closing ? [open, '0px'] : ['0px', open] },
+		{
+			...(params.transition ?? springs.settle),
+			onComplete: closing ? undefined : () => (el.style.height = '')
+		}
+	);
+	return { duration: durationOf(controls) };
+}
+
 const placed = new WeakSet<Element>();
 
 /**
@@ -163,5 +196,21 @@ export function motionPress(
 				animate(element, released, transition ?? springs.snap);
 			};
 		});
+	};
+}
+
+/**
+ * Plays a Motion animation when the element attaches, and stops it if the
+ * element leaves mid-flight. For entrances that do not need Svelte to hold the
+ * node open — `{@attach motionEnter({ opacity: [0, 1] })}`.
+ */
+export function motionEnter(
+	keyframes: DOMKeyframesDefinition,
+	transition?: AnimationOptions
+): Attachment<Element> {
+	return (node) => {
+		if (reducedMotion.current) return;
+		const controls = animate(node, keyframes, transition ?? springs.settle);
+		return () => controls.stop();
 	};
 }
