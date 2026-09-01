@@ -144,6 +144,58 @@ test.describe('the app shell', () => {
 	});
 });
 
+test.describe('the workspace switcher', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	// The switcher lives in the sidebar header; scoping there keeps org names
+	// from colliding with the same text elsewhere on the page (strict mode).
+	const switcher = (page: Page) => page.locator('[data-slot="sidebar-header"]');
+
+	test('shows the active workspace and its tier', async ({ page }) => {
+		// seed.sql: e2e@example.com is a member of "Acme Inc" (pro) plus their
+		// personal org; "Acme Inc" sorts first, so it is the default active org.
+		await expect(switcher(page).getByText('Acme Inc')).toBeVisible();
+		await expect(switcher(page).getByText('Pro')).toBeVisible();
+	});
+
+	test('switches workspaces and persists the choice across reloads', async ({ page }) => {
+		// Open → select → verify as ONE retryable unit. Splitting it (clickWhenLive
+		// to open, then a separate item click) has a parity hazard: the opener's
+		// final retry can toggle the menu closed while the exit animation still
+		// reports the item visible, and the follow-up click then selects nothing.
+		const label = switcher(page).getByText('E2E Robot');
+		const item = page.getByRole('menuitem', { name: 'E2E Robot' });
+		await expect(async () => {
+			if (await label.isVisible()) return; // a previous attempt already switched
+			if (!(await item.isVisible())) {
+				await switcher(page).getByRole('button', { name: 'Acme Inc' }).click({ timeout: 2000 });
+			}
+			await item.click({ timeout: 2000 });
+			// PUT /api/org + invalidate; the first hit also compiles the endpoint.
+			await expect(label).toBeVisible({ timeout: 5000 });
+		}).toPass({ timeout: 30_000 });
+
+		// A reload is served fresh from the server, so this proves the active
+		// org lives in the cookie, not just in client memory.
+		await page.reload();
+		await expect(switcher(page).getByText('E2E Robot')).toBeVisible();
+	});
+
+	test('does not list organizations the user is not a member of', async ({ page }) => {
+		await clickWhenLive(switcher(page).getByRole('button', { name: 'Acme Inc' }), () =>
+			expect(page.getByRole('menuitem', { name: 'E2E Robot' })).toBeVisible()
+		);
+
+		// seed.sql keeps e2e@example.com out of Globex on purpose: RLS must hide
+		// it entirely, so the tenant boundary shows up as an absent menu item.
+		await expect(page.getByRole('menuitem', { name: 'Acme Inc' })).toBeVisible();
+		await expect(page.getByRole('menuitem', { name: 'Globex' })).toHaveCount(0);
+	});
+});
+
 test.describe('signing out', () => {
 	test('ends the session and re-arms the guard', async ({ page }) => {
 		await signIn(page);

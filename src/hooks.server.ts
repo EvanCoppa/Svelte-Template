@@ -17,6 +17,7 @@ import {
 	isDevAutoLoginEnabled,
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
+import { readActiveOrg } from '$lib/server/active-org';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
 import { applySecurityHeaders } from '$lib/server/security-headers';
 
@@ -136,6 +137,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	event.locals.session = session;
 	event.locals.user = user;
+	// UI preference, not an auth decision — see the Locals doc in app.d.ts.
+	event.locals.activeOrgId = user ? readActiveOrg(event.cookies) : null;
 
 	const pathname = event.url.pathname;
 	const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

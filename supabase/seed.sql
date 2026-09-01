@@ -106,4 +106,23 @@ on conflict (id) do update set display_name = excluded.display_name;
 -- Add sample rows for your own tables below, following the same shape: fixed
 -- ids, `on conflict do nothing`, no real data.
 
+-- Two shared organizations on top of the personal orgs the signup trigger /
+-- backfill created. Acme is the multi-member fixture; Globex exists so the
+-- E2E user has an org they are deliberately NOT in (tenant-isolation checks).
+insert into public.organizations (id, name, tier_id) values
+	('10000000-0000-0000-0000-000000000001', 'Acme Inc', 'pro'),
+	('10000000-0000-0000-0000-000000000002', 'Globex', 'free')
+on conflict (id) do nothing;
+
+-- Memberships. `do update` keeps roles deterministic across re-seeds.
+--   Acme:   dev = owner, evan = admin, e2e = member
+--   Globex: evan = owner, dev = member, e2e absent on purpose
+insert into public.organization_members (org_id, user_id, role) values
+	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'member'),
+	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'member')
+on conflict (org_id, user_id) do update set role = excluded.role;
+
 drop table seed_users;
