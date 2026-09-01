@@ -16,8 +16,9 @@ edit files — your deliverable is the report.
 
 1. **Primitive violations** (the big one): hand-rolled widgets or native controls where a
    vendored primitive exists in `src/lib/components/ui/`. Any `<select>` (must be
-   `ui/combobox`), raw `<input type="checkbox">` (→ `ui/checkbox`), styled `<button>`
-   instead of `ui/button`, bare `<input>`/`<textarea>` (→ `ui/input`/`ui/textarea`),
+   `ui/combobox`), raw `<input type="checkbox">` (→ `ui/checkbox`), styled `<button>` or
+   `ui/button` rendered directly (→ `UntitledButton` from `enhanced/untitled-button`), bare
+   `<input>`/`<textarea>` (→ `ui/input`/`ui/textarea`),
    `title="…"` tooltips (→ `ui/tooltip`), div-and-onclick menus/modals/panels
    (→ `ui/dropdown-menu`, `ui/popover`, `ui/dialog`, `ui/sheet`). `ui/select` is
    showcase-only — flag any real-screen usage.

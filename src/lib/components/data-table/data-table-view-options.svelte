@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Settings2Icon from '@lucide/svelte/icons/settings-2';
-	import { buttonVariants } from '$lib/components/ui/button/index.js';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { useDataTable } from './context.svelte.js';
 
@@ -10,12 +10,19 @@
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger
-		data-slot="data-table-view-options"
-		class={buttonVariants({ variant: 'outline', size: 'sm', class: className })}
-	>
-		<Settings2Icon />
-		View
+	<DropdownMenu.Trigger>
+		{#snippet child({ props })}
+			<UntitledButton
+				{...props}
+				data-slot="data-table-view-options"
+				color="secondary"
+				size="xs"
+				class={className}
+			>
+				{#snippet iconLeading()}<Settings2Icon />{/snippet}
+				View
+			</UntitledButton>
+		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>

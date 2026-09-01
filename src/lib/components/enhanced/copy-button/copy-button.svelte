@@ -2,7 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
-	import { motionPress, motionTo } from '$lib/motion.js';
+	import { labelSwap, motionPress, motionTo } from '$lib/motion.js';
 
 	const EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
 	/** The button's own dip under a press. */
@@ -198,13 +198,7 @@
 		{#each labels as [key, text] (key)}
 			<span
 				class="col-start-1 row-start-1 whitespace-nowrap"
-				{@attach motionTo(() => ({
-					keyframes:
-						key === status
-							? { opacity: 1, y: 0, filter: 'blur(0px)' }
-							: { opacity: 0, y: 3, filter: 'blur(3px)' },
-					transition: CROSSFADE
-				}))}
+				{@attach motionTo(() => ({ keyframes: labelSwap(key === status), transition: CROSSFADE }))}
 			>
 				{text}
 			</span>

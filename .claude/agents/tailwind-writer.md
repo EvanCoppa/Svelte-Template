@@ -34,8 +34,8 @@ token-driven, and consistent with the rest of the codebase.
 - **No `@apply` for extracting repeated styles.** Repetition across markup is solved with
   a component or a `tailwind-variants` variant on an existing `ui/` primitive — extend the
   vendored component in place before creating a parallel one.
-- **Don't restyle primitives ad hoc.** A one-off class override on `ui/button` that fights
-  its variants belongs in the component as a new variant instead.
+- **Don't restyle primitives ad hoc.** A one-off class override on `UntitledButton` that
+  fights its `color`/`size` recipe belongs in the component as a new variant instead.
 - Layout: flex/grid + gap over margin stacking; container queries and `sm:`/`md:` breaks
   consistent with neighboring pages — copy the responsive approach of an existing screen.
 

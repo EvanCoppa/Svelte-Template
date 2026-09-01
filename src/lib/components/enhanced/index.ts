@@ -5,11 +5,12 @@
  * These sit alongside the shadcn-svelte primitives in `src/lib/components/ui/`,
  * they do not replace them. Reach for `ui/` first; reach here when the job needs
  * something `ui/` has no answer for — a one-time-code field, a tag field, a
- * password meter, a button that owns its own pending state.
+ * password meter, a sliding segmented control.
  *
- * A few are not Solid Core ports — `UntitledButton` wears the Untitled UI button
- * skin over the `ui/button` element. Those are alternate skins, chosen on purpose
- * at a call site; `ui/button` is still the default answer for a button.
+ * The one exception is the button. `UntitledButton` is the button for every
+ * screen: the Untitled UI look with the interior buttons' motion (press dip,
+ * label swap, self-owned pending state) rendered over the `ui/button` element,
+ * which no screen uses directly.
  *
  * Every one of them paints from the theme tokens in `src/app.css`, so they
  * follow the light/dark toggle in `src/lib/theme.svelte.ts` with no extra
@@ -74,11 +75,6 @@ export {
 	type LoadMoreStatus,
 	type LoadMoreLabels
 } from './load-more/index.js';
-export {
-	LoadingButton,
-	type AsyncActionStatus,
-	type LoadingButtonProps
-} from './loading-button/index.js';
 export {
 	LogoMarquee,
 	type LogoMarqueeProps,
@@ -173,7 +169,8 @@ export {
 	untitledButtonVariants,
 	type UntitledButtonProps,
 	type UntitledButtonColor,
-	type UntitledButtonSize
+	type UntitledButtonSize,
+	type UntitledButtonStatus
 } from './untitled-button/index.js';
 export { ValueFlash, type ValueFlashProps, type FlashDirection } from './value-flash/index.js';
 export {

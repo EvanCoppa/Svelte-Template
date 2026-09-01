@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -73,14 +73,15 @@
 							Submits the sibling reset form (via the form attribute), so the
 							reset action gets whatever email is typed without a separate page.
 						-->
-						<button
+						<UntitledButton
 							type="submit"
 							form="reset-form"
-							disabled={$resetSubmitting}
-							class="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+							color="link-gray"
+							loading={$resetSubmitting}
+							showTextWhileLoading
 						>
 							Forgot password?
-						</button>
+						</UntitledButton>
 					</div>
 					<Input
 						id="password"
@@ -96,9 +97,14 @@
 						<p id="password-error" class="text-destructive text-sm">{$errors.password}</p>
 					{/if}
 				</div>
-				<Button type="submit" class="w-full" disabled={$submitting}>
-					{$submitting ? 'Signing in…' : 'Sign in'}
-				</Button>
+				<UntitledButton
+					type="submit"
+					class="w-full"
+					loading={$submitting}
+					loadingLabel="Signing in…"
+				>
+					Sign in
+				</UntitledButton>
 			</form>
 
 			<!-- Mirrors the typed email into the ?/reset action; see the note above. -->

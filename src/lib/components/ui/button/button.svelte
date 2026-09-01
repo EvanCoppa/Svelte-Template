@@ -17,11 +17,15 @@
 				link: 'text-primary underline-offset-4 hover:underline',
 				/**
 				 * The null skin: no base, no variant, no size — only the `class` the caller
-				 * passes. It exists so a differently-styled button (see
-				 * `enhanced/untitled-button`) can reuse this element's `<button>`/`<a>`
-				 * switch, `ref` binding and disabled handling instead of re-implementing
-				 * them, without fighting the shadcn look through `tailwind-merge`.
-				 * `size` is ignored. Reach for a real variant everywhere else.
+				 * passes. It exists so `enhanced/untitled-button` can reuse this element's
+				 * `<button>`/`<a>` switch, `ref` binding and disabled handling instead of
+				 * re-implementing them, without fighting the shadcn look through
+				 * `tailwind-merge`. `size` is ignored.
+				 *
+				 * This is the only variant a screen ever reaches through: `UntitledButton`
+				 * is the button in this project, and this file is the element underneath
+				 * it. The shadcn variants stay vendored so the primitive is complete, but
+				 * nothing renders them.
 				 */
 				unstyled: ''
 			},

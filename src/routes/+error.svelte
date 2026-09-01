@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
 	let title = $derived(page.status === 404 ? 'Page not found' : 'Something went wrong');
@@ -23,7 +23,7 @@
 			<Card.Description>{description}</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-col items-center gap-3">
-			<Button href="/">Back to the app</Button>
+			<UntitledButton href="/">Back to the app</UntitledButton>
 			{#if page.error?.code}
 				<!-- Opaque reference from handleError — safe to show, useful in logs. -->
 				<p class="text-muted-foreground font-mono text-xs">ref: {page.error.code}</p>

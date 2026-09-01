@@ -1,12 +1,16 @@
 <script lang="ts" module>
 	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { labelSwap, motionPress, motionTo, springs } from '$lib/motion.js';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	/**
-	 * The Untitled UI button skin (https://www.untitledui.com/react/components/buttons),
-	 * repainted from this project's `app.css` tokens.
+	 * The button. Untitled UI's look
+	 * (https://www.untitledui.com/react/components/buttons) repainted from this
+	 * project's `app.css` tokens, with the motion of Solid Core's interior buttons
+	 * underneath: a one-pixel dip under a press, and labels that trade places when
+	 * the state changes instead of being swapped.
 	 *
 	 * What makes the look: a skeuomorphic edge (hairline inset ring + darker bottom
 	 * shade + soft drop shadow), a white inner border on filled buttons that fades
@@ -18,19 +22,24 @@
 	 * deliberately named `color`/`size` rather than `variant`/`size` so a call site
 	 * never reads like `ui/button` while behaving differently — `sm` here is not
 	 * `sm` there.
+	 *
+	 * It renders `ui/button` with `variant="unstyled"`, so the `<button>`/`<a>`
+	 * switch, `ref` binding and disabled handling live in one place. That is the
+	 * only place `ui/button` is rendered — every screen reaches for this component.
 	 */
 	export const untitledButtonVariants = tv({
 		base: [
-			'relative inline-flex cursor-pointer items-center justify-center whitespace-nowrap font-semibold transition duration-100 ease-linear select-none',
+			'relative inline-flex cursor-pointer items-center justify-center whitespace-nowrap font-semibold transition-colors duration-100 ease-linear select-none',
 			// An outline set off the edge, rather than a ring hugging it.
 			'outline-ring focus-visible:outline-2 focus-visible:outline-offset-2',
 			// Dimming is for genuinely unavailable buttons — a loading one keeps full
 			// contrast so the spinner reads against the fill.
 			'disabled:pointer-events-none disabled:not-data-loading:opacity-50',
 			'aria-disabled:pointer-events-none aria-disabled:not-data-loading:opacity-50',
-			// Icons sit a step back from the label; the spinner inherits it instead.
+			// Icons sit a step back from the label; the spinner and the status marks
+			// (anything carrying `data-icon`) do not.
 			'[&_svg]:pointer-events-none [&_svg]:shrink-0',
-			'[&>svg:not([data-icon=loading])]:opacity-70 hover:[&>svg:not([data-icon=loading])]:opacity-100'
+			'[&_svg:not([data-icon])]:opacity-70 hover:[&_svg:not([data-icon])]:opacity-100'
 		],
 		variants: {
 			// Declared before `color` so the link colours' `p-0` wins the merge.
@@ -91,6 +100,7 @@
 		VariantProps<typeof untitledButtonVariants>['color']
 	>;
 	export type UntitledButtonSize = NonNullable<VariantProps<typeof untitledButtonVariants>['size']>;
+	export type UntitledButtonStatus = 'idle' | 'loading' | 'success' | 'error';
 
 	/** The three colours that render as text rather than as a surface. */
 	const LINK_COLORS: readonly UntitledButtonColor[] = [
@@ -99,88 +109,228 @@
 		'link-destructive'
 	];
 
+	/**
+	 * Every state's content sits in the same grid cell, so the button is as wide as
+	 * its widest label and never resizes mid-request.
+	 */
+	const LAYER =
+		'col-start-1 row-start-1 inline-flex items-center justify-center gap-[inherit] whitespace-nowrap';
+
 	export type UntitledButtonProps = Omit<ButtonProps, 'variant' | 'size' | 'children'> & {
 		color?: UntitledButtonColor;
 		size?: UntitledButtonSize;
-		/** Swaps the content for a spinner and makes the button inert. */
+		/**
+		 * A pending state the caller owns — a form's `$submitting`. The label gives
+		 * way to a spinner and the button stops taking clicks, but keeps focus.
+		 */
 		loading?: boolean;
-		/** Keeps the label beside the spinner instead of replacing it. */
+		/** Shown beside the spinner in place of the label while loading. */
+		loadingLabel?: string;
+		/** Keeps the label itself beside the spinner when there is no `loadingLabel`. */
 		showTextWhileLoading?: boolean;
 		/** Rendered before the label. Pass an icon with no `children` for an icon-only button. */
 		iconLeading?: Snippet;
 		/** Rendered after the label. */
 		iconTrailing?: Snippet;
 		children?: Snippet;
-	};
+	} & (
+			| {
+					/**
+					 * A pending state the button owns — for work triggered from JS with no
+					 * form behind it. Runs on click in place of `onclick`; the button shows
+					 * its loading state until the returned promise settles, then
+					 * `successLabel` or `errorLabel` for `resetAfter` milliseconds. A sync
+					 * throw settles into the error state too.
+					 */
+					onAction: () => void | Promise<void>;
+					onclick?: never;
+					successLabel?: string;
+					errorLabel?: string;
+					/** Milliseconds a settled state is held before the label returns to idle. */
+					resetAfter?: number;
+					/** Receives whatever a failed `onAction` threw or rejected with. */
+					onError?: (cause: unknown) => void;
+			  }
+			| {
+					onAction?: undefined;
+					successLabel?: never;
+					errorLabel?: never;
+					resetAfter?: never;
+					onError?: never;
+			  }
+		);
 </script>
 
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	let {
 		class: className,
 		color = 'primary',
 		size = 'md',
 		loading = false,
+		loadingLabel,
 		showTextWhileLoading = false,
 		disabled = false,
+		onclick,
+		onAction,
+		successLabel = 'Done',
+		errorLabel = 'Try again',
+		resetAfter = 1400,
+		onError,
 		iconLeading,
 		iconTrailing,
 		children,
 		...restProps
 	}: UntitledButtonProps = $props();
 
+	let ownStatus = $state<UntitledButtonStatus>('idle');
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let runSeq = 0;
+
+	onDestroy(() => {
+		runSeq += 1;
+		if (timer) clearTimeout(timer);
+	});
+
+	function clearTimer() {
+		if (timer) {
+			clearTimeout(timer);
+			timer = undefined;
+		}
+	}
+
+	function settle(id: number, next: 'success' | 'error') {
+		if (id !== runSeq) return;
+		clearTimer();
+		ownStatus = next;
+		timer = setTimeout(() => {
+			if (id === runSeq) ownStatus = 'idle';
+		}, resetAfter);
+	}
+
+	function run() {
+		if (!onAction || status === 'loading') return;
+		clearTimer();
+		const id = ++runSeq;
+		ownStatus = 'loading';
+
+		Promise.resolve()
+			.then(() => onAction())
+			.then(
+				() => settle(id, 'success'),
+				(cause: unknown) => {
+					onError?.(cause);
+					settle(id, 'error');
+				}
+			);
+	}
+
+	/** A click that lands while loading must not submit the form or follow the link. */
+	function swallow(event: Event) {
+		event.preventDefault();
+	}
+
+	const status = $derived<UntitledButtonStatus>(loading ? 'loading' : ownStatus);
+	const inert = $derived(disabled || status === 'loading');
 	const isLink = $derived(LINK_COLORS.includes(color));
 	const iconOnly = $derived(!children && Boolean(iconLeading || iconTrailing));
+	// The idle layer stays in the accessibility tree while the visible layer has no
+	// text of its own (a bare spinner), so the button keeps its name.
+	const idleExposed = $derived(
+		status === 'idle' ||
+			(status === 'loading' && !loadingLabel && !(showTextWhileLoading && children))
+	);
 </script>
 
 <Button
 	variant="unstyled"
 	data-slot="untitled-button"
-	data-loading={loading ? '' : undefined}
+	data-status={status}
+	data-loading={status === 'loading' ? '' : undefined}
 	data-icon-only={iconOnly ? '' : undefined}
-	aria-busy={loading || undefined}
-	disabled={disabled || loading}
-	class={cn(
-		untitledButtonVariants({ color, size }),
-		// While loading, everything but the spinner steps aside — reserving its space
-		// so the button does not resize mid-request.
-		loading &&
-			(showTextWhileLoading
-				? '[&>*:not([data-icon=loading]):not([data-text])]:hidden'
-				: '[&>*:not([data-icon=loading])]:invisible'),
-		className
-	)}
+	aria-busy={status === 'loading' || undefined}
+	aria-disabled={inert || undefined}
+	{disabled}
+	onclick={status === 'loading' ? swallow : onAction ? run : onclick}
+	class={cn(untitledButtonVariants({ color, size }), className)}
+	{@attach inert ? undefined : motionPress({ y: 1 }, { y: 0 }, springs.snap)}
 	{...restProps}
 >
-	{@render iconLeading?.()}
-
-	{#if loading}
-		<svg
-			data-icon="loading"
-			viewBox="0 0 20 20"
-			fill="none"
-			aria-hidden="true"
-			class={cn(
-				!showTextWhileLoading && 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
-			)}
+	<span class="relative grid">
+		<span
+			aria-hidden={!idleExposed || undefined}
+			class={cn(LAYER, status !== 'idle' && 'opacity-0')}
+			{@attach motionTo(() => ({ keyframes: labelSwap(status === 'idle') }))}
 		>
-			<circle class="stroke-current opacity-30" cx="10" cy="10" r="8" stroke-width="2" />
-			<circle
-				class="origin-center animate-spin stroke-current"
-				cx="10"
-				cy="10"
-				r="8"
-				stroke-width="2"
-				stroke-dasharray="12.5 50"
-				stroke-linecap="round"
-			/>
-		</svg>
-	{/if}
+			{@render iconLeading?.()}
+			{#if children}
+				<!-- The label is its own element so the link colours can underline it without
+				     dragging the icons into the underline. -->
+				<span data-text class={cn(!isLink && 'px-0.5')}>{@render children()}</span>
+			{/if}
+			{@render iconTrailing?.()}
+		</span>
 
-	{#if children}
-		<!-- The label is its own element so the link colours can underline it without
-		     dragging the icons into the underline. -->
-		<span data-text class={cn(!isLink && 'px-0.5')}>{@render children()}</span>
-	{/if}
+		<span
+			aria-hidden={status !== 'loading' || undefined}
+			class={cn(LAYER, status !== 'loading' && 'opacity-0')}
+			{@attach motionTo(() => ({ keyframes: labelSwap(status === 'loading') }))}
+		>
+			<svg data-icon="loading" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+				<circle class="stroke-current opacity-30" cx="10" cy="10" r="8" stroke-width="2" />
+				<circle
+					class="origin-center animate-spin stroke-current"
+					cx="10"
+					cy="10"
+					r="8"
+					stroke-width="2"
+					stroke-dasharray="12.5 50"
+					stroke-linecap="round"
+				/>
+			</svg>
+			{#if loadingLabel}
+				<span data-text class={cn(!isLink && 'px-0.5')}>{loadingLabel}</span>
+			{:else if showTextWhileLoading && children}
+				<span data-text class={cn(!isLink && 'px-0.5')}>{@render children()}</span>
+			{/if}
+		</span>
 
-	{@render iconTrailing?.()}
+		{#if onAction}
+			<span
+				aria-hidden={status !== 'success' || undefined}
+				class={cn(LAYER, status !== 'success' && 'opacity-0')}
+				{@attach motionTo(() => ({ keyframes: labelSwap(status === 'success') }))}
+			>
+				<svg data-icon="success" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+					<path
+						d="M4.5 10.5 8.3 14.3 15.5 6.5"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				<span data-text class={cn(!isLink && 'px-0.5')}>{successLabel}</span>
+			</span>
+
+			<span
+				aria-hidden={status !== 'error' || undefined}
+				class={cn(LAYER, status !== 'error' && 'opacity-0')}
+				{@attach motionTo(() => ({ keyframes: labelSwap(status === 'error') }))}
+			>
+				<svg data-icon="error" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+					<path d="M10 5v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+					<path d="M10 14.5h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+				</svg>
+				<span data-text class={cn(!isLink && 'px-0.5')}>{errorLabel}</span>
+			</span>
+		{/if}
+	</span>
 </Button>
+
+{#if onAction}
+	<span role="status" aria-live="polite" class="sr-only">
+		{status === 'success' ? successLabel : status === 'error' ? errorLabel : ''}
+	</span>
+{/if}
