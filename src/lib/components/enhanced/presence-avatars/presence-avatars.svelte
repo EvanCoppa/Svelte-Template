@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { SvelteMap } from 'svelte/reactivity';
 	import { cn } from '$lib/utils.js';
 	import { motionTo, motionTransition } from '$lib/motion.js';
 
@@ -47,7 +46,13 @@
 	let announcement = $state('');
 
 	// First-seen order, so an arrival cannot reshuffle the people already present.
-	const seen = new SvelteMap<string, number>();
+	// Deliberately a plain Map, against prefer-svelte-reactivity: `ordered` below
+	// assigns slots while it runs, and writing *reactive* state inside a `$derived`
+	// throws state_unsafe_mutation — which killed hydration for the whole page. This
+	// is a pure memo of arrival order, read only inside that derived and never
+	// rendered, so reactivity would buy nothing and cost a self-dependency.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const seen = new Map<string, number>();
 	let nextSlot = 0;
 
 	const ordered = $derived.by(() => {
