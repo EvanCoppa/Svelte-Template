@@ -139,6 +139,17 @@ application data is scoped to an organization, never to a bare user. The
   authenticated user, written only by billing/service-role code. Members can never
   change their own org's `tier_id` (column-level grants enforce this — org writes
   from the browser are limited to `name`).
+- **Fine-grained page access is roles + permissions** (`roles_permissions`
+  migration + `src/lib/server/roles.ts`). Roles are org-scoped (same name in two
+  orgs can grant different things), members can hold several, and access is the
+  union of their grants — `manage` implies `read`, owner/admin implicitly hold
+  `manage` on everything. The `permissions` table is reference data like `tiers`:
+  one key per gated page/feature, rows added by migration as pages are built.
+  Gate a page in its load with `getUserAccess()` + `requirePermission()` (a page
+  is hidden without `read`; add/edit/delete needs `manage`); this is app-level
+  gating like tier gating — use `private.permission_level(org_id, 'key')` in a
+  policy only when a permission is a real security boundary. Role management
+  (create/assign/grant) is owner/admin via RLS, never a permission itself.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.
