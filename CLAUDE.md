@@ -339,6 +339,16 @@ sliding segmented control. Where the two overlap, `ui/` wins: this shelf exists 
 to become a second vocabulary for solved problems. That is why the first batch deliberately skips
 the interior takes on tabs, modals, popovers and dropdowns — `ui/` already answers those.
 
+**Alternate skins are the one exception**, and they earn it by reusing the `ui/` element rather
+than replacing it. `UntitledButton` (`enhanced/untitled-button`) wears the
+[Untitled UI](https://www.untitledui.com/react/components/buttons) button look — skeuomorphic
+edge, faded inner border, offset focus outline, nine `color`s × five `size`s, `loading`, icon
+snippets — but renders `ui/button` with `variant="unstyled"`, so the `<button>`/`<a>` switch,
+`ref` binding and disabled handling stay in one place. `ui/button` is still the default answer for
+a button; reach for a skin when a screen deliberately wants that look, and pick one skin per
+screen rather than mixing them. A further skin follows the same rule: `variant="unstyled"` plus a
+`tv` recipe painted from `app.css` tokens — never a second `<button>` element.
+
 - Every animation goes through `$lib/motion.js`, which is where `prefers-reduced-motion` is
   honoured. Never call Motion's `animate` straight from a component.
 - These paint from the same `src/app.css` tokens as `ui/`, so they follow the light/dark toggle
