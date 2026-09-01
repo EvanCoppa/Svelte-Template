@@ -50,8 +50,8 @@ Do **not** compound-ize:
 - One-off page sections used in exactly one route — keep the markup on the page;
   extract only when a second usage appears.
 - A job an existing `ui/` or `enhanced/` component already solves — CLAUDE.md rule 1:
-  never introduce a second pattern for a solved problem. Check `/components` and
-  `/enhanced` first, and add missing shadcn primitives with
+  never introduce a second pattern for a solved problem. Check `/components` (it
+  covers both shelves) first, and add missing shadcn primitives with
   `npx shadcn-svelte@latest add <name>` rather than hand-building.
 
 ## The two tiers

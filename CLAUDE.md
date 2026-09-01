@@ -253,7 +253,9 @@ before you build.
 
 `src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from
 [Solid Core](https://github.com/EvanCoppa/solid-core)'s `src/lib/primitives/interior/` collection.
-`/enhanced` renders the inventory.
+`/components` renders the full inventory of both shelves together, grouped so a `ui/` primitive
+and its `enhanced/` counterpart sit next to each other for comparison — there is no separate
+`/enhanced` route.
 
 **`ui/` first, always.** Reach for `enhanced/` only when `ui/` has no answer for the job — a
 one-time-code field, a tag field, a password meter, a button that owns its own pending state, a
@@ -268,7 +270,7 @@ the interior takes on tabs, modals, popovers and dropdowns — `ui/` already ans
   (`emerald-500`, `amber-600`) needs its `dark:` pair.
 - To add another: port the folder from Solid Core, point its imports at `$lib/utils.js` and
   `$lib/motion.js`, add the two lines to the folder's `index.ts` and the barrel, and give it a
-  card on `/enhanced`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
+  card on `/components`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
   Core's PascalCase.
 
 ## Compound components — the preferred shape for reusable multi-part UI
