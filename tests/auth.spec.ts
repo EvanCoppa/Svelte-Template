@@ -97,8 +97,10 @@ test.describe('the app shell', () => {
 
 	test('renders every navigation entry in the sidebar', async ({ page }) => {
 		// navItems drives both the sidebar and the palette, so this is really a
-		// check that src/lib/navigation.ts reached the shell.
-		for (const label of ['Dashboard', 'Settings', 'Components', 'Best Practices']) {
+		// check that src/lib/navigation.ts reached the shell. 'Staff' is gated
+		// on the staff permission: seed.sql gives e2e@example.com the general
+		// 'Support' role in Acme, which grants it at read.
+		for (const label of ['Dashboard', 'Staff', 'Settings', 'Components', 'Best Practices']) {
 			await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
 		}
 	});
@@ -141,6 +143,33 @@ test.describe('the app shell', () => {
 		// Loaded through RLS, so this row can only be the caller's own. Matches
 		// the page body and the sidebar user menu, hence first().
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
+	});
+});
+
+test.describe('the staff page', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+		await page.goto('/staff');
+	});
+
+	test('lists the members of the active organization', async ({ page }) => {
+		// seed.sql: Acme Inc holds Dev User (owner), Evan Coppa (admin) and the
+		// E2E robot (member). The roster reads them through the shared-org
+		// profiles policy from the staff_management migration — without it the
+		// caller would only ever see their own row.
+		await expect(page).toHaveTitle('Staff');
+		await expect(page.getByText('Dev User').first()).toBeVisible();
+		await expect(page.getByText('Evan Coppa').first()).toBeVisible();
+	});
+
+	test('offers no invite or removal controls to a read-only member', async ({ page }) => {
+		// The seeded 'Support' role grants staff at read, so the page renders
+		// but every managing affordance stays absent. RLS enforces the same
+		// thing independently — this asserts the screen agrees with it.
+		await expect(page.getByText('Dev User').first()).toBeVisible();
+		await expect(page.getByRole('button', { name: /invite/i })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: /remove/i })).toHaveCount(0);
 	});
 });
 

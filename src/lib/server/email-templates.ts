@@ -105,6 +105,45 @@ export function welcomeEmail({
 }
 
 /**
+ * Sent by the staff page when someone is invited to join an organization.
+ * `inviteUrl` is app-controlled (origin + database-generated token — see
+ * `$lib/server/staff.ts`); the 7-day expiry mirrors the
+ * `organization_invites.expires_at` default.
+ */
+export function orgInviteEmail({
+	orgName,
+	inviterName,
+	inviteUrl
+}: {
+	orgName: string;
+	inviterName: string;
+	inviteUrl: string;
+}): EmailTemplate {
+	return {
+		subject: `You're invited to join ${orgName}`,
+		html: emailLayout({
+			heading: `Join ${escapeHtml(orgName)}`,
+			bodyHtml:
+				paragraph(
+					`${escapeHtml(inviterName)} has invited you to join <strong>${escapeHtml(orgName)}</strong>. Accept the invitation to start working together.`
+				) +
+				button(inviteUrl, 'Accept invitation') +
+				paragraph('This invitation expires in 7 days.'),
+			footerText: `If you weren't expecting this invitation, you can safely ignore this email.`
+		}),
+		text: [
+			`${inviterName} has invited you to join ${orgName}.`,
+			'',
+			`Accept the invitation: ${inviteUrl}`,
+			'',
+			'This invitation expires in 7 days.',
+			'',
+			`If you weren't expecting this invitation, you can safely ignore this email.`
+		].join('\n')
+	};
+}
+
+/**
  * The generic workhorse: a heading, a message, and an optional call-to-action.
  * Reach for this before writing a bespoke template for one-off notifications.
  */

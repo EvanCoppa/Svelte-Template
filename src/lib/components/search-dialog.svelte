@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import * as Command from '$lib/components/ui/command/index.js';
-	import { groupNav, navItems } from '$lib/navigation';
+	import { groupNav, navItems, visibleNavItems } from '$lib/navigation';
+	import type { PermissionId } from '$lib/permissions';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
-	const groups = groupNav(navItems);
+	// Same filter as the sidebar, from the same layout data — the palette must
+	// never offer a page the server would refuse.
+	let permissions: PermissionId[] = $derived(page.data.permissions ?? []);
+	let groups = $derived(groupNav(visibleNavItems(navItems, permissions)));
 
 	function handleSelect(href: string) {
 		open = false;
