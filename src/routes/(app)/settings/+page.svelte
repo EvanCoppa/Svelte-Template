@@ -3,8 +3,8 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -90,9 +90,14 @@
 							</p>
 						{/if}
 					</div>
-					<Button type="submit" class="w-fit" disabled={$savingProfile}>
-						{$savingProfile ? 'Saving…' : 'Save profile'}
-					</Button>
+					<UntitledButton
+						type="submit"
+						class="w-fit"
+						loading={$savingProfile}
+						loadingLabel="Saving…"
+					>
+						Save profile
+					</UntitledButton>
 				</form>
 			{/if}
 		</Card.Content>
@@ -161,9 +166,14 @@
 						</p>
 					{/if}
 				</div>
-				<Button type="submit" class="w-fit" disabled={$savingPassword}>
-					{$savingPassword ? 'Saving…' : 'Update password'}
-				</Button>
+				<UntitledButton
+					type="submit"
+					class="w-fit"
+					loading={$savingPassword}
+					loadingLabel="Saving…"
+				>
+					Update password
+				</UntitledButton>
 			</form>
 		</Card.Content>
 	</Card.Root>

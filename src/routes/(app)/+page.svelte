@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import BlocksIcon from '@lucide/svelte/icons/blocks';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
@@ -75,8 +75,8 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-wrap gap-2">
-			<Button href="/components" variant="default">Browse components</Button>
-			<Button href="/best-practices" variant="outline">Read the conventions</Button>
+			<UntitledButton href="/components">Browse components</UntitledButton>
+			<UntitledButton href="/best-practices" color="secondary">Read the conventions</UntitledButton>
 		</Card.Content>
 	</Card.Root>
 </div>

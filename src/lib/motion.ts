@@ -214,3 +214,26 @@ export function motionEnter(
 		return () => controls.stop();
 	};
 }
+
+/**
+ * How far a hidden label layer softens. Solid Core's interior buttons use 3px,
+ * which smears a 13px label; this is the one place to tune it for every button.
+ */
+const LABEL_SWAP_BLUR = 'blur(1.5px)';
+
+/**
+ * Keyframes for one layer of a label swap — the "labels trade places" beat a
+ * button plays when its text changes with its state (idle → saving → saved).
+ * Every layer sits in the same grid cell; the one being shown settles into
+ * place while the one being hidden drops a few pixels and softens. Pair it with
+ * `motionTo` and `springs.settle`:
+ *
+ * ```svelte
+ * <span {@attach motionTo(() => ({ keyframes: labelSwap(status === 'idle') }))}>Save</span>
+ * ```
+ */
+export function labelSwap(visible: boolean): DOMKeyframesDefinition {
+	return visible
+		? { opacity: 1, y: 0, filter: 'blur(0px)' }
+		: { opacity: 0, y: 3, filter: LABEL_SWAP_BLUR };
+}

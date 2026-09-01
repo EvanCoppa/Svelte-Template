@@ -2,8 +2,8 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { enhance as kitEnhance } from '$app/forms';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -78,18 +78,13 @@
 					<Checkbox id="show-passwords" bind:checked={showPasswords} />
 					<Label for="show-passwords" class="font-normal">Show passwords</Label>
 				</div>
-				<Button type="submit" class="w-full" disabled={$submitting}>
-					{$submitting ? 'Saving…' : 'Set new password'}
-				</Button>
+				<UntitledButton type="submit" class="w-full" loading={$submitting} loadingLabel="Saving…">
+					Set new password
+				</UntitledButton>
 			</form>
 
 			<form method="POST" action="/logout" use:kitEnhance class="mt-4 text-center">
-				<button
-					type="submit"
-					class="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-				>
-					Back to sign in
-				</button>
+				<UntitledButton type="submit" color="link-gray">Back to sign in</UntitledButton>
 			</form>
 		</Card.Content>
 	</Card.Root>

@@ -54,8 +54,8 @@ never add a new hand-validated form. The full house convention is the
 
 - Inputs come from `ui/input`, `ui/textarea`, `ui/checkbox`, `ui/switch`; every picker is
   `ui/combobox` (with `name` set so it posts like a native select); labels via `ui/label`
-  wired with `for`/`id`. Submit buttons are `ui/button` with a pending state from
-  `superForm`'s `$submitting`/`$delayed`.
+  wired with `for`/`id`. Submit buttons are `UntitledButton` (`enhanced/untitled-button`)
+  with `loading={$submitting}` and a `loadingLabel` — never `ui/button` directly.
 - Associate error text to its field (`aria-describedby` / `aria-invalid`), matching
   existing forms; spread `$constraints` onto inputs for native hints.
 

@@ -333,8 +333,10 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   a hidden input exactly like a native select would, so it drops into a form action unchanged.
   `ui/select` is vendored but referenced only by the `/components` showcase — don't start using it
   for real screens.
-- `<input type="checkbox">` → `ui/checkbox`. A styled `<button>` → `ui/button`. A bare `<input>` or
-  `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`. Hand-built
+- `<input type="checkbox">` → `ui/checkbox`. A styled `<button>` → `UntitledButton` from
+  `enhanced/untitled-button` (see "The button" below) — never `ui/button` directly. A bare
+  `<input>` or `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`.
+  Hand-built
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
@@ -356,20 +358,27 @@ and its `enhanced/` counterpart sit next to each other for comparison — there 
 `/enhanced` route.
 
 **`ui/` first, always.** Reach for `enhanced/` only when `ui/` has no answer for the job — a
-one-time-code field, a tag field, a password meter, a button that owns its own pending state, a
-sliding segmented control. Where the two overlap, `ui/` wins: this shelf exists to cover gaps, not
-to become a second vocabulary for solved problems. That is why the first batch deliberately skips
-the interior takes on tabs, modals, popovers and dropdowns — `ui/` already answers those.
+one-time-code field, a tag field, a password meter, a sliding segmented control. Where the two
+overlap, `ui/` wins: this shelf exists to cover gaps, not to become a second vocabulary for solved
+problems. That is why the first batch deliberately skips the interior takes on tabs, modals,
+popovers and dropdowns — `ui/` already answers those.
 
-**Alternate skins are the one exception**, and they earn it by reusing the `ui/` element rather
-than replacing it. `UntitledButton` (`enhanced/untitled-button`) wears the
-[Untitled UI](https://www.untitledui.com/react/components/buttons) button look — skeuomorphic
-edge, faded inner border, offset focus outline, nine `color`s × five `size`s, `loading`, icon
-snippets — but renders `ui/button` with `variant="unstyled"`, so the `<button>`/`<a>` switch,
-`ref` binding and disabled handling stay in one place. `ui/button` is still the default answer for
-a button; reach for a skin when a screen deliberately wants that look, and pick one skin per
-screen rather than mixing them. A further skin follows the same rule: `variant="unstyled"` plus a
-`tv` recipe painted from `app.css` tokens — never a second `<button>` element.
+**The button is the one exception.** `UntitledButton` (`enhanced/untitled-button`) is _the_
+button for every screen — form submits, links styled as buttons, dialog and dropdown triggers
+(through the `child` snippet), icon-only buttons. It wears the
+[Untitled UI](https://www.untitledui.com/react/components/buttons) look — skeuomorphic edge,
+faded inner border, offset focus outline, nine `color`s × five `size`s, leading/trailing icon
+snippets — with the interior buttons' motion underneath: a one-pixel dip under a press, and a
+label swap (drop, soften, settle — `labelSwap()` in `$lib/motion.js`, which is where the blur
+strength lives) between its states. Pending state comes two ways and they never mix:
+`loading={$submitting}` + `loadingLabel` when the page owns the flag (every form), or `onAction`
+when a JS-triggered call has no form behind it — the button then runs the promise itself and
+swaps to `successLabel`/`errorLabel` before returning to idle. It renders `ui/button` with
+`variant="unstyled"`, so the `<button>`/`<a>` switch, `ref` binding and disabled handling stay
+in one place; that is the only place `ui/button` is rendered. Its shadcn variants stay vendored
+so the primitive is complete, but no screen, `ui/` internals aside, imports it. A further skin
+would follow the same rule: `variant="unstyled"` plus a `tv` recipe painted from `app.css`
+tokens — never a second `<button>` element.
 
 - Every animation goes through `$lib/motion.js`, which is where `prefers-reduced-motion` is
   honoured. Never call Motion's `animate` straight from a component.

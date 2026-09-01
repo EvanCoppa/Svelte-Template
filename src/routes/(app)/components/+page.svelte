@@ -24,7 +24,6 @@
 		LiveActivity,
 		type Activity,
 		LoadMore,
-		LoadingButton,
 		LogoMarquee,
 		type LogoMarqueeItem,
 		LongPressButton,
@@ -72,7 +71,6 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -1072,69 +1070,22 @@
 			<h2 class="text-lg font-semibold tracking-tight">Buttons</h2>
 		</div>
 
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Buttons</Card.Title>
-				<Card.Description>Every variant and size, one component.</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				<div class="flex flex-wrap items-center gap-2">
-					<Button>Default</Button>
-					<Button variant="secondary">Secondary</Button>
-					<Button variant="outline">Outline</Button>
-					<Button variant="ghost">Ghost</Button>
-					<Button variant="destructive">Destructive</Button>
-					<Button variant="link">Link</Button>
-				</div>
-				<div class="flex flex-wrap items-center gap-2">
-					<Button size="sm">Small</Button>
-					<Button size="default">Default</Button>
-					<Button size="lg">Large</Button>
-					<Button size="icon" aria-label="Add"><PlusIcon /></Button>
-					<Button disabled>Disabled</Button>
-				</div>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Action buttons (enhanced)</Card.Title>
-				<Card.Description>
-					<code>LoadingButton</code> owns its own pending/success/error state;
-					<code>CopyButton</code> writes to the clipboard and draws its own checkmark.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content class="flex flex-wrap items-center gap-2">
-				<LoadingButton
-					label="Save profile"
-					pendingLabel="Saving…"
-					successLabel="Saved"
-					onAction={saveProfile}
-				/>
-				<LoadingButton
-					label="Deploy"
-					pendingLabel="Deploying…"
-					errorLabel="Deploy failed"
-					onAction={failToSave}
-				/>
-				<CopyButton value="sb_publishable_example_key" />
-				<CopyButton value="npx shadcn-svelte@latest add button" label="Copy command" />
-			</Card.Content>
-		</Card.Root>
-
 		<Card.Root class="lg:col-span-2">
 			<Card.Header>
-				<Card.Title>Untitled UI buttons (enhanced)</Card.Title>
+				<Card.Title>Buttons</Card.Title>
 				<Card.Description>
-					The <a
+					One component for every button. The <a
 						href="https://www.untitledui.com/react/components/buttons"
 						target="_blank"
 						rel="noreferrer">Untitled UI</a
 					>
-					skin — skeuomorphic edge, faded inner border, offset focus outline — painted from this app's
-					tokens onto the same <code>ui/button</code> element. Nine
-					<code>color</code>s and five <code>size</code>s, plus <code>loading</code> and leading/trailing
-					icon snippets.
+					look — skeuomorphic edge, faded inner border, offset focus outline — painted from this app's
+					tokens over the <code>ui/button</code> element, with the interior buttons' motion
+					underneath: press one and it dips a pixel, change its state and the labels trade places.
+					Nine
+					<code>color</code>s and five <code>size</code>s, leading/trailing icon snippets, a
+					caller-owned <code>loading</code> flag for forms and a self-owned <code>onAction</code> for
+					work triggered from JS.
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-4">
@@ -1177,7 +1128,11 @@
 					<UntitledButton disabled>Disabled</UntitledButton>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
-					<UntitledButton loading={untitledLoading} onclick={runUntitledDemo}>
+					<UntitledButton
+						loading={untitledLoading}
+						loadingLabel="Saving…"
+						onclick={runUntitledDemo}
+					>
 						Save changes
 					</UntitledButton>
 					<UntitledButton
@@ -1189,7 +1144,44 @@
 						{#snippet iconLeading()}<PlusIcon />{/snippet}
 						Save changes
 					</UntitledButton>
+					<UntitledButton
+						color="secondary"
+						aria-label="Add"
+						loading={untitledLoading}
+						onclick={runUntitledDemo}
+					>
+						{#snippet iconLeading()}<PlusIcon />{/snippet}
+					</UntitledButton>
 				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<UntitledButton
+						color="secondary"
+						loadingLabel="Saving…"
+						successLabel="Saved"
+						onAction={saveProfile}
+					>
+						Save profile
+					</UntitledButton>
+					<UntitledButton
+						color="secondary"
+						loadingLabel="Deploying…"
+						errorLabel="Deploy failed"
+						onAction={failToSave}
+					>
+						Deploy
+					</UntitledButton>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Copy button (enhanced)</Card.Title>
+				<Card.Description>Writes to the clipboard and draws its own checkmark.</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<CopyButton value="sb_publishable_example_key" />
+				<CopyButton value="npx shadcn-svelte@latest add button" label="Copy command" />
 			</Card.Content>
 		</Card.Root>
 
@@ -1493,7 +1485,7 @@
 				<Dialog.Root bind:open={dialogOpen}>
 					<Dialog.Trigger>
 						{#snippet child({ props })}
-							<Button variant="outline" {...props}>Open dialog</Button>
+							<UntitledButton color="secondary" {...props}>Open dialog</UntitledButton>
 						{/snippet}
 					</Dialog.Trigger>
 					<Dialog.Content>
@@ -1504,7 +1496,7 @@
 							</Dialog.Description>
 						</Dialog.Header>
 						<Dialog.Footer>
-							<Button onclick={() => (dialogOpen = false)}>Done</Button>
+							<UntitledButton onclick={() => (dialogOpen = false)}>Done</UntitledButton>
 						</Dialog.Footer>
 					</Dialog.Content>
 				</Dialog.Root>
@@ -1512,9 +1504,10 @@
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
-							<Button variant="outline" {...props}>
-								Menu <ChevronDownIcon class="size-4" />
-							</Button>
+							<UntitledButton color="secondary" {...props}>
+								Menu
+								{#snippet iconTrailing()}<ChevronDownIcon />{/snippet}
+							</UntitledButton>
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="start">
@@ -1530,7 +1523,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button variant="ghost" {...props}>Hover me</Button>
+							<UntitledButton color="tertiary" {...props}>Hover me</UntitledButton>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>A helpful hint.</Tooltip.Content>
@@ -1550,7 +1543,7 @@
 				<Popover.Root bind:open={popoverOpen}>
 					<Popover.Trigger>
 						{#snippet child({ props })}
-							<Button variant="outline" {...props}>Open popover</Button>
+							<UntitledButton color="secondary" {...props}>Open popover</UntitledButton>
 						{/snippet}
 					</Popover.Trigger>
 					<Popover.Content class="space-y-2">
@@ -1564,7 +1557,7 @@
 				<Sheet.Root bind:open={sheetOpen}>
 					<Sheet.Trigger>
 						{#snippet child({ props })}
-							<Button variant="outline" {...props}>Open sheet</Button>
+							<UntitledButton color="secondary" {...props}>Open sheet</UntitledButton>
 						{/snippet}
 					</Sheet.Trigger>
 					<Sheet.Content>
@@ -1575,7 +1568,7 @@
 							>
 						</Sheet.Header>
 						<Sheet.Footer>
-							<Button onclick={() => (sheetOpen = false)}>Done</Button>
+							<UntitledButton onclick={() => (sheetOpen = false)}>Done</UntitledButton>
 						</Sheet.Footer>
 					</Sheet.Content>
 				</Sheet.Root>
@@ -1653,11 +1646,17 @@
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-wrap items-center gap-2">
-				<Button variant="outline" onclick={() => toast('A plain message')}>Default</Button>
-				<Button variant="outline" onclick={() => toast.success('Changes saved')}>Success</Button>
-				<Button variant="outline" onclick={() => toast.error('Something went wrong')}>Error</Button>
-				<Button
-					variant="outline"
+				<UntitledButton color="secondary" onclick={() => toast('A plain message')}>
+					Default
+				</UntitledButton>
+				<UntitledButton color="secondary" onclick={() => toast.success('Changes saved')}>
+					Success
+				</UntitledButton>
+				<UntitledButton color="secondary" onclick={() => toast.error('Something went wrong')}>
+					Error
+				</UntitledButton>
+				<UntitledButton
+					color="secondary"
 					onclick={() =>
 						toast.promise(new Promise((resolve) => setTimeout(resolve, 1500)), {
 							loading: 'Saving…',
@@ -1666,7 +1665,7 @@
 						})}
 				>
 					Promise
-				</Button>
+				</UntitledButton>
 			</Card.Content>
 		</Card.Root>
 
@@ -1727,15 +1726,15 @@
 					class="mx-auto max-w-[320px]"
 				/>
 				<div class="flex justify-center gap-2">
-					<Button variant="outline" size="sm" onclick={() => (blurSrc = BLUR_PHOTO_A)}
-						>Photo A</Button
-					>
-					<Button variant="outline" size="sm" onclick={() => (blurSrc = BLUR_PHOTO_B)}
-						>Photo B</Button
-					>
-					<Button variant="outline" size="sm" onclick={() => (blurSrc = BLUR_DEAD)}>
+					<UntitledButton color="secondary" size="sm" onclick={() => (blurSrc = BLUR_PHOTO_A)}>
+						Photo A
+					</UntitledButton>
+					<UntitledButton color="secondary" size="sm" onclick={() => (blurSrc = BLUR_PHOTO_B)}>
+						Photo B
+					</UntitledButton>
+					<UntitledButton color="secondary" size="sm" onclick={() => (blurSrc = BLUR_DEAD)}>
 						Broken URL
-					</Button>
+					</UntitledButton>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -1760,7 +1759,7 @@
 					dismissLabel="Dismiss storage notice"
 				>
 					{#snippet action()}
-						<Button variant="secondary" size="sm">Upgrade plan</Button>
+						<UntitledButton color="secondary" size="sm">Upgrade plan</UntitledButton>
 					{/snippet}
 				</CollapsibleBanner>
 			</Card.Content>
@@ -1797,7 +1796,9 @@
 					</ul>
 				{:else}
 					<div class="grid h-[158px] place-items-center">
-						<Button variant="outline" onclick={() => (trashed = [])}>Put them back</Button>
+						<UntitledButton color="secondary" onclick={() => (trashed = [])}>
+							Put them back
+						</UntitledButton>
 					</div>
 				{/if}
 			</Card.Content>
@@ -2031,7 +2032,7 @@
 					</div>
 
 					<div class="absolute right-4 bottom-4">
-						<Button variant="outline" size="sm" onclick={deploy}>Deploy</Button>
+						<UntitledButton color="secondary" size="sm" onclick={deploy}>Deploy</UntitledButton>
 					</div>
 				</div>
 			</Card.Content>
@@ -2186,10 +2187,10 @@
 			<Card.Content class="flex flex-col items-center gap-4">
 				<PresenceAvatars {people} max={3} size={36} label="On this board" />
 				<div class="flex items-center gap-2">
-					<Button type="button" variant="outline" size="sm" onclick={join}>Someone joins</Button>
-					<Button type="button" variant="outline" size="sm" onclick={leave}>
+					<UntitledButton color="secondary" size="sm" onclick={join}>Someone joins</UntitledButton>
+					<UntitledButton color="secondary" size="sm" onclick={leave}>
 						Longest here leaves
-					</Button>
+					</UntitledButton>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -2563,7 +2564,9 @@
 						class="text-muted-foreground block text-[13.5px] leading-relaxed"
 					/>
 				{/key}
-				<Button variant="outline" size="sm" class="mt-4" onclick={() => (take += 1)}>Reveal</Button>
+				<UntitledButton color="secondary" size="sm" class="mt-4" onclick={() => (take += 1)}>
+					Reveal
+				</UntitledButton>
 			</Card.Content>
 		</Card.Root>
 
@@ -2587,14 +2590,15 @@
 							{/snippet}
 
 							{#snippet children(describedBy)}
-								<Button
-									variant="outline"
+								<UntitledButton
+									color="secondary"
+									size="sm"
 									aria-label={tool.label}
 									aria-describedby={describedBy}
-									class="text-muted-foreground h-9 w-10 font-mono text-[12.5px]"
+									class="text-muted-foreground w-10 font-mono text-[12.5px]"
 								>
 									{tool.glyph}
-								</Button>
+								</UntitledButton>
 							{/snippet}
 						</EnhancedTooltip>
 					{/each}
@@ -2658,20 +2662,20 @@
 					</div>
 
 					<div class="border-border flex shrink-0 items-center gap-1.5 border-t px-4 py-3">
-						<Button variant="outline" size="sm" onclick={() => typingTypes('Nadia')}>
+						<UntitledButton color="secondary" size="sm" onclick={() => typingTypes('Nadia')}>
 							Nadia types
-						</Button>
-						<Button variant="outline" size="sm" onclick={() => typingTypes('Ravi')}
-							>Ravi types</Button
-						>
-						<Button
-							variant="outline"
+						</UntitledButton>
+						<UntitledButton color="secondary" size="sm" onclick={() => typingTypes('Ravi')}>
+							Ravi types
+						</UntitledButton>
+						<UntitledButton
+							color="secondary"
 							size="sm"
 							class="ml-auto"
 							onclick={() => typingSends(typists[0] ?? '')}
 						>
 							Sends it
-						</Button>
+						</UntitledButton>
 					</div>
 				</div>
 			</Card.Content>
@@ -2694,9 +2698,9 @@
 				/>
 				<div class="flex gap-1.5">
 					{#each VALUE_STEPS as step (step)}
-						<Button variant="outline" size="sm" onclick={() => nudgeRequests(step)}>
+						<UntitledButton color="secondary" size="sm" onclick={() => nudgeRequests(step)}>
 							{step > 0 ? '+' : '−'}{Math.abs(step).toLocaleString('en-US')}
-						</Button>
+						</UntitledButton>
 					{/each}
 				</div>
 			</Card.Content>

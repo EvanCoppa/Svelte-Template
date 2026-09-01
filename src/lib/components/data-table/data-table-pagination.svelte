@@ -4,7 +4,7 @@
 	import ChevronsLeftIcon from '@lucide/svelte/icons/chevrons-left';
 	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import { Combobox } from '$lib/components/ui/combobox/index.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 	import { useDataTable } from './context.svelte.js';
@@ -50,42 +50,44 @@
 			Page {pagination.pageIndex + 1} of {Math.max(1, dataTable.table.getPageCount())}
 		</div>
 		<div class="flex items-center space-x-2">
-			<Button
-				variant="outline"
-				class="hidden size-8 p-0 lg:flex"
+			<UntitledButton
+				color="secondary"
+				size="xs"
+				class="hidden lg:inline-flex"
+				aria-label="Go to first page"
 				onclick={() => dataTable.table.setPageIndex(0)}
 				disabled={!dataTable.table.getCanPreviousPage()}
 			>
-				<span class="sr-only">Go to first page</span>
-				<ChevronsLeftIcon />
-			</Button>
-			<Button
-				variant="outline"
-				class="size-8 p-0"
+				{#snippet iconLeading()}<ChevronsLeftIcon />{/snippet}
+			</UntitledButton>
+			<UntitledButton
+				color="secondary"
+				size="xs"
+				aria-label="Go to previous page"
 				onclick={() => dataTable.table.previousPage()}
 				disabled={!dataTable.table.getCanPreviousPage()}
 			>
-				<span class="sr-only">Go to previous page</span>
-				<ChevronLeftIcon />
-			</Button>
-			<Button
-				variant="outline"
-				class="size-8 p-0"
+				{#snippet iconLeading()}<ChevronLeftIcon />{/snippet}
+			</UntitledButton>
+			<UntitledButton
+				color="secondary"
+				size="xs"
+				aria-label="Go to next page"
 				onclick={() => dataTable.table.nextPage()}
 				disabled={!dataTable.table.getCanNextPage()}
 			>
-				<span class="sr-only">Go to next page</span>
-				<ChevronRightIcon />
-			</Button>
-			<Button
-				variant="outline"
-				class="hidden size-8 p-0 lg:flex"
+				{#snippet iconLeading()}<ChevronRightIcon />{/snippet}
+			</UntitledButton>
+			<UntitledButton
+				color="secondary"
+				size="xs"
+				class="hidden lg:inline-flex"
+				aria-label="Go to last page"
 				onclick={() => dataTable.table.setPageIndex(dataTable.table.getPageCount() - 1)}
 				disabled={!dataTable.table.getCanNextPage()}
 			>
-				<span class="sr-only">Go to last page</span>
-				<ChevronsRightIcon />
-			</Button>
+				{#snippet iconLeading()}<ChevronsRightIcon />{/snippet}
+			</UntitledButton>
 		</div>
 	</div>
 </div>

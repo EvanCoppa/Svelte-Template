@@ -2,5 +2,6 @@ export { default as UntitledButton, untitledButtonVariants } from './untitled-bu
 export type {
 	UntitledButtonColor,
 	UntitledButtonProps,
-	UntitledButtonSize
+	UntitledButtonSize,
+	UntitledButtonStatus
 } from './untitled-button.svelte';

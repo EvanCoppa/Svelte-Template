@@ -4,7 +4,7 @@
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { UntitledButton } from '$lib/components/enhanced/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
@@ -51,21 +51,23 @@
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
-					<Button
+					<UntitledButton
 						{...props}
-						variant="ghost"
-						size="sm"
-						class="data-[state=open]:bg-accent -ms-3 h-8"
+						color="tertiary"
+						size="xs"
+						class="data-[state=open]:bg-accent -ms-2.5"
 					>
-						<span>{title}</span>
-						{#if column.getIsSorted() === 'desc'}
-							<ArrowDownIcon />
-						{:else if column.getIsSorted() === 'asc'}
-							<ArrowUpIcon />
-						{:else}
-							<ChevronsUpDownIcon />
-						{/if}
-					</Button>
+						{title}
+						{#snippet iconTrailing()}
+							{#if column.getIsSorted() === 'desc'}
+								<ArrowDownIcon />
+							{:else if column.getIsSorted() === 'asc'}
+								<ArrowUpIcon />
+							{:else}
+								<ChevronsUpDownIcon />
+							{/if}
+						{/snippet}
+					</UntitledButton>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="start">
