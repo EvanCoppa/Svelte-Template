@@ -114,7 +114,7 @@ describe('can', () => {
 	it('owners and admins bypass grants entirely', () => {
 		for (const role of ['owner', 'admin'] as const) {
 			const access: UserAccess = { role, roles: [], grants: new Map() };
-			expect(can(access, 'anything', 'manage')).toBe(true);
+			expect(can(access, 'clients', 'manage')).toBe(true);
 		}
 	});
 });
@@ -191,6 +191,18 @@ describe('roles data access', () => {
 		expect(builder.delete).toHaveBeenCalled();
 		expect(builder.insert).toHaveBeenCalledWith([
 			{ permission_id: 'tickets', level: 'manage', org_id: ORG_ID, role_id: ROLE_ID }
+		]);
+	});
+
+	it('dedupes grants before writing so the PK cannot trip after the delete', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await setRolePermissions(supabase, ORG_ID, ROLE_ID, [
+			{ permission_id: 'clients', level: 'read' },
+			{ permission_id: 'clients', level: 'manage' }
+		]);
+		expect(builder.insert).toHaveBeenCalledWith([
+			{ permission_id: 'clients', level: 'manage', org_id: ORG_ID, role_id: ROLE_ID }
 		]);
 	});
 

@@ -35,6 +35,15 @@ export type PermissionLevel = Enums<'permission_level'>;
 export type Permission = Tables<'permissions'>;
 export type Role = Tables<'roles'>;
 
+/**
+ * The permission keys the app knows at build time, in lockstep with the
+ * `permissions` catalog: the migration adding a page's row also adds its key
+ * here. Checks take this union so a typo'd key is a `check` error — with a
+ * bare string it would silently pass for owners/admins (the bypass) while
+ * denying every member.
+ */
+export type PermissionId = 'clients' | 'deals' | 'tasks' | 'tickets';
+
 /** One grant on a role, as edited by a role-management screen. */
 export type PermissionGrant = Pick<Tables<'role_permissions'>, 'permission_id' | 'level'>;
 
@@ -93,7 +102,7 @@ export function unionGrants(grantLists: PermissionGrant[][]): PermissionGrants {
  */
 export function can(
 	access: UserAccess,
-	permission: string,
+	permission: PermissionId,
 	level: PermissionLevel = 'read'
 ): boolean {
 	if (access.role === 'owner' || access.role === 'admin') return true;
@@ -104,7 +113,7 @@ export function can(
 /** `can()` or a 403 — the guard a gated load or action opens with. */
 export function requirePermission(
 	access: UserAccess,
-	permission: string,
+	permission: PermissionId,
 	level: PermissionLevel = 'read'
 ): void {
 	if (!can(access, permission, level)) {
@@ -175,7 +184,11 @@ export async function deleteRole(
 /**
  * Replaces a role's grants wholesale — the shape a role-edit form submits.
  * Delete-then-insert keeps it a dumb, predictable save (removals included)
- * instead of a diff dance.
+ * instead of a diff dance. Grants are deduped by key first (`manage` wins)
+ * so a duplicate in the payload can never trip the primary key after the
+ * delete has already run. The two writes are separate requests, so a save
+ * that still fails between them (an unknown permission key) fails CLOSED —
+ * the role is left with no grants until a valid re-save.
  */
 export async function setRolePermissions(
 	supabase: SupabaseClient<Database>,
@@ -183,15 +196,17 @@ export async function setRolePermissions(
 	roleId: string,
 	grants: PermissionGrant[]
 ): Promise<void> {
+	const deduped = [...unionGrants([grants])].map(([permission_id, level]) => ({
+		permission_id,
+		level,
+		org_id: orgId,
+		role_id: roleId
+	}));
 	ensure(
 		await supabase.from('role_permissions').delete().eq('org_id', orgId).eq('role_id', roleId)
 	);
-	if (grants.length > 0) {
-		ensure(
-			await supabase
-				.from('role_permissions')
-				.insert(grants.map((grant) => ({ ...grant, org_id: orgId, role_id: roleId })))
-		);
+	if (deduped.length > 0) {
+		ensure(await supabase.from('role_permissions').insert(deduped));
 	}
 }
 

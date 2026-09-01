@@ -144,7 +144,8 @@ application data is scoped to an organization, never to a bare user. The
   orgs can grant different things), members can hold several, and access is the
   union of their grants — `manage` implies `read`, owner/admin implicitly hold
   `manage` on everything. The `permissions` table is reference data like `tiers`:
-  one key per gated page/feature, rows added by migration as pages are built.
+  one key per gated page/feature, rows added by migration as pages are built —
+  mirror each new key in the `PermissionId` union so typos are `check` errors.
   Gate a page in its load with `getUserAccess()` + `requirePermission()` (a page
   is hidden without `read`; add/edit/delete needs `manage`); this is app-level
   gating like tier gating — use `private.permission_level(org_id, 'key')` in a
