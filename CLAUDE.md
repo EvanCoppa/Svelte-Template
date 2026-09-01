@@ -148,6 +148,16 @@ application data is scoped to an organization, never to a bare user. The
   `QUERY.org`. Child loads filter by `locals.activeOrgId`; it is a UI preference,
   not an auth decision — RLS is the boundary, a forged cookie yields zero rows.
   Switching goes through `PUT /api/org` (the team switcher) + `invalidate(QUERY.org)`.
+- **CRM working data is member-writable** — a documented extension of the canonical
+  shape, not a drift. The `crm_core` migration is the reference: members create and
+  edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
+  comments) is editable by its author or owner/admin, deletes stay owner/admin, and
+  notifications belong to their recipient (created server-side only, via
+  `src/lib/server/crm/notifications.ts` + the service-role client). Column-level
+  grants keep `org_id`, authorship columns and ticket numbers immutable from the
+  browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
+  actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
+  never through ad-hoc `.from()` chains in routes.
 
 ## Database
 
