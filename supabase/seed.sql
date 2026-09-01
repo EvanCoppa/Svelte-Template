@@ -125,4 +125,63 @@ insert into public.organization_members (org_id, user_id, role) values
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'member')
 on conflict (org_id, user_id) do update set role = excluded.role;
 
+-- CRM fixtures, all inside Acme so every seed user can see them (and Globex
+-- stays empty for tenant-isolation checks). Ids use the 2000…/3000…/… ranges
+-- per table family to stay greppable.
+insert into public.clients (id, org_id, name, email, phone, company, website, status, created_by) values
+	('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Wayne Enterprises', 'hello@wayne.example.com', '+1 555 0100', 'Wayne Enterprises',
+		'https://wayne.example.com', 'active', '00000000-0000-0000-0000-000000000001'),
+	('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'Stark Industries', 'contact@stark.example.com', null, 'Stark Industries',
+		null, 'lead', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.client_contacts (id, org_id, client_id, name, email, title, is_primary) values
+	('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Lucius Fox', 'lucius@wayne.example.com', 'CEO', true),
+	('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000002', 'Pepper Potts', 'pepper@stark.example.com', 'COO', true)
+on conflict (id) do nothing;
+
+insert into public.deals (id, org_id, client_id, title, amount, stage, assigned_to, created_by) values
+	('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Annual support contract', 24000.00, 'proposal',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.tasks (id, org_id, client_id, title, due_at, assigned_to, created_by) values
+	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Send renewal quote', now() + interval '7 days',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.notes (id, org_id, client_id, author_id, body) values
+	('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001',
+		'Prefers email over phone. Renewal window opens in Q4.')
+on conflict (id) do nothing;
+
+insert into public.support_tickets (id, org_id, client_id, subject, description, status, priority, assigned_to, created_by) values
+	('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Cannot export invoices',
+		'Export button returns a 500 since the last update.', 'open', 'high',
+		'00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.ticket_comments (id, org_id, ticket_id, author_id, body, is_internal) values
+	('80000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'70000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
+		'Reproduced on staging; looks like the PDF service credential expired.', true)
+on conflict (id) do nothing;
+
+insert into public.notifications (id, org_id, user_id, type, title, body, link) values
+	('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000002', 'ticket_assigned', 'Ticket assigned to you',
+		'Cannot export invoices (high priority)', '/tickets'),
+	('90000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001', 'task_assigned', 'New task from Evan Coppa',
+		'Send renewal quote', '/tasks')
+on conflict (id) do nothing;
+
 drop table seed_users;
