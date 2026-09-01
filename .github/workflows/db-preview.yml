@@ -1,0 +1,161 @@
+# On-demand Supabase preview branch for a PR.
+#
+# WHY THIS EXISTS INSTEAD OF SUPABASE'S "AUTOMATIC BRANCHING"
+# Automatic branching spins up a real, billed Postgres project for *every* PR.
+# Branch compute bills by the hour ($0.01344/hr on Micro ≈ $0.32/day), Compute
+# Credits do not apply to it, and it is NOT covered by the org spend cap — so a
+# branch left open over a long weekend quietly bills with nothing to stop it.
+#
+# Nearly every migration bug is caught for free by the `database` job in ci.yml,
+# which replays the migrations against a throwaway Postgres on the runner. A
+# cloud branch is only worth paying for when you need the real thing: Auth,
+# Storage, Realtime, an actual project URL to point a preview deploy at.
+#
+# So: branches are OPT-IN per PR, and three separate things tear one down —
+# removing the label, closing the PR, and the reaper in db-preview-reaper.yml.
+#
+# Turn "Automatic branching" OFF in the Supabase GitHub integration or this
+# whole workflow is pointless — the integration will have made the branch already.
+name: DB preview branch
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, closed]
+
+concurrency:
+  group: db-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  LABEL: db:preview
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+  BRANCH: ${{ github.event.pull_request.head.ref }}
+
+jobs:
+  create:
+    name: Create branch
+    # A fork PR cannot read secrets, so the CLI would fail with a confusing
+    # auth error rather than an obvious one.
+    if: >-
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'db:preview' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Create preview branch
+        run: |
+          npx supabase --experimental branches create "$BRANCH" \
+            --project-ref "$SUPABASE_PROJECT_ID" --yes
+
+      # `branches create` returns as soon as the branch is requested. The
+      # migrations run afterwards, so without this the job would go green on a
+      # branch whose migrations failed.
+      - name: Wait for migrations
+        id: wait
+        run: |
+          for _ in $(seq 1 60); do
+            status=$(npx supabase --experimental branches list \
+              --project-ref "$SUPABASE_PROJECT_ID" -o json 2>/dev/null \
+              | jq -r --arg b "$BRANCH" '(. // []) | map(select(.name == $b)) | .[0].status // "PENDING"')
+            echo "status: $status"
+            case "$status" in
+              MIGRATIONS_PASSED|FUNCTIONS_DEPLOYED)
+                echo "ref=$(npx supabase --experimental branches list --project-ref "$SUPABASE_PROJECT_ID" -o json \
+                  | jq -r --arg b "$BRANCH" 'map(select(.name == $b)) | .[0].project_ref')" >> "$GITHUB_OUTPUT"
+                exit 0 ;;
+              MIGRATIONS_FAILED|FUNCTIONS_FAILED)
+                echo "::error::Branch deployment failed with status $status"
+                exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Timed out waiting for the preview branch to become healthy"
+          exit 1
+
+      # Credentials deliberately stay out of the comment — they are one click
+      # away in the dashboard for anyone who already has project access.
+      - name: Comment on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REF: ${{ steps.wait.outputs.ref }}
+        run: |
+          body=$(cat <<EOF
+          <!-- supabase-preview-branch -->
+          **Supabase preview branch is live** — \`$BRANCH\` → project \`$REF\`
+
+          Migrations from this PR are applied. Credentials are in the [dashboard](https://supabase.com/dashboard/project/$REF/settings/api) under this branch.
+
+          This branch bills by the hour (~\$0.32/day) and is **not** covered by the spend cap. It is deleted when the \`$LABEL\` label is removed, when this PR closes, or by the nightly reaper — whichever comes first.
+          EOF
+          )
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '[.[] | select(.body | contains("<!-- supabase-preview-branch -->"))] | .[0].id // empty')
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -f body="$body"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body"
+          fi
+
+  destroy:
+    name: Delete branch
+    if: >-
+      (github.event.action == 'unlabeled' && github.event.label.name == 'db:preview') ||
+      (github.event.action == 'closed' &&
+       contains(github.event.pull_request.labels.*.name, 'db:preview'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Idempotent on purpose: the reaper or a previous run may have got there
+      # first, and a missing branch is the desired end state either way.
+      - name: Delete preview branch
+        run: |
+          exists=$(npx supabase --experimental branches list \
+            --project-ref "$SUPABASE_PROJECT_ID" -o json 2>/dev/null \
+            | jq -r --arg b "$BRANCH" '(. // []) | map(select(.name == $b)) | length')
+          if [ "$exists" = "0" ]; then
+            echo "No preview branch named $BRANCH — nothing to bill, nothing to do."
+            exit 0
+          fi
+          npx supabase --experimental branches delete "$BRANCH" \
+            --project-ref "$SUPABASE_PROJECT_ID" --yes
+
+      - name: Comment on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '[.[] | select(.body | contains("<!-- supabase-preview-branch -->"))] | .[0].id // empty')
+          [ -n "$existing" ] || exit 0
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+            -f body="<!-- supabase-preview-branch -->
+          **Supabase preview branch deleted** — \`$BRANCH\` is no longer billing.
+
+          Re-add the \`db:preview\` label to spin up a fresh one."

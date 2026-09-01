@@ -5,8 +5,9 @@
 -- and public on purpose: they exist so `npm run dev` and the Playwright suite
 -- have a user to sign in as without anyone having to provision one by hand.
 --
---   dev@example.com / password123    ← sign in with this while developing
---   e2e@example.com / password123    ← reserved for the E2E suite
+--   dev@example.com      / password123   ← sign in with this while developing
+--   e2e@example.com      / password123   ← reserved for the E2E suite
+--   evancoppa@gmail.com  / password123   ← same local password, not a real one
 --
 -- NEVER put a real credential in this file. It is committed.
 --
@@ -25,7 +26,8 @@ create temporary table seed_users (
 -- Add a row here to add a user. Everything below is generic.
 insert into seed_users (id, email, password, display_name) values
 	('00000000-0000-0000-0000-000000000001', 'dev@example.com', 'password123', 'Dev User'),
-	('00000000-0000-0000-0000-000000000002', 'e2e@example.com', 'password123', 'E2E Robot');
+	('00000000-0000-0000-0000-000000000002', 'e2e@example.com', 'password123', 'E2E Robot'),
+	('00000000-0000-0000-0000-000000000003', 'evancoppa@gmail.com', 'password123', 'Evan Coppa');
 
 -- The account. `email_confirmed_at` is set so sign-in works immediately,
 -- matching `enable_confirmations = false` in config.toml. The empty-string

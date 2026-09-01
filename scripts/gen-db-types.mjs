@@ -8,7 +8,10 @@
  *   - local stack  (PUBLIC_SUPABASE_URL on 127.0.0.1) → `--local`
  *   - hosted project                                  → `--project-id <ref>`
  *
- * Pass --local or --remote to override the detection.
+ * Pass --local or --remote to override the detection. Pass --check to compare
+ * instead of writing: it exits non-zero when the committed file disagrees with
+ * the schema, which is how CI catches a migration landing without regenerated
+ * types.
  *
  * Env is read the way Vite reads it: .env, then .env.local (which wins), then
  * the real environment. The hosted path needs the CLI authenticated once per
@@ -16,7 +19,7 @@
  * (`npm run db:start`).
  */
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readEnvFiles } from './dotenv.mjs';
 
 const OUT_FILE = 'src/lib/database.types.ts';
@@ -26,6 +29,7 @@ const env = { ...readEnvFiles(), ...process.env };
 const url = env.PUBLIC_SUPABASE_URL ?? '';
 
 const flags = process.argv.slice(2);
+const check = flags.includes('--check');
 const isLocal = flags.includes('--local')
 	? true
 	: flags.includes('--remote')
@@ -69,6 +73,21 @@ try {
 		isLocal
 			? '\nType generation failed. Is the local stack running? Try `npm run db:start`.'
 			: '\nType generation failed. If this is an auth error, run `npx supabase login` first.'
+	);
+	process.exit(1);
+}
+
+if (check) {
+	const current = existsSync(OUT_FILE) ? readFileSync(OUT_FILE, 'utf8') : '';
+	if (current === output) {
+		console.log(`${OUT_FILE} is up to date with the schema.`);
+		process.exit(0);
+	}
+	// Write it anyway so a failing CI run leaves the corrected file in the
+	// workspace — `git diff` then shows exactly what was missed.
+	writeFileSync(OUT_FILE, output);
+	console.error(
+		`\n${OUT_FILE} does not match the schema.\n` + 'Run `npm run db:types` and commit the result.'
 	);
 	process.exit(1);
 }

@@ -44,6 +44,8 @@ npm run db:reset       # re-apply every migration, then supabase/seed.sql
 npm run db:env         # write .env.local pointing at the local stack
 npm run db:new <name>  # scaffold a migration file
 npm run db:types       # regenerate src/lib/database.types.ts (local or hosted)
+npm run db:types:check # fail if the committed types disagree with the schema (CI)
+npm run db:lint        # schema static analysis — keep at ZERO
 npm run format         # prettier (svelte + tailwind plugins)
 ```
 
@@ -129,7 +131,21 @@ stay testable as a signed-out browser.
   `src/lib/database.types.ts`**. That script follows whichever database
   `PUBLIC_SUPABASE_URL` points at. Every Supabase client is `SupabaseClient<Database>`;
   an untyped `.from()` should never exist. Row types come from the `Tables<'name'>`
-  aliases in that file.
+  aliases in that file. CI runs `npm run db:types:check` and fails the PR when the
+  committed file disagrees with the migrations, so the two cannot silently drift.
+- The Supabase CLI is pinned in `devDependencies`. Always invoke it as `npx supabase`
+  so it resolves to that pinned binary — generated types differ between CLI versions,
+  and a globally installed one fails the CI type check for no real reason.
+- **Production migrations are applied by CI on merge to `main`**
+  (`.github/workflows/db-deploy.yml`). Never `supabase db push` from a laptop: it can
+  apply a migration whose file is not committed, and the remote history then disagrees
+  with the repo with nothing to detect it.
+- Cloud preview branches are **opt-in per PR** via the `db:preview` label, never
+  automatic. They are separately billed (~$0.32/day), Compute Credits do not apply, and
+  they are excluded from the org spend cap. The free `database` CI job already replays
+  every migration against a disposable Postgres, so only ask for a branch when you need
+  hosted Auth/Storage/Realtime or a real project URL. The deploy pipeline, the branch
+  lifecycle and the one-time setup are `docs/database-workflow.md`.
 
 ## Server actions vs API endpoints
 

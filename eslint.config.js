@@ -18,7 +18,10 @@ export default ts.config(
 		// `.prettierignore` skips this directory for the same reason.
 		// The vendored anti-slop oxlint plugin is likewise kept byte-identical
 		// to upstream (it lints itself with oxlint's rules there).
-		ignores: ['.claude/skills/**', 'tools/oxlint/anti-slop/**']
+		// `.claude/worktrees/**` holds Claude Code worktrees — whole checkouts of
+		// this repo nested inside it. Git excludes them; without this, `npm run
+		// lint` reports another branch's files as errors in this one.
+		ignores: ['.claude/skills/**', '.claude/worktrees/**', 'tools/oxlint/anti-slop/**']
 	},
 	js.configs.recommended,
 	...ts.configs.recommended,
