@@ -47,7 +47,7 @@
 			/>
 		</div>
 		<div class="flex w-28 items-center justify-center text-sm font-medium">
-			Page {pagination.pageIndex + 1} of {dataTable.table.getPageCount()}
+			Page {pagination.pageIndex + 1} of {Math.max(1, dataTable.table.getPageCount())}
 		</div>
 		<div class="flex items-center space-x-2">
 			<Button

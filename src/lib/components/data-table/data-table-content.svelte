@@ -33,7 +33,16 @@
 			{#each dataTable.table.getHeaderGroups() as headerGroup (headerGroup.id)}
 				<Table.Row>
 					{#each headerGroup.headers as header (header.id)}
-						<Table.Head colspan={header.colSpan} class="[&:has([role=checkbox])]:ps-3">
+						{@const sorted = header.column.getIsSorted()}
+						<Table.Head
+							colspan={header.colSpan}
+							aria-sort={sorted === 'asc'
+								? 'ascending'
+								: sorted === 'desc'
+									? 'descending'
+									: undefined}
+							class="[&:has([role=checkbox])]:ps-3"
+						>
 							{#if !header.isPlaceholder}
 								<FlexRender {header} />
 							{/if}
@@ -53,7 +62,10 @@
 				</Table.Row>
 			{:else}
 				<Table.Row>
-					<Table.Cell colspan={dataTable.table.getAllColumns().length} class="h-24 text-center">
+					<Table.Cell
+						colspan={dataTable.table.getVisibleLeafColumns().length}
+						class="h-24 text-center"
+					>
 						{#if empty}{@render empty()}{:else}{emptyMessage}{/if}
 					</Table.Cell>
 				</Table.Row>
