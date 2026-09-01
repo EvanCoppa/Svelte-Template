@@ -16,10 +16,14 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	depends(QUERY.org);
 
 	// RLS scopes this to the signed-in user's memberships; the joins pull the
-	// org row and its tier in the same round trip.
+	// org row and its tier in the same round trip. The embed names its foreign
+	// key explicitly: `member_roles` also points at both tables, so a bare
+	// `organizations(...)` is an ambiguous relationship to PostgREST (PGRST201).
 	const { data: memberships, error: orgError } = await locals.supabase
 		.from('organization_members')
-		.select('role, organizations(id, name, tier_id, industry_id, tiers(name))')
+		.select(
+			'role, organizations!organization_members_org_id_fkey(id, name, tier_id, industry_id, tiers(name))'
+		)
 		.eq('user_id', locals.user.id);
 
 	if (orgError) {
