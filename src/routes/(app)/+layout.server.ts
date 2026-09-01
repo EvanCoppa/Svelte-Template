@@ -17,12 +17,28 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 
 	// RLS scopes this to the signed-in user's memberships; the joins pull the
 	// org row and its tier in the same round trip.
+	//
+	// The `!organization_members_org_id_fkey` hint is load-bearing, not
+	// decoration. Every tenant-scoped table that composite-FKs back to
+	// organization_members (deals, tasks, support_tickets, notifications,
+	// member_roles) also references organizations, so PostgREST reads each of
+	// them as a junction table and finds six candidate paths from
+	// organization_members to organizations. Faced with more than one it
+	// refuses to guess and fails the whole request with PGRST201 — naming the
+	// constraint pins the direct org_id path. Any future table scoped to both
+	// an org and a member adds another candidate, so this hint has to stay.
 	const { data: memberships, error: orgError } = await locals.supabase
 		.from('organization_members')
-		.select('role, organizations(id, name, tier_id, industry_id, tiers(name))')
+		.select(
+			'role, organizations!organization_members_org_id_fkey(id, name, tier_id, industry_id, tiers(name))'
+		)
 		.eq('user_id', locals.user.id);
 
 	if (orgError) {
+		// Surfacing the cause matters: every failure here renders the same vague
+		// banner, so without this line a schema-level fault is indistinguishable
+		// from an outage. The operator gets the detail, the browser does not.
+		console.error('[(app)/layout] failed to load organizations', orgError);
 		throw error(500, 'Could not load your organizations.');
 	}
 
