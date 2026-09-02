@@ -117,7 +117,11 @@ Action mechanics:
 
 - `src/lib/components/ui/` is **vendored** shadcn-svelte source — edit it in place,
   commit the diff. Add new primitives with `npx shadcn-svelte@latest add <name>`.
-- One navigation config (`src/lib/navigation.ts`) drives the sidebar and ⌘K palette.
+- Navigation is derived, never declared: the `(app)` layout filters the feature registry
+  once (`navFor()` in `src/lib/server/route-access.ts`) and the sidebar, the ⌘K palette
+  and any in-page link to a feature page consume that list (`navItemFor()` in
+  `src/lib/navigation.ts`). "Can this user open X?" is `canVisitRoute()` from the same
+  module, never a check composed at the call site.
 - Icons: `@lucide/svelte/icons/<name>` one-per-file imports only — the barrel import
   (`import { X } from '@lucide/svelte'`) drags the whole icon set through the dev
   server and bundler.

@@ -217,6 +217,12 @@ insert into public.organization_feature_overrides (org_id, feature_id, mode, not
 	('10000000-0000-0000-0000-000000000002', 'deals', 'enabled', 'Pilot: deals outside the construction catalog.')
 on conflict (org_id, feature_id) do nothing;
 
+-- The maintainer's seeded account runs the deployment: it may open /admin
+-- (the platform_operators migration bootstraps the hosted copy by email).
+insert into public.platform_operators (user_id) values
+	('00000000-0000-0000-0000-000000000003')
+on conflict (user_id) do nothing;
+
 -- A pending shareable-link invite into Acme with a fixed token, so the accept
 -- flow (/invite/<token>) is exercisable straight after a reset. Personal
 -- invites created from /staff get random database-generated tokens; a fixed

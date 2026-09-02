@@ -192,6 +192,16 @@ application data is scoped to an organization, never to a bare user. The
   (column grants keep it out of reach of the browser), and members can read
   the profiles of people they share an org with, which is what lets a roster
   name anyone.
+- **Platform operators run the deployment** (`platform_operators` migration +
+  `src/lib/server/operator.ts` + `src/routes/(app)/admin/`). Not an org role and not
+  a feature: a global allowlist of user ids, added by migration or SQL, that opens
+  the `/admin` console — the UI for everything the tables above call "operator /
+  service-role only": the feature catalog and its industry/tier maps, the role
+  catalog and its grants, and each org's industry, plan, overrides, opt-outs and
+  memberships. Every `/admin` load and action opens with `requireOperator(locals)`,
+  which answers 404 to anyone else and hands back the service-role client; the
+  data access lives in `src/lib/server/admin.ts` and writes through that client,
+  so no RLS policy is widened for it. A non-operator sees no link to it anywhere.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.
@@ -315,15 +325,29 @@ tests — keep them green and extend them.
 
 ## Navigation
 
-`src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
-come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
-`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
-that is `enabled` or `locked_visible` for the active org and readable by the user.
-Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
-clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
-only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
-when a feature needs it; never the barrel import.
+Navigation is **derived, not declared**. `src/lib/navigation.ts` drives both the
+sidebar and the ⌘K palette, and the entries come from the feature registry:
+`navFor(locals.org)` (`src/lib/server/route-access.ts`, called once in the `(app)`
+layout load) merges `staticNavItems` (Dashboard, Settings — the pages every org has)
+with every feature that is `enabled` or `locked_visible` for the active org and
+readable by the user. That is the one place filtering happens: everything downstream
+consumes `page.data.nav`, and no component checks a mode or a grant itself — the moment
+two components each do their own check, they disagree, and a user sees a link that
+403s. Adding a page = create the route under `(app)` + register the feature by
+migration; nothing in `navigation.ts` changes. A locked entry renders with a lock and
+sends clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and
+resolved only through the one-per-file map in `src/lib/features/icons.ts` — add a slug
+there when a feature needs it; never the barrel import.
+
+"Can this user open X?" has exactly one answer: `canVisitRoute(pathname, locals.org)`
+in `src/lib/server/route-access.ts`, which intersects every axis (feature mode and read
+grant — the same call the hook's `routeGateFor()` makes). Use it in a load or action
+that picks a redirect target; never compose `features` and `hasGrant()` at a call site.
+The browser never receives the axes, so client code that links to a feature page — a
+CTA, an empty state, an onboarding step — looks the entry up with
+`navItemFor(page.data.nav, pathname)` and renders it through `navItemTarget()`: absent
+means no link, locked means the upgrade page. A hardcoded `href="/clients"` in markup
+is a bug; the dashboard's "Start here" card is the reference.
 
 ## Svelte reference docs
 

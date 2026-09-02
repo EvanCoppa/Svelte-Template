@@ -1,8 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants.js';
-import { buildNav } from '$lib/navigation';
 import { QUERY } from '$lib/queries';
-import { hasGrant } from '$lib/server/roles';
+import { navFor } from '$lib/server/route-access';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
@@ -20,14 +19,15 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	depends(QUERY.org);
 	depends(QUERY.features);
 
-	const { organizations, activeOrg, features, access } = locals.org;
+	const { organizations, activeOrg } = locals.org;
 
 	return {
 		organizations,
 		activeOrg,
-		// Filtered server-side so grants never reach the browser: an entry is
-		// either linkable, or locked with an upgrade prompt, or absent.
-		nav: buildNav(features, (featureId) => hasGrant(access, featureId)),
+		// Filtered once, here, from the whole org context — so grants never
+		// reach the browser and no component re-checks a mode or a grant. An
+		// entry is either linkable, or locked with an upgrade prompt, or absent.
+		nav: navFor(locals.org),
 		// The sidebar trigger writes its state to a cookie; reading it here means
 		// a collapsed sidebar stays collapsed across reloads with no flash.
 		sidebarOpen: cookies.get(SIDEBAR_COOKIE_NAME) !== 'false'

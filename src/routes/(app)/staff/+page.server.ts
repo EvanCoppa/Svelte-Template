@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { QUERY } from '$lib/queries';
+import { assignRoleSchema, unassignRoleSchema } from '$lib/schemas/member-roles';
 import { sendEmail } from '$lib/server/email';
 import { orgInviteEmail } from '$lib/server/email-templates';
 import {
@@ -21,14 +22,7 @@ import {
 	removeMember,
 	revokeInvite
 } from '$lib/server/staff';
-import {
-	assignRoleSchema,
-	inviteLinkSchema,
-	inviteSchema,
-	removeMemberSchema,
-	unassignRoleSchema,
-	revokeInviteSchema
-} from './schema';
+import { inviteLinkSchema, inviteSchema, removeMemberSchema, revokeInviteSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
 /**

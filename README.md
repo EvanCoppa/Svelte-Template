@@ -8,7 +8,7 @@ An opinionated, production-shaped starting point for new software projects:
 - **shadcn-svelte** primitives vendored in `src/lib/components/ui/` (button, input,
   select, combobox, dialog, dropdown, table, tabs, sidebar, command palette, …)
 - The **app shell**: collapsible sidebar with hover-peek, sticky blurred header,
-  ⌘K navigation palette, dark mode — all driven by one config file
+  ⌘K navigation palette, dark mode — every entry derived from the feature registry
 - **Vercel** adapter preconfigured
 - Written-down conventions in [`docs/`](docs/) so every project starts aligned
 
@@ -233,8 +233,8 @@ type NewProfile = TablesInsert<'profiles'>;
 ## The app shell
 
 The sidebar sections and the ⌘K palette both render from the **feature registry**
-(`features` table, resolved per org in `src/lib/server/org-context.ts` and filtered by
-`buildNav()` in `src/lib/navigation.ts`). Adding a page:
+(`features` table, resolved per org in `src/lib/server/org-context.ts` and filtered once
+by `navFor()` in `src/lib/server/route-access.ts`). Adding a page:
 
 1. Create `src/routes/(app)/reports/+page.svelte` — it's automatically protected and
    gets the sidebar/header shell.
@@ -244,7 +244,13 @@ The sidebar sections and the ⌘K palette both render from the **feature registr
 
 That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
 plan lacks it is sent to `/upgrade`, one whose industry lacks it gets a 404, and the
-org can switch it off for itself under `/settings/features`. See `docs/features.md`.
+org can switch it off for itself under `/settings/features`. Which industries and
+plans include it, what each role may do with it, and per-organization exceptions are
+edited at `/admin` by a platform operator (a row in `platform_operators`; needs
+`SUPABASE_SERVICE_ROLE_KEY`). A page that links to a
+feature (a dashboard CTA, an empty state) looks it up in `page.data.nav` with
+`navItemFor()` instead of hardcoding the href, so it never advertises a page the gate
+would bounce. See `docs/features.md`.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
 or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it

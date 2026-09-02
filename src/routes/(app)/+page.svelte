@@ -3,12 +3,29 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { navItemFor, navItemTarget } from '$lib/navigation';
 	import BlocksIcon from '@lucide/svelte/icons/blocks';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
 
 	let user = $derived(page.data.user);
+
+	// The "Start here" buttons point at feature pages, so they come from the
+	// nav the (app) layout filtered for this org and user rather than from a
+	// hardcoded href: absent when the feature is hidden, switched off or not
+	// readable, locked (→ the upgrade page) when the plan lacks it. A bare
+	// `href="/components"` here would advertise a page the gate bounces.
+	const startHere = [
+		{ pathname: '/components', label: 'Browse components', variant: 'default' },
+		{ pathname: '/best-practices', label: 'Read the conventions', variant: 'outline' }
+	] as const;
+	let startHereLinks = $derived(
+		startHere.flatMap(({ pathname, ...cta }) => {
+			const item = navItemFor(page.data.nav ?? [], pathname);
+			return item ? [{ ...cta, item }] : [];
+		})
+	);
 
 	const features = [
 		{
@@ -69,14 +86,21 @@
 		<Card.Header>
 			<Card.Title>Start here</Card.Title>
 			<Card.Description>
-				Rename the app in <code>src/lib/navigation.ts</code> and
-				<code>src/lib/components/app-sidebar.svelte</code>, point
+				Register your first feature by migration (see <code>docs/features.md</code>), point
 				<code>.env</code> at your Supabase project, and delete what you don't need.
 			</Card.Description>
 		</Card.Header>
-		<Card.Content class="flex flex-wrap gap-2">
-			<Button href="/components" variant="default">Browse components</Button>
-			<Button href="/best-practices" variant="outline">Read the conventions</Button>
-		</Card.Content>
+		{#if startHereLinks.length > 0}
+			<Card.Content class="flex flex-wrap gap-2">
+				{#each startHereLinks as { item, label, variant } (item.href)}
+					<Button href={navItemTarget(item)} {variant}>
+						{#if item.locked}
+							<LockIcon class="size-4" aria-label="Upgrade required" />
+						{/if}
+						{label}
+					</Button>
+				{/each}
+			</Card.Content>
+		{/if}
 	</Card.Root>
 </div>

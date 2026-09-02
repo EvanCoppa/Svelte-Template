@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { featureGateFor, matchFeature, passesFeatureGate } from './gate';
+import { featureGateFor, matchFeature } from './gate';
 import type { Feature, FeatureMap, FeatureMode } from './types';
 
 function feature(id: string, route: string): Feature {
@@ -126,14 +126,5 @@ describe('featureGateFor', () => {
 
 	it('treats an empty map as no gate at all', () => {
 		expect(featureGateFor('/deals', {}, readNone)).toBeNull();
-	});
-});
-
-describe('passesFeatureGate', () => {
-	it('is the boolean form of featureGateFor', () => {
-		expect(passesFeatureGate('/clients', map, readAll)).toBe(true);
-		expect(passesFeatureGate('/clients', map, readNone)).toBe(false);
-		expect(passesFeatureGate('/best-practices', map, readAll)).toBe(false);
-		expect(passesFeatureGate('/deals', map, readAll)).toBe(false);
 	});
 });
