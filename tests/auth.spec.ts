@@ -199,6 +199,14 @@ test.describe('the app shell', () => {
 		expect(response?.status()).toBe(403);
 	});
 
+	test('answers 404 on the operator console for a non-operator', async ({ page }) => {
+		// seed.sql makes evancoppa@gmail.com the platform operator, not the E2E
+		// user. /admin must not confirm it exists to anyone else.
+		const response = await page.goto('/admin');
+		expect(response?.status()).toBe(404);
+		await expect(page.getByText('Page not found')).toBeVisible();
+	});
+
 	test('lists a readable feature page with its seeded rows', async ({ page }) => {
 		await page.goto('/clients');
 		await expect(page).toHaveTitle('Clients');

@@ -78,6 +78,21 @@ the same answer. The nav is the browser's only projection of it — `navItemFor(
 `src/lib/navigation.ts` looks a page up there, so a client-side link to a feature page is
 either open, locked (→ `/upgrade`) or absent, never a route the gate would bounce.
 
+## The operator console
+
+`/admin` (`src/routes/(app)/admin/`) edits by hand what the tables above otherwise get
+only by migration or SQL: the catalog rows (name, description, icon, section, order),
+the industry and tier maps, the role catalog and its grants per industry, and each
+organization's industry, plan, overrides, opt-outs and memberships — with a "shows
+as" column that runs `resolveFeatures()` for the org so the preview cannot disagree
+with the gate. It is open to **platform operators** only: rows in
+`platform_operators` (its own migration), checked by `requireOperator()` in
+`src/lib/server/operator.ts`, which 404s anyone else and hands the service-role
+client to the caller. Writes go through that client (`src/lib/server/admin.ts`), so
+none of the RLS above changes; the console needs `SUPABASE_SERVICE_ROLE_KEY` set
+wherever it runs. Adding a feature is still a migration — the console cannot mint an
+id the code does not know.
+
 ## Adding a feature
 
 1. Create the route under `src/routes/(app)/<route>/`.

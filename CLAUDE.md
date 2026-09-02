@@ -192,6 +192,16 @@ application data is scoped to an organization, never to a bare user. The
   (column grants keep it out of reach of the browser), and members can read
   the profiles of people they share an org with, which is what lets a roster
   name anyone.
+- **Platform operators run the deployment** (`platform_operators` migration +
+  `src/lib/server/operator.ts` + `src/routes/(app)/admin/`). Not an org role and not
+  a feature: a global allowlist of user ids, added by migration or SQL, that opens
+  the `/admin` console — the UI for everything the tables above call "operator /
+  service-role only": the feature catalog and its industry/tier maps, the role
+  catalog and its grants, and each org's industry, plan, overrides, opt-outs and
+  memberships. Every `/admin` load and action opens with `requireOperator(locals)`,
+  which answers 404 to anyone else and hands back the service-role client; the
+  data access lives in `src/lib/server/admin.ts` and writes through that client,
+  so no RLS policy is widened for it. A non-operator sees no link to it anywhere.
 - **Every user always has ≥1 org**: `handle_new_user` creates a personal free org
   with an owner membership on signup, so no screen needs an empty-org state. Don't
   break that invariant without building onboarding to replace it.

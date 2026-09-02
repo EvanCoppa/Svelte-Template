@@ -18,15 +18,8 @@ export const revokeInviteSchema = z.object({
 	invite_id: z.uuid()
 });
 
-export const assignRoleSchema = z.object({
-	user_id: z.uuid(),
-	role_id: z.uuid('Choose a role to assign.')
-});
-
-export const unassignRoleSchema = z.object({
-	user_id: z.uuid(),
-	role_id: z.uuid()
-});
+// assignRoleSchema / unassignRoleSchema live in $lib/schemas/member-roles:
+// the operator console posts the same two forms.
 
 export const removeMemberSchema = z.object({
 	user_id: z.uuid()

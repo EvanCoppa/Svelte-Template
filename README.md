@@ -244,7 +244,10 @@ by `navFor()` in `src/lib/server/route-access.ts`). Adding a page:
 
 That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
 plan lacks it is sent to `/upgrade`, one whose industry lacks it gets a 404, and the
-org can switch it off for itself under `/settings/features`. A page that links to a
+org can switch it off for itself under `/settings/features`. Which industries and
+plans include it, what each role may do with it, and per-organization exceptions are
+edited at `/admin` by a platform operator (a row in `platform_operators`; needs
+`SUPABASE_SERVICE_ROLE_KEY`). A page that links to a
 feature (a dashboard CTA, an empty state) looks it up in `page.data.nav` with
 `navItemFor()` instead of hardcoding the href, so it never advertises a page the gate
 would bounce. See `docs/features.md`.
