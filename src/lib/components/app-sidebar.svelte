@@ -32,7 +32,7 @@
 			<TeamSwitcher {organizations} {activeOrg} />
 		{/if}
 	</Sidebar.Header>
-	<Sidebar.Content class="scrollable-sidebar group-data-[peek=true]:pr-2">
+	<Sidebar.Content class="scrollable-sidebar">
 		{#each groups as group (group.key)}
 			<Sidebar.Group class="ml-2">
 				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
@@ -60,7 +60,7 @@
 			</Sidebar.Group>
 		{/each}
 	</Sidebar.Content>
-	<Sidebar.Footer class="pt-0 pr-0 group-data-[peek=true]:pr-2">
+	<Sidebar.Footer class="pt-0">
 		<div
 			class="border-border bg-background flex w-full flex-col rounded-xl border shadow-sm group-data-[collapsible=icon]:hidden"
 		>
