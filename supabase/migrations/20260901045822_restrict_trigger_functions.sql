@@ -1,0 +1,43 @@
+-- Take the trigger functions off the PostgREST API surface.
+--
+-- Both functions created by the profiles migration are trigger functions: they
+-- are meant to be called by Postgres when a row changes, never by a client.
+-- But they live in `public`, and PostgREST exposes every function there that
+-- an API role can execute as `/rest/v1/rpc/<name>`. Two separate grants put
+-- them in reach:
+--
+--   1. Postgres grants EXECUTE on every new function to PUBLIC, and `anon` and
+--      `authenticated` inherit that.
+--   2. Supabase additionally runs `alter default privileges in schema public
+--      grant execute on functions to anon, authenticated, service_role`, so
+--      both roles also hold an explicit grant of their own.
+--
+-- Revoking from PUBLIC alone therefore does NOT clear this — the explicit
+-- grants survive it. All three have to go, which is what the statements below
+-- do. Supabase's security advisor reports the two grants that matter as
+-- `anon_security_definer_function_executable` and
+-- `authenticated_security_definer_function_executable` (lints 0028/0029).
+--
+-- Calling either function over the API errors today, because a trigger
+-- function dereferences `new`, which is null outside a trigger. This is
+-- defence in depth: `handle_new_user()` is SECURITY DEFINER, so it runs as its
+-- owner and bypasses RLS, and reachable surface that nothing needs is worth
+-- closing whether or not it is exploitable right now. `set_updated_at()` is
+-- SECURITY INVOKER and lower risk, but it is no more meant to be called over
+-- HTTP, so it gets the same treatment.
+--
+-- Triggers keep working. Postgres checks EXECUTE on a trigger function when
+-- the trigger is created, not each time it fires, so `on_auth_user_created`
+-- and `profiles_set_updated_at` are unaffected.
+--
+-- `service_role` keeps its grant: it is a server-only secret that already
+-- bypasses RLS, and the advisor does not flag it.
+--
+-- Do this for every trigger function you add from here on — the default
+-- privileges above mean each new one starts out exposed. A function you
+-- genuinely want callable over the API is the exception, and should be granted
+-- to a specific role deliberately rather than arriving that way by default.
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+revoke execute on function public.set_updated_at() from public, anon, authenticated;
