@@ -13,14 +13,26 @@
 		ref = $bindable(null),
 		class: className,
 		pageSizeOptions = [10, 20, 30, 40, 50],
+		selectable = false,
+		noun = 'row',
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		/** Choices offered in the rows-per-page picker. */
 		pageSizeOptions?: number[];
+		/**
+		 * Set when the table has a selection column, so the readout reports what
+		 * is selected. Without one, a "0 of 3 row(s) selected" line describes a
+		 * control the table does not offer — it counts the rows instead.
+		 */
+		selectable?: boolean;
+		/** What a row is called in the count, singularised by the readout. */
+		noun?: string;
 	} = $props();
 
 	const dataTable = useDataTable();
 	const pagination = $derived(dataTable.table.atoms.pagination.get());
+	const shown = $derived(dataTable.table.getFilteredRowModel().rows.length);
+	const total = $derived(dataTable.table.getCoreRowModel().rows.length);
 </script>
 
 <div
@@ -30,8 +42,17 @@
 	{...restProps}
 >
 	<div class="text-muted-foreground flex-1 text-sm">
-		{dataTable.table.getFilteredSelectedRowModel().rows.length} of
-		{dataTable.table.getFilteredRowModel().rows.length} row(s) selected.
+		{#if selectable}
+			{dataTable.table.getFilteredSelectedRowModel().rows.length} of
+			{shown}
+			{noun}(s) selected.
+		{:else if shown === total}
+			{total}
+			{total === 1 ? noun : `${noun}s`}
+		{:else}
+			{shown} of {total}
+			{total === 1 ? noun : `${noun}s`}
+		{/if}
 	</div>
 	<div class="flex items-center space-x-6 lg:space-x-8">
 		<div class="flex items-center space-x-2">

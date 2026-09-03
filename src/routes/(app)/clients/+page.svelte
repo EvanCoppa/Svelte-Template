@@ -57,7 +57,7 @@
 		<Card.Content>
 			<DataTable.Root {table}>
 				<DataTable.Content />
-				<DataTable.Pagination />
+				<DataTable.Pagination noun="client" />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>

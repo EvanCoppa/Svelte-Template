@@ -217,11 +217,43 @@ test.describe('the staff page', () => {
 
 	test('offers no invite or removal controls to a read-only member', async ({ page }) => {
 		// The seeded 'Support' role grants staff at read, so the page renders
-		// but every managing affordance stays absent. RLS enforces the same
-		// thing independently — this asserts the screen agrees with it.
+		// but every managing affordance stays absent — including the row menu,
+		// whose column drops out entirely. RLS enforces the same thing
+		// independently; this asserts the screen agrees with it.
 		await expect(page.getByText('Dev User').first()).toBeVisible();
 		await expect(page.getByRole('button', { name: /invite/i })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: /remove/i })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: /^Actions for/ })).toHaveCount(0);
+	});
+
+	test('filters the roster from the search box', async ({ page }) => {
+		// Filtering happens in the browser, so it only answers once Svelte has
+		// hydrated — the same hazard clickWhenLive() exists for, retried the
+		// same way rather than waited out.
+		const search = page.getByLabel('Search staff');
+		await expect(async () => {
+			await search.fill('evan');
+			await expect(page.getByText('Dev User')).toHaveCount(0);
+		}).toPass({ timeout: 20_000 });
+
+		await expect(page.getByText('Evan Coppa')).toBeVisible();
+	});
+
+	test('summarises the same roster beside it', async ({ page }) => {
+		// seed.sql: Acme holds three people, two of them owner/admin, and the
+		// E2E robot is the only one carrying a role. Card.Title renders a
+		// <div>, so the cards are located by their slot, not a heading role.
+		const stats = page.locator('[data-slot="card"]', {
+			has: page.getByText('Staff statistics')
+		});
+		await expect(stats.getByText('Total members')).toBeVisible();
+		await expect(stats.getByText('3', { exact: true })).toBeVisible();
+
+		const roles = page.locator('[data-slot="card"]', {
+			has: page.getByText('Role distribution')
+		});
+		await expect(roles.getByText('Support')).toBeVisible();
+		await expect(roles.getByText('1 member')).toBeVisible();
 	});
 });
 

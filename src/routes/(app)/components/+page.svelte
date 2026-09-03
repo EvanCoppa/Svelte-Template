@@ -2798,7 +2798,7 @@
 					<DataTable.ViewOptions class="ms-auto" />
 				</div>
 				<DataTable.Content />
-				<DataTable.Pagination pageSizeOptions={[5, 10, 20, 30, 50]} />
+				<DataTable.Pagination selectable pageSizeOptions={[5, 10, 20, 30, 50]} />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>

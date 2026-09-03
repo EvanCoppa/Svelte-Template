@@ -158,7 +158,11 @@ export async function getMembership(
 	const row = unwrap(
 		await supabase
 			.from('organization_members')
-			.select('role, organizations(name, industry_id)')
+			// The org embed names its foreign key: member_roles, deals, tasks,
+			// tickets and notifications all reference both tables, so a bare
+			// `organizations(...)` is ambiguous to PostgREST (PGRST201) and every
+			// action on this page would 500. Same hint as `loadOrgContext()`.
+			.select('role, organizations!organization_members_org_id_fkey(name, industry_id)')
 			.eq('org_id', orgId)
 			.eq('user_id', userId)
 			.maybeSingle()

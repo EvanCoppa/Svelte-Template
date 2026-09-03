@@ -73,7 +73,7 @@
 		<Card.Content>
 			<DataTable.Root {table}>
 				<DataTable.Content />
-				<DataTable.Pagination />
+				<DataTable.Pagination noun="deal" />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>

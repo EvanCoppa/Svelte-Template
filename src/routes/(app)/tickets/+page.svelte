@@ -67,7 +67,7 @@
 		<Card.Content>
 			<DataTable.Root {table}>
 				<DataTable.Content />
-				<DataTable.Pagination />
+				<DataTable.Pagination noun="ticket" />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>
