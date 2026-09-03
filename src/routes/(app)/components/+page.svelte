@@ -185,24 +185,7 @@
 	const paymentColumnHelper = createColumnHelper<DataTable.DataTableFeatures, Payment>();
 
 	const paymentColumns = paymentColumnHelper.columns([
-		paymentColumnHelper.display({
-			id: 'select',
-			header: ({ table }) =>
-				renderComponent(Checkbox, {
-					checked: table.getIsAllPageRowsSelected(),
-					indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
-					onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
-					'aria-label': 'Select all'
-				}),
-			cell: ({ row }) =>
-				renderComponent(Checkbox, {
-					checked: row.getIsSelected(),
-					onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
-					'aria-label': 'Select row'
-				}),
-			enableSorting: false,
-			enableHiding: false
-		}),
+		DataTable.selectColumn(paymentColumnHelper),
 		paymentColumnHelper.accessor('email', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' })
 		}),
@@ -2783,7 +2766,8 @@
 				builds its columns with <code>createColumnHelper</code> and creates the table with
 				<code>createTable</code> against the shared <code>DataTable.features</code> preset; the
 				parts render it. The toolbar row here is page markup — search inputs and
-				<code>ViewOptions</code> compose per page.
+				<code>ViewOptions</code> compose per page — and the checkbox column is
+				<code>DataTable.selectColumn(columnHelper)</code>, first in every list.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
@@ -2798,7 +2782,7 @@
 					<DataTable.ViewOptions class="ms-auto" />
 				</div>
 				<DataTable.Content />
-				<DataTable.Pagination selectable pageSizeOptions={[5, 10, 20, 30, 50]} />
+				<DataTable.Pagination noun="payment" pageSizeOptions={[5, 10, 20, 30, 50]} />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>

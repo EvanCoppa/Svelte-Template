@@ -21,6 +21,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, TicketWithClient>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('number', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: '#' })
 		}),

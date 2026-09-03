@@ -15,6 +15,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Client>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('name', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' })
 		}),

@@ -9,6 +9,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Task>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Task' })
 		}),

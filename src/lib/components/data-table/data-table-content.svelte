@@ -25,7 +25,7 @@
 <div
 	bind:this={ref}
 	data-slot="data-table-content"
-	class={cn('rounded-md border', className)}
+	class={cn('border-border/60 overflow-hidden rounded-2xl border-2', className)}
 	{...restProps}
 >
 	<Table.Root>

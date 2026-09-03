@@ -20,6 +20,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, DealWithClient>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Deal' })
 		}),

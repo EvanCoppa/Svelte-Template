@@ -6,6 +6,7 @@ import ViewOptions from './data-table-view-options.svelte';
 
 export { features, type DataTableFeatures } from './features.js';
 export { statusCell } from './cells.js';
+export { selectColumn } from './columns.js';
 
 export {
 	Root,

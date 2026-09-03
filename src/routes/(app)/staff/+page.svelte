@@ -91,6 +91,7 @@
 
 	const columns = $derived.by(() => {
 		const defs = columnHelper.columns([
+			DataTable.selectColumn(columnHelper),
 			// The accessor is what the search box filters and what sorting reads;
 			// the cell shows the person. Name first, so sorting stays by name.
 			columnHelper.accessor((member) => `${Staff.memberName(member)} ${member.email ?? ''}`, {
