@@ -50,17 +50,52 @@ jobs:
       - name: Install
         run: npm ci
 
+      # This repo is a template, so a fresh clone has no Supabase secrets and
+      # would otherwise redden main on every merge that touches supabase/ —
+      # which teaches people to ignore a red main. Skip loudly instead: an
+      # ::warning:: annotation on the run, and a note in the job summary.
+      #
+      # Deliberately not silent. If a secret is deleted from a project that was
+      # deploying, migrations stop reaching production, and the warning is the
+      # only thing that says so.
+      - name: Are deploy credentials configured?
+        id: creds
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_PROJECT_ID" ] || missing="$missing SUPABASE_PROJECT_ID"
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+
+          if [ -z "$missing" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'configured=false' >> "$GITHUB_OUTPUT"
+          echo "::warning::Supabase deploys are not configured (missing:$missing). Migrations were NOT applied."
+          {
+            echo "### Migrations not deployed"
+            echo
+            echo "Missing secrets:$missing"
+            echo
+            echo 'Expected on a fresh clone of the template. To enable deploys, see'
+            echo '`docs/database-workflow.md` → One-time setup.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Link production project
+        if: steps.creds.outputs.configured == 'true'
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: What would be applied
+        if: steps.creds.outputs.configured == 'true'
         run: npx supabase db push --dry-run
 
       - name: Apply
+        if: steps.creds.outputs.configured == 'true'
         run: npx supabase db push
 
       - name: Summary
-        if: always()
+        if: always() && steps.creds.outputs.configured == 'true'
         run: |
           {
             echo "### Migrations deployed to \`$SUPABASE_PROJECT_ID\`"
