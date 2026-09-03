@@ -618,20 +618,20 @@ export type Database = {
       role_permissions: {
         Row: {
           created_at: string
-          level: Database["public"]["Enums"]["permission_level"]
           feature_id: string
+          level: Database["public"]["Enums"]["permission_level"]
           role_id: string
         }
         Insert: {
           created_at?: string
-          level?: Database["public"]["Enums"]["permission_level"]
           feature_id: string
+          level?: Database["public"]["Enums"]["permission_level"]
           role_id: string
         }
         Update: {
           created_at?: string
-          level?: Database["public"]["Enums"]["permission_level"]
           feature_id?: string
+          level?: Database["public"]["Enums"]["permission_level"]
           role_id?: string
         }
         Relationships: [

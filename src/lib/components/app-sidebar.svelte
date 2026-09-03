@@ -34,7 +34,7 @@
 	</Sidebar.Header>
 	<Sidebar.Content class="scrollable-sidebar">
 		{#each groups as group (group.key)}
-			<Sidebar.Group class="ml-2">
+			<Sidebar.Group>
 				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
 				<Sidebar.Menu>
 					{#each group.items as item (item.href)}
