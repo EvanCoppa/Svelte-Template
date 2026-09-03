@@ -240,20 +240,15 @@ test.describe('the staff page', () => {
 	});
 
 	test('summarises the same roster beside it', async ({ page }) => {
-		// seed.sql: Acme holds three people, two of them owner/admin, and the
-		// E2E robot is the only one carrying a role. Card.Title renders a
-		// <div>, so the cards are located by their slot, not a heading role.
-		const stats = page.locator('[data-slot="card"]', {
-			has: page.getByText('Staff statistics')
+		// seed.sql: Acme holds three people, two of them owner/admin. The panel
+		// is located by a row it always carries — Card.Title renders a <div>, so
+		// there is no heading role, and this card is titled with the org name.
+		const summary = page.locator('[data-slot="card"]', {
+			has: page.getByText('Total members')
 		});
-		await expect(stats.getByText('Total members')).toBeVisible();
-		await expect(stats.getByText('3', { exact: true })).toBeVisible();
-
-		const roles = page.locator('[data-slot="card"]', {
-			has: page.getByText('Role distribution')
-		});
-		await expect(roles.getByText('Support')).toBeVisible();
-		await expect(roles.getByText('1 member')).toBeVisible();
+		await expect(summary.getByText('Acme Inc')).toBeVisible();
+		await expect(summary.getByText('3', { exact: true })).toBeVisible();
+		await expect(summary.getByText('Owners & admins')).toBeVisible();
 	});
 });
 

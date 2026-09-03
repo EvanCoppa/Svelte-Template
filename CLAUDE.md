@@ -369,6 +369,18 @@ writing it yourself. These files are project source, so extend one in place — 
 prop — before creating a parallel component. `/components` renders the full inventory; check it
 before you build.
 
+### A data table is not a card
+
+`DataTable.Content` already draws its own bordered, rounded frame around the rows, so wrapping
+one in `ui/card` stacks two borders around the same table and buys nothing. **A list page is the
+page heading, then the toolbar, then the table** — `/clients`, `/deals`, `/tickets`, `/tasks` and
+`/staff` are all built that way, and a new one copies them. (The `/components` showcase is not an
+exception to fix: there the card is the demo frame around a primitive, not a page layout.)
+
+Cards still earn their place around everything that is _not_ the table: a form, and the summary
+or grouped panels that sit beside a roster — the staff page's organization panel and its pending
+invites are the reference.
+
 ### Enhanced primitives
 
 `src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from

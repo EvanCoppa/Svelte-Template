@@ -2,7 +2,6 @@
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import type { Client } from '$lib/server/crm/clients';
 
 	let { data } = $props();
@@ -53,12 +52,8 @@
 		<p class="text-muted-foreground">The companies and people you work with.</p>
 	</div>
 
-	<Card.Root>
-		<Card.Content>
-			<DataTable.Root {table}>
-				<DataTable.Content />
-				<DataTable.Pagination noun="client" />
-			</DataTable.Root>
-		</Card.Content>
-	</Card.Root>
+	<DataTable.Root {table}>
+		<DataTable.Content />
+		<DataTable.Pagination noun="client" />
+	</DataTable.Root>
 </div>

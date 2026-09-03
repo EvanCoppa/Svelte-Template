@@ -83,22 +83,6 @@
 	});
 
 	/**
-	 * Every role this org can hand out, with how many people hold it — including
-	 * the ones nobody holds, which is the half a roster cannot show you.
-	 */
-	const roleDistribution = $derived.by(() => {
-		const held: Record<string, number> = {};
-		for (const member of data.staff) {
-			for (const role of member.roles) {
-				held[role.id] = (held[role.id] ?? 0) + 1;
-			}
-		}
-		return data.roles
-			.map((role) => ({ id: role.id, name: role.name, count: held[role.id] ?? 0 }))
-			.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-	});
-
-	/**
 	 * The roster table. Columns are derived rather than fixed so the actions
 	 * column drops out entirely for a reader with nothing to act on — switching
 	 * org can change that without the page ever unmounting.
@@ -365,34 +349,52 @@
 	</div>
 
 	<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-		<div class="space-y-6">
+		<div class="space-y-4">
+			<FormAlert message={$linkMessage} />
+
+			<DataTable.Root {table}>
+				<div class="flex items-center gap-2">
+					<Input
+						placeholder="Search by name or email…"
+						aria-label="Search staff"
+						value={search}
+						oninput={(event) =>
+							table.getColumn('member')?.setFilterValue(event.currentTarget.value)}
+						class="max-w-xs"
+					/>
+					<DataTable.ViewOptions class="ms-auto" />
+				</div>
+				<DataTable.Content emptyMessage="No members match that search." />
+				<DataTable.Pagination noun="member" />
+			</DataTable.Root>
+		</div>
+
+		<aside class="space-y-4">
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Members</Card.Title>
-					<Card.Description>
-						{data.staff.length === 1
-							? 'You are the only person in this organization.'
-							: `${data.staff.length} people can sign in to this organization.`}
-					</Card.Description>
+					<Card.Title>{activeOrg.name}</Card.Title>
 				</Card.Header>
-				<Card.Content>
-					<FormAlert message={$linkMessage} />
+				<Card.Content class="space-y-3">
+					<div class="flex items-center justify-between gap-3">
+						<span class="text-muted-foreground text-sm">Plan</span>
+						<TagBadge tone="violet">{activeOrg.tierName}</TagBadge>
+					</div>
+					<div class="flex items-center justify-between gap-3">
+						<span class="text-muted-foreground text-sm">Your access</span>
+						<StatusBadge tone={ORG_ROLE_TONES[activeOrg.role]} class="capitalize">
+							{activeOrg.role}
+						</StatusBadge>
+					</div>
 
-					<DataTable.Root {table}>
-						<div class="flex items-center gap-2">
-							<Input
-								placeholder="Search by name or email…"
-								aria-label="Search staff"
-								value={search}
-								oninput={(event) =>
-									table.getColumn('member')?.setFilterValue(event.currentTarget.value)}
-								class="max-w-xs"
-							/>
-							<DataTable.ViewOptions class="ms-auto" />
-						</div>
-						<DataTable.Content emptyMessage="No members match that search." />
-						<DataTable.Pagination noun="member" />
-					</DataTable.Root>
+					<div class="border-border space-y-3 border-t pt-3">
+						{@render stat('Total members', stats.total)}
+						{@render stat('Owners & admins', stats.privileged, 'violet')}
+						{@render stat('Holding 2+ roles', stats.multiRole, 'info')}
+						{@render stat('Members with no role', stats.unassigned, 'warning')}
+						{#if data.canManage}
+							{@render stat('Pending invites', data.invites.length, 'neutral')}
+						{/if}
+					</div>
 				</Card.Content>
 			</Card.Root>
 
@@ -409,9 +411,7 @@
 
 						{#each data.invites as invite (invite.id)}
 							{@const expired = new Date(invite.expires_at).getTime() < Date.now()}
-							<div
-								class="border-border flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-							>
+							<div class="border-border space-y-2 rounded-lg border p-3">
 								<div class="min-w-0">
 									<p class="truncate text-sm font-medium">
 										{invite.email ?? 'Anyone with the link'}
@@ -435,6 +435,7 @@
 										<Button
 											type="submit"
 											variant="ghost"
+											size="sm"
 											disabled={$revoking}
 											aria-label="Revoke the invite for {invite.email ?? 'anyone with the link'}"
 										>
@@ -447,70 +448,6 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
-		</div>
-
-		<aside class="space-y-4">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Organization</Card.Title>
-				</Card.Header>
-				<Card.Content class="space-y-3">
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-muted-foreground text-sm">Name</span>
-						<span class="truncate text-sm font-medium">{activeOrg.name}</span>
-					</div>
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-muted-foreground text-sm">Plan</span>
-						<TagBadge tone="violet">{activeOrg.tierName}</TagBadge>
-					</div>
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-muted-foreground text-sm">Your access</span>
-						<StatusBadge tone={ORG_ROLE_TONES[activeOrg.role]} class="capitalize">
-							{activeOrg.role}
-						</StatusBadge>
-					</div>
-				</Card.Content>
-			</Card.Root>
-
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Staff statistics</Card.Title>
-				</Card.Header>
-				<Card.Content class="space-y-3">
-					{@render stat('Total members', stats.total)}
-					{@render stat('Owners & admins', stats.privileged, 'violet')}
-					{@render stat('Holding 2+ roles', stats.multiRole, 'info')}
-					{@render stat('Members with no role', stats.unassigned, 'warning')}
-					{#if data.canManage}
-						{@render stat('Pending invites', data.invites.length, 'neutral')}
-					{/if}
-				</Card.Content>
-			</Card.Root>
-
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Role distribution</Card.Title>
-					<Card.Description>
-						The roles {activeOrg.name} can hand out, and how many people hold each.
-					</Card.Description>
-				</Card.Header>
-				<Card.Content class="space-y-2">
-					{#each roleDistribution as role (role.id)}
-						<div class="flex items-center justify-between gap-3">
-							<TagBadge tone="indigo">{role.name}</TagBadge>
-							<span class="text-muted-foreground text-sm tabular-nums">
-								{role.count}
-								{role.count === 1 ? 'member' : 'members'}
-							</span>
-						</div>
-					{:else}
-						<p class="text-muted-foreground text-sm">This industry ships no roles yet.</p>
-					{/each}
-					<p class="text-muted-foreground border-border mt-3 border-t pt-3 text-xs">
-						People can hold several roles, so these add up to more than the roster.
-					</p>
-				</Card.Content>
-			</Card.Root>
 		</aside>
 	</div>
 </div>
