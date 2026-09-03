@@ -2,7 +2,6 @@
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import type { DealStage, DealWithClient } from '$lib/server/crm/deals';
 
 	let { data } = $props();
@@ -21,6 +20,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, DealWithClient>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Deal' })
 		}),
@@ -69,12 +69,8 @@
 		<p class="text-muted-foreground">Pipeline of opportunities, by stage and value.</p>
 	</div>
 
-	<Card.Root>
-		<Card.Content>
-			<DataTable.Root {table}>
-				<DataTable.Content />
-				<DataTable.Pagination />
-			</DataTable.Root>
-		</Card.Content>
-	</Card.Root>
+	<DataTable.Root {table}>
+		<DataTable.Content />
+		<DataTable.Pagination noun="deal" />
+	</DataTable.Root>
 </div>

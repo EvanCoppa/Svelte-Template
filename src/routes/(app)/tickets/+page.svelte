@@ -2,7 +2,6 @@
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import type { TicketWithClient } from '$lib/server/crm/tickets';
 
 	let { data } = $props();
@@ -22,6 +21,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, TicketWithClient>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('number', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: '#' })
 		}),
@@ -63,12 +63,8 @@
 		<p class="text-muted-foreground">Support requests and their threads.</p>
 	</div>
 
-	<Card.Root>
-		<Card.Content>
-			<DataTable.Root {table}>
-				<DataTable.Content />
-				<DataTable.Pagination />
-			</DataTable.Root>
-		</Card.Content>
-	</Card.Root>
+	<DataTable.Root {table}>
+		<DataTable.Content />
+		<DataTable.Pagination noun="ticket" />
+	</DataTable.Root>
 </div>

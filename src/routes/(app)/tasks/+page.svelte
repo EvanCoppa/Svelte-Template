@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import type { Task } from '$lib/server/crm/tasks';
 
 	let { data } = $props();
@@ -10,6 +9,7 @@
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Task>();
 	const columns = columnHelper.columns([
+		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Task' })
 		}),
@@ -48,12 +48,8 @@
 		<p class="text-muted-foreground">Follow-ups and to-dos, with due dates and owners.</p>
 	</div>
 
-	<Card.Root>
-		<Card.Content>
-			<DataTable.Root {table}>
-				<DataTable.Content />
-				<DataTable.Pagination />
-			</DataTable.Root>
-		</Card.Content>
-	</Card.Root>
+	<DataTable.Root {table}>
+		<DataTable.Content />
+		<DataTable.Pagination noun="task" />
+	</DataTable.Root>
 </div>

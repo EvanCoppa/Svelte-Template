@@ -140,7 +140,7 @@ describe('revokeInvite and removeMember', () => {
 
 describe('getMembership', () => {
 	it('returns the caller’s role, the org industry and its name', async () => {
-		const { supabase } = supabaseMock({
+		const { supabase, builder } = supabaseMock({
 			data: { role: 'admin', organizations: { name: 'Acme Inc', industry_id: 'general' } }
 		});
 
@@ -149,6 +149,12 @@ describe('getMembership', () => {
 			industryId: 'general',
 			orgName: 'Acme Inc'
 		});
+		// Several tables reference both organization_members and organizations,
+		// so the embed must name its foreign key or PostgREST refuses it
+		// (PGRST201) and every form action on /staff answers 500.
+		expect(builder.select).toHaveBeenCalledWith(
+			'role, organizations!organization_members_org_id_fkey(name, industry_id)'
+		);
 	});
 
 	it('returns null for a non-member', async () => {

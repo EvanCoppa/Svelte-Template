@@ -217,11 +217,38 @@ test.describe('the staff page', () => {
 
 	test('offers no invite or removal controls to a read-only member', async ({ page }) => {
 		// The seeded 'Support' role grants staff at read, so the page renders
-		// but every managing affordance stays absent. RLS enforces the same
-		// thing independently — this asserts the screen agrees with it.
+		// but every managing affordance stays absent — including the row menu,
+		// whose column drops out entirely. RLS enforces the same thing
+		// independently; this asserts the screen agrees with it.
 		await expect(page.getByText('Dev User').first()).toBeVisible();
 		await expect(page.getByRole('button', { name: /invite/i })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: /remove/i })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: /^Actions for/ })).toHaveCount(0);
+	});
+
+	test('filters the roster from the search box', async ({ page }) => {
+		// Filtering happens in the browser, so it only answers once Svelte has
+		// hydrated — the same hazard clickWhenLive() exists for, retried the
+		// same way rather than waited out.
+		const search = page.getByLabel('Search staff');
+		await expect(async () => {
+			await search.fill('evan');
+			await expect(page.getByText('Dev User')).toHaveCount(0);
+		}).toPass({ timeout: 20_000 });
+
+		await expect(page.getByText('Evan Coppa')).toBeVisible();
+	});
+
+	test('summarises the same roster beside it', async ({ page }) => {
+		// seed.sql: Acme holds three people, two of them owner/admin. The panel
+		// is located by a row it always carries — Card.Title renders a <div>, so
+		// there is no heading role, and this card is titled with the org name.
+		const summary = page.locator('[data-slot="card"]', {
+			has: page.getByText('Total members')
+		});
+		await expect(summary.getByText('Acme Inc')).toBeVisible();
+		await expect(summary.getByText('3', { exact: true })).toBeVisible();
+		await expect(summary.getByText('Owners & admins')).toBeVisible();
 	});
 });
 

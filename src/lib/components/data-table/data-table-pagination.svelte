@@ -13,14 +13,21 @@
 		ref = $bindable(null),
 		class: className,
 		pageSizeOptions = [10, 20, 30, 40, 50],
+		noun = 'row',
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		/** Choices offered in the rows-per-page picker. */
 		pageSizeOptions?: number[];
+		/** What a row is called in the readout, singularised as needed. */
+		noun?: string;
 	} = $props();
 
 	const dataTable = useDataTable();
 	const pagination = $derived(dataTable.table.atoms.pagination.get());
+	const shown = $derived(dataTable.table.getFilteredRowModel().rows.length);
+	const total = $derived(dataTable.table.getCoreRowModel().rows.length);
+	const selected = $derived(dataTable.table.getFilteredSelectedRowModel().rows.length);
+	const plural = $derived((count: number) => (count === 1 ? noun : `${noun}s`));
 </script>
 
 <div
@@ -29,9 +36,15 @@
 	class={cn('flex items-center justify-between px-2', className)}
 	{...restProps}
 >
+	<!-- The count is always there; a selection is mentioned only once one exists. -->
 	<div class="text-muted-foreground flex-1 text-sm">
-		{dataTable.table.getFilteredSelectedRowModel().rows.length} of
-		{dataTable.table.getFilteredRowModel().rows.length} row(s) selected.
+		{#if selected > 0}
+			{selected} of {shown} {plural(shown)} selected
+		{:else if shown === total}
+			{total} {plural(total)}
+		{:else}
+			{shown} of {total} {plural(total)}
+		{/if}
 	</div>
 	<div class="flex items-center space-x-6 lg:space-x-8">
 		<div class="flex items-center space-x-2">
