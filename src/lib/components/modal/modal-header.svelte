@@ -10,7 +10,7 @@
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
 </script>
 
-<!-- `pe-14` keeps the title clear of the close button `Modal.Content` pins to the corner. -->
+<!-- `pe-14` keeps the title clear of the close button `Modal.Card` pins to its corner. -->
 <div
 	bind:this={ref}
 	data-slot="modal-header"

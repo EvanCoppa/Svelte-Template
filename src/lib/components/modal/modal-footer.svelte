@@ -10,14 +10,15 @@
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
 </script>
 
-<!-- Cancel sits at the start, the primary action at the end: `<Modal.Cancel>` then `<Modal.Action>`. -->
+<!--
+	Sits on the tray below the card. Cancel at the start, the primary action at
+	the end: `<Modal.Cancel>` then `<Modal.Action>`. The tray's own padding
+	supplies the last few pixels, so the buttons end up evenly inset.
+-->
 <div
 	bind:this={ref}
 	data-slot="modal-footer"
-	class={cn(
-		'bg-muted/50 flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4',
-		className
-	)}
+	class={cn('flex flex-wrap items-center justify-between gap-3 px-2 pt-3 pb-2', className)}
 	{...restProps}
 >
 	{@render children?.()}

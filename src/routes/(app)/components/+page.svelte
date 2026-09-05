@@ -1482,8 +1482,9 @@
 			<Card.Header>
 				<Card.Title>Modal</Card.Title>
 				<Card.Description>
-					The standard dialog frame: an icon-led title bar with its close button, a body, and a
-					footer that pairs Cancel (Escape) with the primary action (Enter) — <code>ui/dialog</code>
+					The standard dialog frame: a muted tray holding a white card — icon-led title bar with its
+					close button, then the body — and a footer on the tray that pairs Cancel (Escape) with the
+					primary action (Enter). <code>ui/dialog</code> and <code>ui/card</code>
 					underneath, <code>UntitledButton</code>s on top.
 				</Card.Description>
 			</Card.Header>
@@ -1498,26 +1499,28 @@
 						{/snippet}
 					</Modal.Trigger>
 					<Modal.Content>
-						<Modal.Header>
-							<Modal.Title><MegaphoneIcon /> Create campaign</Modal.Title>
-						</Modal.Header>
 						<form onsubmit={createCampaign}>
-							<Modal.Body>
-								<div class="grid gap-2">
-									<Label for="campaign-name" required>Campaign name</Label>
-									<Input
-										id="campaign-name"
-										name="name"
-										placeholder="e.g. April product update"
-										autocomplete="off"
-										required
-										bind:value={campaignName}
-									/>
-									<p class="text-muted-foreground text-sm">
-										Used internally to find this campaign in your list.
-									</p>
-								</div>
-							</Modal.Body>
+							<Modal.Card>
+								<Modal.Header>
+									<Modal.Title><MegaphoneIcon /> Create campaign</Modal.Title>
+								</Modal.Header>
+								<Modal.Body>
+									<div class="grid gap-2">
+										<Label for="campaign-name" required>Campaign name</Label>
+										<Input
+											id="campaign-name"
+											name="name"
+											placeholder="e.g. April product update"
+											autocomplete="off"
+											required
+											bind:value={campaignName}
+										/>
+										<p class="text-muted-foreground text-sm">
+											Used internally to find this campaign in your list.
+										</p>
+									</div>
+								</Modal.Body>
+							</Modal.Card>
 							<Modal.Footer>
 								<Modal.Cancel>Cancel</Modal.Cancel>
 								<Modal.Action type="submit">Create campaign</Modal.Action>
