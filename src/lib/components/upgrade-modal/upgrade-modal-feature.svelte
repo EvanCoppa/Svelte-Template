@@ -14,8 +14,11 @@
 <!-- One row: a check in a tile, then `FeatureTitle` and `FeatureDescription` stacked beside it. -->
 <li
 	bind:this={ref}
-	data-slot="upgrade-card-feature"
-	class={cn('flex items-center gap-3', className)}
+	data-slot="upgrade-modal-feature"
+	class={cn(
+		'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards flex items-center gap-3 motion-safe:delay-150 motion-safe:duration-300',
+		className
+	)}
 	{...restProps}
 >
 	<span

@@ -12,8 +12,8 @@
 
 <p
 	bind:this={ref}
-	data-slot="upgrade-card-description"
-	class={cn('text-muted-foreground text-sm', className)}
+	data-slot="upgrade-modal-feature-description"
+	class={cn('text-muted-foreground text-sm leading-snug', className)}
 	{...restProps}
 >
 	{@render children?.()}

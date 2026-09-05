@@ -116,16 +116,19 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
 	});
 
-	test('marks a feature outside the plan as locked and sends it to the upgrade page', async ({
+	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
 		page
 	}) => {
 		// Best Practices is enterprise-only; Acme is on Pro -> locked_visible.
 		const entry = page.getByRole('button', { name: /Best Practices/ }).first();
 		await expect(entry.locator('..').locator('[data-slot="sidebar-menu-badge"]')).toBeVisible();
 
-		await clickWhenLive(entry, () => expect(page).toHaveURL('/upgrade?feature=best-practices'));
-		await expect(page).toHaveTitle('Upgrade');
-		await expect(page.getByText(/Best Practices isn't included in the Pro plan/)).toBeVisible();
+		// No navigation: the pitch opens in place.
+		await clickWhenLive(entry, () => expect(page.getByRole('dialog')).toBeVisible());
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).not.toHaveURL(/upgrade/);
 	});
 
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
@@ -160,11 +163,17 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('combobox')).toBeVisible();
 	});
 
-	test('bounces a locked feature route to the upgrade page', async ({ page }) => {
+	test('bounces a locked feature route to the dashboard and opens the upgrade prompt', async ({
+		page
+	}) => {
 		// Gated in hooks.server.ts before any load runs — typing the URL is no
-		// way around a missing plan.
+		// way around a missing plan. The prompt then takes `?upgrade=` off the URL.
 		await page.goto('/best-practices');
-		await expect(page).toHaveURL('/upgrade?feature=best-practices');
+		await expect(page.getByRole('dialog')).toBeVisible();
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).toHaveURL('/');
 	});
 
 	test('sends a feature the org switched off to the feature settings', async ({ page }) => {

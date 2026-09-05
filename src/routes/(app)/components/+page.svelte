@@ -70,7 +70,7 @@
 	} from '$lib/components/enhanced/index.js';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
-	import * as UpgradeCard from '$lib/components/upgrade-card/index.js';
+	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -93,6 +93,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { cn } from '$lib/utils.js';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -144,7 +145,12 @@
 	let acceptTerms = $state(false);
 	let notifications = $state(true);
 	let dialogOpen = $state(false);
-	// Upgrade card — demo copy; /upgrade fills it from the feature registry.
+	// Upgrade modal — demo copy; the app's own (`showUpgrade()`) pitches from the feature registry.
+	let upgradeDemoOpen = $state(false);
+	function requestUpgradeDemo() {
+		upgradeDemoOpen = false;
+		toast.success('Upgrade requested');
+	}
 	const UPGRADE_PERKS = [
 		{ name: 'Deals', description: 'Pipeline of opportunities, by stage and value.' },
 		{ name: 'Reports', description: 'Forecasts and win rates, by owner and by month.' },
@@ -1541,6 +1547,63 @@
 
 		<Card.Root>
 			<Card.Header>
+				<Card.Title>Upgrade modal</Card.Title>
+				<Card.Description>
+					The upgrade pitch as a dialog: a primary-tinted halftone hero, a title with the plan pill
+					beside it, what the plan adds, and a full-width action over a quiet way out —
+					<code>ui/dialog</code> underneath, <code>UntitledButton</code>s on top. The app mounts one
+					in the <code>(app)</code> layout: <code>showUpgrade('deals')</code> from
+					<code>$lib/upgrade.svelte</code> opens it with the org's real plans, from anywhere.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<UpgradeModal.Root bind:open={upgradeDemoOpen}>
+					<UpgradeModal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<SparklesIcon />{/snippet}
+								Demo copy
+							</UntitledButton>
+						{/snippet}
+					</UpgradeModal.Trigger>
+					<UpgradeModal.Content>
+						<UpgradeModal.Hero><SparklesIcon /></UpgradeModal.Hero>
+						<UpgradeModal.Header>
+							<UpgradeModal.Title>Upgrade your plan</UpgradeModal.Title>
+							<UpgradeModal.Badge>Pro</UpgradeModal.Badge>
+							<UpgradeModal.Description>
+								Get the pipeline view, the reports that go with it, and a named contact when you
+								need one.
+							</UpgradeModal.Description>
+						</UpgradeModal.Header>
+						<UpgradeModal.Features>
+							{#each UPGRADE_PERKS as perk (perk.name)}
+								<UpgradeModal.Feature>
+									<UpgradeModal.FeatureTitle>{perk.name}</UpgradeModal.FeatureTitle>
+									<UpgradeModal.FeatureDescription
+										>{perk.description}</UpgradeModal.FeatureDescription
+									>
+								</UpgradeModal.Feature>
+							{/each}
+						</UpgradeModal.Features>
+						<UpgradeModal.Footer>
+							<UpgradeModal.Action onclick={requestUpgradeDemo}>Upgrade to Pro</UpgradeModal.Action>
+							<UpgradeModal.Dismiss>No thanks</UpgradeModal.Dismiss>
+						</UpgradeModal.Footer>
+						<UpgradeModal.Close />
+					</UpgradeModal.Content>
+				</UpgradeModal.Root>
+				<UntitledButton color="secondary" onclick={() => showUpgrade()}
+					>showUpgrade()</UntitledButton
+				>
+				<UntitledButton color="secondary" onclick={() => showUpgrade('deals')}>
+					showUpgrade('deals')
+				</UntitledButton>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title>Dialog, menu &amp; tooltip</Card.Title>
 				<Card.Description>A blocking modal, a floating menu, and a hover hint.</Card.Description>
 			</Card.Header>
@@ -1722,52 +1785,6 @@
 				>
 					Promise
 				</Button>
-			</Card.Content>
-		</Card.Root>
-
-		<div class="lg:col-span-2">
-			<h2 class="text-lg font-semibold tracking-tight">Cards</h2>
-		</div>
-
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Upgrade card</Card.Title>
-				<Card.Description>
-					The upgrade pitch: a primary-tinted halftone hero, a title with the plan pill beside it,
-					what the plan adds, and a full-width action over a quiet way out — <code>ui/card</code>
-					underneath, <code>UntitledButton</code>s on top. <code>/upgrade</code> composes it from the
-					feature registry.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content class="flex justify-center">
-				<UpgradeCard.Root class="w-full max-w-sm">
-					<UpgradeCard.Hero><SparklesIcon /></UpgradeCard.Hero>
-					<UpgradeCard.Header>
-						<UpgradeCard.Title>Upgrade your plan</UpgradeCard.Title>
-						<UpgradeCard.Badge>Pro</UpgradeCard.Badge>
-						<UpgradeCard.Description>
-							Get the pipeline view, the reports that go with it, and a named contact when you need
-							one.
-						</UpgradeCard.Description>
-					</UpgradeCard.Header>
-					<UpgradeCard.Features>
-						{#each UPGRADE_PERKS as perk (perk.name)}
-							<UpgradeCard.Feature>
-								<UpgradeCard.FeatureTitle>{perk.name}</UpgradeCard.FeatureTitle>
-								<UpgradeCard.FeatureDescription>{perk.description}</UpgradeCard.FeatureDescription>
-							</UpgradeCard.Feature>
-						{/each}
-					</UpgradeCard.Features>
-					<UpgradeCard.Footer>
-						<UpgradeCard.Action onclick={() => toast.success('Upgrade requested')}>
-							Upgrade to Pro
-						</UpgradeCard.Action>
-						<UpgradeCard.Dismiss onclick={() => toast('Maybe next time')}
-							>No thanks</UpgradeCard.Dismiss
-						>
-					</UpgradeCard.Footer>
-					<UpgradeCard.Close onclick={() => toast('Dismissed')} />
-				</UpgradeCard.Root>
 			</Card.Content>
 		</Card.Root>
 

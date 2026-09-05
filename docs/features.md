@@ -57,16 +57,19 @@ the browser needs. Grants never leave the server: the nav arrives already filter
 `featureGateFor(pathname, features, canRead)` in `src/lib/features/gate.ts` finds the
 feature owning a path (longest route prefix wins, `/` is exact-only) and answers:
 
-| mode                     | result                                          |
-| ------------------------ | ----------------------------------------------- |
-| `enabled`, readable      | allowed                                         |
-| `enabled`, no read grant | 403                                             |
-| `locked_visible`         | 303 → `/upgrade?feature=<id>`                   |
-| `disabled`               | 303 → `/settings/features?feature=<id>`         |
-| `hidden`                 | 404 — never a 403 that confirms the page exists |
+| mode                     | result                                            |
+| ------------------------ | ------------------------------------------------- |
+| `enabled`, readable      | allowed                                           |
+| `enabled`, no read grant | 403                                               |
+| `locked_visible`         | 303 → `/?upgrade=<id>` — the upgrade prompt opens |
+| `disabled`               | 303 → `/settings/features?feature=<id>`           |
+| `hidden`                 | 404 — never a 403 that confirms the page exists   |
 
-`/settings`, `/upgrade`, `/api/` and `/logout` are exempt so a user can always respond
-to a decision; unregistered paths pass through. Errors thrown from the hook render
+`/settings`, `/api/` and `/logout` are exempt so a user can always respond to a
+decision; unregistered paths pass through. A redirect cannot open a dialog, so a locked
+route lands on the dashboard with `?upgrade=<id>`, which `UpgradePrompt` (mounted by the
+`(app)` layout) consumes to open the pitch; inside the app, locked entries call
+`showUpgrade()` from `$lib/upgrade.svelte` and never navigate. Errors thrown from the hook render
 `src/error.html` (no route has matched yet); client-side navigations get the in-shell
 `+error.svelte`. The same matcher builds the nav, so nothing is ever linked that the
 server would bounce.

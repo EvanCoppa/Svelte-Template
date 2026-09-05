@@ -1,6 +1,7 @@
 <script lang="ts">
 	import AppHeader from '$lib/components/app-header.svelte';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import UpgradePrompt from '$lib/components/upgrade-prompt.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
 	let { data, children } = $props();
@@ -14,6 +15,8 @@
 			{@render children()}
 		</div>
 	</Sidebar.Inset>
+	<!-- The one upgrade dialog; `showUpgrade()` from `$lib/upgrade.svelte` opens it anywhere in the shell. -->
+	<UpgradePrompt plans={data.plans} currentTier={data.activeOrg.tierName} />
 </Sidebar.Provider>
 
 <style>

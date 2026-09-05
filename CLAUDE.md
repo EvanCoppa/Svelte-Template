@@ -153,12 +153,12 @@ application data is scoped to an organization, never to a bare user. The
   (industry has it, plan doesn't — the tier axis, shown with an upgrade prompt),
   `disabled` (the org switched it off), `hidden` (not in the industry — does not
   exist). **`hooks.server.ts` enforces the mode** next to the auth check via
-  `featureGateFor()` (locked → `/upgrade?feature=`, disabled →
-  `/settings/features?feature=`, hidden → 404), so a page is gated by being
+  `featureGateFor()` (locked → `/?upgrade=<id>`, where the upgrade prompt opens,
+  disabled → `/settings/features?feature=`, hidden → 404), so a page is gated by being
   registered, never by a check in its load. Adding a page = the route + one
   migration inserting its rows (the migration's closing comment is the
   checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
-  the registry, and `/settings` and `/upgrade` are the gate's exempt surfaces.
+  the registry, and `/settings` (with `/api/` and `/logout`) is exempt from the gate.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -320,8 +320,9 @@ come from the feature registry: `buildNav()` (called in the `(app)` layout load)
 `staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
 Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
-clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
+nothing in `navigation.ts` changes. A locked entry renders with a lock and a click
+opens the upgrade prompt (`showUpgrade()`) instead of navigating. Icons are named by
+lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
 
@@ -367,6 +368,13 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   `Modal.Footer` in the page's `<form>` so `Modal.Action type="submit"` posts it. Reach for bare
   `ui/dialog` only when a screen needs a different frame; `/components` → Overlays → Modal is the
   reference.
+- **Selling a plan is `showUpgrade(featureId?)`** from `$lib/upgrade.svelte`. It opens the one
+  `UpgradePrompt` the `(app)` layout mounts — `UpgradeModal` (`src/lib/components/upgrade-modal/`,
+  the pitch as a dialog frame) fed the plans from the layout load — with the smallest plan that
+  unlocks the feature and what else it adds. Call it where a locked click or a tier limit lands
+  (the sidebar, the palette and the feature gate already do); never navigate somewhere to pitch
+  a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
+  the reference.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted

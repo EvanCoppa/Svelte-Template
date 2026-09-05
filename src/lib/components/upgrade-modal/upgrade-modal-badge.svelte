@@ -13,7 +13,7 @@
 <!-- The pill beside the title — the plan being pitched, or a promotion. `Header` makes room for it when present. -->
 <Badge
 	bind:ref
-	data-slot="upgrade-card-badge"
+	data-slot="upgrade-modal-badge"
 	class={cn(
 		'col-start-2 row-span-2 row-start-1 self-start justify-self-end rounded-full px-2.5',
 		className

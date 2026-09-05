@@ -1,7 +1,9 @@
 import { redirect } from '@sveltejs/kit';
 import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants.js';
+import { upgradePlans } from '$lib/features/plans';
 import { buildNav } from '$lib/navigation';
 import { QUERY } from '$lib/queries';
+import { listTiersWithFeatures } from '$lib/server/features';
 import { hasGrant } from '$lib/server/roles';
 import type { LayoutServerLoad } from './$types';
 
@@ -22,12 +24,19 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 
 	const { organizations, activeOrg, features, access } = locals.org;
 
+	// Reference data, read once per session (this load reruns only on the
+	// keys above), so the upgrade prompt opens anywhere without a round trip.
+	const tiers = await listTiersWithFeatures(locals.supabase);
+
 	return {
 		organizations,
 		activeOrg,
 		// Filtered server-side so grants never reach the browser: an entry is
 		// either linkable, or locked with an upgrade prompt, or absent.
 		nav: buildNav(features, (featureId) => hasGrant(access, featureId)),
+		// What each plan above the org's own would unlock — the upgrade prompt's
+		// pitch, keyed like the nav on tier and mode (grants play no part).
+		plans: upgradePlans(tiers, features, activeOrg.tierId),
 		// The sidebar trigger writes its state to a cookie; reading it here means
 		// a collapsed sidebar stays collapsed across reloads with no flash.
 		sidebarOpen: cookies.get(SIDEBAR_COOKIE_NAME) !== 'false'

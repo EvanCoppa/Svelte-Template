@@ -243,7 +243,7 @@ The sidebar sections and the ⌘K palette both render from the **feature registr
    `FEATURE_IDS` in `src/lib/features/types.ts`.
 
 That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
-plan lacks it is sent to `/upgrade`, one whose industry lacks it gets a 404, and the
+plan lacks it gets the upgrade prompt, one whose industry lacks it gets a 404, and the
 org can switch it off for itself under `/settings/features`. See `docs/features.md`.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,

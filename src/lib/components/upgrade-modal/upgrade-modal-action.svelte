@@ -18,7 +18,7 @@
 	a link (billing, a mailto), `onclick` or `type="submit"` for an action.
 -->
 <UntitledButton
-	data-slot="upgrade-card-action"
+	data-slot="upgrade-modal-action"
 	{color}
 	{size}
 	class={cn('w-full', className)}

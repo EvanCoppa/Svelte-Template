@@ -67,13 +67,13 @@ describe('featureGateFor', () => {
 		expect(featureGateFor('/clients', map, (id) => id === 'clients')).toBeNull();
 	});
 
-	it('sends a locked feature to the upgrade page with its id', () => {
+	it('sends a locked feature to the dashboard with its id, for the upgrade prompt', () => {
 		expect(featureGateFor('/best-practices', map, readAll)).toEqual({
-			redirectTo: '/upgrade?feature=best-practices'
+			redirectTo: '/?upgrade=best-practices'
 		});
 		// Mode is decided before the grant: locked is locked even without read.
 		expect(featureGateFor('/best-practices', map, readNone)).toEqual({
-			redirectTo: '/upgrade?feature=best-practices'
+			redirectTo: '/?upgrade=best-practices'
 		});
 	});
 
@@ -93,7 +93,7 @@ describe('featureGateFor', () => {
 
 	it('inherits the more specific feature on nested paths', () => {
 		expect(featureGateFor('/clients/pipeline', map, readAll)).toEqual({
-			redirectTo: '/upgrade?feature=pipeline'
+			redirectTo: '/?upgrade=pipeline'
 		});
 	});
 
@@ -101,16 +101,14 @@ describe('featureGateFor', () => {
 		expect(featureGateFor('/notes', map, readNone)).toBeNull();
 	});
 
-	it('exempts the settings, upgrade, api and logout surfaces', () => {
+	it('exempts the settings, api and logout surfaces', () => {
 		const blocked = features([
 			['settings', '/settings', 'hidden'],
-			['upgrade', '/upgrade', 'hidden'],
 			['api', '/api', 'hidden'],
 			['logout', '/logout', 'hidden']
 		]);
 		expect(featureGateFor('/settings', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/settings/features', blocked, readNone)).toBeNull();
-		expect(featureGateFor('/upgrade', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/api/org', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/logout', blocked, readNone)).toBeNull();
 		// A prefix exemption is by path segment, not by string prefix.
@@ -121,7 +119,7 @@ describe('featureGateFor', () => {
 
 	it('url-encodes the feature id in redirects', () => {
 		const odd = features([['a b', '/odd', 'locked_visible']]);
-		expect(featureGateFor('/odd', odd, readAll)).toEqual({ redirectTo: '/upgrade?feature=a%20b' });
+		expect(featureGateFor('/odd', odd, readAll)).toEqual({ redirectTo: '/?upgrade=a%20b' });
 	});
 
 	it('treats an empty map as no gate at all', () => {
