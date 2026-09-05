@@ -163,12 +163,12 @@ application data is scoped to an organization, never to a bare user. The
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
   and `role_permissions` ship by migration, and an org's `industry_id` (default
-  `general`, set by onboarding/service-role code like `tier_id`) decides which
+  `crm`, set by onboarding/service-role code like `tier_id`) decides which
   roles its owners/admins can hand out — so onboarding an org needs zero role
   setup, and two industries can each have a same-named role granting different
   things. The catalog (`industry_role_catalog` migration) ships six industries —
-  general, construction, healthcare, real-estate, legal, hospitality — each with
-  a full ladder: a Viewer (read on everything in the industry), the vertical's
+  crm, roofing, medical-supplies, cosmetic, dentistry, beverage — each with a
+  full ladder: a Viewer (read on everything in the industry), the vertical's
   specialists, a Manager (manage on everything) and a Director (delete on
   everything); ids follow `b0000000-0000-0000-00II-0000000000RR` (II =
   industry, RR = role), and adding an industry is one migration (that file's

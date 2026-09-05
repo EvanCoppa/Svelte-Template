@@ -98,7 +98,7 @@ test.describe('the app shell', () => {
 	test('renders every navigation entry the session may see', async ({ page }) => {
 		// The static pages plus the features resolved for the active org and
 		// readable by the user (seed.sql: e2e is an Acme member holding the
-		// general 'Support' role, which grants staff, clients, tickets and the
+		// crm 'Support' role, which grants staff, clients, tickets and the
 		// library pages at read). Tasks is switched off by the org and Deals
 		// carries no grant for Support, so neither may appear.
 		for (const label of [

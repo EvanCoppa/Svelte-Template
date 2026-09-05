@@ -1,10 +1,21 @@
--- Industry catalog: four more verticals, the features each one includes,
--- and a full role ladder for every industry — the spectrum an owner/admin
--- hands out to members, from a read-only Viewer up to a Director who can
--- delete. Everything here is reference data in the tiers mechanism:
--- shipped by migration, readable by every signed-in user, written only by
--- migrations / the service role, so onboarding an org into any of these
--- industries still needs zero role setup.
+-- Industry catalog: the six verticals this product ships — crm, roofing,
+-- medical-supplies, cosmetic, dentistry, beverage — the features each one
+-- includes, and a full role ladder for every industry: the spectrum an
+-- owner/admin hands out to members, from a read-only Viewer up to a
+-- Director who can delete. Everything here is reference data in the tiers
+-- mechanism: shipped by migration, readable by every signed-in user, written
+-- only by migrations / the service role, so onboarding an org into any of
+-- these industries still needs zero role setup.
+--
+-- Two of the six take over the industries the roles_permissions migration
+-- shipped: 'general' (the default every new org got) becomes 'crm', the
+-- neutral vertical of a CRM product, and 'construction' becomes 'roofing'.
+-- The re-homing is an UPDATE, not a delete-and-recreate: existing orgs,
+-- their roles (Support and Sales, construction's Support) and their industry
+-- feature maps keep every row and id and simply move, the column default
+-- follows, and the two old catalog rows go only once nothing references
+-- them — Postgres checks the foreign keys, so a miss fails loudly instead of
+-- leaving orphans.
 --
 -- Every industry's ladder has the same shape, with vertical-specific names:
 --
@@ -17,55 +28,79 @@
 -- Role ids are fixed, in the b0000000-… range the roles_permissions
 -- migration reserved for roles, segmented so they stay greppable:
 -- b0000000-0000-0000-00II-0000000000RR, where II is the industry
--- (01 general, 02 construction, 03 healthcare, 04 real-estate, 05 legal,
--- 06 hospitality) and RR the role within it. The three roles the
+-- (01 crm, 02 roofing, 03 medical-supplies, 04 cosmetic, 05 dentistry,
+-- 06 beverage) and RR the role within it. The three roles the
 -- roles_permissions migration shipped (…-0000-000000000001/2/3) predate the
 -- scheme and keep their ids. Idempotent throughout so a re-apply is a no-op.
 
 -- ---------------------------------------------------------------------------
--- industries — four more verticals
+-- industries — the six verticals
 -- ---------------------------------------------------------------------------
 
 insert into public.industries (id, name) values
-	('healthcare', 'Healthcare'),
-	('real-estate', 'Real Estate'),
-	('legal', 'Legal'),
-	('hospitality', 'Hospitality')
+	('crm', 'CRM'),
+	('roofing', 'Roofing'),
+	('medical-supplies', 'Medical Supplies'),
+	('cosmetic', 'Cosmetic'),
+	('dentistry', 'Dentistry'),
+	('beverage', 'Beverage')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- general -> crm, construction -> roofing
+-- ---------------------------------------------------------------------------
+
+-- Orgs first (they hold the only non-cascading foreign key), then the
+-- default new orgs get, then the roles and feature maps, then the old rows.
+-- Each statement matches zero rows on a re-apply.
+update public.organizations set industry_id = 'crm' where industry_id = 'general';
+update public.organizations set industry_id = 'roofing' where industry_id = 'construction';
+
+alter table public.organizations alter column industry_id set default 'crm';
+
+update public.roles set industry_id = 'crm' where industry_id = 'general';
+update public.roles set industry_id = 'roofing' where industry_id = 'construction';
+
+update public.industry_features set industry_id = 'crm' where industry_id = 'general';
+update public.industry_features set industry_id = 'roofing' where industry_id = 'construction';
+
+delete from public.industries where id in ('general', 'construction');
 
 -- ---------------------------------------------------------------------------
 -- industry_features — what exists in each new vertical
 -- ---------------------------------------------------------------------------
 
--- Deliberately different shapes so the hidden mode has fixtures: a clinic
--- runs no deal pipeline, an agency has no ticket queue, a law firm has the
--- whole catalog like general, and hospitality lacks only the enterprise
--- library page. Staff and components are in every industry, like general.
+-- crm keeps general's full catalog and roofing keeps construction's (no
+-- deals, no best-practices — the seeded pilot override on Globex still has
+-- something to override). The rest are deliberately different shapes so the
+-- hidden mode has fixtures: a distributor runs the whole pipeline, a beauty
+-- brand has no ticket queue, a dental practice has no deal pipeline. Staff
+-- and components are in every industry.
 insert into public.industry_features (industry_id, feature_id) values
-	('healthcare', 'clients'),
-	('healthcare', 'tasks'),
-	('healthcare', 'tickets'),
-	('healthcare', 'staff'),
-	('healthcare', 'components'),
-	('real-estate', 'clients'),
-	('real-estate', 'deals'),
-	('real-estate', 'tasks'),
-	('real-estate', 'staff'),
-	('real-estate', 'components'),
-	('real-estate', 'best-practices'),
-	('legal', 'clients'),
-	('legal', 'deals'),
-	('legal', 'tasks'),
-	('legal', 'tickets'),
-	('legal', 'staff'),
-	('legal', 'components'),
-	('legal', 'best-practices'),
-	('hospitality', 'clients'),
-	('hospitality', 'deals'),
-	('hospitality', 'tasks'),
-	('hospitality', 'tickets'),
-	('hospitality', 'staff'),
-	('hospitality', 'components')
+	('medical-supplies', 'clients'),
+	('medical-supplies', 'deals'),
+	('medical-supplies', 'tasks'),
+	('medical-supplies', 'tickets'),
+	('medical-supplies', 'staff'),
+	('medical-supplies', 'components'),
+	('cosmetic', 'clients'),
+	('cosmetic', 'deals'),
+	('cosmetic', 'tasks'),
+	('cosmetic', 'staff'),
+	('cosmetic', 'components'),
+	('cosmetic', 'best-practices'),
+	('dentistry', 'clients'),
+	('dentistry', 'tasks'),
+	('dentistry', 'tickets'),
+	('dentistry', 'staff'),
+	('dentistry', 'components'),
+	('beverage', 'clients'),
+	('beverage', 'deals'),
+	('beverage', 'tasks'),
+	('beverage', 'tickets'),
+	('beverage', 'staff'),
+	('beverage', 'components'),
+	('beverage', 'best-practices')
 on conflict (industry_id, feature_id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -73,75 +108,77 @@ on conflict (industry_id, feature_id) do nothing;
 -- ---------------------------------------------------------------------------
 
 insert into public.roles (id, industry_id, name, description) values
-	-- general (Support and Sales already exist)
-	('b0000000-0000-0000-0001-000000000001', 'general', 'Viewer',
+	-- crm (Support and Sales already exist, re-homed from general)
+	('b0000000-0000-0000-0001-000000000001', 'crm', 'Viewer',
 		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0001-000000000002', 'general', 'Operations',
+	('b0000000-0000-0000-0001-000000000002', 'crm', 'Operations',
 		'Runs the task board; can look up clients, tickets and the roster.'),
-	('b0000000-0000-0000-0001-000000000003', 'general', 'Manager',
+	('b0000000-0000-0000-0001-000000000003', 'crm', 'Manager',
 		'Manages every feature.'),
-	('b0000000-0000-0000-0001-000000000004', 'general', 'Director',
+	('b0000000-0000-0000-0001-000000000004', 'crm', 'Director',
 		'Manages every feature and can delete.'),
-	-- construction (Support already exists)
-	('b0000000-0000-0000-0002-000000000001', 'construction', 'Viewer',
+	-- roofing (Support already exists, re-homed from construction)
+	('b0000000-0000-0000-0002-000000000001', 'roofing', 'Viewer',
 		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0002-000000000002', 'construction', 'Site Supervisor',
-		'Runs the job list on site; can look up clients, tickets and the crew.'),
-	('b0000000-0000-0000-0002-000000000003', 'construction', 'Safety Officer',
+	('b0000000-0000-0000-0002-000000000002', 'roofing', 'Crew Lead',
+		'Runs the job list on site; can look up clients, callbacks and the crew.'),
+	('b0000000-0000-0000-0002-000000000003', 'roofing', 'Safety Officer',
 		'Works the incident queue; can see the job list and the crew.'),
-	('b0000000-0000-0000-0002-000000000004', 'construction', 'Project Manager',
+	('b0000000-0000-0000-0002-000000000004', 'roofing', 'Project Manager',
 		'Manages every feature.'),
-	('b0000000-0000-0000-0002-000000000005', 'construction', 'Operations Director',
+	('b0000000-0000-0000-0002-000000000005', 'roofing', 'Operations Director',
 		'Manages every feature and can delete.'),
-	-- healthcare
-	('b0000000-0000-0000-0003-000000000001', 'healthcare', 'Viewer',
+	-- medical-supplies
+	('b0000000-0000-0000-0003-000000000001', 'medical-supplies', 'Viewer',
 		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0003-000000000002', 'healthcare', 'Front Desk',
-		'Registers and updates patients; can see follow-ups and requests.'),
-	('b0000000-0000-0000-0003-000000000003', 'healthcare', 'Care Coordinator',
-		'Runs patients and their follow-ups; can see requests and the roster.'),
-	('b0000000-0000-0000-0003-000000000004', 'healthcare', 'Patient Support',
+	('b0000000-0000-0000-0003-000000000002', 'medical-supplies', 'Customer Service',
+		'Works the support queue; can look up accounts and orders in progress.'),
+	('b0000000-0000-0000-0003-000000000003', 'medical-supplies', 'Sales Rep',
+		'Runs accounts, quotes and follow-ups; can see support requests.'),
+	('b0000000-0000-0000-0003-000000000004', 'medical-supplies', 'Fulfillment',
+		'Runs the order task board; can see accounts, requests and the roster.'),
+	('b0000000-0000-0000-0003-000000000005', 'medical-supplies', 'Sales Manager',
+		'Manages every feature.'),
+	('b0000000-0000-0000-0003-000000000006', 'medical-supplies', 'Operations Director',
+		'Manages every feature and can delete.'),
+	-- cosmetic
+	('b0000000-0000-0000-0004-000000000001', 'cosmetic', 'Viewer',
+		'Sees everything; changes nothing.'),
+	('b0000000-0000-0000-0004-000000000002', 'cosmetic', 'Beauty Advisor',
+		'Runs client profiles; can see orders and the to-do list.'),
+	('b0000000-0000-0000-0004-000000000003', 'cosmetic', 'Account Executive',
+		'Runs clients, orders and follow-ups; can see the roster and best practices.'),
+	('b0000000-0000-0000-0004-000000000004', 'cosmetic', 'Studio Coordinator',
+		'Runs the to-do list; can see clients and the components library.'),
+	('b0000000-0000-0000-0004-000000000005', 'cosmetic', 'Brand Manager',
+		'Manages every feature.'),
+	('b0000000-0000-0000-0004-000000000006', 'cosmetic', 'Creative Director',
+		'Manages every feature and can delete.'),
+	-- dentistry
+	('b0000000-0000-0000-0005-000000000001', 'dentistry', 'Viewer',
+		'Sees everything; changes nothing.'),
+	('b0000000-0000-0000-0005-000000000002', 'dentistry', 'Front Desk',
+		'Registers and updates patients; can see recalls and requests.'),
+	('b0000000-0000-0000-0005-000000000003', 'dentistry', 'Hygienist',
+		'Runs recalls and follow-ups; can look patients and requests up.'),
+	('b0000000-0000-0000-0005-000000000004', 'dentistry', 'Patient Support',
 		'Works the request queue; can look patients up.'),
-	('b0000000-0000-0000-0003-000000000005', 'healthcare', 'Practice Manager',
+	('b0000000-0000-0000-0005-000000000005', 'dentistry', 'Practice Manager',
 		'Manages every feature.'),
-	('b0000000-0000-0000-0003-000000000006', 'healthcare', 'Medical Director',
+	('b0000000-0000-0000-0005-000000000006', 'dentistry', 'Lead Dentist',
 		'Manages every feature and can delete.'),
-	-- real-estate
-	('b0000000-0000-0000-0004-000000000001', 'real-estate', 'Viewer',
+	-- beverage
+	('b0000000-0000-0000-0006-000000000001', 'beverage', 'Viewer',
 		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0004-000000000002', 'real-estate', 'Listing Coordinator',
-		'Runs the to-do list; can see clients, listings and the components library.'),
-	('b0000000-0000-0000-0004-000000000003', 'real-estate', 'Agent',
-		'Runs clients, listings and follow-ups; can see the roster and best practices.'),
-	('b0000000-0000-0000-0004-000000000004', 'real-estate', 'Broker',
+	('b0000000-0000-0000-0006-000000000002', 'beverage', 'Route Sales Rep',
+		'Runs accounts, orders and follow-ups; can see support requests.'),
+	('b0000000-0000-0000-0006-000000000003', 'beverage', 'Distribution Coordinator',
+		'Runs the delivery task board; can see accounts, requests and the roster.'),
+	('b0000000-0000-0000-0006-000000000004', 'beverage', 'Account Support',
+		'Works the request queue; can look up accounts and tasks.'),
+	('b0000000-0000-0000-0006-000000000005', 'beverage', 'Sales Manager',
 		'Manages every feature.'),
-	('b0000000-0000-0000-0004-000000000005', 'real-estate', 'Managing Broker',
-		'Manages every feature and can delete.'),
-	-- legal
-	('b0000000-0000-0000-0005-000000000001', 'legal', 'Viewer',
-		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0005-000000000002', 'legal', 'Paralegal',
-		'Runs the task list; can see clients, matters, requests and best practices.'),
-	('b0000000-0000-0000-0005-000000000003', 'legal', 'Client Services',
-		'Works the request queue; can look up clients and tasks.'),
-	('b0000000-0000-0000-0005-000000000004', 'legal', 'Associate',
-		'Runs clients, matters and tasks; can see requests, the roster and best practices.'),
-	('b0000000-0000-0000-0005-000000000005', 'legal', 'Partner',
-		'Manages every feature.'),
-	('b0000000-0000-0000-0005-000000000006', 'legal', 'Managing Partner',
-		'Manages every feature and can delete.'),
-	-- hospitality
-	('b0000000-0000-0000-0006-000000000001', 'hospitality', 'Viewer',
-		'Sees everything; changes nothing.'),
-	('b0000000-0000-0000-0006-000000000002', 'hospitality', 'Front of House',
-		'Runs guests and their requests; can see the task board.'),
-	('b0000000-0000-0000-0006-000000000003', 'hospitality', 'Events Coordinator',
-		'Runs guests, bookings and tasks; can see requests.'),
-	('b0000000-0000-0000-0006-000000000004', 'hospitality', 'Operations',
-		'Runs the task board; can see requests, the roster and the components library.'),
-	('b0000000-0000-0000-0006-000000000005', 'hospitality', 'General Manager',
-		'Manages every feature.'),
-	('b0000000-0000-0000-0006-000000000006', 'hospitality', 'Regional Director',
+	('b0000000-0000-0000-0006-000000000006', 'beverage', 'Regional Director',
 		'Manages every feature and can delete.')
 on conflict (id) do nothing;
 
@@ -159,24 +196,24 @@ on conflict (id) do nothing;
 insert into public.role_permissions (role_id, feature_id, level)
 select ladder.role_id, f.feature_id, ladder.level
 from (values
-	('b0000000-0000-0000-0001-000000000001'::uuid, 'general', 'read'::public.permission_level),
-	('b0000000-0000-0000-0001-000000000003', 'general', 'manage'),
-	('b0000000-0000-0000-0001-000000000004', 'general', 'delete'),
-	('b0000000-0000-0000-0002-000000000001', 'construction', 'read'),
-	('b0000000-0000-0000-0002-000000000004', 'construction', 'manage'),
-	('b0000000-0000-0000-0002-000000000005', 'construction', 'delete'),
-	('b0000000-0000-0000-0003-000000000001', 'healthcare', 'read'),
-	('b0000000-0000-0000-0003-000000000005', 'healthcare', 'manage'),
-	('b0000000-0000-0000-0003-000000000006', 'healthcare', 'delete'),
-	('b0000000-0000-0000-0004-000000000001', 'real-estate', 'read'),
-	('b0000000-0000-0000-0004-000000000004', 'real-estate', 'manage'),
-	('b0000000-0000-0000-0004-000000000005', 'real-estate', 'delete'),
-	('b0000000-0000-0000-0005-000000000001', 'legal', 'read'),
-	('b0000000-0000-0000-0005-000000000005', 'legal', 'manage'),
-	('b0000000-0000-0000-0005-000000000006', 'legal', 'delete'),
-	('b0000000-0000-0000-0006-000000000001', 'hospitality', 'read'),
-	('b0000000-0000-0000-0006-000000000005', 'hospitality', 'manage'),
-	('b0000000-0000-0000-0006-000000000006', 'hospitality', 'delete')
+	('b0000000-0000-0000-0001-000000000001'::uuid, 'crm', 'read'::public.permission_level),
+	('b0000000-0000-0000-0001-000000000003', 'crm', 'manage'),
+	('b0000000-0000-0000-0001-000000000004', 'crm', 'delete'),
+	('b0000000-0000-0000-0002-000000000001', 'roofing', 'read'),
+	('b0000000-0000-0000-0002-000000000004', 'roofing', 'manage'),
+	('b0000000-0000-0000-0002-000000000005', 'roofing', 'delete'),
+	('b0000000-0000-0000-0003-000000000001', 'medical-supplies', 'read'),
+	('b0000000-0000-0000-0003-000000000005', 'medical-supplies', 'manage'),
+	('b0000000-0000-0000-0003-000000000006', 'medical-supplies', 'delete'),
+	('b0000000-0000-0000-0004-000000000001', 'cosmetic', 'read'),
+	('b0000000-0000-0000-0004-000000000005', 'cosmetic', 'manage'),
+	('b0000000-0000-0000-0004-000000000006', 'cosmetic', 'delete'),
+	('b0000000-0000-0000-0005-000000000001', 'dentistry', 'read'),
+	('b0000000-0000-0000-0005-000000000005', 'dentistry', 'manage'),
+	('b0000000-0000-0000-0005-000000000006', 'dentistry', 'delete'),
+	('b0000000-0000-0000-0006-000000000001', 'beverage', 'read'),
+	('b0000000-0000-0000-0006-000000000005', 'beverage', 'manage'),
+	('b0000000-0000-0000-0006-000000000006', 'beverage', 'delete')
 ) as ladder (role_id, industry_id, level)
 join public.industry_features f on f.industry_id = ladder.industry_id
 on conflict (role_id, feature_id) do nothing;
@@ -189,75 +226,74 @@ on conflict (role_id, feature_id) do nothing;
 -- features in the role's industry are granted: a grant on a hidden feature
 -- would be inert (the resolver hides it before any grant is consulted).
 insert into public.role_permissions (role_id, feature_id, level) values
-	-- general / Operations
+	-- crm / Operations
 	('b0000000-0000-0000-0001-000000000002', 'tasks', 'manage'),
 	('b0000000-0000-0000-0001-000000000002', 'clients', 'read'),
 	('b0000000-0000-0000-0001-000000000002', 'tickets', 'read'),
 	('b0000000-0000-0000-0001-000000000002', 'staff', 'read'),
 	('b0000000-0000-0000-0001-000000000002', 'components', 'read'),
-	-- construction / Site Supervisor
+	-- roofing / Crew Lead
 	('b0000000-0000-0000-0002-000000000002', 'tasks', 'manage'),
 	('b0000000-0000-0000-0002-000000000002', 'clients', 'read'),
 	('b0000000-0000-0000-0002-000000000002', 'tickets', 'read'),
 	('b0000000-0000-0000-0002-000000000002', 'staff', 'read'),
-	-- construction / Safety Officer
+	-- roofing / Safety Officer
 	('b0000000-0000-0000-0002-000000000003', 'tickets', 'manage'),
 	('b0000000-0000-0000-0002-000000000003', 'tasks', 'read'),
 	('b0000000-0000-0000-0002-000000000003', 'staff', 'read'),
-	-- healthcare / Front Desk
-	('b0000000-0000-0000-0003-000000000002', 'clients', 'manage'),
+	-- medical-supplies / Customer Service
+	('b0000000-0000-0000-0003-000000000002', 'tickets', 'manage'),
+	('b0000000-0000-0000-0003-000000000002', 'clients', 'read'),
 	('b0000000-0000-0000-0003-000000000002', 'tasks', 'read'),
-	('b0000000-0000-0000-0003-000000000002', 'tickets', 'read'),
-	-- healthcare / Care Coordinator
+	-- medical-supplies / Sales Rep
 	('b0000000-0000-0000-0003-000000000003', 'clients', 'manage'),
+	('b0000000-0000-0000-0003-000000000003', 'deals', 'manage'),
 	('b0000000-0000-0000-0003-000000000003', 'tasks', 'manage'),
 	('b0000000-0000-0000-0003-000000000003', 'tickets', 'read'),
-	('b0000000-0000-0000-0003-000000000003', 'staff', 'read'),
-	-- healthcare / Patient Support
-	('b0000000-0000-0000-0003-000000000004', 'tickets', 'manage'),
+	-- medical-supplies / Fulfillment
+	('b0000000-0000-0000-0003-000000000004', 'tasks', 'manage'),
 	('b0000000-0000-0000-0003-000000000004', 'clients', 'read'),
-	-- real-estate / Listing Coordinator
-	('b0000000-0000-0000-0004-000000000002', 'tasks', 'manage'),
-	('b0000000-0000-0000-0004-000000000002', 'clients', 'read'),
+	('b0000000-0000-0000-0003-000000000004', 'tickets', 'read'),
+	('b0000000-0000-0000-0003-000000000004', 'staff', 'read'),
+	-- cosmetic / Beauty Advisor
+	('b0000000-0000-0000-0004-000000000002', 'clients', 'manage'),
 	('b0000000-0000-0000-0004-000000000002', 'deals', 'read'),
-	('b0000000-0000-0000-0004-000000000002', 'components', 'read'),
-	-- real-estate / Agent
+	('b0000000-0000-0000-0004-000000000002', 'tasks', 'read'),
+	-- cosmetic / Account Executive
 	('b0000000-0000-0000-0004-000000000003', 'clients', 'manage'),
 	('b0000000-0000-0000-0004-000000000003', 'deals', 'manage'),
 	('b0000000-0000-0000-0004-000000000003', 'tasks', 'manage'),
 	('b0000000-0000-0000-0004-000000000003', 'staff', 'read'),
 	('b0000000-0000-0000-0004-000000000003', 'best-practices', 'read'),
-	-- legal / Paralegal
-	('b0000000-0000-0000-0005-000000000002', 'tasks', 'manage'),
-	('b0000000-0000-0000-0005-000000000002', 'clients', 'read'),
-	('b0000000-0000-0000-0005-000000000002', 'deals', 'read'),
+	-- cosmetic / Studio Coordinator
+	('b0000000-0000-0000-0004-000000000004', 'tasks', 'manage'),
+	('b0000000-0000-0000-0004-000000000004', 'clients', 'read'),
+	('b0000000-0000-0000-0004-000000000004', 'components', 'read'),
+	-- dentistry / Front Desk
+	('b0000000-0000-0000-0005-000000000002', 'clients', 'manage'),
+	('b0000000-0000-0000-0005-000000000002', 'tasks', 'read'),
 	('b0000000-0000-0000-0005-000000000002', 'tickets', 'read'),
-	('b0000000-0000-0000-0005-000000000002', 'best-practices', 'read'),
-	-- legal / Client Services
-	('b0000000-0000-0000-0005-000000000003', 'tickets', 'manage'),
+	-- dentistry / Hygienist
+	('b0000000-0000-0000-0005-000000000003', 'tasks', 'manage'),
 	('b0000000-0000-0000-0005-000000000003', 'clients', 'read'),
-	('b0000000-0000-0000-0005-000000000003', 'tasks', 'read'),
-	-- legal / Associate
-	('b0000000-0000-0000-0005-000000000004', 'clients', 'manage'),
-	('b0000000-0000-0000-0005-000000000004', 'deals', 'manage'),
-	('b0000000-0000-0000-0005-000000000004', 'tasks', 'manage'),
-	('b0000000-0000-0000-0005-000000000004', 'tickets', 'read'),
-	('b0000000-0000-0000-0005-000000000004', 'staff', 'read'),
-	('b0000000-0000-0000-0005-000000000004', 'best-practices', 'read'),
-	-- hospitality / Front of House
+	('b0000000-0000-0000-0005-000000000003', 'tickets', 'read'),
+	-- dentistry / Patient Support
+	('b0000000-0000-0000-0005-000000000004', 'tickets', 'manage'),
+	('b0000000-0000-0000-0005-000000000004', 'clients', 'read'),
+	-- beverage / Route Sales Rep
 	('b0000000-0000-0000-0006-000000000002', 'clients', 'manage'),
-	('b0000000-0000-0000-0006-000000000002', 'tickets', 'manage'),
-	('b0000000-0000-0000-0006-000000000002', 'tasks', 'read'),
-	-- hospitality / Events Coordinator
-	('b0000000-0000-0000-0006-000000000003', 'clients', 'manage'),
-	('b0000000-0000-0000-0006-000000000003', 'deals', 'manage'),
+	('b0000000-0000-0000-0006-000000000002', 'deals', 'manage'),
+	('b0000000-0000-0000-0006-000000000002', 'tasks', 'manage'),
+	('b0000000-0000-0000-0006-000000000002', 'tickets', 'read'),
+	-- beverage / Distribution Coordinator
 	('b0000000-0000-0000-0006-000000000003', 'tasks', 'manage'),
+	('b0000000-0000-0000-0006-000000000003', 'clients', 'read'),
 	('b0000000-0000-0000-0006-000000000003', 'tickets', 'read'),
-	-- hospitality / Operations
-	('b0000000-0000-0000-0006-000000000004', 'tasks', 'manage'),
-	('b0000000-0000-0000-0006-000000000004', 'tickets', 'read'),
-	('b0000000-0000-0000-0006-000000000004', 'staff', 'read'),
-	('b0000000-0000-0000-0006-000000000004', 'components', 'read')
+	('b0000000-0000-0000-0006-000000000003', 'staff', 'read'),
+	-- beverage / Account Support
+	('b0000000-0000-0000-0006-000000000004', 'tickets', 'manage'),
+	('b0000000-0000-0000-0006-000000000004', 'clients', 'read'),
+	('b0000000-0000-0000-0006-000000000004', 'tasks', 'read')
 on conflict (role_id, feature_id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -270,5 +306,6 @@ on conflict (role_id, feature_id) do nothing;
 -- the specialists listed. Then give seed.sql an org in it so every mode and
 -- rung is exercisable after `npm run db:reset`. Nothing in the app changes:
 -- roles, the gate and the nav all read the catalog. An org joins the
--- industry through organizations.industry_id, set by onboarding /
--- service-role code — never from the browser.
+-- industry through organizations.industry_id (default 'crm'), set by
+-- onboarding / service-role code — never from the browser. Retiring an
+-- industry is the re-homing block above, in that order.
