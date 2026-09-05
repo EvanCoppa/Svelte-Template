@@ -29,6 +29,13 @@ on everything. So one catalog drives navigation, the gate, plan/industry availab
 role grants. `staff` (the roster and invitations) is a feature like any other — in every
 industry and every tier, so what a member sees of it is decided by their grant alone.
 
+Roles come in industry-scoped ladders (`industry_role_catalog` migration): every industry
+has a Viewer (`read` on everything it includes), its own specialists (`manage` on their
+domain, `read` around it), a Manager (`manage` on everything) and a Director (`delete` on
+everything). System admins (`system_admins` migration) sit outside the catalog entirely:
+`private.org_role()` answers `owner` for them on every org, so they pass every gate and
+grant without a row here.
+
 ## Resolution
 
 `resolveFeatures()` in `src/lib/features/resolve.ts` is pure and client-safe; the
@@ -88,10 +95,22 @@ No nav edit, no per-page check. Writes inside the page still open with
 
 `supabase/seed.sql` makes every mode visible locally:
 
-- **Acme Inc** (pro, general): clients, deals, tickets, staff, components enabled; **tasks**
+- **Acme Inc** (pro, crm): clients, deals, tickets, staff, components enabled; **tasks**
   switched off by the org (`disabled`); **best-practices** enterprise-only
-  (`locked_visible`). `e2e@example.com` holds general Support, which grants nothing on
+  (`locked_visible`). `e2e@example.com` holds crm Support, which grants nothing on
   deals — so `/deals` answers 403 for that user.
-- **Globex** (free, construction): **deals** is outside both its industry and its tier
+- **Globex** (free, roofing): **deals** is outside both its industry and its tier
   but an operator override enables it (a pilot); **best-practices** is not in
-  construction (`hidden`).
+  roofing (`hidden`).
+- **Two orgs per industry** — Initech and Hooli (crm), Ridgeline Roofing and Northwind
+  Roofing (roofing), Meridian Medical Supply and Harbor Health Supplies (medical-supplies),
+  Lumen Cosmetics and Velvet & Vale Beauty (cosmetic), Bright Smile Dental and Ashford
+  Family Dentistry (dentistry), Marigold Beverage Co and Lakeside Brewing (beverage). Tiers
+  are mixed so the free orgs show `locked_visible` where their industry has deals (Hooli,
+  Harbor Health Supplies, Lakeside Brewing), the pro orgs where it has best-practices
+  (Lumen Cosmetics, Marigold Beverage Co), and features outside an industry are `hidden`
+  (deals in a dental practice, tickets in a beauty brand). `dev` and `e2e` hold each
+  industry's roles as plain members; the seed's comment block lists who holds what.
+- **`evancoppa@gmail.com` is the system admin**: every org above is in their switcher and
+  they are owner-level in each, whatever their membership row says. Sign in as
+  `dev@example.com` for the member view.

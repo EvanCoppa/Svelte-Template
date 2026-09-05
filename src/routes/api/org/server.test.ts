@@ -5,23 +5,26 @@ import { PUT } from './+server';
 const ORG_ID = '10000000-0000-0000-0000-000000000001';
 const USER_ID = '20000000-0000-0000-0000-000000000001';
 
-type MembershipRow = { org_id: string } | null;
+/** The organizations row RLS hands back — null when the caller may not act in it. */
+type OrgRow = { id: string } | null;
 
-function event(body: string, membership: MembershipRow) {
-	const maybeSingle = vi.fn(async () => ({ data: membership, error: null }));
+function event(body: string, org: OrgRow) {
+	const maybeSingle = vi.fn(async () => ({ data: org, error: null }));
 	const query = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
 		maybeSingle
 	};
+	const from = vi.fn(() => query);
 	const cookies = { set: vi.fn() };
 	return {
 		request: new Request('http://localhost/api/org', { method: 'PUT', body }),
 		locals: {
 			user: { id: USER_ID },
-			supabase: { from: vi.fn(() => query) }
+			supabase: { from }
 		},
 		cookies,
+		from,
 		query
 	};
 }
@@ -45,28 +48,31 @@ async function status(e: ReturnType<typeof event>): Promise<number> {
 
 describe('PUT /api/org', () => {
 	it('rejects a non-JSON body', async () => {
-		expect(await status(event('not json', { org_id: ORG_ID }))).toBe(400);
+		expect(await status(event('not json', { id: ORG_ID }))).toBe(400);
 	});
 
 	it('rejects a body whose orgId is not a UUID', async () => {
-		expect(await status(event(JSON.stringify({ orgId: 'nope' }), { org_id: ORG_ID }))).toBe(400);
-		expect(await status(event(JSON.stringify({}), { org_id: ORG_ID }))).toBe(400);
+		expect(await status(event(JSON.stringify({ orgId: 'nope' }), { id: ORG_ID }))).toBe(400);
+		expect(await status(event(JSON.stringify({}), { id: ORG_ID }))).toBe(400);
 	});
 
-	it('403s when the caller is not a member of the organization', async () => {
+	it('403s when RLS shows the caller no such organization', async () => {
 		const e = event(JSON.stringify({ orgId: ORG_ID }), null);
 		expect(await status(e)).toBe(403);
 		expect(e.cookies.set).not.toHaveBeenCalled();
 	});
 
-	it('sets the cookie and returns 204 for a member', async () => {
-		const e = event(JSON.stringify({ orgId: ORG_ID }), { org_id: ORG_ID });
+	it('sets the cookie and returns 204 for an organization the caller may act in', async () => {
+		const e = event(JSON.stringify({ orgId: ORG_ID }), { id: ORG_ID });
 		const response = await callPut(e);
 
 		expect(response.status).toBe(204);
 		expect(e.cookies.set).toHaveBeenCalledWith(ACTIVE_ORG_COOKIE, ORG_ID, expect.any(Object));
-		// Membership was checked as the caller, scoped to both org and user.
-		expect(e.query.eq).toHaveBeenCalledWith('org_id', ORG_ID);
-		expect(e.query.eq).toHaveBeenCalledWith('user_id', USER_ID);
+		// Access was checked as the caller against organizations, whose policy
+		// answers for members and system admins alike — never a membership row,
+		// which an operator opening a foreign org does not have.
+		expect(e.from).toHaveBeenCalledWith('organizations');
+		expect(e.query.eq).toHaveBeenCalledWith('id', ORG_ID);
+		expect(e.query.maybeSingle).toHaveBeenCalled();
 	});
 });

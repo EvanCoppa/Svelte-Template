@@ -144,34 +144,6 @@ export async function removeMember(
 	);
 }
 
-/**
- * The caller's own membership context for an org — what form actions use to
- * rebuild `UserAccess` (loads get the same values from layout data instead),
- * plus the org name an invite email needs. Null when the caller is not a
- * member of the org at all.
- */
-export async function getMembership(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	userId: string
-): Promise<{ role: Enums<'org_role'>; industryId: string; orgName: string } | null> {
-	const row = unwrap(
-		await supabase
-			.from('organization_members')
-			// The org embed names its foreign key: member_roles, deals, tasks,
-			// tickets and notifications all reference both tables, so a bare
-			// `organizations(...)` is ambiguous to PostgREST (PGRST201) and every
-			// action on this page would 500. Same hint as `loadOrgContext()`.
-			.select('role, organizations!organization_members_org_id_fkey(name, industry_id)')
-			.eq('org_id', orgId)
-			.eq('user_id', userId)
-			.maybeSingle()
-	);
-	return row
-		? { role: row.role, industryId: row.organizations.industry_id, orgName: row.organizations.name }
-		: null;
-}
-
 /** The link an invite email or the copy button hands out. */
 export function inviteUrl(origin: string, token: string): string {
 	return `${origin}/invite/${token}`;

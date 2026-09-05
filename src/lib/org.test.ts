@@ -33,6 +33,20 @@ describe('resolveActiveOrg', () => {
 		expect(resolveActiveOrg([acme, globex], null)).toBe(acme);
 	});
 
+	it('prefers an organization the user belongs to over one they only operate', () => {
+		// A system admin's list holds every org; 'AAA Corp' sorts first but is
+		// not theirs, so a missing or stale cookie must not land them in it.
+		const aaa = org('10000000-0000-0000-0000-000000000099', 'AAA Corp', { role: 'owner' });
+		const isOwn = (candidate: OrgMembership) => candidate.id === acme.id;
+
+		expect(resolveActiveOrg([aaa, acme], null, isOwn)).toBe(acme);
+		expect(resolveActiveOrg([aaa, acme], '99999999-0000-0000-0000-000000000000', isOwn)).toBe(acme);
+		// The cookie still wins when it names an org they may act in.
+		expect(resolveActiveOrg([aaa, acme], aaa.id, isOwn)).toBe(aaa);
+		// Nothing is their own: the first entry, so the type's promise holds.
+		expect(resolveActiveOrg([aaa, acme], null, () => false)).toBe(aaa);
+	});
+
 	it('returns null for a user with no organizations', () => {
 		expect(resolveActiveOrg([], acme.id)).toBeNull();
 	});

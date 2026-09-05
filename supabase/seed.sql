@@ -7,7 +7,8 @@
 --
 --   dev@example.com      / password123   ← sign in with this while developing
 --   e2e@example.com      / password123   ← reserved for the E2E suite
---   evancoppa@gmail.com  / password123   ← same local password, not a real one
+--   evancoppa@gmail.com  / password123   ← same local password, not a real one;
+--                                         the system admin (sees every org)
 --
 -- NEVER put a real credential in this file. It is committed.
 --
@@ -109,12 +110,12 @@ on conflict (id) do update set display_name = excluded.display_name;
 -- Two shared organizations on top of the personal orgs the signup trigger /
 -- backfill created. Acme is the multi-member fixture; Globex exists so the
 -- E2E user has an org they are deliberately NOT in (tenant-isolation checks).
--- Industries are spelled out for determinism: Acme keeps the 'general'
--- default, Globex is 'construction' so the two orgs draw from different
--- role sets (see the member_roles fixture below).
+-- Industries are spelled out for determinism: Acme keeps the 'crm'
+-- default, Globex is 'roofing' so the two orgs draw from different role
+-- sets (see the member_roles fixture below).
 insert into public.organizations (id, name, tier_id, industry_id) values
-	('10000000-0000-0000-0000-000000000001', 'Acme Inc', 'pro', 'general'),
-	('10000000-0000-0000-0000-000000000002', 'Globex', 'free', 'construction')
+	('10000000-0000-0000-0000-000000000001', 'Acme Inc', 'pro', 'crm'),
+	('10000000-0000-0000-0000-000000000002', 'Globex', 'free', 'roofing')
 on conflict (id) do nothing;
 
 -- Memberships. `do update` keeps roles deterministic across re-seeds.
@@ -126,6 +127,86 @@ insert into public.organization_members (org_id, user_id, role) values
 	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'member'),
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', 'owner'),
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'member')
+on conflict (org_id, user_id) do update set role = excluded.role;
+
+-- Industry fixtures: two organizations in every industry the catalog ships
+-- (industry_role_catalog migration), so each vertical's role ladder and
+-- feature shape is exercisable after a reset. Evan owns one org per
+-- industry and administers the other (dev owns that one); dev and e2e hold
+-- the industry's roles as plain members, spread so every rung — Viewer, a
+-- specialist, Manager — is held by someone somewhere. Tiers vary on
+-- purpose so locked_visible shows up: a free org in an industry with deals
+-- (Hooli, Harbor Health Supplies, Lakeside Brewing), a pro org in one with
+-- best-practices (Lumen Cosmetics, Marigold Beverage Co). Every name sorts
+-- after "Acme Inc", which keeps Acme the default active org for
+-- e2e@example.com (tests/auth.spec.ts relies on it); Acme's own roster and
+-- Globex's e2e-free membership are untouched.
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000003', 'Initech', 'enterprise', 'crm'),
+	('10000000-0000-0000-0000-000000000004', 'Hooli', 'free', 'crm'),
+	('10000000-0000-0000-0000-000000000005', 'Ridgeline Roofing', 'pro', 'roofing'),
+	('10000000-0000-0000-0000-000000000006', 'Northwind Roofing', 'enterprise', 'roofing'),
+	('10000000-0000-0000-0000-000000000007', 'Meridian Medical Supply', 'pro', 'medical-supplies'),
+	('10000000-0000-0000-0000-000000000008', 'Harbor Health Supplies', 'free', 'medical-supplies'),
+	('10000000-0000-0000-0000-000000000009', 'Lumen Cosmetics', 'pro', 'cosmetic'),
+	('10000000-0000-0000-0000-000000000010', 'Velvet & Vale Beauty', 'enterprise', 'cosmetic'),
+	('10000000-0000-0000-0000-000000000011', 'Bright Smile Dental', 'enterprise', 'dentistry'),
+	('10000000-0000-0000-0000-000000000012', 'Ashford Family Dentistry', 'pro', 'dentistry'),
+	('10000000-0000-0000-0000-000000000013', 'Marigold Beverage Co', 'pro', 'beverage'),
+	('10000000-0000-0000-0000-000000000014', 'Lakeside Brewing', 'free', 'beverage')
+on conflict (id) do nothing;
+
+-- Memberships: Evan owns the odd-numbered orgs and is admin of the
+-- even-numbered ones, where dev is the owner; dev is a plain member of the
+-- odd-numbered ones; e2e is a plain member wherever listed.
+insert into public.organization_members (org_id, user_id, role) values
+	-- Initech (crm)
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Hooli (crm)
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Ridgeline Roofing (roofing)
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Northwind Roofing (roofing)
+	('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000003', 'admin'),
+	-- Meridian Medical Supply (medical-supplies)
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Harbor Health Supplies (medical-supplies)
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Lumen Cosmetics (cosmetic)
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Velvet & Vale Beauty (cosmetic)
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Bright Smile Dental (dentistry)
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Ashford Family Dentistry (dentistry)
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Marigold Beverage Co (beverage)
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Lakeside Brewing (beverage)
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000002', 'member')
 on conflict (org_id, user_id) do update set role = excluded.role;
 
 -- CRM fixtures, all inside Acme so every seed user can see them (and Globex
@@ -193,8 +274,8 @@ on conflict (id) do nothing;
 -- 'Support' role: same name, different grants per industry — the
 -- cross-industry divergence fixture. Owners/admins hold implicit 'manage'
 -- on everything and need no role.
---   Acme (general):        e2e holds general 'Support' (tickets manage, clients read, library pages read)
---   Globex (construction): dev holds construction 'Support' (clients manage)
+--   Acme (crm):       e2e holds crm 'Support' (tickets manage, clients read, library pages read)
+--   Globex (roofing): dev holds roofing 'Support' (clients manage)
 insert into public.member_roles (org_id, user_id, role_id) values
 	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
 		'b0000000-0000-0000-0000-000000000001'),
@@ -202,19 +283,74 @@ insert into public.member_roles (org_id, user_id, role_id) values
 		'b0000000-0000-0000-0000-000000000003')
 on conflict (org_id, user_id, role_id) do nothing;
 
+-- The industry orgs' assignments (ids follow the industry_role_catalog
+-- migration's b0000000-0000-0000-00II-0000000000RR scheme: II = industry,
+-- RR = role). One rung per plain member, except dev in Initech, who holds
+-- two — the union fixture: Operations' manage on tasks plus Viewer's read
+-- on everything else.
+--   Initech (crm):                       dev = Viewer + Operations; e2e = Manager
+--   Hooli (crm):                         e2e = Operations
+--   Ridgeline Roofing (roofing):         dev = Crew Lead; e2e = Viewer
+--   Meridian (medical-supplies):         dev = Sales Rep; e2e = Customer Service
+--   Harbor Health (medical-supplies):    e2e = Viewer
+--   Lumen Cosmetics (cosmetic):          dev = Account Executive; e2e = Studio Coordinator
+--   Velvet & Vale (cosmetic):            e2e = Viewer
+--   Bright Smile (dentistry):            dev = Hygienist; e2e = Front Desk
+--   Ashford Family Dentistry (dentistry): e2e = Patient Support
+--   Marigold Beverage (beverage):        dev = Route Sales Rep; e2e = Distribution Coordinator
+--   Lakeside Brewing (beverage):         e2e = Viewer
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0001-000000000001'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0001-000000000002'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0001-000000000003'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0001-000000000002'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0002-000000000002'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0002-000000000001'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0003-000000000003'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0003-000000000002'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0003-000000000001'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0004-000000000003'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0004-000000000004'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0004-000000000001'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0005-000000000003'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0005-000000000002'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0005-000000000004'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0006-000000000002'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0006-000000000003'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0006-000000000001')
+on conflict (org_id, user_id, role_id) do nothing;
+
 -- Feature fixtures, one per escape hatch, so the seeded orgs show every mode
 -- (the registry and its industry/tier maps ship by migration):
---   Acme (pro, general):      tasks switched off by the org itself -> disabled;
+--   Acme (pro, crm):          tasks switched off by the org itself -> disabled;
 --                             best-practices is enterprise-only     -> locked_visible
---   Globex (free, construction): deals is outside both its industry and its
+--   Globex (free, roofing):   deals is outside both its industry and its
 --                             tier, an operator override enables it  -> a pilot;
---                             best-practices is not in construction -> hidden
+--                             best-practices is not in roofing -> hidden
 insert into public.organization_disabled_features (org_id, feature_id) values
 	('10000000-0000-0000-0000-000000000001', 'tasks')
 on conflict (org_id, feature_id) do nothing;
 
 insert into public.organization_feature_overrides (org_id, feature_id, mode, note) values
-	('10000000-0000-0000-0000-000000000002', 'deals', 'enabled', 'Pilot: deals outside the construction catalog.')
+	('10000000-0000-0000-0000-000000000002', 'deals', 'enabled', 'Pilot: deals outside the roofing catalog.')
 on conflict (org_id, feature_id) do nothing;
 
 -- A pending shareable-link invite into Acme with a fixed token, so the accept
@@ -226,5 +362,16 @@ insert into public.organization_invites (id, org_id, email, token, invited_by) v
 		null, 'seed0000seed0000seed0000seed0000seed0000seed0000',
 		'00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
+
+-- The platform operator (see the system_admins migration). Evan is the
+-- developer's own account, so `npm run dev` lands in the operator view:
+-- every org above in the switcher and owner-level access in each, whatever
+-- the membership rows say. Sign in as dev@example.com or e2e@example.com to
+-- see the app as a regular member; delete this row to see Evan as the plain
+-- owner/admin/member the memberships make them.
+insert into public.system_admins (user_id, note) values
+	('00000000-0000-0000-0000-000000000003',
+		'Seed fixture: the developer account operates every local org.')
+on conflict (user_id) do nothing;
 
 drop table seed_users;
