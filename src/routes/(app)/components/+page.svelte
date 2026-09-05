@@ -109,9 +109,7 @@
 	} from '@internationalized/date';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import CalendarPlusIcon from '@lucide/svelte/icons/calendar-plus';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import ClockIcon from '@lucide/svelte/icons/clock';
-	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -1661,15 +1659,6 @@
 						<form onsubmit={scheduleAppointment}>
 							<Modal.Card>
 								<Modal.Header>
-									<div
-										class="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium"
-									>
-										<Badge variant="outline" class="gap-1 font-medium">
-											<MapPinIcon class="size-3" /> Operatory 3
-										</Badge>
-										<ChevronRightIcon class="size-3.5" />
-										New appointment
-									</div>
 									<Modal.Title><CalendarPlusIcon /> Schedule dental appointment</Modal.Title>
 								</Modal.Header>
 								<Modal.Body>
