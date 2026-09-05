@@ -100,6 +100,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import CalendarPlusIcon from '@lucide/svelte/icons/calendar-plus';
 	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -165,6 +166,48 @@
 		modalOpen = false;
 		campaignName = '';
 	}
+	// Modal — a longer multi-field form, still one form wrapping Card + Footer.
+	let appointmentModalOpen = $state(false);
+	const PATIENT_LABELS = {
+		'ava-thompson': 'Ava Thompson (#1)',
+		'liam-chen': 'Liam Chen (#2)',
+		'noah-patel': 'Noah Patel (#3)'
+	} satisfies Record<string, string>;
+	const PROVIDER_LABELS = {
+		'elena-ruiz': 'Dr. Elena Ruiz',
+		'marcus-lee': 'Dr. Marcus Lee'
+	} satisfies Record<string, string>;
+	const APPOINTMENT_TYPE_LABELS = {
+		'new-patient-exam': 'New Patient Exam',
+		cleaning: 'Cleaning',
+		filling: 'Filling',
+		'root-canal': 'Root Canal',
+		consultation: 'Consultation'
+	} satisfies Record<string, string>;
+	const DURATION_LABELS = {
+		'15': '15 min',
+		'30': '30 min',
+		'45': '45 min',
+		'60': '60 min',
+		'90': '90 min'
+	} satisfies Record<string, string>;
+	let appointmentPatient = $state('ava-thompson');
+	let appointmentProvider = $state('elena-ruiz');
+	let appointmentType = $state('new-patient-exam');
+	let appointmentDate = $state('2026-09-05');
+	let appointmentTime = $state('09:00');
+	let appointmentDuration = $state('30');
+	let appointmentNotes = $state('');
+	let createMoreAppointments = $state(false);
+	function scheduleAppointment(event: SubmitEvent) {
+		event.preventDefault();
+		toast.success(`Scheduled ${PATIENT_LABELS[appointmentPatient as keyof typeof PATIENT_LABELS]}`);
+		appointmentNotes = '';
+		if (!createMoreAppointments) {
+			appointmentModalOpen = false;
+		}
+	}
+
 	let popoverOpen = $state(false);
 	let sheetOpen = $state(false);
 
@@ -1538,6 +1581,122 @@
 							<Modal.Footer>
 								<Modal.Cancel>Cancel</Modal.Cancel>
 								<Modal.Action type="submit">Create campaign</Modal.Action>
+							</Modal.Footer>
+						</form>
+					</Modal.Content>
+				</Modal.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Modal (multi-field form)</Card.Title>
+				<Card.Description>
+					The same frame carrying a longer form — <code>Combobox</code> for every picker, plain
+					date/time <code>Input</code>s, a <code>Switch</code> for a footer-level option next to the primary
+					action.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<Modal.Root bind:open={appointmentModalOpen}>
+					<Modal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<CalendarPlusIcon />{/snippet}
+								Schedule appointment
+							</UntitledButton>
+						{/snippet}
+					</Modal.Trigger>
+					<Modal.Content>
+						<form onsubmit={scheduleAppointment}>
+							<Modal.Card>
+								<Modal.Header>
+									<Modal.Title><CalendarPlusIcon /> Schedule dental appointment</Modal.Title>
+								</Modal.Header>
+								<Modal.Body>
+									<div class="grid gap-4 sm:grid-cols-2">
+										<div class="grid gap-2">
+											<Label for="appointment-patient" required>Patient</Label>
+											<Combobox
+												id="appointment-patient"
+												name="patient"
+												bind:value={appointmentPatient}
+												options={optionsFromLabels(PATIENT_LABELS)}
+												placeholder="Select a patient…"
+												searchThreshold={0}
+												required
+											/>
+										</div>
+										<div class="grid gap-2">
+											<Label for="appointment-provider">Provider</Label>
+											<Combobox
+												id="appointment-provider"
+												name="provider"
+												bind:value={appointmentProvider}
+												options={optionsFromLabels(PROVIDER_LABELS)}
+												placeholder="Select a provider…"
+											/>
+										</div>
+										<div class="grid gap-2">
+											<Label for="appointment-type">Appointment type</Label>
+											<Combobox
+												id="appointment-type"
+												name="type"
+												bind:value={appointmentType}
+												options={optionsFromLabels(APPOINTMENT_TYPE_LABELS)}
+												placeholder="Select a type…"
+											/>
+										</div>
+										<div class="grid grid-cols-2 gap-2">
+											<div class="grid gap-2">
+												<Label for="appointment-date">Date</Label>
+												<Input
+													id="appointment-date"
+													name="date"
+													type="date"
+													bind:value={appointmentDate}
+												/>
+											</div>
+											<div class="grid gap-2">
+												<Label for="appointment-time">Time</Label>
+												<Input
+													id="appointment-time"
+													name="time"
+													type="time"
+													bind:value={appointmentTime}
+												/>
+											</div>
+										</div>
+										<div class="grid gap-2 sm:col-span-2">
+											<Label for="appointment-duration">Duration</Label>
+											<Combobox
+												id="appointment-duration"
+												name="duration"
+												bind:value={appointmentDuration}
+												options={optionsFromLabels(DURATION_LABELS)}
+												class="sm:w-56"
+											/>
+										</div>
+									</div>
+									<div class="grid gap-2">
+										<Label for="appointment-notes">Notes</Label>
+										<Textarea
+											id="appointment-notes"
+											name="notes"
+											placeholder="Add notes for this appointment…"
+											bind:value={appointmentNotes}
+										/>
+									</div>
+								</Modal.Body>
+							</Modal.Card>
+							<Modal.Footer>
+								<div class="flex items-center gap-2">
+									<Switch id="appointment-create-more" bind:checked={createMoreAppointments} />
+									<Label for="appointment-create-more" class="text-muted-foreground font-normal">
+										Create more
+									</Label>
+								</div>
+								<Modal.Action type="submit">Create appointment</Modal.Action>
 							</Modal.Footer>
 						</form>
 					</Modal.Content>
