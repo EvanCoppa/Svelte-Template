@@ -359,6 +359,14 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`. Hand-built
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
+- **A dialog is `Modal`** (`src/lib/components/modal/`), the app-level compound over `ui/dialog`
+  and `ui/card`: `Modal.Content` is the muted tray, `Modal.Card` the white card inside it holding
+  `Modal.Header` (an icon-led `Modal.Title`; the close button is pinned to the card) and
+  `Modal.Body`, and `Modal.Footer` sits on the tray pairing `Modal.Cancel` (`esc`) with
+  `Modal.Action` (`↵` on a submit button) — both `UntitledButton`s. Wrap `Modal.Card` +
+  `Modal.Footer` in the page's `<form>` so `Modal.Action type="submit"` posts it. Reach for bare
+  `ui/dialog` only when a screen needs a different frame; `/components` → Overlays → Modal is the
+  reference.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted
