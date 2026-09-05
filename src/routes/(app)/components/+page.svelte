@@ -75,6 +75,7 @@
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Calendar } from '$lib/components/ui/calendar/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -100,7 +101,17 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import {
+		CalendarDate,
+		DateFormatter,
+		getLocalTimeZone,
+		type DateValue
+	} from '@internationalized/date';
+	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import CalendarPlusIcon from '@lucide/svelte/icons/calendar-plus';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -137,6 +148,7 @@
 	} satisfies Record<string, string>;
 	let role = $state('');
 	let tags = $state<string[]>([]);
+	let showcaseDate = $state<DateValue | undefined>();
 	const tagOptions = ['Design', 'Engineering', 'Marketing', 'Sales', 'Support'];
 
 	// Command — the raw list-filtering primitive Combobox is built on.
@@ -191,17 +203,39 @@
 		'60': '60 min',
 		'90': '90 min'
 	} satisfies Record<string, string>;
+	const TIME_SLOTS = [
+		'8:00 AM',
+		'8:30 AM',
+		'9:00 AM',
+		'9:30 AM',
+		'10:00 AM',
+		'10:30 AM',
+		'11:00 AM',
+		'1:00 PM',
+		'1:30 PM',
+		'2:00 PM',
+		'2:30 PM',
+		'3:00 PM',
+		'4:00 PM'
+	];
+	const appointmentDateFormatter = new DateFormatter('en-US', { dateStyle: 'long' });
 	let appointmentPatient = $state('ava-thompson');
 	let appointmentProvider = $state('elena-ruiz');
 	let appointmentType = $state('new-patient-exam');
-	let appointmentDate = $state('2026-09-05');
-	let appointmentTime = $state('09:00');
+	let appointmentDate = $state<DateValue | undefined>(new CalendarDate(2026, 9, 5));
+	let appointmentDateOpen = $state(false);
+	let appointmentTime = $state('9:00 AM');
 	let appointmentDuration = $state('30');
 	let appointmentNotes = $state('');
 	let createMoreAppointments = $state(false);
+	const appointmentDateLabel = $derived(
+		appointmentDate
+			? appointmentDateFormatter.format(appointmentDate.toDate(getLocalTimeZone()))
+			: 'Pick a date'
+	);
 	function scheduleAppointment(event: SubmitEvent) {
 		event.preventDefault();
-		toast.success(`Scheduled ${PATIENT_LABELS[appointmentPatient as keyof typeof PATIENT_LABELS]}`);
+		toast.success(`Scheduled for ${appointmentDateLabel} at ${appointmentTime}`);
 		appointmentNotes = '';
 		if (!createMoreAppointments) {
 			appointmentModalOpen = false;
@@ -1442,6 +1476,20 @@
 
 		<Card.Root>
 			<Card.Header>
+				<Card.Title>Calendar</Card.Title>
+				<Card.Description>
+					Date selection, on <code>@internationalized/date</code> values rather than strings. Inline
+					here; pair it with <code>ui/popover</code> for a date field that collapses to a chip — the scheduling
+					modal below does exactly that.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Calendar type="single" bind:value={showcaseDate} class="rounded-md border" />
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title>Command</Card.Title>
 				<Card.Description>
 					The raw filterable-list primitive <code>Combobox</code> and the ⌘K palette are built on.
@@ -1592,9 +1640,11 @@
 			<Card.Header>
 				<Card.Title>Modal (multi-field form)</Card.Title>
 				<Card.Description>
-					The same frame carrying a longer form — <code>Combobox</code> for every picker, plain
-					date/time <code>Input</code>s, a <code>Switch</code> for a footer-level option next to the primary
-					action.
+					The same frame carrying a scheduling form. The two identifying fields are labelled
+					<code>Combobox</code>es; everything that qualifies the slot collapses into a row of
+					<code>size="sm"</code> chips, with the date chip opening a
+					<code>Calendar</code> in a <code>Popover</code>. Notes sit in a headed box whose caption
+					is the field's own <code>Label</code>.
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-wrap items-center gap-2">
@@ -1607,10 +1657,19 @@
 							</UntitledButton>
 						{/snippet}
 					</Modal.Trigger>
-					<Modal.Content>
+					<Modal.Content class="sm:max-w-2xl">
 						<form onsubmit={scheduleAppointment}>
 							<Modal.Card>
 								<Modal.Header>
+									<div
+										class="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium"
+									>
+										<Badge variant="outline" class="gap-1 font-medium">
+											<MapPinIcon class="size-3" /> Operatory 3
+										</Badge>
+										<ChevronRightIcon class="size-3.5" />
+										New appointment
+									</div>
 									<Modal.Title><CalendarPlusIcon /> Schedule dental appointment</Modal.Title>
 								</Modal.Header>
 								<Modal.Body>
@@ -1637,54 +1696,77 @@
 												placeholder="Select a provider…"
 											/>
 										</div>
-										<div class="grid gap-2">
-											<Label for="appointment-type">Appointment type</Label>
-											<Combobox
-												id="appointment-type"
-												name="type"
-												bind:value={appointmentType}
-												options={optionsFromLabels(APPOINTMENT_TYPE_LABELS)}
-												placeholder="Select a type…"
-											/>
-										</div>
-										<div class="grid grid-cols-2 gap-2">
-											<div class="grid gap-2">
-												<Label for="appointment-date">Date</Label>
-												<Input
-													id="appointment-date"
-													name="date"
-													type="date"
-													bind:value={appointmentDate}
-												/>
-											</div>
-											<div class="grid gap-2">
-												<Label for="appointment-time">Time</Label>
-												<Input
-													id="appointment-time"
-													name="time"
-													type="time"
-													bind:value={appointmentTime}
-												/>
-											</div>
-										</div>
-										<div class="grid gap-2 sm:col-span-2">
-											<Label for="appointment-duration">Duration</Label>
-											<Combobox
-												id="appointment-duration"
-												name="duration"
-												bind:value={appointmentDuration}
-												options={optionsFromLabels(DURATION_LABELS)}
-												class="sm:w-56"
-											/>
-										</div>
 									</div>
-									<div class="grid gap-2">
-										<Label for="appointment-notes">Notes</Label>
+
+									<div class="flex flex-wrap items-center gap-2">
+										<Combobox
+											name="type"
+											size="sm"
+											class="w-auto"
+											ariaLabel="Appointment type"
+											bind:value={appointmentType}
+											options={optionsFromLabels(APPOINTMENT_TYPE_LABELS)}
+										/>
+
+										<Popover.Root bind:open={appointmentDateOpen}>
+											<Popover.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														type="button"
+														variant="outline"
+														size="sm"
+														class="font-medium"
+													>
+														<CalendarIcon class="text-muted-foreground" />
+														{appointmentDateLabel}
+													</Button>
+												{/snippet}
+											</Popover.Trigger>
+											<Popover.Content class="w-auto p-0">
+												<Calendar
+													type="single"
+													bind:value={appointmentDate}
+													onValueChange={() => (appointmentDateOpen = false)}
+												/>
+											</Popover.Content>
+										</Popover.Root>
+										<input type="hidden" name="date" value={appointmentDate?.toString() ?? ''} />
+
+										<Combobox
+											name="time"
+											size="sm"
+											class="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 w-auto"
+											ariaLabel="Start time"
+											bind:value={appointmentTime}
+											options={TIME_SLOTS}
+										>
+											{#snippet icon()}<ClockIcon />{/snippet}
+										</Combobox>
+
+										<Combobox
+											name="duration"
+											size="sm"
+											class="w-auto"
+											ariaLabel="Duration"
+											bind:value={appointmentDuration}
+											options={optionsFromLabels(DURATION_LABELS)}
+										/>
+									</div>
+
+									<div class="border-input overflow-hidden rounded-lg border">
+										<Label
+											for="appointment-notes"
+											class="bg-muted/50 border-input text-muted-foreground block border-b px-3 py-2 text-[11px] font-semibold tracking-wider uppercase"
+										>
+											Notes
+										</Label>
 										<Textarea
 											id="appointment-notes"
 											name="notes"
 											placeholder="Add notes for this appointment…"
 											bind:value={appointmentNotes}
+											class="min-h-20 resize-none rounded-none border-0 shadow-none focus-visible:ring-0"
 										/>
 									</div>
 								</Modal.Body>
