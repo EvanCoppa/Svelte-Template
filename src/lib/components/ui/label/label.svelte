@@ -5,8 +5,13 @@
 	let {
 		ref = $bindable(null),
 		class: className,
+		required = false,
+		children,
 		...restProps
-	}: LabelPrimitive.RootProps = $props();
+	}: LabelPrimitive.RootProps & {
+		/** Appends the required marker; the field itself still carries `required`. */
+		required?: boolean;
+	} = $props();
 </script>
 
 <LabelPrimitive.Root
@@ -17,4 +22,10 @@
 		className
 	)}
 	{...restProps}
-/>
+>
+	{@render children?.()}
+	{#if required}
+		<!-- Pulled back against the text so it reads as a suffix, not a separate word. -->
+		<span aria-hidden="true" class="text-primary -ms-1.5">*</span>
+	{/if}
+</LabelPrimitive.Root>

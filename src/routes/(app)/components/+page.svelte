@@ -69,6 +69,7 @@
 		type WizardStep
 	} from '$lib/components/enhanced/index.js';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as Modal from '$lib/components/modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -97,6 +98,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import {
 		createColumnHelper,
@@ -140,6 +142,15 @@
 	let acceptTerms = $state(false);
 	let notifications = $state(true);
 	let dialogOpen = $state(false);
+	// Modal — the demo form posts nowhere; a real page wires a form action here.
+	let modalOpen = $state(false);
+	let campaignName = $state('');
+	function createCampaign(event: SubmitEvent) {
+		event.preventDefault();
+		toast.success(`Created "${campaignName.trim()}"`);
+		modalOpen = false;
+		campaignName = '';
+	}
 	let popoverOpen = $state(false);
 	let sheetOpen = $state(false);
 
@@ -1466,6 +1477,56 @@
 		<div class="lg:col-span-2">
 			<h2 class="text-lg font-semibold tracking-tight">Overlays</h2>
 		</div>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Modal</Card.Title>
+				<Card.Description>
+					The standard dialog frame: an icon-led title bar with its close button, a body, and a
+					footer that pairs Cancel (Escape) with the primary action (Enter) — <code>ui/dialog</code>
+					underneath, <code>UntitledButton</code>s on top.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<Modal.Root bind:open={modalOpen}>
+					<Modal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<MegaphoneIcon />{/snippet}
+								Create campaign
+							</UntitledButton>
+						{/snippet}
+					</Modal.Trigger>
+					<Modal.Content>
+						<Modal.Header>
+							<Modal.Title><MegaphoneIcon /> Create campaign</Modal.Title>
+						</Modal.Header>
+						<form onsubmit={createCampaign}>
+							<Modal.Body>
+								<div class="grid gap-2">
+									<Label for="campaign-name" required>Campaign name</Label>
+									<Input
+										id="campaign-name"
+										name="name"
+										placeholder="e.g. April product update"
+										autocomplete="off"
+										required
+										bind:value={campaignName}
+									/>
+									<p class="text-muted-foreground text-sm">
+										Used internally to find this campaign in your list.
+									</p>
+								</div>
+							</Modal.Body>
+							<Modal.Footer>
+								<Modal.Cancel>Cancel</Modal.Cancel>
+								<Modal.Action type="submit">Create campaign</Modal.Action>
+							</Modal.Footer>
+						</form>
+					</Modal.Content>
+				</Modal.Root>
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>
