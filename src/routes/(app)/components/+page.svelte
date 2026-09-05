@@ -70,6 +70,7 @@
 	} from '$lib/components/enhanced/index.js';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
+	import * as UpgradeCard from '$lib/components/upgrade-card/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -100,6 +101,7 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import {
 		createColumnHelper,
 		createTable,
@@ -142,6 +144,12 @@
 	let acceptTerms = $state(false);
 	let notifications = $state(true);
 	let dialogOpen = $state(false);
+	// Upgrade card — demo copy; /upgrade fills it from the feature registry.
+	const UPGRADE_PERKS = [
+		{ name: 'Deals', description: 'Pipeline of opportunities, by stage and value.' },
+		{ name: 'Reports', description: 'Forecasts and win rates, by owner and by month.' },
+		{ name: 'Priority support', description: 'A named contact and a one-business-day reply.' }
+	];
 	// Modal — the demo form posts nowhere; a real page wires a form action here.
 	let modalOpen = $state(false);
 	let campaignName = $state('');
@@ -1714,6 +1722,52 @@
 				>
 					Promise
 				</Button>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Cards</h2>
+		</div>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Upgrade card</Card.Title>
+				<Card.Description>
+					The upgrade pitch: a primary-tinted halftone hero, a title with the plan pill beside it,
+					what the plan adds, and a full-width action over a quiet way out — <code>ui/card</code>
+					underneath, <code>UntitledButton</code>s on top. <code>/upgrade</code> composes it from the
+					feature registry.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex justify-center">
+				<UpgradeCard.Root class="w-full max-w-sm">
+					<UpgradeCard.Hero><SparklesIcon /></UpgradeCard.Hero>
+					<UpgradeCard.Header>
+						<UpgradeCard.Title>Upgrade your plan</UpgradeCard.Title>
+						<UpgradeCard.Badge>Pro</UpgradeCard.Badge>
+						<UpgradeCard.Description>
+							Get the pipeline view, the reports that go with it, and a named contact when you need
+							one.
+						</UpgradeCard.Description>
+					</UpgradeCard.Header>
+					<UpgradeCard.Features>
+						{#each UPGRADE_PERKS as perk (perk.name)}
+							<UpgradeCard.Feature>
+								<UpgradeCard.FeatureTitle>{perk.name}</UpgradeCard.FeatureTitle>
+								<UpgradeCard.FeatureDescription>{perk.description}</UpgradeCard.FeatureDescription>
+							</UpgradeCard.Feature>
+						{/each}
+					</UpgradeCard.Features>
+					<UpgradeCard.Footer>
+						<UpgradeCard.Action onclick={() => toast.success('Upgrade requested')}>
+							Upgrade to Pro
+						</UpgradeCard.Action>
+						<UpgradeCard.Dismiss onclick={() => toast('Maybe next time')}
+							>No thanks</UpgradeCard.Dismiss
+						>
+					</UpgradeCard.Footer>
+					<UpgradeCard.Close onclick={() => toast('Dismissed')} />
+				</UpgradeCard.Root>
 			</Card.Content>
 		</Card.Root>
 

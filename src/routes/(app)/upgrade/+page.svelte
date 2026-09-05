@@ -1,11 +1,12 @@
 <script lang="ts">
-	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import * as UpgradeCard from '$lib/components/upgrade-card/index.js';
+	import { iconFor } from '$lib/features/icons';
 
 	let { data } = $props();
 
@@ -16,27 +17,58 @@
 		}
 		return `You already have access to ${data.feature.name}`;
 	});
+
+	let description = $derived.by(() => {
+		if (data.recommended)
+			return `Here's what the ${data.recommended.name} plan adds for your organization.`;
+		if (data.feature?.description) return data.feature.description;
+		return `You're on the ${data.currentTier.name} plan, which already includes everything.`;
+	});
+
+	// The locked feature's own icon fronts its pitch; the generic one sparkles.
+	const HeroIcon = $derived(data.feature ? iconFor(data.feature.icon) : SparklesIcon);
+
+	// Plans change on the billing side, never from the browser.
+	const contactHref = (tier: string) =>
+		`mailto:sales@example.com?subject=${encodeURIComponent(`Upgrade request: ${tier}`)}`;
 </script>
 
 <svelte:head>
 	<title>Upgrade</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
-	<div class="space-y-2 text-center">
-		<Badge variant="secondary" class="gap-1.5">
-			<SparklesIcon class="size-3.5" />
-			Upgrade
-		</Badge>
-		<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
-		<p class="text-muted-foreground mx-auto max-w-md">
-			{#if data.feature?.description}
-				{data.feature.description}
-			{:else}
-				Pick a plan to unlock more of the product for your organization.
+<div class="mx-auto max-w-3xl space-y-8">
+	<UpgradeCard.Root class="mx-auto w-full max-w-sm">
+		<UpgradeCard.Hero><HeroIcon /></UpgradeCard.Hero>
+		<UpgradeCard.Header>
+			<UpgradeCard.Title>{title}</UpgradeCard.Title>
+			{#if data.recommended}
+				<UpgradeCard.Badge>{data.recommended.name}</UpgradeCard.Badge>
 			{/if}
-		</p>
-	</div>
+			<UpgradeCard.Description>{description}</UpgradeCard.Description>
+		</UpgradeCard.Header>
+		{#if data.recommended}
+			<UpgradeCard.Features>
+				{#each data.recommended.unlocks as unlock (unlock.id)}
+					<UpgradeCard.Feature>
+						<UpgradeCard.FeatureTitle>{unlock.name}</UpgradeCard.FeatureTitle>
+						{#if unlock.description}
+							<UpgradeCard.FeatureDescription>{unlock.description}</UpgradeCard.FeatureDescription>
+						{/if}
+					</UpgradeCard.Feature>
+				{/each}
+			</UpgradeCard.Features>
+		{/if}
+		<UpgradeCard.Footer>
+			{#if data.recommended}
+				<UpgradeCard.Action href={contactHref(data.recommended.name)}>
+					Upgrade to {data.recommended.name}
+				</UpgradeCard.Action>
+			{/if}
+			<UpgradeCard.Dismiss href="/">No thanks</UpgradeCard.Dismiss>
+		</UpgradeCard.Footer>
+		<UpgradeCard.Close href="/" />
+	</UpgradeCard.Root>
 
 	<div class="grid gap-4 sm:grid-cols-3">
 		{#each data.tiers as tier (tier.id)}
@@ -70,20 +102,12 @@
 					{#if tier.current}
 						<Button variant="outline" class="w-full" disabled>Your plan</Button>
 					{:else}
-						<!-- Plans change on the billing side, never from the browser. -->
-						<Button href="mailto:sales@example.com?subject=Upgrade%20request" class="w-full">
+						<Button href={contactHref(tier.name)} class="w-full">
 							Contact us about {tier.name}
 						</Button>
 					{/if}
 				</Card.Footer>
 			</Card.Root>
 		{/each}
-	</div>
-
-	<div class="text-center">
-		<Button href="/" variant="ghost">
-			<ArrowLeftIcon class="size-4" />
-			Back to the dashboard
-		</Button>
 	</div>
 </div>
