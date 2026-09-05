@@ -7,7 +7,8 @@
 --
 --   dev@example.com      / password123   ← sign in with this while developing
 --   e2e@example.com      / password123   ← reserved for the E2E suite
---   evancoppa@gmail.com  / password123   ← same local password, not a real one
+--   evancoppa@gmail.com  / password123   ← same local password, not a real one;
+--                                         the system admin (sees every org)
 --
 -- NEVER put a real credential in this file. It is committed.
 --
@@ -128,6 +129,85 @@ insert into public.organization_members (org_id, user_id, role) values
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'member')
 on conflict (org_id, user_id) do update set role = excluded.role;
 
+-- Industry fixtures: two organizations in every industry the catalog ships
+-- (industry_role_catalog migration), so each vertical's role ladder and
+-- feature shape is exercisable after a reset. Evan owns one org per
+-- industry and administers the other (dev owns that one); dev and e2e hold
+-- the industry's roles as plain members, spread so every rung — Viewer, a
+-- specialist, Manager — is held by someone somewhere. Tiers vary on
+-- purpose so locked_visible shows up: a free org in an industry with deals
+-- (Hooli, Lakeside Inns), a pro org in one with best-practices (Harbor &
+-- Vale, Ashford). Every name sorts after "Acme Inc", which keeps Acme the
+-- default active org for e2e@example.com (tests/auth.spec.ts relies on
+-- it); Acme's own roster and Globex's e2e-free membership are untouched.
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000003', 'Initech', 'enterprise', 'general'),
+	('10000000-0000-0000-0000-000000000004', 'Hooli', 'free', 'general'),
+	('10000000-0000-0000-0000-000000000005', 'Bluth Company', 'pro', 'construction'),
+	('10000000-0000-0000-0000-000000000006', 'Northwind Builders', 'enterprise', 'construction'),
+	('10000000-0000-0000-0000-000000000007', 'Sacred Heart Clinic', 'pro', 'healthcare'),
+	('10000000-0000-0000-0000-000000000008', 'Pinecrest Family Practice', 'free', 'healthcare'),
+	('10000000-0000-0000-0000-000000000009', 'Harbor & Vale Realty', 'pro', 'real-estate'),
+	('10000000-0000-0000-0000-000000000010', 'Summit Brokerage', 'enterprise', 'real-estate'),
+	('10000000-0000-0000-0000-000000000011', 'Crane Poole & Schmidt', 'enterprise', 'legal'),
+	('10000000-0000-0000-0000-000000000012', 'Ashford Legal Group', 'pro', 'legal'),
+	('10000000-0000-0000-0000-000000000013', 'Marigold Hotels', 'pro', 'hospitality'),
+	('10000000-0000-0000-0000-000000000014', 'Lakeside Inns', 'free', 'hospitality')
+on conflict (id) do nothing;
+
+-- Memberships: Evan owns the odd-numbered orgs and is admin of the
+-- even-numbered ones, where dev is the owner; dev is a plain member of the
+-- odd-numbered ones; e2e is a plain member wherever listed.
+insert into public.organization_members (org_id, user_id, role) values
+	-- Initech (general)
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Hooli (general)
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Bluth Company (construction)
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Northwind Builders (construction)
+	('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000003', 'admin'),
+	-- Sacred Heart Clinic (healthcare)
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Pinecrest Family Practice (healthcare)
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Harbor & Vale Realty (real-estate)
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Summit Brokerage (real-estate)
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Crane Poole & Schmidt (legal)
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Ashford Legal Group (legal)
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Marigold Hotels (hospitality)
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Lakeside Inns (hospitality)
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000002', 'member')
+on conflict (org_id, user_id) do update set role = excluded.role;
+
 -- CRM fixtures, all inside Acme so every seed user can see them (and Globex
 -- stays empty for tenant-isolation checks). Ids use the 2000…/3000…/… ranges
 -- per table family to stay greppable.
@@ -202,6 +282,61 @@ insert into public.member_roles (org_id, user_id, role_id) values
 		'b0000000-0000-0000-0000-000000000003')
 on conflict (org_id, user_id, role_id) do nothing;
 
+-- The industry orgs' assignments (ids follow the industry_role_catalog
+-- migration's b0000000-0000-0000-00II-0000000000RR scheme: II = industry,
+-- RR = role). One rung per plain member, except dev in Initech, who holds
+-- two — the union fixture: Operations' manage on tasks plus Viewer's read
+-- on everything else.
+--   Initech (general):             dev = Viewer + Operations; e2e = Manager
+--   Hooli (general):               e2e = Operations
+--   Bluth Company (construction):  dev = Site Supervisor; e2e = Viewer
+--   Sacred Heart (healthcare):     dev = Care Coordinator; e2e = Patient Support
+--   Pinecrest (healthcare):        e2e = Viewer
+--   Harbor & Vale (real-estate):   dev = Agent; e2e = Listing Coordinator
+--   Summit (real-estate):          e2e = Viewer
+--   Crane Poole & Schmidt (legal): dev = Associate; e2e = Paralegal
+--   Ashford (legal):               e2e = Client Services
+--   Marigold (hospitality):        dev = Front of House; e2e = Events Coordinator
+--   Lakeside (hospitality):        e2e = Viewer
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0001-000000000001'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0001-000000000002'),
+	('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0001-000000000003'),
+	('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0001-000000000002'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0002-000000000002'),
+	('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0002-000000000001'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0003-000000000003'),
+	('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0003-000000000004'),
+	('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0003-000000000001'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0004-000000000003'),
+	('10000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0004-000000000002'),
+	('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0004-000000000001'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0005-000000000004'),
+	('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0005-000000000002'),
+	('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0005-000000000003'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0006-000000000002'),
+	('10000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0006-000000000003'),
+	('10000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0006-000000000001')
+on conflict (org_id, user_id, role_id) do nothing;
+
 -- Feature fixtures, one per escape hatch, so the seeded orgs show every mode
 -- (the registry and its industry/tier maps ship by migration):
 --   Acme (pro, general):      tasks switched off by the org itself -> disabled;
@@ -226,5 +361,16 @@ insert into public.organization_invites (id, org_id, email, token, invited_by) v
 		null, 'seed0000seed0000seed0000seed0000seed0000seed0000',
 		'00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
+
+-- The platform operator (see the system_admins migration). Evan is the
+-- developer's own account, so `npm run dev` lands in the operator view:
+-- every org above in the switcher and owner-level access in each, whatever
+-- the membership rows say. Sign in as dev@example.com or e2e@example.com to
+-- see the app as a regular member; delete this row to see Evan as the plain
+-- owner/admin/member the memberships make them.
+insert into public.system_admins (user_id, note) values
+	('00000000-0000-0000-0000-000000000003',
+		'Seed fixture: the developer account operates every local org.')
+on conflict (user_id) do nothing;
 
 drop table seed_users;

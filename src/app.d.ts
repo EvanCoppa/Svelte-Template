@@ -23,8 +23,8 @@ declare global {
 			 * The active-organization cookie's value, when it parses as a UUID.
 			 * A convenience for child loads (filter tenant data without an
 			 * `await parent()` waterfall) — never an auth decision: RLS returns
-			 * zero rows for an org the user is not a member of, and the (app)
-			 * layout load repairs a stale cookie.
+			 * zero rows for an org the user may not act in (not a member, not a
+			 * system admin), and the (app) layout load repairs a stale cookie.
 			 */
 			activeOrgId: string | null;
 			/**

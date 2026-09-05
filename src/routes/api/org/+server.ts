@@ -20,19 +20,21 @@ export const PUT: RequestHandler = async ({ request, locals, cookies }) => {
 	}
 	const { orgId } = parsed.data;
 
-	// RLS scopes this select to the caller's own memberships, so a row coming
-	// back is proof of membership — no service-role client needed.
-	const { data: membership, error: memberError } = await locals.supabase
-		.from('organization_members')
-		.select('org_id')
-		.eq('org_id', orgId)
-		.eq('user_id', locals.user!.id)
+	// RLS scopes this select to the organizations the caller may act in —
+	// their own memberships, or every org for a system admin (see the
+	// system_admins migration) — so a row coming back is proof of access, the
+	// same proof the (app) layout builds the switcher list on. No
+	// service-role client needed.
+	const { data: org, error: orgError } = await locals.supabase
+		.from('organizations')
+		.select('id')
+		.eq('id', orgId)
 		.maybeSingle();
 
-	if (memberError) {
-		throw error(500, 'Could not verify membership.');
+	if (orgError) {
+		throw error(500, 'Could not verify access to that organization.');
 	}
-	if (!membership) {
+	if (!org) {
 		throw error(403, 'Not a member of that organization.');
 	}
 

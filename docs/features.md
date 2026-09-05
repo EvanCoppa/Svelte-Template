@@ -29,6 +29,13 @@ on everything. So one catalog drives navigation, the gate, plan/industry availab
 role grants. `staff` (the roster and invitations) is a feature like any other — in every
 industry and every tier, so what a member sees of it is decided by their grant alone.
 
+Roles come in industry-scoped ladders (`industry_role_catalog` migration): every industry
+has a Viewer (`read` on everything it includes), its own specialists (`manage` on their
+domain, `read` around it), a Manager (`manage` on everything) and a Director (`delete` on
+everything). System admins (`system_admins` migration) sit outside the catalog entirely:
+`private.org_role()` answers `owner` for them on every org, so they pass every gate and
+grant without a row here.
+
 ## Resolution
 
 `resolveFeatures()` in `src/lib/features/resolve.ts` is pure and client-safe; the
@@ -95,3 +102,15 @@ No nav edit, no per-page check. Writes inside the page still open with
 - **Globex** (free, construction): **deals** is outside both its industry and its tier
   but an operator override enables it (a pilot); **best-practices** is not in
   construction (`hidden`).
+- **Two orgs per industry** — Initech and Hooli (general), Bluth Company and Northwind
+  Builders (construction), Sacred Heart Clinic and Pinecrest Family Practice (healthcare),
+  Harbor & Vale Realty and Summit Brokerage (real-estate), Crane Poole & Schmidt and
+  Ashford Legal Group (legal), Marigold Hotels and Lakeside Inns (hospitality). Tiers are
+  mixed so the free orgs show `locked_visible` where their industry has deals (Hooli,
+  Lakeside Inns), the pro orgs where it has best-practices (Harbor & Vale, Ashford), and
+  features outside an industry are `hidden` (deals in a clinic, tickets in an agency).
+  `dev` and `e2e` hold each industry's roles as plain members; the seed's comment block
+  lists who holds what.
+- **`evancoppa@gmail.com` is the system admin**: every org above is in their switcher and
+  they are owner-level in each, whatever their membership row says. Sign in as
+  `dev@example.com` for the member view.

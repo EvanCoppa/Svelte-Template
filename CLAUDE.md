@@ -166,8 +166,15 @@ application data is scoped to an organization, never to a bare user. The
   `general`, set by onboarding/service-role code like `tier_id`) decides which
   roles its owners/admins can hand out — so onboarding an org needs zero role
   setup, and two industries can each have a same-named role granting different
-  things. Custom per-org roles are a deliberate future extension, not built
-  yet. Members can hold several roles and access is the union of their grants.
+  things. The catalog (`industry_role_catalog` migration) ships six industries —
+  general, construction, healthcare, real-estate, legal, hospitality — each with
+  a full ladder: a Viewer (read on everything in the industry), the vertical's
+  specialists, a Manager (manage on everything) and a Director (delete on
+  everything); ids follow `b0000000-0000-0000-00II-0000000000RR` (II =
+  industry, RR = role), and adding an industry is one migration (that file's
+  closing comment is the checklist). Custom per-org roles are a deliberate
+  future extension, not built yet. Members can hold several roles and access
+  is the union of their grants.
   Levels are a ladder — `read` < `manage` < `delete`, each implying the ones
   below — and owner/admin implicitly hold `delete` on everything. A policy
   gating on a level therefore compares with `in ('manage','delete')`, never
@@ -180,10 +187,25 @@ application data is scoped to an organization, never to a bare user. The
   a feature is a real security boundary (the `staff` feature is: invite rows
   carry join tokens). Assigning/unassigning roles is owner/admin via RLS (only
   roles from the org's industry), never a feature.
+- **System admins are the one role outside the catalog** (`system_admins`
+  migration): a table of user ids, written by SQL/service-role code only (like
+  `tier_id`), never a `roles` row — roles are industry-scoped and need a
+  membership, and an operator has neither. `private.org_role()` answers
+  `owner` for a system admin on every org, so every policy written against it
+  and `private.feature_level()` honour the role with no per-table wiring, and
+  `private.shares_org_with()` lets them see any roster's names. The app
+  mirrors that: `loadOrgContext()` lists every org RLS shows them with
+  `role: 'owner'`, and `PUT /api/org` and the staff actions check org
+  visibility, never a membership row — copy that when a new surface needs
+  "may this user act in this org". A user can only read their own
+  `system_admins` row, so nothing can list operators. Locally,
+  `evancoppa@gmail.com` is the seeded operator.
 - **Staff management is the reference gated page** (`staff_management`
   migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
   all three levels: `read` shows the roster, `manage` invites people and
-  assigns roles, `delete` removes a member. Invitations are rows in
+  revokes invites, `delete` removes a member — while assigning roles stays an
+  owner/admin act (what the `member_roles` policies accept), since a role can
+  hand out `delete`. Invitations are rows in
   `organization_invites` — single-use, database-generated tokens, 7-day
   expiry, either addressed to an email or shareable as a link — consumed at
   `/invite/[token]`, which lives outside `(app)` because the person accepting
