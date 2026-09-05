@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureMap, FeatureMode } from './features/types';
-import { buildNav, groupNav, isNavItemActive, navItemTarget, staticNavItems } from './navigation';
+import { buildNav, groupNav, isNavItemActive, staticNavItems } from './navigation';
 
 function map(
 	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
@@ -87,22 +87,6 @@ describe('buildNav', () => {
 
 	it('returns only the static pages for an empty map', () => {
 		expect(buildNav({}, readAll)).toEqual(staticNavItems);
-	});
-});
-
-describe('navItemTarget', () => {
-	it('sends locked entries to the upgrade page and the rest to their own', () => {
-		const nav = buildNav(
-			map([
-				['clients', 'enabled'],
-				['best-practices', 'locked_visible']
-			]),
-			readAll
-		);
-		const item = (id: string) => nav.find((i) => i.featureId === id)!;
-		expect(navItemTarget(item('clients'))).toBe('/clients');
-		expect(navItemTarget(item('best-practices'))).toBe('/upgrade?feature=best-practices');
-		expect(navItemTarget(staticNavItems[0])).toBe('/');
 	});
 });
 

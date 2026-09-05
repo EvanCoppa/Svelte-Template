@@ -11,6 +11,7 @@
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { iconFor } from '$lib/features/icons';
 	import { NAV_CATEGORIES } from '$lib/navigation';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { featuresSchema } from './schema';
 
 	let { data } = $props();
@@ -97,11 +98,7 @@
 								{/if}
 							</div>
 							{#if locked}
-								<Button
-									href={`/upgrade?feature=${encodeURIComponent(row.id)}`}
-									variant="outline"
-									size="sm"
-								>
+								<Button variant="outline" size="sm" onclick={() => showUpgrade(row.id)}>
 									<LockIcon class="size-3.5" />
 									Upgrade
 								</Button>

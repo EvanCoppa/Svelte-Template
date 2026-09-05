@@ -13,7 +13,7 @@ import { ensure, unwrap } from './crm/unwrap';
  * tool (SQL / service role), exactly like `tier_id`.
  */
 
-/** A tier with the features it unlocks, for the upgrade page. */
+/** A tier with the features it unlocks — the upgrade prompt's plans come from these. */
 export type TierWithFeatures = Tables<'tiers'> & { tier_features: { feature_id: string }[] };
 
 /**

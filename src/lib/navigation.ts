@@ -37,7 +37,7 @@ export interface NavItem {
 	aliases?: string[];
 	/** Set when the entry is a registered feature. */
 	featureId?: string;
-	/** locked_visible: render with a lock and send clicks to the upgrade page. */
+	/** locked_visible: render with a lock; a click opens the upgrade prompt instead of navigating. */
 	locked?: boolean;
 }
 
@@ -114,11 +114,4 @@ export function groupNav(items: NavItem[]): NavGroup[] {
 export function isNavItemActive(item: NavItem, pathname: string): boolean {
 	if (item.href === '/') return pathname === '/';
 	return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
-/** The upgrade page for a locked entry, or the entry's own page. */
-export function navItemTarget(item: NavItem): string {
-	return item.locked && item.featureId
-		? `/upgrade?feature=${encodeURIComponent(item.featureId)}`
-		: item.href;
 }

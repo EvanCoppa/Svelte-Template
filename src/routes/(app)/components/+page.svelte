@@ -70,6 +70,7 @@
 	} from '$lib/components/enhanced/index.js';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
+	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -92,6 +93,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { cn } from '$lib/utils.js';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -100,6 +102,7 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import {
 		createColumnHelper,
 		createTable,
@@ -142,6 +145,17 @@
 	let acceptTerms = $state(false);
 	let notifications = $state(true);
 	let dialogOpen = $state(false);
+	// Upgrade modal — demo copy; the app's own (`showUpgrade()`) pitches from the feature registry.
+	let upgradeDemoOpen = $state(false);
+	function requestUpgradeDemo() {
+		upgradeDemoOpen = false;
+		toast.success('Upgrade requested');
+	}
+	const UPGRADE_PERKS = [
+		{ name: 'Deals', description: 'Pipeline of opportunities, by stage and value.' },
+		{ name: 'Reports', description: 'Forecasts and win rates, by owner and by month.' },
+		{ name: 'Priority support', description: 'A named contact and a one-business-day reply.' }
+	];
 	// Modal — the demo form posts nowhere; a real page wires a form action here.
 	let modalOpen = $state(false);
 	let campaignName = $state('');
@@ -1528,6 +1542,63 @@
 						</form>
 					</Modal.Content>
 				</Modal.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Upgrade modal</Card.Title>
+				<Card.Description>
+					The upgrade pitch as a dialog: a primary-tinted halftone hero, a title with the plan pill
+					beside it, what the plan adds, and a full-width action over a quiet way out —
+					<code>ui/dialog</code> underneath, <code>UntitledButton</code>s on top. The app mounts one
+					in the <code>(app)</code> layout: <code>showUpgrade('deals')</code> from
+					<code>$lib/upgrade.svelte</code> opens it with the org's real plans, from anywhere.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<UpgradeModal.Root bind:open={upgradeDemoOpen}>
+					<UpgradeModal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<SparklesIcon />{/snippet}
+								Demo copy
+							</UntitledButton>
+						{/snippet}
+					</UpgradeModal.Trigger>
+					<UpgradeModal.Content>
+						<UpgradeModal.Hero><SparklesIcon /></UpgradeModal.Hero>
+						<UpgradeModal.Header>
+							<UpgradeModal.Title>Upgrade your plan</UpgradeModal.Title>
+							<UpgradeModal.Badge>Pro</UpgradeModal.Badge>
+							<UpgradeModal.Description>
+								Get the pipeline view, the reports that go with it, and a named contact when you
+								need one.
+							</UpgradeModal.Description>
+						</UpgradeModal.Header>
+						<UpgradeModal.Features>
+							{#each UPGRADE_PERKS as perk (perk.name)}
+								<UpgradeModal.Feature>
+									<UpgradeModal.FeatureTitle>{perk.name}</UpgradeModal.FeatureTitle>
+									<UpgradeModal.FeatureDescription
+										>{perk.description}</UpgradeModal.FeatureDescription
+									>
+								</UpgradeModal.Feature>
+							{/each}
+						</UpgradeModal.Features>
+						<UpgradeModal.Footer>
+							<UpgradeModal.Action onclick={requestUpgradeDemo}>Upgrade to Pro</UpgradeModal.Action>
+							<UpgradeModal.Dismiss>No thanks</UpgradeModal.Dismiss>
+						</UpgradeModal.Footer>
+						<UpgradeModal.Close />
+					</UpgradeModal.Content>
+				</UpgradeModal.Root>
+				<UntitledButton color="secondary" onclick={() => showUpgrade()}
+					>showUpgrade()</UntitledButton
+				>
+				<UntitledButton color="secondary" onclick={() => showUpgrade('deals')}>
+					showUpgrade('deals')
+				</UntitledButton>
 			</Card.Content>
 		</Card.Root>
 
