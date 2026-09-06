@@ -154,9 +154,18 @@ create table public.proposals (
 	-- proposal_options exists; it is composite so the selection can only
 	-- ever be one of this proposal's own options.
 	selected_option_id uuid,
+	-- Which deck presents this proposal. A deck is a reusable template that
+	-- holds no proposal data (see the slide_decks migration), so this is a
+	-- plain pointer, not a join table: a proposal is presented through one
+	-- deck, and null means "the org's default". Composite, so the deck must
+	-- belong to this org; dropping the deck falls the proposal back to the
+	-- default rather than deleting it.
+	deck_id uuid,
 	created_by uuid references auth.users (id) on delete set null default auth.uid(),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now(),
+	foreign key (deck_id, org_id) references public.slide_decks (id, org_id)
+		on delete set null (deck_id),
 	-- Composite target for child-table FKs, same trick as clients.
 	unique (id, org_id),
 	constraint proposals_entity_link_complete
@@ -181,6 +190,7 @@ create index proposals_org_id_status_idx on public.proposals (org_id, status);
 -- The record page: every proposal attached to one client / contact / deal.
 create index proposals_org_id_entity_idx on public.proposals (org_id, entity_type, entity_id);
 create index proposals_selected_option_id_idx on public.proposals (selected_option_id);
+create index proposals_deck_id_idx on public.proposals (deck_id);
 
 create trigger proposals_set_updated_at
 	before update on public.proposals
@@ -584,30 +594,6 @@ create trigger proposals_refresh_option_totals
 	for each row execute procedure public.refresh_proposal_option_totals();
 
 -- ---------------------------------------------------------------------------
--- proposal_decks — which decks present a proposal
--- ---------------------------------------------------------------------------
-
--- Pure join rows, added and removed, never edited (the
--- organization_disabled_features shape). Generating a deck from a proposal
--- is a later step; this is only the link.
-create table public.proposal_decks (
-	id uuid not null primary key default gen_random_uuid(),
-	org_id uuid not null references public.organizations (id) on delete cascade,
-	proposal_id uuid not null,
-	slide_deck_id uuid not null,
-	created_at timestamptz not null default now(),
-	foreign key (proposal_id, org_id) references public.proposals (id, org_id) on delete cascade,
-	foreign key (slide_deck_id, org_id) references public.slide_decks (id, org_id) on delete cascade,
-	unique (proposal_id, slide_deck_id)
-);
-
-comment on table public.proposal_decks is
-	'A slide deck built for a proposal. Join rows only; never edited.';
-
-create index proposal_decks_org_id_idx on public.proposal_decks (org_id);
-create index proposal_decks_slide_deck_id_idx on public.proposal_decks (slide_deck_id);
-
--- ---------------------------------------------------------------------------
 -- proposal_events — what happened to a proposal, in order
 -- ---------------------------------------------------------------------------
 
@@ -693,7 +679,6 @@ alter table public.proposal_options enable row level security;
 alter table public.custom_field_definitions enable row level security;
 alter table public.proposal_custom_field_values enable row level security;
 alter table public.proposal_line_items enable row level security;
-alter table public.proposal_decks enable row level security;
 alter table public.proposal_events enable row level security;
 alter table public.execution_records enable row level security;
 
@@ -794,21 +779,6 @@ create policy "Owners and admins can delete line items"
 	on public.proposal_line_items for delete to authenticated
 	using (private.org_role(org_id) in ('owner', 'admin'));
 
--- proposal_decks -----------------------------------------------------------
--- Join rows: members add them, owners/admins remove them, nobody edits.
-
-create policy "Members can view proposal decks"
-	on public.proposal_decks for select to authenticated
-	using (private.org_role(org_id) is not null);
-
-create policy "Members can link decks to proposals"
-	on public.proposal_decks for insert to authenticated
-	with check (private.org_role(org_id) is not null);
-
-create policy "Owners and admins can unlink decks from proposals"
-	on public.proposal_decks for delete to authenticated
-	using (private.org_role(org_id) in ('owner', 'admin'));
-
 -- proposal_events ----------------------------------------------------------
 -- Append-only: select and insert-as-self, nothing else (see the table).
 
@@ -853,9 +823,9 @@ create policy "Owners and admins can delete execution records"
 
 revoke insert, update on table public.proposals from authenticated;
 grant insert (org_id, entity_type, entity_id, title, base_config, status, default_fee, tax_rate,
-		valid_until, created_by),
+		valid_until, deck_id, created_by),
 	update (entity_type, entity_id, title, base_config, status, default_fee, tax_rate, valid_until,
-		selected_option_id)
+		selected_option_id, deck_id)
 	on table public.proposals to authenticated;
 
 revoke insert, update on table public.proposal_options from authenticated;
@@ -883,10 +853,6 @@ revoke insert, update on table public.proposal_line_items from authenticated;
 grant insert (org_id, proposal_option_id, label, quantity, unit_cost, sort_order),
 	update (label, quantity, unit_cost, sort_order)
 	on table public.proposal_line_items to authenticated;
-
--- Join rows have nothing editable, so no update grant at all.
-revoke insert, update on table public.proposal_decks from authenticated;
-grant insert (org_id, proposal_id, slide_deck_id) on table public.proposal_decks to authenticated;
 
 -- Append-only, so no update grant at all; occurred_at is always now().
 revoke insert, update on table public.proposal_events from authenticated;

@@ -775,52 +775,6 @@ export type Database = {
           },
         ]
       }
-      proposal_decks: {
-        Row: {
-          created_at: string
-          id: string
-          org_id: string
-          proposal_id: string
-          slide_deck_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          org_id: string
-          proposal_id: string
-          slide_deck_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          org_id?: string
-          proposal_id?: string
-          slide_deck_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "proposal_decks_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_decks_proposal_id_org_id_fkey"
-            columns: ["proposal_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "proposals"
-            referencedColumns: ["id", "org_id"]
-          },
-          {
-            foreignKeyName: "proposal_decks_slide_deck_id_org_id_fkey"
-            columns: ["slide_deck_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "slide_decks"
-            referencedColumns: ["id", "org_id"]
-          },
-        ]
-      }
       proposal_events: {
         Row: {
           actor: string | null
@@ -1025,6 +979,7 @@ export type Database = {
           base_config: Json
           created_at: string
           created_by: string | null
+          deck_id: string | null
           default_fee: number | null
           entity_id: string | null
           entity_type:
@@ -1043,6 +998,7 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
+          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?:
@@ -1061,6 +1017,7 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
+          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?:
@@ -1076,6 +1033,13 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposals_deck_id_org_id_fkey"
+            columns: ["deck_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "slide_decks"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "proposals_org_id_fkey"
             columns: ["org_id"]
@@ -1167,26 +1131,32 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          deck_json: Json
           id: string
+          name: string
           org_id: string
-          title: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          deck_json?: Json
           id?: string
+          name: string
           org_id: string
-          title: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          deck_json?: Json
           id?: string
+          name?: string
           org_id?: string
-          title?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {

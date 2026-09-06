@@ -21,10 +21,9 @@ This page is the contract for keeping it that way. The `proposals` migration
 | `proposal_line_items`          | an itemised line inside an option; `total` is generated               | members (delete: owner/admin)      |
 | `custom_field_definitions`     | an org-declared, typed attribute its options carry (a comparison row) | owner/admin                        |
 | `proposal_custom_field_values` | an option's value for one definition, in the column matching its type | members (delete: owner/admin)      |
-| `proposal_decks`               | a slide deck built for a proposal (join rows, never edited)           | members (delete: owner/admin)      |
 | `proposal_events`              | one thing that happened: sent, viewed, option selected, accepted, …   | members as themselves; append-only |
 | `execution_records`            | the vertical-specific follow-through on the accepted option           | members (delete: owner/admin)      |
-| `slide_decks`                  | the deck itself (its slide content model arrives with the builder)    | members (delete: owner/admin)      |
+| `slide_decks`                  | a reusable presentation template: which slides, in what order         | members (delete: owner/admin)      |
 
 Everything upstream of the decision is shared. **Only `execution_records` is allowed to
 differ per vertical**: its `execution_type` is a fixed set we own, but its `status` is
@@ -150,6 +149,59 @@ oneself, with no update or delete policy at all (the client-facing view logs thr
 service-role client with a null `actor`). Column grants keep `org_id`, authorship, a child's
 parent link and every computed column out of the browser's reach.
 
+## Decks are templates, not documents
+
+A deck holds **no proposal data**. It says which slides appear, in what order, on
+which template, with what design and static copy — and the proposal's own figures are
+injected when it is presented. That is why one deck presents every proposal an org
+sends, and why `proposals.deck_id` is a plain nullable pointer (null = the org's
+default) rather than a join table: a proposal is presented _through_ a deck, it does
+not _own_ one.
+
+The whole slide list lives in one `deck_json` column:
+
+```json
+{
+	"version": 1,
+	"slides": [
+		{
+			"id": "s1",
+			"templateId": "comparison-table",
+			"content": {
+				"text": { "heading": "Compare Your Options" },
+				"images": {},
+				"colors": { "accentColor": "#2563eb" },
+				"styles": {},
+				"variables": { "heading": { "sourceField": "proposal.title" } }
+			}
+		}
+	]
+}
+```
+
+This is not a hole in rule 1. A deck is always read, written and versioned as a
+unit — the editor loads it whole and saves it whole, and nothing queries across
+slides — so a row per slide would buy ordering and referential machinery for a
+document never accessed a row at a time. The rule's own test still decides it: no two
+industries will ever query on the innards of a slide.
+
+Two things bridge a template and a filled-in presentation, and both belong to the
+presenter, not the schema:
+
+- **Expansion** — one authored slide becomes many. An option-shaped slide (a pricing
+  or comparison slide) is repeated once per `proposal_options` row, in `sort_order`,
+  so the author places it once and never edits it again when an option is added.
+- **Variables** — `content.variables[key].sourceField` is a dot path resolved against
+  the live proposal at present time (`client.name`, `option.computed_total`), with the
+  authored text as the fallback when the path is missing, so a deck renders even with
+  no proposal attached.
+
+The database guarantees only the envelope (an object carrying a numeric `version` and
+an array of `slides`); `slideDeckSchema` in `src/lib/schemas/decks.ts` guarantees the
+slide shapes on save — the freeform-content tier of the three-tier rule above. It
+deliberately does **not** check `templateId` against a registry: an unknown template is
+the renderer's problem, not a reason to refuse a save and lose the author's work.
+
 ## From options to slides
 
 The grid is `proposal_options` ordered by `sort_order`: one column per option
@@ -170,7 +222,9 @@ icons. A template never meets a string it has to guess at.
 - **A `proposals` feature and page.** The registry gates pages by existing; register the
   feature (rows in `features`, `industry_features`, `tier_features`, its id in
   `FEATURE_IDS`) in the migration that adds the route.
-- **Generating a deck from a proposal.** `proposal_decks` is only the link.
+- **The deck editor and the presenter.** `slide_decks` stores a deck and
+  `proposals.deck_id` points at one; authoring slides, expanding them per option and
+  resolving variables at present time are all still to build.
 - **Auto-logging status changes as events.** The form action that flips `status` writes
   the matching `proposal_events` row; a trigger could take that over if it drifts.
 - **Vertical-specific handling of `execution_records`** beyond the table.
