@@ -34,10 +34,6 @@
 	];
 </script>
 
-<svelte:head>
-	<title>Dashboard</title>
-</svelte:head>
-
 <div class="mx-auto max-w-5xl space-y-8">
 	<div class="space-y-1">
 		<div class="flex items-center gap-3">

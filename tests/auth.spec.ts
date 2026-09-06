@@ -43,6 +43,9 @@ test.describe('signing in', () => {
 		await signIn(page);
 
 		await expect(page).toHaveURL('/');
+		// Titles come from the `pages` table, resolved by the (app) layout — the
+		// dashboard is a shell page, belonging to no feature.
+		await expect(page).toHaveTitle('Dashboard');
 		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 		// Rendered in the page body and again in the sidebar's user menu.
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
@@ -92,6 +95,21 @@ test.describe('signing in', () => {
 test.describe('the app shell', () => {
 	test.beforeEach(async ({ page }) => {
 		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	test('names the last pages visited in the header breadcrumb trail', async ({ page }) => {
+		// A trail of where you have been, not a hierarchy: the crumbs are named
+		// from the `pages` registry and kept in this tab's sessionStorage, so
+		// they survive the full page load below.
+		await page.goto('/clients');
+
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		await expect(trail.getByRole('link', { name: 'Clients' })).toBeVisible();
+
+		// And the way back is a plain link, so it works before hydration.
+		await trail.getByRole('link', { name: 'Dashboard' }).click();
 		await expect(page).toHaveURL('/');
 	});
 
