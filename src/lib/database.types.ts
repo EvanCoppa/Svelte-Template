@@ -113,6 +113,47 @@ export type Database = {
           },
         ]
       }
+      custom_field_definitions: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          id: string
+          key: string
+          label: string
+          org_id: string
+          updated_at: string
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          id?: string
+          key: string
+          label: string
+          org_id: string
+          updated_at?: string
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          id?: string
+          key?: string
+          label?: string
+          org_id?: string
+          updated_at?: string
+          value_type?: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_field_definitions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deals: {
         Row: {
           amount: number | null
@@ -174,6 +215,67 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      execution_records: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          details: Json
+          execution_type: Database["public"]["Enums"]["execution_type"]
+          id: string
+          org_id: string
+          proposal_id: string
+          proposal_option_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          details?: Json
+          execution_type: Database["public"]["Enums"]["execution_type"]
+          id?: string
+          org_id: string
+          proposal_id: string
+          proposal_option_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          details?: Json
+          execution_type?: Database["public"]["Enums"]["execution_type"]
+          id?: string
+          org_id?: string
+          proposal_id?: string
+          proposal_option_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "execution_records_proposal_id_org_id_fkey"
+            columns: ["proposal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "execution_records_proposal_option_id_proposal_id_fkey"
+            columns: ["proposal_option_id", "proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id", "proposal_id"]
           },
         ]
       }
@@ -615,6 +717,381 @@ export type Database = {
         }
         Relationships: []
       }
+      proposal_custom_field_values: {
+        Row: {
+          created_at: string
+          field_definition_id: string
+          id: string
+          org_id: string
+          proposal_option_id: string
+          updated_at: string
+          value_boolean: boolean | null
+          value_numeric: number | null
+          value_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          field_definition_id: string
+          id?: string
+          org_id: string
+          proposal_option_id: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          field_definition_id?: string
+          id?: string
+          org_id?: string
+          proposal_option_id?: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_custom_field_values_field_definition_id_org_id_fkey"
+            columns: ["field_definition_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "custom_field_definitions"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "proposal_custom_field_values_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_custom_field_values_proposal_option_id_org_id_fkey"
+            columns: ["proposal_option_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      proposal_decks: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          proposal_id: string
+          slide_deck_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          proposal_id: string
+          slide_deck_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          proposal_id?: string
+          slide_deck_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_decks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_decks_proposal_id_org_id_fkey"
+            columns: ["proposal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "proposal_decks_slide_deck_id_org_id_fkey"
+            columns: ["slide_deck_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "slide_decks"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      proposal_events: {
+        Row: {
+          actor: string | null
+          event_type: Database["public"]["Enums"]["proposal_event_type"]
+          id: string
+          metadata: Json
+          occurred_at: string
+          org_id: string
+          proposal_id: string
+          proposal_option_id: string | null
+        }
+        Insert: {
+          actor?: string | null
+          event_type: Database["public"]["Enums"]["proposal_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          org_id: string
+          proposal_id: string
+          proposal_option_id?: string | null
+        }
+        Update: {
+          actor?: string | null
+          event_type?: Database["public"]["Enums"]["proposal_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          org_id?: string
+          proposal_id?: string
+          proposal_option_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_events_proposal_id_org_id_fkey"
+            columns: ["proposal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "proposal_events_proposal_option_id_proposal_id_fkey"
+            columns: ["proposal_option_id", "proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id", "proposal_id"]
+          },
+        ]
+      }
+      proposal_line_items: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          org_id: string
+          proposal_option_id: string
+          quantity: number
+          sort_order: number
+          total: number | null
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          org_id: string
+          proposal_option_id: string
+          quantity?: number
+          sort_order?: number
+          total?: number | null
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          org_id?: string
+          proposal_option_id?: string
+          quantity?: number
+          sort_order?: number
+          total?: number | null
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_line_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_line_items_proposal_option_id_org_id_fkey"
+            columns: ["proposal_option_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      proposal_options: {
+        Row: {
+          base_price: number
+          computed_total: number | null
+          created_at: string
+          currency: string
+          custom_fields: Json
+          discount_amount: number
+          discount_pct: number | null
+          duration_unit: Database["public"]["Enums"]["duration_unit"] | null
+          duration_value: number | null
+          fee_override: number | null
+          financing_apr: number | null
+          financing_available: boolean
+          financing_term_months: number | null
+          id: string
+          is_recommended: boolean
+          label: string
+          org_id: string
+          primary_image_url: string | null
+          proposal_id: string
+          sort_order: number
+          start_offset_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          base_price?: number
+          computed_total?: number | null
+          created_at?: string
+          currency?: string
+          custom_fields?: Json
+          discount_amount?: number
+          discount_pct?: number | null
+          duration_unit?: Database["public"]["Enums"]["duration_unit"] | null
+          duration_value?: number | null
+          fee_override?: number | null
+          financing_apr?: number | null
+          financing_available?: boolean
+          financing_term_months?: number | null
+          id?: string
+          is_recommended?: boolean
+          label: string
+          org_id: string
+          primary_image_url?: string | null
+          proposal_id: string
+          sort_order?: number
+          start_offset_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          computed_total?: number | null
+          created_at?: string
+          currency?: string
+          custom_fields?: Json
+          discount_amount?: number
+          discount_pct?: number | null
+          duration_unit?: Database["public"]["Enums"]["duration_unit"] | null
+          duration_value?: number | null
+          fee_override?: number | null
+          financing_apr?: number | null
+          financing_available?: boolean
+          financing_term_months?: number | null
+          id?: string
+          is_recommended?: boolean
+          label?: string
+          org_id?: string
+          primary_image_url?: string | null
+          proposal_id?: string
+          sort_order?: number
+          start_offset_days?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_options_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_options_proposal_id_org_id_fkey"
+            columns: ["proposal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          base_config: Json
+          created_at: string
+          created_by: string | null
+          default_fee: number | null
+          entity_id: string | null
+          entity_type:
+            | Database["public"]["Enums"]["proposal_entity_type"]
+            | null
+          id: string
+          org_id: string
+          selected_option_id: string | null
+          status: Database["public"]["Enums"]["proposal_status"]
+          tax_rate: number | null
+          title: string
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          base_config?: Json
+          created_at?: string
+          created_by?: string | null
+          default_fee?: number | null
+          entity_id?: string | null
+          entity_type?:
+            | Database["public"]["Enums"]["proposal_entity_type"]
+            | null
+          id?: string
+          org_id: string
+          selected_option_id?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          tax_rate?: number | null
+          title: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          base_config?: Json
+          created_at?: string
+          created_by?: string | null
+          default_fee?: number | null
+          entity_id?: string | null
+          entity_type?:
+            | Database["public"]["Enums"]["proposal_entity_type"]
+            | null
+          id?: string
+          org_id?: string
+          selected_option_id?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          tax_rate?: number | null
+          title?: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_selected_option_id_id_fkey"
+            columns: ["selected_option_id", "id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id", "proposal_id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string
@@ -682,6 +1159,41 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slide_decks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slide_decks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -925,6 +1437,7 @@ export type Database = {
     }
     Enums: {
       client_status: "lead" | "prospect" | "active" | "inactive"
+      custom_field_value_type: "text" | "numeric" | "boolean" | "select"
       deal_stage:
         | "lead"
         | "qualified"
@@ -932,9 +1445,30 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
+      duration_unit: "visits" | "days" | "weeks" | "months" | "sec"
+      execution_type:
+        | "appointment_schedule"
+        | "work_order"
+        | "purchase_order"
+        | "production_run"
       feature_mode: "enabled" | "locked_visible" | "disabled" | "hidden"
       org_role: "owner" | "admin" | "member"
       permission_level: "read" | "manage" | "delete"
+      proposal_entity_type: "client" | "contact" | "deal"
+      proposal_event_type:
+        | "sent"
+        | "viewed"
+        | "option_selected"
+        | "accepted"
+        | "declined"
+        | "expired"
+      proposal_status:
+        | "draft"
+        | "sent"
+        | "viewed"
+        | "accepted"
+        | "declined"
+        | "expired"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
@@ -1065,6 +1599,7 @@ export const Constants = {
   public: {
     Enums: {
       client_status: ["lead", "prospect", "active", "inactive"],
+      custom_field_value_type: ["text", "numeric", "boolean", "select"],
       deal_stage: [
         "lead",
         "qualified",
@@ -1073,9 +1608,33 @@ export const Constants = {
         "won",
         "lost",
       ],
+      duration_unit: ["visits", "days", "weeks", "months", "sec"],
+      execution_type: [
+        "appointment_schedule",
+        "work_order",
+        "purchase_order",
+        "production_run",
+      ],
       feature_mode: ["enabled", "locked_visible", "disabled", "hidden"],
       org_role: ["owner", "admin", "member"],
       permission_level: ["read", "manage", "delete"],
+      proposal_entity_type: ["client", "contact", "deal"],
+      proposal_event_type: [
+        "sent",
+        "viewed",
+        "option_selected",
+        "accepted",
+        "declined",
+        "expired",
+      ],
+      proposal_status: [
+        "draft",
+        "sent",
+        "viewed",
+        "accepted",
+        "declined",
+        "expired",
+      ],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
