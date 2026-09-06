@@ -15,11 +15,12 @@ import type { FeatureMap, ResolvedFeature } from './types';
 
 /**
  * Pathname prefixes that are NEVER feature-gated: the surfaces a user needs
- * to respond to a gate decision (the upgrade page, the org's feature
- * settings), API endpoints (they carry their own checks) and sign-out.
+ * to respond to a gate decision (the org's feature settings; a locked
+ * feature lands on the dashboard, where the upgrade prompt opens), API
+ * endpoints (they carry their own checks) and sign-out.
  * Public paths never reach the gate — the auth guard handles them first.
  */
-export const FEATURE_GATE_EXEMPT_PREFIXES = ['/settings', '/upgrade', '/api/', '/logout'] as const;
+export const FEATURE_GATE_EXEMPT_PREFIXES = ['/settings', '/api/', '/logout'] as const;
 
 /** Where a request goes instead, or why it is refused. `null` = allowed. */
 export type GateDecision = { redirectTo: string } | { status: 403 | 404; message: string };
@@ -44,7 +45,8 @@ export function matchFeature(pathname: string, features: FeatureMap): ResolvedFe
 
 /**
  * Decide a request. Mode first, then the read grant:
- *   locked_visible  -> /upgrade?feature=<id>
+ *   locked_visible  -> /?upgrade=<id> (the dashboard; UpgradePrompt reads the
+ *                      param and opens the pitch — a redirect cannot open a dialog)
  *   disabled        -> /settings/features?feature=<id> (the org can undo it there)
  *   hidden          -> 404 (it does not exist for this org — never a 403 that
  *                      confirms the page is real)
@@ -64,7 +66,7 @@ export function featureGateFor(
 	const id = encodeURIComponent(match.feature.id);
 	switch (match.mode) {
 		case 'locked_visible':
-			return { redirectTo: `/upgrade?feature=${id}` };
+			return { redirectTo: `/?upgrade=${id}` };
 		case 'disabled':
 			return { redirectTo: `/settings/features?feature=${id}` };
 		case 'hidden':

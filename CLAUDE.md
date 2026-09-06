@@ -153,12 +153,23 @@ application data is scoped to an organization, never to a bare user. The
   (industry has it, plan doesn't — the tier axis, shown with an upgrade prompt),
   `disabled` (the org switched it off), `hidden` (not in the industry — does not
   exist). **`hooks.server.ts` enforces the mode** next to the auth check via
-  `featureGateFor()` (locked → `/upgrade?feature=`, disabled →
-  `/settings/features?feature=`, hidden → 404), so a page is gated by being
+  `featureGateFor()` (locked → `/?upgrade=<id>`, where the upgrade prompt opens,
+  disabled → `/settings/features?feature=`, hidden → 404), so a page is gated by being
   registered, never by a check in its load. Adding a page = the route + one
   migration inserting its rows (the migration's closing comment is the
   checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
-  the registry, and `/settings` and `/upgrade` are the gate's exempt surfaces.
+  the registry, and `/settings` (with `/api/` and `/logout`) is exempt from the gate.
+- **A feature is made of pages, and a page has a title** (`pages` migration +
+  `src/lib/features/pages.ts`). One row per screen — `path`, `title`, and the
+  `feature_id` it belongs to (null for the shell pages, dashboard and settings).
+  The `(app)` layout ships the pages the session may see (`visiblePages()`,
+  filtered by the same predicate as the nav) and renders **the one `<title>` for
+  the whole group** from `matchPage(page.url.pathname, …)`, re-resolved on every
+  navigation. **Never put `<svelte:head><title>` in a page file** — a title is a
+  row, so the migration adding a route adds its page row too. A title that
+  depends on a record is the one exception: that page's load returns `title` and
+  page data wins. Public screens (`/login`, `/reset-password`, `/invite`) keep
+  static titles — they render before a session exists.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -341,11 +352,24 @@ tests — keep them green and extend them.
 come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
 `staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
-Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
-clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
+Adding a page = create the route under `(app)` + register the feature and its `pages`
+row by migration; nothing in `navigation.ts` changes, and the page's `<title>` comes
+from that row (see "A feature is made of pages" under Multi-tenancy). A locked entry
+renders with a lock and a click opens the upgrade prompt (`showUpgrade()`) instead of
+navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
+
+The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
+on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings
+under one shell and the same screen is reached from a dozen places, so a tree would be
+fiction. All of its behaviour (dedupe, cap, storage) is in `src/lib/breadcrumbs.svelte.ts`;
+`src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
+the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
+document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
+user + org (this tab's own; no cookie on every request, and switching org or user starts a
+fresh one). Never add a second breadcrumb surface, a per-page crumb prop, or a
+hierarchy-from-the-URL variant.
 
 ## Svelte reference docs
 
@@ -381,6 +405,21 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`. Hand-built
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
+- **A dialog is `Modal`** (`src/lib/components/modal/`), the app-level compound over `ui/dialog`
+  and `ui/card`: `Modal.Content` is the muted tray, `Modal.Card` the white card inside it holding
+  `Modal.Header` (an icon-led `Modal.Title`; the close button is pinned to the card) and
+  `Modal.Body`, and `Modal.Footer` sits on the tray pairing `Modal.Cancel` (`esc`) with
+  `Modal.Action` (`↵` on a submit button) — both `UntitledButton`s. Wrap `Modal.Card` +
+  `Modal.Footer` in the page's `<form>` so `Modal.Action type="submit"` posts it. Reach for bare
+  `ui/dialog` only when a screen needs a different frame; `/components` → Overlays → Modal is the
+  reference.
+- **Selling a plan is `showUpgrade(featureId?)`** from `$lib/upgrade.svelte`. It opens the one
+  `UpgradePrompt` the `(app)` layout mounts — `UpgradeModal` (`src/lib/components/upgrade-modal/`,
+  the pitch as a dialog frame) fed the plans from the layout load — with the smallest plan that
+  unlocks the feature and what else it adds. Call it where a locked click or a tier limit lands
+  (the sidebar, the palette and the feature gate already do); never navigate somewhere to pitch
+  a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
+  the reference.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted

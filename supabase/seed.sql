@@ -363,6 +363,150 @@ insert into public.organization_invites (id, org_id, email, token, invited_by) v
 		'00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
+-- Proposal fixtures, all inside Acme. Ids use the a0…/a1…/… ranges per
+-- table family. Two proposals: one out for decision (sent, three options,
+-- line items, custom values, a deck, a timeline) and one already accepted
+-- with its execution record, so every table has a row after a reset.
+-- computed_total is left out on purpose — the trigger owns it.
+insert into public.custom_field_definitions (id, org_id, key, label, value_type, allowed_values) values
+	('a3000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'warranty_years', 'Warranty (years)', 'numeric', null),
+	('a3000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'includes_onboarding', 'Onboarding included', 'boolean', null),
+	('a3000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'support_tier', 'Support tier', 'select', '["email", "business hours", "24/7"]')
+on conflict (id) do nothing;
+
+-- A deck is a reusable template, so this one carries slides and no proposal
+-- data: a title slide with a runtime-bound heading, then the two slides the
+-- presenter expands and fills from whichever proposal is being shown.
+insert into public.slide_decks (id, org_id, name, deck_json, created_by, updated_by) values
+	('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Standard proposal deck',
+		'{
+			"version": 1,
+			"slides": [
+				{
+					"id": "s1",
+					"templateId": "title",
+					"content": {
+						"text": { "heading": "A proposal for you", "subheading": "Acme Inc" },
+						"images": {},
+						"colors": { "accentColor": "#2563eb" },
+						"variables": { "heading": { "sourceField": "proposal.title" } }
+					}
+				},
+				{
+					"id": "s2",
+					"templateId": "comparison-table",
+					"content": {
+						"text": { "heading": "Compare Your Options" },
+						"images": {},
+						"colors": { "accentColor": "#2563eb" }
+					}
+				},
+				{
+					"id": "s3",
+					"templateId": "investment-summary",
+					"content": {
+						"text": { "heading": "Your Investment" },
+						"images": {},
+						"colors": { "accentColor": "#2563eb" }
+					}
+				}
+			]
+		}',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+-- Proposal 1 hangs off the Wayne deal; proposal 2 off the Wayne client.
+insert into public.proposals (id, org_id, entity_type, entity_id, title, base_config, status,
+		default_fee, tax_rate, valid_until, deck_id, created_by) values
+	('a1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'deal', '40000000-0000-0000-0000-000000000001', 'Annual support contract — options',
+		'{"seats": 120, "regions": ["us-east", "eu-west"]}', 'sent',
+		250.00, 8.25, now() + interval '30 days',
+		'a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+	('a1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'client', '20000000-0000-0000-0000-000000000001', 'Website redesign',
+		'{}', 'draft',
+		null, null, null, null, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.proposal_options (id, org_id, proposal_id, label, sort_order, is_recommended,
+		base_price, fee_override, discount_amount, discount_pct, duration_value, duration_unit,
+		start_offset_days, financing_available, financing_term_months, financing_apr, custom_fields) values
+	('a2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000001', 'Basic', 0, false,
+		12000.00, null, 0, null, 12, 'months', 0, false, null, null, '{}'),
+	('a2000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000001', 'Standard', 1, true,
+		24000.00, null, 0, 5, 12, 'months', 0, true, 12, 0, '{"sla_hours": 8}'),
+	('a2000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000001', 'Premium', 2, false,
+		30000.00, 0, 1000.00, null, 12, 'months', 0, true, 24, 4.99, '{"sla_hours": 1}'),
+	('a2000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000002', 'Refresh', 0, false,
+		8000.00, null, 0, null, 6, 'weeks', 14, false, null, null, '{}'),
+	('a2000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000002', 'Rebuild', 1, true,
+		18000.00, null, 0, null, 12, 'weeks', 14, true, 12, 0, '{}')
+on conflict (id) do nothing;
+
+insert into public.proposal_line_items (id, org_id, proposal_option_id, label, quantity, unit_cost, sort_order) values
+	('a5000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000003', 'Dedicated engineer (days)', 10, 1200.00, 0),
+	('a5000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000003', 'Quarterly review', 4, 500.00, 1)
+on conflict (id) do nothing;
+
+insert into public.proposal_custom_field_values (id, org_id, proposal_option_id, field_definition_id,
+		value_text, value_numeric, value_boolean) values
+	('a4000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', null, 1, null),
+	('a4000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000001', null, 2, null),
+	('a4000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000001', null, 3, null),
+	('a4000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000002', null, null, false),
+	('a4000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000002', null, null, true),
+	('a4000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000002', null, null, true),
+	('a4000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000003', 'email', null, null),
+	('a4000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000003', 'business hours', null, null),
+	('a4000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001',
+		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', '24/7', null, null)
+on conflict (id) do nothing;
+
+-- The accepted one: selection and status land together (the check
+-- constraint wants both), then the follow-through. Idempotent by nature.
+update public.proposals
+set status = 'accepted', selected_option_id = 'a2000000-0000-0000-0000-000000000005'
+where id = 'a1000000-0000-0000-0000-000000000002';
+
+insert into public.proposal_events (id, org_id, proposal_id, event_type, proposal_option_id, actor, occurred_at, metadata) values
+	('a7000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000001', 'sent', null,
+		'00000000-0000-0000-0000-000000000001', now() - interval '2 days', '{"channel": "email"}'),
+	('a7000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000001', 'viewed', null,
+		null, now() - interval '1 day', '{"user_agent": "seed"}'),
+	('a7000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000002', 'accepted', 'a2000000-0000-0000-0000-000000000005',
+		'00000000-0000-0000-0000-000000000003', now() - interval '3 days', '{}')
+on conflict (id) do nothing;
+
+insert into public.execution_records (id, org_id, proposal_id, proposal_option_id, execution_type, status, details, created_by) values
+	('a8000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a1000000-0000-0000-0000-000000000002', 'a2000000-0000-0000-0000-000000000005',
+		'work_order', 'scheduled', '{"kickoff": "next sprint", "team": "web"}',
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
 -- The platform operator (see the system_admins migration). Evan is the
 -- developer's own account, so `npm run dev` lands in the operator view:
 -- every org above in the switcher and owner-level access in each, whatever

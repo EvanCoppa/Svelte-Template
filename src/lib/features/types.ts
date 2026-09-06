@@ -54,3 +54,11 @@ export type ResolvedFeature = { feature: Feature; mode: FeatureMode };
 
 /** Every registered feature, keyed by id, with its mode for the session. */
 export type FeatureMap = Record<string, ResolvedFeature>;
+
+/**
+ * One registered page: a titled screen under a feature's route, or one of
+ * the shell pages that belong to no feature (`feature_id` null — the
+ * dashboard and settings). The columns the browser needs; `created_at`
+ * stays on the server.
+ */
+export type PageMeta = Pick<Tables<'pages'>, 'id' | 'feature_id' | 'path' | 'title'>;

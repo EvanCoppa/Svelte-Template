@@ -68,11 +68,16 @@
 		WizardSteps,
 		type WizardStep
 	} from '$lib/components/enhanced/index.js';
+	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as Modal from '$lib/components/modal/index.js';
+	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Calendar } from '$lib/components/ui/calendar/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -91,13 +96,25 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { cn } from '$lib/utils.js';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import {
+		CalendarDate,
+		DateFormatter,
+		getLocalTimeZone,
+		type DateValue
+	} from '@internationalized/date';
+	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import CalendarPlusIcon from '@lucide/svelte/icons/calendar-plus';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import MegaphoneIcon from '@lucide/svelte/icons/megaphone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import {
 		createColumnHelper,
 		createTable,
@@ -131,6 +148,7 @@
 	} satisfies Record<string, string>;
 	let role = $state('');
 	let tags = $state<string[]>([]);
+	let showcaseDate = $state<DateValue | undefined>();
 	const tagOptions = ['Design', 'Engineering', 'Marketing', 'Sales', 'Support'];
 
 	// Command — the raw list-filtering primitive Combobox is built on.
@@ -140,6 +158,90 @@
 	let acceptTerms = $state(false);
 	let notifications = $state(true);
 	let dialogOpen = $state(false);
+	// Upgrade modal — demo copy; the app's own (`showUpgrade()`) pitches from the feature registry.
+	let upgradeDemoOpen = $state(false);
+	function requestUpgradeDemo() {
+		upgradeDemoOpen = false;
+		toast.success('Upgrade requested');
+	}
+	const UPGRADE_PERKS = [
+		{ name: 'Deals', description: 'Pipeline of opportunities, by stage and value.' },
+		{ name: 'Reports', description: 'Forecasts and win rates, by owner and by month.' },
+		{ name: 'Priority support', description: 'A named contact and a one-business-day reply.' }
+	];
+	// Modal — the demo form posts nowhere; a real page wires a form action here.
+	let modalOpen = $state(false);
+	let campaignName = $state('');
+	function createCampaign(event: SubmitEvent) {
+		event.preventDefault();
+		toast.success(`Created "${campaignName.trim()}"`);
+		modalOpen = false;
+		campaignName = '';
+	}
+	// Modal — a longer multi-field form, still one form wrapping Card + Footer.
+	let appointmentModalOpen = $state(false);
+	const PATIENT_LABELS = {
+		'ava-thompson': 'Ava Thompson (#1)',
+		'liam-chen': 'Liam Chen (#2)',
+		'noah-patel': 'Noah Patel (#3)'
+	} satisfies Record<string, string>;
+	const PROVIDER_LABELS = {
+		'elena-ruiz': 'Dr. Elena Ruiz',
+		'marcus-lee': 'Dr. Marcus Lee'
+	} satisfies Record<string, string>;
+	const APPOINTMENT_TYPE_LABELS = {
+		'new-patient-exam': 'New Patient Exam',
+		cleaning: 'Cleaning',
+		filling: 'Filling',
+		'root-canal': 'Root Canal',
+		consultation: 'Consultation'
+	} satisfies Record<string, string>;
+	const DURATION_LABELS = {
+		'15': '15 min',
+		'30': '30 min',
+		'45': '45 min',
+		'60': '60 min',
+		'90': '90 min'
+	} satisfies Record<string, string>;
+	const TIME_SLOTS = [
+		'8:00 AM',
+		'8:30 AM',
+		'9:00 AM',
+		'9:30 AM',
+		'10:00 AM',
+		'10:30 AM',
+		'11:00 AM',
+		'1:00 PM',
+		'1:30 PM',
+		'2:00 PM',
+		'2:30 PM',
+		'3:00 PM',
+		'4:00 PM'
+	];
+	const appointmentDateFormatter = new DateFormatter('en-US', { dateStyle: 'long' });
+	let appointmentPatient = $state('ava-thompson');
+	let appointmentProvider = $state('elena-ruiz');
+	let appointmentType = $state('new-patient-exam');
+	let appointmentDate = $state<DateValue | undefined>(new CalendarDate(2026, 9, 5));
+	let appointmentDateOpen = $state(false);
+	let appointmentTime = $state('9:00 AM');
+	let appointmentDuration = $state('30');
+	let appointmentNotes = $state('');
+	let createMoreAppointments = $state(false);
+	const appointmentDateLabel = $derived(
+		appointmentDate
+			? appointmentDateFormatter.format(appointmentDate.toDate(getLocalTimeZone()))
+			: 'Pick a date'
+	);
+	function scheduleAppointment(event: SubmitEvent) {
+		event.preventDefault();
+		toast.success(`Scheduled for ${appointmentDateLabel} at ${appointmentTime}`);
+		appointmentNotes = '';
+		if (!createMoreAppointments) {
+			appointmentModalOpen = false;
+		}
+	}
+
 	let popoverOpen = $state(false);
 	let sheetOpen = $state(false);
 
@@ -1033,10 +1135,6 @@
 	let wizardDone = $state(false);
 </script>
 
-<svelte:head>
-	<title>Components</title>
-</svelte:head>
-
 <div class="mx-auto max-w-5xl space-y-6">
 	<div class="space-y-1">
 		<h1 class="text-2xl font-bold tracking-tight">Components</h1>
@@ -1374,6 +1472,20 @@
 
 		<Card.Root>
 			<Card.Header>
+				<Card.Title>Calendar</Card.Title>
+				<Card.Description>
+					Date selection, on <code>@internationalized/date</code> values rather than strings. Inline
+					here; pair it with <code>ui/popover</code> for a date field that collapses to a chip — the scheduling
+					modal below does exactly that.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Calendar type="single" bind:value={showcaseDate} class="rounded-md border" />
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title>Command</Card.Title>
 				<Card.Description>
 					The raw filterable-list primitive <code>Combobox</code> and the ⌘K palette are built on.
@@ -1466,6 +1578,257 @@
 		<div class="lg:col-span-2">
 			<h2 class="text-lg font-semibold tracking-tight">Overlays</h2>
 		</div>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Modal</Card.Title>
+				<Card.Description>
+					The standard dialog frame: a muted tray holding a white card — icon-led title bar with its
+					close button, then the body — and a footer on the tray that pairs Cancel (Escape) with the
+					primary action (Enter). <code>ui/dialog</code> and <code>ui/card</code>
+					underneath, <code>UntitledButton</code>s on top.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<Modal.Root bind:open={modalOpen}>
+					<Modal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<MegaphoneIcon />{/snippet}
+								Create campaign
+							</UntitledButton>
+						{/snippet}
+					</Modal.Trigger>
+					<Modal.Content>
+						<form onsubmit={createCampaign}>
+							<Modal.Card>
+								<Modal.Header>
+									<Modal.Title><MegaphoneIcon /> Create campaign</Modal.Title>
+								</Modal.Header>
+								<Modal.Body>
+									<div class="grid gap-2">
+										<Label for="campaign-name" required>Campaign name</Label>
+										<Input
+											id="campaign-name"
+											name="name"
+											placeholder="e.g. April product update"
+											autocomplete="off"
+											required
+											bind:value={campaignName}
+										/>
+										<p class="text-muted-foreground text-sm">
+											Used internally to find this campaign in your list.
+										</p>
+									</div>
+								</Modal.Body>
+							</Modal.Card>
+							<Modal.Footer>
+								<Modal.Cancel>Cancel</Modal.Cancel>
+								<Modal.Action type="submit">Create campaign</Modal.Action>
+							</Modal.Footer>
+						</form>
+					</Modal.Content>
+				</Modal.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Modal (multi-field form)</Card.Title>
+				<Card.Description>
+					The same frame carrying a scheduling form. The two identifying fields are labelled
+					<code>Combobox</code>es; everything that qualifies the slot collapses into a row of
+					<code>size="sm"</code> chips, with the date chip opening a
+					<code>Calendar</code> in a <code>Popover</code>. Notes sit in a headed box whose caption
+					is the field's own <code>Label</code>.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<Modal.Root bind:open={appointmentModalOpen}>
+					<Modal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<CalendarPlusIcon />{/snippet}
+								Schedule appointment
+							</UntitledButton>
+						{/snippet}
+					</Modal.Trigger>
+					<Modal.Content class="sm:max-w-2xl">
+						<form onsubmit={scheduleAppointment}>
+							<Modal.Card>
+								<Modal.Header>
+									<Modal.Title><CalendarPlusIcon /> Schedule dental appointment</Modal.Title>
+								</Modal.Header>
+								<Modal.Body>
+									<div class="grid gap-4 sm:grid-cols-2">
+										<div class="grid gap-2">
+											<Label for="appointment-patient" required>Patient</Label>
+											<Combobox
+												id="appointment-patient"
+												name="patient"
+												bind:value={appointmentPatient}
+												options={optionsFromLabels(PATIENT_LABELS)}
+												placeholder="Select a patient…"
+												searchThreshold={0}
+												required
+											/>
+										</div>
+										<div class="grid gap-2">
+											<Label for="appointment-provider">Provider</Label>
+											<Combobox
+												id="appointment-provider"
+												name="provider"
+												bind:value={appointmentProvider}
+												options={optionsFromLabels(PROVIDER_LABELS)}
+												placeholder="Select a provider…"
+											/>
+										</div>
+									</div>
+
+									<div class="flex flex-wrap items-center gap-2">
+										<Combobox
+											name="type"
+											size="sm"
+											class="w-auto"
+											ariaLabel="Appointment type"
+											bind:value={appointmentType}
+											options={optionsFromLabels(APPOINTMENT_TYPE_LABELS)}
+										/>
+
+										<Popover.Root bind:open={appointmentDateOpen}>
+											<Popover.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														type="button"
+														variant="outline"
+														size="sm"
+														class="font-medium"
+													>
+														<CalendarIcon class="text-muted-foreground" />
+														{appointmentDateLabel}
+													</Button>
+												{/snippet}
+											</Popover.Trigger>
+											<Popover.Content class="w-auto p-0">
+												<Calendar
+													type="single"
+													bind:value={appointmentDate}
+													onValueChange={() => (appointmentDateOpen = false)}
+												/>
+											</Popover.Content>
+										</Popover.Root>
+										<input type="hidden" name="date" value={appointmentDate?.toString() ?? ''} />
+
+										<Combobox
+											name="time"
+											size="sm"
+											class="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 w-auto"
+											ariaLabel="Start time"
+											bind:value={appointmentTime}
+											options={TIME_SLOTS}
+										>
+											{#snippet icon()}<ClockIcon />{/snippet}
+										</Combobox>
+
+										<Combobox
+											name="duration"
+											size="sm"
+											class="w-auto"
+											ariaLabel="Duration"
+											bind:value={appointmentDuration}
+											options={optionsFromLabels(DURATION_LABELS)}
+										/>
+									</div>
+
+									<div class="border-input overflow-hidden rounded-lg border">
+										<Label
+											for="appointment-notes"
+											class="bg-muted/50 border-input text-muted-foreground block border-b px-3 py-2 text-[11px] font-semibold tracking-wider uppercase"
+										>
+											Notes
+										</Label>
+										<Textarea
+											id="appointment-notes"
+											name="notes"
+											placeholder="Add notes for this appointment…"
+											bind:value={appointmentNotes}
+											class="min-h-20 resize-none rounded-none border-0 shadow-none focus-visible:ring-0"
+										/>
+									</div>
+								</Modal.Body>
+							</Modal.Card>
+							<Modal.Footer>
+								<div class="flex items-center gap-2">
+									<Switch id="appointment-create-more" bind:checked={createMoreAppointments} />
+									<Label for="appointment-create-more" class="text-muted-foreground font-normal">
+										Create more
+									</Label>
+								</div>
+								<Modal.Action type="submit">Create appointment</Modal.Action>
+							</Modal.Footer>
+						</form>
+					</Modal.Content>
+				</Modal.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Upgrade modal</Card.Title>
+				<Card.Description>
+					The upgrade pitch as a dialog: a primary-tinted halftone hero, a title with the plan pill
+					beside it, what the plan adds, and a full-width action over a quiet way out —
+					<code>ui/dialog</code> underneath, <code>UntitledButton</code>s on top. The app mounts one
+					in the <code>(app)</code> layout: <code>showUpgrade('deals')</code> from
+					<code>$lib/upgrade.svelte</code> opens it with the org's real plans, from anywhere.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-center gap-2">
+				<UpgradeModal.Root bind:open={upgradeDemoOpen}>
+					<UpgradeModal.Trigger>
+						{#snippet child({ props })}
+							<UntitledButton color="secondary" {...props}>
+								{#snippet iconLeading()}<SparklesIcon />{/snippet}
+								Demo copy
+							</UntitledButton>
+						{/snippet}
+					</UpgradeModal.Trigger>
+					<UpgradeModal.Content>
+						<UpgradeModal.Hero><SparklesIcon /></UpgradeModal.Hero>
+						<UpgradeModal.Header>
+							<UpgradeModal.Title>Upgrade your plan</UpgradeModal.Title>
+							<UpgradeModal.Badge>Pro</UpgradeModal.Badge>
+							<UpgradeModal.Description>
+								Get the pipeline view, the reports that go with it, and a named contact when you
+								need one.
+							</UpgradeModal.Description>
+						</UpgradeModal.Header>
+						<UpgradeModal.Features>
+							{#each UPGRADE_PERKS as perk (perk.name)}
+								<UpgradeModal.Feature>
+									<UpgradeModal.FeatureTitle>{perk.name}</UpgradeModal.FeatureTitle>
+									<UpgradeModal.FeatureDescription
+										>{perk.description}</UpgradeModal.FeatureDescription
+									>
+								</UpgradeModal.Feature>
+							{/each}
+						</UpgradeModal.Features>
+						<UpgradeModal.Footer>
+							<UpgradeModal.Action onclick={requestUpgradeDemo}>Upgrade to Pro</UpgradeModal.Action>
+							<UpgradeModal.Dismiss>No thanks</UpgradeModal.Dismiss>
+						</UpgradeModal.Footer>
+						<UpgradeModal.Close />
+					</UpgradeModal.Content>
+				</UpgradeModal.Root>
+				<UntitledButton color="secondary" onclick={() => showUpgrade()}
+					>showUpgrade()</UntitledButton
+				>
+				<UntitledButton color="secondary" onclick={() => showUpgrade('deals')}>
+					showUpgrade('deals')
+				</UntitledButton>
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>
@@ -1592,6 +1955,38 @@
 						a dialog.
 					</Tabs.Content>
 				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Navigation</h2>
+		</div>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Breadcrumbs</Card.Title>
+				<Card.Description>
+					The app header renders these for real: the last {MAX_CRUMBS} pages this tab was on, named from
+					the page registry and kept in <code>$lib/breadcrumbs.svelte</code>. A trail, not a tree —
+					these pages are siblings, and the same screen is reached from a dozen places.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Breadcrumb.Root>
+					<Breadcrumb.List>
+						<Breadcrumb.Item>
+							<Breadcrumb.Link href="/clients">Clients</Breadcrumb.Link>
+						</Breadcrumb.Item>
+						<Breadcrumb.Separator />
+						<Breadcrumb.Item>
+							<Breadcrumb.Link href="/deals">Deals</Breadcrumb.Link>
+						</Breadcrumb.Item>
+						<Breadcrumb.Separator />
+						<Breadcrumb.Item>
+							<Breadcrumb.Page>Components</Breadcrumb.Page>
+						</Breadcrumb.Item>
+					</Breadcrumb.List>
+				</Breadcrumb.Root>
 			</Card.Content>
 		</Card.Root>
 

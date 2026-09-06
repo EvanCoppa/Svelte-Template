@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
-import type { FeatureRegistryRow } from '$lib/features/types';
+import type { FeatureRegistryRow, PageMeta } from '$lib/features/types';
 import { ensure, unwrap } from './crm/unwrap';
 
 /**
- * Data access for the feature registry and the org's own opt-outs. Same
+ * Data access for the feature and page registries and the org's own
+ * opt-outs. Same
  * contract as the crm modules: the request-scoped client (`locals.supabase`)
  * so RLS decides visibility, plus ids from the org context. The registry
  * tables are reference data (select-only for clients); the one thing the
@@ -13,7 +14,7 @@ import { ensure, unwrap } from './crm/unwrap';
  * tool (SQL / service role), exactly like `tier_id`.
  */
 
-/** A tier with the features it unlocks, for the upgrade page. */
+/** A tier with the features it unlocks — the upgrade prompt's plans come from these. */
 export type TierWithFeatures = Tables<'tiers'> & { tier_features: { feature_id: string }[] };
 
 /**
@@ -29,6 +30,15 @@ export async function loadFeatureRegistry(
 			.select('*, industry_features(industry_id), tier_features(tier_id)')
 			.order('sort_order')
 	);
+}
+
+/**
+ * Every registered page with its title, ordered by path — what the `(app)`
+ * layout titles the shell from. `visiblePages()` filters it for the session
+ * before it reaches the browser.
+ */
+export async function loadPageRegistry(supabase: SupabaseClient<Database>): Promise<PageMeta[]> {
+	return unwrap(await supabase.from('pages').select('id, feature_id, path, title').order('path'));
 }
 
 export async function listTiersWithFeatures(

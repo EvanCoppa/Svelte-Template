@@ -7,7 +7,8 @@
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { iconFor } from '$lib/features/icons';
-	import { groupNav, isNavItemActive, navItemTarget } from '$lib/navigation';
+	import { groupNav, isNavItemActive } from '$lib/navigation';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import type { OrgMembership } from '$lib/org';
 
 	let {
@@ -40,11 +41,12 @@
 					{#each group.items as item (item.href)}
 						{@const Icon = iconFor(item.icon)}
 						{@const active = !item.locked && isNavItemActive(item, page.url.pathname)}
+						<!-- A locked entry never navigates: the upgrade prompt opens in place. -->
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								class={['nav-hover-effect', active && 'nav-active', item.locked && 'opacity-60']}
 								tooltipContent={item.locked ? `${item.label} — upgrade required` : item.label}
-								onclick={() => goto(navItemTarget(item))}
+								onclick={() => (item.locked ? showUpgrade(item.featureId) : goto(item.href))}
 							>
 								<Icon class="h-6 w-6" />
 								<span class="sidebar-text">{item.label}</span>

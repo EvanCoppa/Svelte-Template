@@ -43,6 +43,9 @@ test.describe('signing in', () => {
 		await signIn(page);
 
 		await expect(page).toHaveURL('/');
+		// Titles come from the `pages` table, resolved by the (app) layout — the
+		// dashboard is a shell page, belonging to no feature.
+		await expect(page).toHaveTitle('Dashboard');
 		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 		// Rendered in the page body and again in the sidebar's user menu.
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
@@ -95,6 +98,21 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
+	test('names the last pages visited in the header breadcrumb trail', async ({ page }) => {
+		// A trail of where you have been, not a hierarchy: the crumbs are named
+		// from the `pages` registry and kept in this tab's sessionStorage, so
+		// they survive the full page load below.
+		await page.goto('/clients');
+
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		await expect(trail.getByRole('link', { name: 'Clients' })).toBeVisible();
+
+		// And the way back is a plain link, so it works before hydration.
+		await trail.getByRole('link', { name: 'Dashboard' }).click();
+		await expect(page).toHaveURL('/');
+	});
+
 	test('renders every navigation entry the session may see', async ({ page }) => {
 		// The static pages plus the features resolved for the active org and
 		// readable by the user (seed.sql: e2e is an Acme member holding the
@@ -116,16 +134,19 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
 	});
 
-	test('marks a feature outside the plan as locked and sends it to the upgrade page', async ({
+	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
 		page
 	}) => {
 		// Best Practices is enterprise-only; Acme is on Pro -> locked_visible.
 		const entry = page.getByRole('button', { name: /Best Practices/ }).first();
 		await expect(entry.locator('..').locator('[data-slot="sidebar-menu-badge"]')).toBeVisible();
 
-		await clickWhenLive(entry, () => expect(page).toHaveURL('/upgrade?feature=best-practices'));
-		await expect(page).toHaveTitle('Upgrade');
-		await expect(page.getByText(/Best Practices isn't included in the Pro plan/)).toBeVisible();
+		// No navigation: the pitch opens in place.
+		await clickWhenLive(entry, () => expect(page.getByRole('dialog')).toBeVisible());
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).not.toHaveURL(/upgrade/);
 	});
 
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
@@ -160,11 +181,17 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('combobox')).toBeVisible();
 	});
 
-	test('bounces a locked feature route to the upgrade page', async ({ page }) => {
+	test('bounces a locked feature route to the dashboard and opens the upgrade prompt', async ({
+		page
+	}) => {
 		// Gated in hooks.server.ts before any load runs — typing the URL is no
-		// way around a missing plan.
+		// way around a missing plan. The prompt then takes `?upgrade=` off the URL.
 		await page.goto('/best-practices');
-		await expect(page).toHaveURL('/upgrade?feature=best-practices');
+		await expect(page.getByRole('dialog')).toBeVisible();
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).toHaveURL('/');
 	});
 
 	test('sends a feature the org switched off to the feature settings', async ({ page }) => {

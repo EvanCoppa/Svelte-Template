@@ -11,6 +11,7 @@
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { iconFor } from '$lib/features/icons';
 	import { NAV_CATEGORIES } from '$lib/navigation';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { featuresSchema } from './schema';
 
 	let { data } = $props();
@@ -39,10 +40,6 @@
 		$form.enabled = on ? [...rest, id] : rest;
 	}
 </script>
-
-<svelte:head>
-	<title>Features</title>
-</svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
 	<div class="space-y-1">
@@ -97,11 +94,7 @@
 								{/if}
 							</div>
 							{#if locked}
-								<Button
-									href={`/upgrade?feature=${encodeURIComponent(row.id)}`}
-									variant="outline"
-									size="sm"
-								>
+								<Button variant="outline" size="sm" onclick={() => showUpgrade(row.id)}>
 									<LockIcon class="size-3.5" />
 									Upgrade
 								</Button>
