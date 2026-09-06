@@ -43,6 +43,9 @@ test.describe('signing in', () => {
 		await signIn(page);
 
 		await expect(page).toHaveURL('/');
+		// Titles come from the `pages` table, resolved by the (app) layout — the
+		// dashboard is a shell page, belonging to no feature.
+		await expect(page).toHaveTitle('Dashboard');
 		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 		// Rendered in the page body and again in the sidebar's user menu.
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();

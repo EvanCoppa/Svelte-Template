@@ -1133,10 +1133,6 @@
 	let wizardDone = $state(false);
 </script>
 
-<svelte:head>
-	<title>Components</title>
-</svelte:head>
-
 <div class="mx-auto max-w-5xl space-y-6">
 	<div class="space-y-1">
 		<h1 class="text-2xl font-bold tracking-tight">Components</h1>

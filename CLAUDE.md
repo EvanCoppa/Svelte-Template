@@ -159,6 +159,17 @@ application data is scoped to an organization, never to a bare user. The
   migration inserting its rows (the migration's closing comment is the
   checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
   the registry, and `/settings` (with `/api/` and `/logout`) is exempt from the gate.
+- **A feature is made of pages, and a page has a title** (`pages` migration +
+  `src/lib/features/pages.ts`). One row per screen — `path`, `title`, and the
+  `feature_id` it belongs to (null for the shell pages, dashboard and settings).
+  The `(app)` layout ships the pages the session may see (`visiblePages()`,
+  filtered by the same predicate as the nav) and renders **the one `<title>` for
+  the whole group** from `matchPage(page.url.pathname, …)`, re-resolved on every
+  navigation. **Never put `<svelte:head><title>` in a page file** — a title is a
+  row, so the migration adding a route adds its page row too. A title that
+  depends on a record is the one exception: that page's load returns `title` and
+  page data wins. Public screens (`/login`, `/reset-password`, `/invite`) keep
+  static titles — they render before a session exists.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -319,10 +330,11 @@ tests — keep them green and extend them.
 come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
 `staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
-Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and a click
-opens the upgrade prompt (`showUpgrade()`) instead of navigating. Icons are named by
-lucide slug (`features.icon`) and resolved
+Adding a page = create the route under `(app)` + register the feature and its `pages`
+row by migration; nothing in `navigation.ts` changes, and the page's `<title>` comes
+from that row (see "A feature is made of pages" under Multi-tenancy). A locked entry
+renders with a lock and a click opens the upgrade prompt (`showUpgrade()`) instead of
+navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
 

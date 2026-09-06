@@ -234,17 +234,23 @@ type NewProfile = TablesInsert<'profiles'>;
 
 The sidebar sections and the ⌘K palette both render from the **feature registry**
 (`features` table, resolved per org in `src/lib/server/org-context.ts` and filtered by
-`buildNav()` in `src/lib/navigation.ts`). Adding a page:
+`buildNav()` in `src/lib/navigation.ts`), and every browser title comes from the **page
+registry** (`pages` table — a feature is made of pages, and a page has a title). Adding
+a page:
 
 1. Create `src/routes/(app)/reports/+page.svelte` — it's automatically protected and
    gets the sidebar/header shell.
 2. Register the feature in a migration: its row in `features` (route, icon slug,
    category), which industries include it, which tiers unlock it. Add its id to
    `FEATURE_IDS` in `src/lib/features/types.ts`.
+3. In the same migration, insert the page's `pages` row (`feature_id`, `path`, `title`)
+   — one row per screen the feature is made of.
 
 That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
 plan lacks it gets the upgrade prompt, one whose industry lacks it gets a 404, and the
-org can switch it off for itself under `/settings/features`. See `docs/features.md`.
+org can switch it off for itself under `/settings/features`. Its title needs no
+`<svelte:head>` either — the `(app)` layout matches the pathname against the page
+registry and titles the whole group. See `docs/features.md`.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
 or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it

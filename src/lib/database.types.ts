@@ -588,6 +588,38 @@ export type Database = {
           },
         ]
       }
+      pages: {
+        Row: {
+          created_at: string
+          feature_id: string | null
+          id: string
+          path: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id?: string | null
+          id: string
+          path: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string | null
+          id?: string
+          path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pages_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

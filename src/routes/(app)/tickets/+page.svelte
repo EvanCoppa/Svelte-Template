@@ -53,10 +53,6 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Tickets</title>
-</svelte:head>
-
 <div class="space-y-6">
 	<div class="space-y-1">
 		<h1 class="text-2xl font-bold tracking-tight">Tickets</h1>
