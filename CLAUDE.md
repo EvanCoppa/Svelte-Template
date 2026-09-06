@@ -338,6 +338,17 @@ navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
 
+The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
+on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings
+under one shell and the same screen is reached from a dozen places, so a tree would be
+fiction. All of its behaviour (dedupe, cap, storage) is in `src/lib/breadcrumbs.svelte.ts`;
+`src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
+the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
+document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
+user + org (this tab's own; no cookie on every request, and switching org or user starts a
+fresh one). Never add a second breadcrumb surface, a per-page crumb prop, or a
+hierarchy-from-the-URL variant.
+
 ## Svelte reference docs
 
 **Always look Svelte docs up rather than answering from memory** — the runes API,

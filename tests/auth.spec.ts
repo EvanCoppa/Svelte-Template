@@ -98,6 +98,21 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
+	test('names the last pages visited in the header breadcrumb trail', async ({ page }) => {
+		// A trail of where you have been, not a hierarchy: the crumbs are named
+		// from the `pages` registry and kept in this tab's sessionStorage, so
+		// they survive the full page load below.
+		await page.goto('/clients');
+
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		await expect(trail.getByRole('link', { name: 'Clients' })).toBeVisible();
+
+		// And the way back is a plain link, so it works before hydration.
+		await trail.getByRole('link', { name: 'Dashboard' }).click();
+		await expect(page).toHaveURL('/');
+	});
+
 	test('renders every navigation entry the session may see', async ({ page }) => {
 		// The static pages plus the features resolved for the active org and
 		// readable by the user (seed.sql: e2e is an Acme member holding the

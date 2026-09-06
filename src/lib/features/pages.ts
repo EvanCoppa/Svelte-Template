@@ -51,3 +51,13 @@ export function matchPage(pathname: string, pages: readonly PageMeta[]): PageMet
 	}
 	return null;
 }
+
+/**
+ * What the page currently rendering is called: the record-specific title its
+ * own load returned, else the registry's. The one answer to "what is this
+ * page's name" — the `(app)` layout titles the document with it and the
+ * breadcrumb trail records it, so the two can never disagree.
+ */
+export function titleFor(data: App.PageData, pathname: string): string | undefined {
+	return data.title ?? matchPage(pathname, data.pages ?? [])?.title;
+}

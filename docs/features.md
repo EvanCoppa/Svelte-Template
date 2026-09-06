@@ -105,6 +105,10 @@ Two consequences worth knowing:
 `+error.svelte` still renders its own title, and the layout stands down while an error
 is showing — two `<title>` tags in one head and the first one wins.
 
+The header's breadcrumb trail (`src/lib/breadcrumbs.svelte.ts`) names its crumbs with
+the same `titleFor()`, so a page is called one thing everywhere: in the tab, in the
+trail, and in the sidebar entry its feature registers.
+
 The public screens (`/login`, `/reset-password`, `/invite/[token]` and the pre-route
 `src/error.html`) keep static titles on purpose: they render before a session or an org
 exists, and `pages` is readable by signed-in users only.

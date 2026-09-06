@@ -4,15 +4,14 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import UpgradePrompt from '$lib/components/upgrade-prompt.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { matchPage } from '$lib/features/pages';
+	import { titleFor } from '$lib/features/pages';
 
 	let { data, children } = $props();
 
 	// The one <title> for everything in the shell, resolved from the `pages`
-	// table on every navigation — no page file sets its own. A title that
-	// depends on a record returns `title` from that page's load, and page data
-	// wins over the registry.
-	let title = $derived(page.data.title ?? matchPage(page.url.pathname, data.pages)?.title);
+	// table on every navigation — no page file sets its own. The breadcrumb
+	// trail in the header names pages with the same `titleFor()`.
+	let title = $derived(titleFor(page.data, page.url.pathname));
 </script>
 
 <svelte:head>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/breadcrumbs.svelte';
 	import SearchDialog from '$lib/components/search-dialog.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { theme } from '$lib/theme.svelte';
@@ -29,6 +30,13 @@
 			<span>Search ...</span>
 			<kbd>&#8984;K</kbd>
 		</button>
+
+		<!-- Where you have just been; hidden on narrow screens, where the
+		     header has no room for it. Still mounted there, so the trail keeps
+		     recording. -->
+		<div class="trail">
+			<Breadcrumbs />
+		</div>
 
 		<div class="header-right">
 			<button class="icon-btn" aria-label="Toggle theme" onclick={() => theme.toggle()}>
@@ -105,6 +113,12 @@
 		color: var(--text-tertiary);
 	}
 
+	.trail {
+		min-width: 0;
+		overflow: hidden;
+		padding-left: 8px;
+	}
+
 	.header-right {
 		display: flex;
 		align-items: center;
@@ -146,6 +160,9 @@
 			font-size: 15px;
 		}
 		.search-bar kbd {
+			display: none;
+		}
+		.trail {
 			display: none;
 		}
 	}

@@ -68,12 +68,14 @@
 		WizardSteps,
 		type WizardStep
 	} from '$lib/components/enhanced/index.js';
+	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Calendar } from '$lib/components/ui/calendar/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -1953,6 +1955,38 @@
 						a dialog.
 					</Tabs.Content>
 				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Navigation</h2>
+		</div>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Breadcrumbs</Card.Title>
+				<Card.Description>
+					The app header renders these for real: the last {MAX_CRUMBS} pages this tab was on, named from
+					the page registry and kept in <code>$lib/breadcrumbs.svelte</code>. A trail, not a tree —
+					these pages are siblings, and the same screen is reached from a dozen places.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Breadcrumb.Root>
+					<Breadcrumb.List>
+						<Breadcrumb.Item>
+							<Breadcrumb.Link href="/clients">Clients</Breadcrumb.Link>
+						</Breadcrumb.Item>
+						<Breadcrumb.Separator />
+						<Breadcrumb.Item>
+							<Breadcrumb.Link href="/deals">Deals</Breadcrumb.Link>
+						</Breadcrumb.Item>
+						<Breadcrumb.Separator />
+						<Breadcrumb.Item>
+							<Breadcrumb.Page>Components</Breadcrumb.Page>
+						</Breadcrumb.Item>
+					</Breadcrumb.List>
+				</Breadcrumb.Root>
 			</Card.Content>
 		</Card.Root>
 
