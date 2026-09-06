@@ -363,6 +363,15 @@ is set, hard-refuses on `VERCEL_ENV=production`, `/logout` still signs out (an o
 cookie stops instant re-login; clear it by visiting any page with `?autologin=1`), and
 the `/auth` emailed-link flows keep their signed-out behavior.
 
+## AI assistant
+
+`/assistant` is a chat over the organization's data, built on the Vercel AI SDK. Set
+`ANTHROPIC_API_KEY` (and optionally `AI_MODEL`) in `.env` to turn it on; without a key the
+page renders but says it is not configured. The assistant's tools are linked to features —
+a tool is available only when its feature is enabled for the org and the signed-in member
+holds the level it needs — and anything destructive asks for approval in the thread. The
+architecture, the tool contract and how to add a tool are in `docs/assistant.md`.
+
 ## Conventions
 
 - [`docs/sveltekit-best-practices.md`](docs/sveltekit-best-practices.md) — form actions

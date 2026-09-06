@@ -18,5 +18,7 @@ export const QUERY = {
 	clients: 'app:clients',
 	deals: 'app:deals',
 	tasks: 'app:tasks',
-	tickets: 'app:tickets'
+	tickets: 'app:tickets',
+	/** The signed-in member's assistant conversations — the history rail and a thread's title. */
+	assistant: 'app:assistant'
 } as const;

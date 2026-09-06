@@ -7,6 +7,7 @@ import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import SettingsIcon from '@lucide/svelte/icons/settings';
+import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import TicketIcon from '@lucide/svelte/icons/ticket';
 import UsersIcon from '@lucide/svelte/icons/users';
 
@@ -25,6 +26,7 @@ export const ICONS = {
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
 	settings: SettingsIcon,
+	sparkles: SparklesIcon,
 	ticket: TicketIcon,
 	users: UsersIcon
 } satisfies Record<string, NavIcon>;

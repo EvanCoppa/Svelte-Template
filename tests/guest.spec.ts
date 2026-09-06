@@ -33,6 +33,13 @@ test.describe('unauthenticated visitor', () => {
 		await expect(page).toHaveURL('/login?next=%2Fclients');
 	});
 
+	test('asks for a login before the assistant can answer', async ({ page }) => {
+		// The assistant is a feature route like any other, and its stream
+		// endpoint sits under it: neither says anything to an anonymous visitor.
+		await page.goto('/assistant');
+		await expect(page).toHaveURL('/login?next=%2Fassistant');
+	});
+
 	test('sends an invite link through login and back again', async ({ page }) => {
 		// /invite/[token] is protected like everything else, so an invitee who
 		// is not signed in reaches the login page with the invitation preserved

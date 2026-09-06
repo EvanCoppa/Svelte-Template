@@ -324,6 +324,40 @@ Config is env-only (`RESEND_API_KEY`, `EMAIL_FROM`, optional `EMAIL_REPLY_TO` �
 `.env.example`); unconfigured sends log to the console instead. Both modules have
 tests — keep them green and extend them.
 
+## AI assistant
+
+The assistant (`/assistant`, feature id `assistant`) is built on the Vercel AI SDK, and
+**the SDK's own mechanism is the answer to every AI concern** — never a parallel one. The
+SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the installed
+version; read them before the website. The full account is `docs/assistant.md`.
+
+- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
+  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
+  unconfigured the page says so and the endpoint answers 503, never a crash.
+- **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
+  instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
+  `activeTools` live there, not in the endpoint.
+- **A tool is one file** in `src/lib/server/ai/tools/`: `tool()` with a zod `inputSchema`
+  and `outputSchema`, the shared `contextSchema`, and an `execute` that calls a data
+  module (`src/lib/server/crm/*`) — never `.from()` directly. Next to it, its
+  `ToolAccess`: the feature it touches and the level it needs. **Tools are linked to
+  features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
+  org and the caller holds the level, and every tool re-checks with
+  `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+- **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
+  tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
+  result is a data part; a message-level fact is metadata (`messageMetadataSchema`).
+- **The browser sends only the last message** (`prepareSendMessagesRequest` in
+  `Assistant.Root`); `src/lib/server/ai/conversations.ts` owns the thread and the endpoint
+  saves it from `onEnd`. The browser's copy of an assistant message is never trusted —
+  only its approval decisions are merged.
+- **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
+  HTML disabled, never `{@html}`.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+  Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
+  the real agent with `MockLanguageModelV4` from `ai/test`.
+
 ## Navigation
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
