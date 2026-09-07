@@ -102,11 +102,11 @@ test.describe('the app shell', () => {
 		// A trail of where you have been, not a hierarchy: the crumbs are named
 		// from the `pages` registry and kept in this tab's sessionStorage, so
 		// they survive the full page load below.
-		await page.goto('/clients');
+		await page.goto('/companies');
 
 		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
 		await expect(trail.getByRole('link', { name: 'Dashboard' })).toBeVisible();
-		await expect(trail.getByRole('link', { name: 'Clients' })).toBeVisible();
+		await expect(trail.getByRole('link', { name: 'Companies' })).toBeVisible();
 
 		// And the way back is a plain link, so it works before hydration.
 		await trail.getByRole('link', { name: 'Dashboard' }).click();
@@ -116,12 +116,14 @@ test.describe('the app shell', () => {
 	test('renders every navigation entry the session may see', async ({ page }) => {
 		// The static pages plus the features resolved for the active org and
 		// readable by the user (seed.sql: e2e is an Acme member holding the
-		// crm 'Support' role, which grants staff, clients, tickets and the
-		// library pages at read). Tasks is switched off by the org and Deals
-		// carries no grant for Support, so neither may appear.
+		// crm 'Support' role, which grants staff, companies, contacts, tickets
+		// and the library pages at read). Tasks is switched off by the org,
+		// and Deals and Products carry no grant for Support, so none of the
+		// three may appear.
 		for (const label of [
 			'Dashboard',
-			'Clients',
+			'Companies',
+			'Contacts',
 			'Tickets',
 			'Staff',
 			'Settings',
@@ -132,6 +134,7 @@ test.describe('the app shell', () => {
 		}
 		await expect(page.getByRole('button', { name: 'Tasks' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Products' })).toHaveCount(0);
 	});
 
 	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
@@ -211,9 +214,17 @@ test.describe('the app shell', () => {
 	});
 
 	test('lists a readable feature page with its seeded rows', async ({ page }) => {
-		await page.goto('/clients');
-		await expect(page).toHaveTitle('Clients');
+		await page.goto('/companies');
+		await expect(page).toHaveTitle('Companies');
 		await expect(page.getByRole('cell', { name: 'Wayne Enterprises' })).toBeVisible();
+	});
+
+	test('lists a person who belongs to no company at all', async ({ page }) => {
+		// The party model's whole point: a customer who is a person, with an
+		// em dash where a company would be rather than an invented one.
+		await page.goto('/contacts');
+		await expect(page).toHaveTitle('Contacts');
+		await expect(page.getByRole('cell', { name: 'Bruce Wayne' })).toBeVisible();
 	});
 
 	test('shows the signed-in user their profile on /settings', async ({ page }) => {

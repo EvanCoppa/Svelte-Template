@@ -4,7 +4,7 @@ import { ORG_ID, supabaseMock } from './crm/test-support';
 
 describe('loadFeatureRegistry', () => {
 	it('loads every feature with its industry and tier maps, in nav order', async () => {
-		const rows = [{ id: 'clients', industry_features: [], tier_features: [] }];
+		const rows = [{ id: 'companies', industry_features: [], tier_features: [] }];
 		const { supabase, from, builder } = supabaseMock({ data: rows });
 
 		await expect(loadFeatureRegistry(supabase)).resolves.toBe(rows);

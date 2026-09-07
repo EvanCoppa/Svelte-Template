@@ -16,7 +16,7 @@ This page is the contract for keeping it that way. The `proposals` migration
 
 | table                          | one row means                                                         | written by                         |
 | ------------------------------ | --------------------------------------------------------------------- | ---------------------------------- |
-| `proposals`                    | a decision offered to one client record: title, status, shared terms  | members (delete: owner/admin)      |
+| `proposals`                    | a decision offered to one CRM record: title, status, shared terms     | members (delete: owner/admin)      |
 | `proposal_options`             | one column of the grid — a priced, timed, financeable choice          | members (delete: owner/admin)      |
 | `proposal_line_items`          | an itemised line inside an option; `total` is generated               | members (delete: owner/admin)      |
 | `custom_field_definitions`     | an org-declared, typed attribute its options carry (a comparison row) | owner/admin                        |
@@ -72,8 +72,8 @@ definition; when a template just needs to _carry_ something, it is `custom_field
 `proposals.entity_type` + `entity_id` point at the record the proposal is for. There is
 no `patient_id`, `job_id` or `deal_id` column and there never will be: **adding a vertical
 must not require a schema change to `proposals`**. The kinds are the CRM records every
-vertical attaches to — `client`, `contact`, `deal` — because a dental patient _is_ a
-client and a roofing job _is_ a deal. A new vertical maps its nouns onto those kinds and
+vertical attaches to — `company`, `contact`, `deal` — because a dental patient _is_ a
+contact and a roofing job _is_ a deal. A new vertical maps its nouns onto those kinds and
 touches nothing here.
 
 Postgres cannot express a foreign key over a polymorphic pair, so two triggers stand in
@@ -81,7 +81,7 @@ for it, both in the migration:
 
 - `proposals_check_entity` refuses a link to a record that does not exist **in the same
   org** (raised with the foreign-key SQLSTATE, so app code maps it like any FK error).
-- `*_detach_proposals` on `clients`, `client_contacts` and `deals` set the link null when
+- `*_crm_entity_deleted` on `companies`, `contacts` and `deals` set the link null when
   the parent is deleted. Detach, not cascade: an accepted proposal is a commercial record,
   the same reasoning as tickets in `crm_core`. Both null is a legal state — an
   unattached draft — and the check constraint forbids a half-set link.

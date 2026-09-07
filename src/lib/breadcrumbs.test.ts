@@ -10,33 +10,33 @@ function walk(...paths: string[]): Crumb[] {
 
 describe('appendCrumb', () => {
 	it('keeps the current page last', () => {
-		expect(walk('/clients', '/deals').at(-1)).toEqual(crumb('/deals'));
+		expect(walk('/companies', '/deals').at(-1)).toEqual(crumb('/deals'));
 	});
 
 	it(`keeps at most ${MAX_CRUMBS} crumbs, dropping the oldest`, () => {
-		expect(walk('/', '/clients', '/deals', '/tasks').map((c) => c.path)).toEqual([
-			'/clients',
+		expect(walk('/', '/companies', '/deals', '/tasks').map((c) => c.path)).toEqual([
+			'/companies',
 			'/deals',
 			'/tasks'
 		]);
 	});
 
 	it('moves a page already in the trail instead of repeating it', () => {
-		expect(walk('/clients', '/deals', '/clients').map((c) => c.path)).toEqual([
+		expect(walk('/companies', '/deals', '/companies').map((c) => c.path)).toEqual([
 			'/deals',
-			'/clients'
+			'/companies'
 		]);
 	});
 
 	it('re-titles a page visited again, without duplicating it', () => {
-		const trail = appendCrumb(walk('/clients/42'), { path: '/clients/42', title: 'Acme Inc' });
-		expect(trail).toEqual([{ path: '/clients/42', title: 'Acme Inc' }]);
+		const trail = appendCrumb(walk('/companies/42'), { path: '/companies/42', title: 'Acme Inc' });
+		expect(trail).toEqual([{ path: '/companies/42', title: 'Acme Inc' }]);
 	});
 
 	it('leaves the trail it was given alone', () => {
-		const trail = walk('/clients');
+		const trail = walk('/companies');
 		appendCrumb(trail, crumb('/deals'));
-		expect(trail).toEqual([crumb('/clients')]);
+		expect(trail).toEqual([crumb('/companies')]);
 	});
 });
 
@@ -46,9 +46,9 @@ describe('the trail', () => {
 	});
 
 	it('records visits within a scope and starts over when the scope changes', () => {
-		breadcrumbs.visit('user:acme', crumb('/clients'));
+		breadcrumbs.visit('user:acme', crumb('/companies'));
 		breadcrumbs.visit('user:acme', crumb('/deals'));
-		expect(breadcrumbs.crumbsIn('user:acme').map((c) => c.path)).toEqual(['/clients', '/deals']);
+		expect(breadcrumbs.crumbsIn('user:acme').map((c) => c.path)).toEqual(['/companies', '/deals']);
 
 		// Another organization (or another user) is another trail: nothing from
 		// the previous scope can be linked to from this one.
@@ -57,7 +57,7 @@ describe('the trail', () => {
 	});
 
 	it('shows nothing for a scope it is not holding, rather than the wrong pages', () => {
-		breadcrumbs.visit('user:acme', crumb('/clients'));
+		breadcrumbs.visit('user:acme', crumb('/companies'));
 		expect(breadcrumbs.crumbsIn('user:globex')).toEqual([]);
 	});
 });

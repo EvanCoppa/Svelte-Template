@@ -37,7 +37,7 @@ export function visiblePages(
 
 /**
  * The page a pathname belongs to: an exact match, else the longest
- * registered path it sits under — so `/clients/42` inherits the Clients
+ * registered path it sits under — so `/companies/42` inherits the Companies
  * title until that route registers a page of its own. '/' is matched
  * exactly, never as a prefix; the same rule as `matchFeature()`.
  */

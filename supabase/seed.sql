@@ -9,6 +9,8 @@
 --   e2e@example.com      / password123   ← reserved for the E2E suite
 --   evancoppa@gmail.com  / password123   ← same local password, not a real one;
 --                                         the system admin (sees every org)
+--   client@example.com   / password123   ← a PORTAL user: a client with a login,
+--                                         not a member of any org (see below)
 --
 -- NEVER put a real credential in this file. It is committed.
 --
@@ -21,14 +23,20 @@ create temporary table seed_users (
 	id uuid primary key,
 	email text not null,
 	password text not null,
-	display_name text not null
+	display_name text not null,
+	-- 'staff' signs up to USE the product and gets a personal organization;
+	-- 'portal' is a client logging in to somebody else's, and gets none. The
+	-- party-model migration's handle_new_user reads this from the signup
+	-- metadata built below.
+	account_type text not null default 'staff'
 );
 
 -- Add a row here to add a user. Everything below is generic.
-insert into seed_users (id, email, password, display_name) values
-	('00000000-0000-0000-0000-000000000001', 'dev@example.com', 'password123', 'Dev User'),
-	('00000000-0000-0000-0000-000000000002', 'e2e@example.com', 'password123', 'E2E Robot'),
-	('00000000-0000-0000-0000-000000000003', 'evancoppa@gmail.com', 'password123', 'Evan Coppa');
+insert into seed_users (id, email, password, display_name, account_type) values
+	('00000000-0000-0000-0000-000000000001', 'dev@example.com', 'password123', 'Dev User', 'staff'),
+	('00000000-0000-0000-0000-000000000002', 'e2e@example.com', 'password123', 'E2E Robot', 'staff'),
+	('00000000-0000-0000-0000-000000000003', 'evancoppa@gmail.com', 'password123', 'Evan Coppa', 'staff'),
+	('00000000-0000-0000-0000-000000000004', 'client@example.com', 'password123', 'Bruce Wayne', 'portal');
 
 -- The account. `email_confirmed_at` is set so sign-in works immediately,
 -- matching `enable_confirmations = false` in config.toml. The empty-string
@@ -63,7 +71,7 @@ select
 	now(),
 	now(),
 	'{"provider":"email","providers":["email"]}'::jsonb,
-	jsonb_build_object('full_name', s.display_name),
+	jsonb_build_object('full_name', s.display_name, 'account_type', s.account_type),
 	'',
 	'',
 	'',
@@ -212,43 +220,106 @@ on conflict (org_id, user_id) do update set role = excluded.role;
 -- CRM fixtures, all inside Acme so every seed user can see them (and Globex
 -- stays empty for tenant-isolation checks). Ids use the 2000…/3000…/… ranges
 -- per table family to stay greppable.
-insert into public.clients (id, org_id, name, email, phone, company, website, status, created_by) values
+insert into public.companies (id, org_id, name, email, phone, website, status, relationship, created_by) values
 	('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'Wayne Enterprises', 'hello@wayne.example.com', '+1 555 0100', 'Wayne Enterprises',
-		'https://wayne.example.com', 'active', '00000000-0000-0000-0000-000000000001'),
+		'Wayne Enterprises', 'hello@wayne.example.com', '+1 555 0100',
+		'https://wayne.example.com', 'active', 'customer', '00000000-0000-0000-0000-000000000001'),
 	('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'Stark Industries', 'contact@stark.example.com', null, 'Stark Industries',
-		null, 'lead', '00000000-0000-0000-0000-000000000003')
+		'Stark Industries', 'contact@stark.example.com', null,
+		null, 'lead', 'customer', '00000000-0000-0000-0000-000000000003'),
+	-- A supplier, so the relationship axis has more than one value in it.
+	('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'Gotham Steel Supply', 'orders@gothamsteel.example.com', '+1 555 0180',
+		null, 'active', 'supplier', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
-insert into public.client_contacts (id, org_id, client_id, name, email, title, is_primary) values
+-- Two people at companies and one standing alone. The third is the whole point
+-- of the party model: a customer who is a person, the shape a dental patient or
+-- a homeowner takes, with no company row invented to hold them.
+insert into public.contacts (id, org_id, company_id, name, email, title, is_primary, status, created_by) values
 	('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Lucius Fox', 'lucius@wayne.example.com', 'CEO', true),
+		'20000000-0000-0000-0000-000000000001', 'Lucius Fox', 'lucius@wayne.example.com', 'CEO', true,
+		'active', '00000000-0000-0000-0000-000000000001'),
 	('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000002', 'Pepper Potts', 'pepper@stark.example.com', 'COO', true)
+		'20000000-0000-0000-0000-000000000002', 'Pepper Potts', 'pepper@stark.example.com', 'COO', true,
+		'active', '00000000-0000-0000-0000-000000000001'),
+	('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, 'Bruce Wayne', 'client@example.com', null, false,
+		'active', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
-insert into public.deals (id, org_id, client_id, title, amount, stage, assigned_to, created_by) values
-	('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Annual support contract', 24000.00, 'proposal',
-		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001')
+-- The portal login: Bruce is a contact of Acme who can sign in as himself. He
+-- is deliberately NOT an organization_member, so every existing policy already
+-- shows him nothing — the link grants an identity, not access.
+insert into public.contact_profiles (id, org_id, user_id, contact_id, invited_at) values
+	('31000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000003', now())
 on conflict (id) do nothing;
 
-insert into public.tasks (id, org_id, client_id, title, due_at, assigned_to, created_by) values
+-- Addresses: a billing address on the company and a home address on the person
+-- who has no company, which is exactly the case the old schema could not hold.
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, is_primary) values
+	('32000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000001', 'billing',
+		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', true),
+	('32000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000003', 'primary',
+		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', true)
+on conflict (id) do nothing;
+
+-- The stage is a row now, so the fixture looks it up by name in Acme's default
+-- pipeline (created by the organizations trigger, see the pipelines migration)
+-- rather than naming an enum value.
+insert into public.deals (id, org_id, company_id, contact_id, title, amount, pipeline_id, stage_id, assigned_to, created_by)
+select
+	'40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+	'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+	'Annual support contract', 24000.00, s.pipeline_id, s.id,
+	'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'
+from public.pipeline_stages s
+join public.pipelines p on p.id = s.pipeline_id and p.is_default
+where p.org_id = '10000000-0000-0000-0000-000000000001' and s.name = 'Proposal'
+on conflict (id) do nothing;
+
+-- A deal for the standalone person, in the first stage, with no company at all.
+insert into public.deals (id, org_id, contact_id, title, amount, assigned_to, created_by) values
+	('40000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'30000000-0000-0000-0000-000000000003', 'Private security retainer', 8000.00,
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.tasks (id, org_id, company_id, title, due_at, assigned_to, created_by) values
 	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', 'Send renewal quote', now() + interval '7 days',
 		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
-insert into public.notes (id, org_id, client_id, author_id, body) values
+-- The interaction log that replaced `notes`: a note, a call and an email, so a
+-- record timeline has something to render and every activity type is exercised.
+insert into public.activities (id, org_id, entity_type, entity_id, type, direction, subject, body, occurred_at, duration_minutes, author_id) values
 	('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001',
-		'Prefers email over phone. Renewal window opens in Q4.')
+		'company', '20000000-0000-0000-0000-000000000001', 'note', null, null,
+		'Prefers email over phone. Renewal window opens in Q4.',
+		now() - interval '9 days', null, '00000000-0000-0000-0000-000000000001'),
+	('60000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000001', 'call', 'outbound',
+		'Renewal check-in', 'Walked through the three options; Lucius wants the mid tier.',
+		now() - interval '2 days', 18, '00000000-0000-0000-0000-000000000001'),
+	('60000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'deal', '40000000-0000-0000-0000-000000000001', 'email', 'outbound',
+		'Proposal sent', 'Sent the options deck and the investment summary.',
+		now() - interval '1 day', null, '00000000-0000-0000-0000-000000000003'),
+	-- An org-level note: no record at all, the shape `notes.client_id is null` had.
+	('60000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		null, null, 'note', null, null,
+		'Q4 pricing review scheduled for the first week of October.',
+		now() - interval '5 days', null, '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
-insert into public.support_tickets (id, org_id, client_id, subject, description, status, priority, assigned_to, created_by) values
+insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
 	('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Cannot export invoices',
+		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+		'Cannot export invoices',
 		'Export button returns a 500 since the last update.', 'open', 'high',
 		'00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
@@ -268,14 +339,66 @@ insert into public.notifications (id, org_id, user_id, type, title, body, link) 
 		'Send renewal quote', '/tasks')
 on conflict (id) do nothing;
 
+-- Catalog fixtures: a two-level category tree, a stocked good and a service,
+-- so the `kind` split and the inventory constraint both have a row. Prices are
+-- what a proposal line item cites; the line keeps its own snapshot.
+insert into public.product_categories (id, org_id, parent_id, name, sort_order) values
+	('b1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		null, 'Materials', 10),
+	('b1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'b1000000-0000-0000-0000-000000000001', 'Fixings', 10),
+	('b1000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, 'Services', 20)
+on conflict (id) do nothing;
+
+insert into public.products (id, org_id, category_id, kind, sku, name, description, unit_price,
+		unit_cost, unit, track_inventory, quantity_on_hand, created_by) values
+	('b2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'b1000000-0000-0000-0000-000000000002', 'good', 'FIX-SS-100',
+		'Stainless fixing pack (100)', 'Marine-grade, for coastal installs.',
+		42.50, 21.00, 'pack', true, 120, '00000000-0000-0000-0000-000000000001'),
+	('b2000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'b1000000-0000-0000-0000-000000000003', 'service', 'SVC-INSPECT',
+		'Site inspection', 'A technician on site for up to two hours.',
+		150.00, 60.00, 'visit', false, null, '00000000-0000-0000-0000-000000000001'),
+	-- No SKU and no category: the everyday one-off line, proving both are optional.
+	('b2000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, 'service', null, 'Consulting', null,
+		200.00, null, 'hour', false, null, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Tags reuse the badge palette, so a tag and a status pill of the same tone are
+-- the same hue. The taggings land on three different kinds of record, which is
+-- the whole point of the shared entity link.
+insert into public.tags (id, org_id, name, tone) values
+	('b3000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'VIP', 'violet'),
+	('b3000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Renewal', 'warning'),
+	('b3000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Coastal', 'cyan')
+on conflict (id) do nothing;
+
+insert into public.taggings (id, org_id, tag_id, entity_type, entity_id, created_by) values
+	('b4000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'b3000000-0000-0000-0000-000000000001', 'company', '20000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001'),
+	('b4000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'b3000000-0000-0000-0000-000000000001', 'contact', '30000000-0000-0000-0000-000000000003',
+		'00000000-0000-0000-0000-000000000001'),
+	('b4000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'b3000000-0000-0000-0000-000000000002', 'deal', '40000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003'),
+	('b4000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'b3000000-0000-0000-0000-000000000003', 'product', 'b2000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
 -- Role assignments only — the roles themselves and their grants are
 -- industry-scoped reference data shipped by the roles_permissions migration
 -- (the b0000000-… ids). Each org's plain member gets its industry's
 -- 'Support' role: same name, different grants per industry — the
 -- cross-industry divergence fixture. Owners/admins hold implicit 'manage'
 -- on everything and need no role.
---   Acme (crm):       e2e holds crm 'Support' (tickets manage, clients read, library pages read)
---   Globex (roofing): dev holds roofing 'Support' (clients manage)
+--   Acme (crm):       e2e holds crm 'Support' (tickets manage, companies/contacts read, library pages read)
+--   Globex (roofing): dev holds roofing 'Support' (companies/contacts manage)
 insert into public.member_roles (org_id, user_id, role_id) values
 	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
 		'b0000000-0000-0000-0000-000000000001'),
@@ -368,13 +491,24 @@ on conflict (id) do nothing;
 -- line items, custom values, a deck, a timeline) and one already accepted
 -- with its execution record, so every table has a row after a reset.
 -- computed_total is left out on purpose — the trigger owns it.
-insert into public.custom_field_definitions (id, org_id, key, label, value_type, allowed_values) values
+-- Definitions declare which kind of record they are for. The first three are
+-- the proposal comparison rows; the fourth is the industry-specific attribute
+-- on a PERSON that the generalized custom fields exist to make possible.
+insert into public.custom_field_definitions (id, org_id, entity_type, key, label, value_type, allowed_values) values
 	('a3000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'warranty_years', 'Warranty (years)', 'numeric', null),
+		'proposal_option', 'warranty_years', 'Warranty (years)', 'numeric', null),
 	('a3000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'includes_onboarding', 'Onboarding included', 'boolean', null),
+		'proposal_option', 'includes_onboarding', 'Onboarding included', 'boolean', null),
 	('a3000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
-		'support_tier', 'Support tier', 'select', '["email", "business hours", "24/7"]')
+		'proposal_option', 'support_tier', 'Support tier', 'select', '["email", "business hours", "24/7"]'),
+	('a3000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'contact', 'preferred_channel', 'Preferred channel', 'select', '["email", "phone", "text"]')
+on conflict (id) do nothing;
+
+insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_text) values
+	('a4000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000003',
+		'a3000000-0000-0000-0000-000000000004', 'email')
 on conflict (id) do nothing;
 
 -- A deck is a reusable template, so this one carries slides and no proposal
@@ -419,7 +553,7 @@ insert into public.slide_decks (id, org_id, name, deck_json, created_by, updated
 		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
--- Proposal 1 hangs off the Wayne deal; proposal 2 off the Wayne client.
+-- Proposal 1 hangs off the Wayne deal; proposal 2 off the Wayne company.
 insert into public.proposals (id, org_id, entity_type, entity_id, title, base_config, status,
 		default_fee, tax_rate, valid_until, deck_id, created_by) values
 	('a1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
@@ -428,7 +562,7 @@ insert into public.proposals (id, org_id, entity_type, entity_id, title, base_co
 		250.00, 8.25, now() + interval '30 days',
 		'a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
 	('a1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'client', '20000000-0000-0000-0000-000000000001', 'Website redesign',
+		'company', '20000000-0000-0000-0000-000000000001', 'Website redesign',
 		'{}', 'draft',
 		null, null, null, null, '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
@@ -460,26 +594,26 @@ insert into public.proposal_line_items (id, org_id, proposal_option_id, label, q
 		'a2000000-0000-0000-0000-000000000003', 'Quarterly review', 4, 500.00, 1)
 on conflict (id) do nothing;
 
-insert into public.proposal_custom_field_values (id, org_id, proposal_option_id, field_definition_id,
+insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id,
 		value_text, value_numeric, value_boolean) values
 	('a4000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', null, 1, null),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', null, 1, null),
 	('a4000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000001', null, 2, null),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000001', null, 2, null),
 	('a4000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000001', null, 3, null),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000001', null, 3, null),
 	('a4000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000002', null, null, false),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000002', null, null, false),
 	('a4000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000002', null, null, true),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000002', null, null, true),
 	('a4000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000002', null, null, true),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000002', null, null, true),
 	('a4000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000003', 'email', null, null),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000003', 'email', null, null),
 	('a4000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000003', 'business hours', null, null),
+		'proposal_option', 'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000003', 'business hours', null, null),
 	('a4000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001',
-		'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', '24/7', null, null)
+		'proposal_option', 'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', '24/7', null, null)
 on conflict (id) do nothing;
 
 -- The accepted one: selection and status land together (the check

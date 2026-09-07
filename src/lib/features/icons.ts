@@ -1,11 +1,13 @@
 import type { Component } from 'svelte';
 import BlocksIcon from '@lucide/svelte/icons/blocks';
 import BookOpenIcon from '@lucide/svelte/icons/book-open';
+import Building2Icon from '@lucide/svelte/icons/building-2';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 import ContactIcon from '@lucide/svelte/icons/contact';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+import PackageIcon from '@lucide/svelte/icons/package';
 import SettingsIcon from '@lucide/svelte/icons/settings';
 import TicketIcon from '@lucide/svelte/icons/ticket';
 import UsersIcon from '@lucide/svelte/icons/users';
@@ -20,10 +22,12 @@ import UsersIcon from '@lucide/svelte/icons/users';
 export const ICONS = {
 	blocks: BlocksIcon,
 	'book-open': BookOpenIcon,
+	'building-2': Building2Icon,
 	contact: ContactIcon,
 	handshake: HandshakeIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
+	package: PackageIcon,
 	settings: SettingsIcon,
 	ticket: TicketIcon,
 	users: UsersIcon
