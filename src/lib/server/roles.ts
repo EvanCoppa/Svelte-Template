@@ -20,6 +20,13 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
  * so a fresh org is never locked out. The database mirrors the same rules
  * in `private.feature_level()` for policies that need it.
  *
+ * System admins — platform operators, the `system_admins` table — sit
+ * outside every industry's catalog: `private.org_role()` answers 'owner'
+ * for them on every organization, member or not, so RLS lets them act
+ * everywhere, and the org context mirrors that by giving them `role:
+ * 'owner'` in every org (`isSystemAdmin()` below). Nothing else here
+ * treats them specially — they take the owner/admin bypass.
+ *
  * Every function takes the request-scoped client (`locals.supabase`) plus
  * ids from layout data — the same contract as the crm modules. RLS gates
  * the writes (assigning roles is owner/admin only, and only from the org's
@@ -84,6 +91,24 @@ export async function getUserAccess(
 
 	const roles = held.map(({ roles: r }) => ({ id: r.id, name: r.name }));
 	return { role, roles, grants: unionGrants(held.map(({ roles: r }) => r.role_permissions)) };
+}
+
+/**
+ * Is this user a platform operator? A user can only ever read their own
+ * `system_admins` row, so this is one indexed lookup, never a listing —
+ * and the answer is exactly what `private.is_system_admin()` gives the
+ * policies. Operators are added and removed by SQL / the service role only
+ * (see the system_admins migration); there is no write path here on
+ * purpose.
+ */
+export async function isSystemAdmin(
+	supabase: SupabaseClient<Database>,
+	userId: string
+): Promise<boolean> {
+	const row = unwrap(
+		await supabase.from('system_admins').select('user_id').eq('user_id', userId).maybeSingle()
+	);
+	return row !== null;
 }
 
 /** Folds grant lists from several roles into one map; the strongest wins. */
