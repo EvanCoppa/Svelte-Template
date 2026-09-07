@@ -25,11 +25,11 @@ const unlock = (id: string, name: string) => ({
 	icon: null
 });
 
-// An industry that has everything but `secret`: Free carries clients, Pro
+// An industry that has everything but `secret`: Free carries companies, Pro
 // adds deals, Enterprise adds best practices. Each org's map is what the
 // resolver would produce for its own plan.
 const freeOrg: FeatureMap = {
-	clients: feature('clients', 'Clients', 'enabled', 10),
+	companies: feature('companies', 'Companies', 'enabled', 10),
 	deals: feature('deals', 'Deals', 'locked_visible', 20),
 	'best-practices': feature('best-practices', 'Best Practices', 'locked_visible', 30),
 	secret: feature('secret', 'Secret', 'hidden')
@@ -45,14 +45,14 @@ const tiers = [
 		id: 'enterprise',
 		name: 'Enterprise',
 		tier_features: [
-			{ feature_id: 'clients' },
+			{ feature_id: 'companies' },
 			{ feature_id: 'best-practices' },
 			{ feature_id: 'secret' },
 			{ feature_id: 'deals' }
 		]
 	},
-	{ id: 'free', name: 'Free', tier_features: [{ feature_id: 'clients' }] },
-	{ id: 'pro', name: 'Pro', tier_features: [{ feature_id: 'clients' }, { feature_id: 'deals' }] }
+	{ id: 'free', name: 'Free', tier_features: [{ feature_id: 'companies' }] },
+	{ id: 'pro', name: 'Pro', tier_features: [{ feature_id: 'companies' }, { feature_id: 'deals' }] }
 ];
 
 // The plans as a Free org sees them.
@@ -95,8 +95,8 @@ describe('pitchFor', () => {
 			feature: null,
 			unlocks: pro.unlocks
 		});
-		expect(pitchFor([pro, enterprise], 'clients')?.plan).toEqual(pro);
-		expect(pitchFor([pro, enterprise], 'clients')?.feature).toBeNull();
+		expect(pitchFor([pro, enterprise], 'companies')?.plan).toEqual(pro);
+		expect(pitchFor([pro, enterprise], 'companies')?.feature).toBeNull();
 	});
 
 	it('has nothing to pitch on the top plan', () => {

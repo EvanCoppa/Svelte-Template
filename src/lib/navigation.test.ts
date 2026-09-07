@@ -31,7 +31,7 @@ describe('buildNav', () => {
 	it('lists enabled and locked features and drops disabled and hidden ones', () => {
 		const nav = buildNav(
 			map([
-				['clients', 'enabled'],
+				['companies', 'enabled'],
 				['deals', 'locked_visible'],
 				['tasks', 'disabled'],
 				['tickets', 'hidden']
@@ -40,7 +40,7 @@ describe('buildNav', () => {
 		);
 		const features = nav.filter((i) => i.featureId);
 		expect(features.map((i) => [i.featureId, i.locked])).toEqual([
-			['clients', false],
+			['companies', false],
 			['deals', true]
 		]);
 	});
@@ -48,12 +48,12 @@ describe('buildNav', () => {
 	it('hides features the user has no read grant on, locked ones included', () => {
 		const nav = buildNav(
 			map([
-				['clients', 'enabled'],
+				['companies', 'enabled'],
 				['deals', 'locked_visible']
 			]),
-			(id) => id === 'clients'
+			(id) => id === 'companies'
 		);
-		expect(nav.filter((i) => i.featureId).map((i) => i.featureId)).toEqual(['clients']);
+		expect(nav.filter((i) => i.featureId).map((i) => i.featureId)).toEqual(['companies']);
 	});
 
 	it('keeps the static pages and orders by category, then sortOrder, then label', () => {

@@ -30,7 +30,7 @@ const org = (overrides: Partial<OrgFeatureState> = {}): OrgFeatureState => ({
 
 describe('resolveFeatures', () => {
 	it('enables a feature in the industry and the tier', () => {
-		expect(resolveFeatures([row('clients')], org()).clients.mode).toBe('enabled');
+		expect(resolveFeatures([row('companies')], org()).companies.mode).toBe('enabled');
 	});
 
 	it('locks a feature the industry has but the tier does not', () => {
@@ -74,27 +74,27 @@ describe('resolveFeatures', () => {
 	});
 
 	it('lets locked and hidden overrides win over everything, including the opt-out', () => {
-		const registry = [row('clients'), row('tasks')];
+		const registry = [row('companies'), row('tasks')];
 		const features = resolveFeatures(
 			registry,
 			org({
 				overrides: [
-					{ feature_id: 'clients', mode: 'locked_visible' },
+					{ feature_id: 'companies', mode: 'locked_visible' },
 					{ feature_id: 'tasks', mode: 'hidden' }
 				],
-				disabled: ['clients', 'tasks']
+				disabled: ['companies', 'tasks']
 			})
 		);
-		expect(features.clients.mode).toBe('locked_visible');
+		expect(features.companies.mode).toBe('locked_visible');
 		expect(features.tasks.mode).toBe('hidden');
 	});
 
 	it('returns every registry row, keyed by id, without the embedded maps', () => {
-		const features = resolveFeatures([row('clients'), row('deals', { tiers: ['pro'] })], org());
-		expect(Object.keys(features)).toEqual(['clients', 'deals']);
-		expect(features.clients.feature).not.toHaveProperty('industry_features');
-		expect(features.clients.feature).not.toHaveProperty('tier_features');
-		expect(features.clients.feature.route).toBe('/clients');
+		const features = resolveFeatures([row('companies'), row('deals', { tiers: ['pro'] })], org());
+		expect(Object.keys(features)).toEqual(['companies', 'deals']);
+		expect(features.companies.feature).not.toHaveProperty('industry_features');
+		expect(features.companies.feature).not.toHaveProperty('tier_features');
+		expect(features.companies.feature.route).toBe('/companies');
 	});
 
 	it('resolves an empty registry to an empty map', () => {

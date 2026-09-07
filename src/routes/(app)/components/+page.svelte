@@ -1975,7 +1975,7 @@
 				<Breadcrumb.Root>
 					<Breadcrumb.List>
 						<Breadcrumb.Item>
-							<Breadcrumb.Link href="/clients">Clients</Breadcrumb.Link>
+							<Breadcrumb.Link href="/companies">Companies</Breadcrumb.Link>
 						</Breadcrumb.Item>
 						<Breadcrumb.Separator />
 						<Breadcrumb.Item>

@@ -218,7 +218,7 @@ features, access }` on `locals.org` — the hook gates the route on it, and
 /api/org` (the team switcher) + `invalidate(QUERY.org)`.
 - **CRM working data is member-writable** — a documented extension of the canonical
   shape, not a drift. The `crm_core` migration is the reference: members create and
-  edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
+  edit companies/contacts/deals/tasks/tickets, authored content (activities, ticket
   comments) is editable by its author or owner/admin, deletes stay owner/admin, and
   notifications belong to their recipient (created server-side only, via
   `src/lib/server/crm/notifications.ts` + the service-role client). Column-level
@@ -226,6 +226,42 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **The party model is two tables, split by what a row IS** (`crm_party_model`
+  migration). `companies` are organizations you deal with — `relationship` says
+  customer, supplier or partner, so a vendor is not a second table — and `contacts`
+  are people, with a **nullable `company_id`**: a dental patient or a homeowner is a
+  contact who belongs to no company, and the same list and picker serve them and the
+  buyer at a 500-person account. Records that involve a party (deals, tasks,
+  tickets) carry both `company_id` and `contact_id`, both nullable. `contact_profiles`
+  links an auth user to the contact they are, for a client-facing app; a portal user
+  is **not** an `organization_member`, so every existing policy already excludes
+  them, and `handle_new_user` skips the personal org when signup metadata says
+  `account_type: 'portal'`.
+- **One polymorphic link, not one per table.** "This row is about some CRM record"
+  is answered everywhere by the same three pieces: the `crm_entity_type` enum plus
+  an `entity_id`, `private.crm_entity_exists()` as the foreign key Postgres cannot
+  express, and `public.on_crm_entity_deleted()` as the one place that says what
+  happens when a record goes (proposals detach, addresses/activities/taggings/custom
+  values are deleted). `addresses`, `activities`, `taggings` and `custom_field_values`
+  all use it; app code names the pair once in `src/lib/server/crm/entity.ts`. A new
+  table that points at "some record" adds a branch to those functions — never a
+  second mechanism, and never a column per kind.
+- **Org-definable sets are rows; vocabularies we own are enums.** `pipelines` +
+  `pipeline_stages` replaced the `deal_stage` enum, because a dental practice and a
+  roofer do not run the same board — a deal's `stage_id` is pinned to its own
+  pipeline by a composite foreign key, every org gets a default board by trigger, and
+  an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
+  board has exactly those three. Custom fields follow the same rule and now apply to
+  **any** kind of record — a definition declares its `entity_type` and values
+  reference `(field_definition_id, entity_type)`, so a contact's field cannot be
+  filled in on a product. That is where industry specifics belong: a column if two
+  unrelated industries would ever query on it, a custom field otherwise.
+- **`products` is one catalog for goods and services** (`kind`), because a dental
+  procedure, a roofing labor line and a stocked part all become priced lines on a
+  proposal. Inventory columns are guarded by a check constraint so a service cannot
+  track stock, and `proposal_line_items.product_id` is **provenance, not a live
+  lookup** — the line keeps its own label and `unit_cost` so repricing the catalog
+  never rewrites a quote that was already sent.
 
 ## Database
 

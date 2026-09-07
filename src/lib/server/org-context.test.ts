@@ -8,10 +8,10 @@ const GLOBEX_ID = '10000000-0000-0000-0000-000000000002';
 
 const registry = [
 	{
-		id: 'clients',
+		id: 'companies',
 		name: 'Clients',
 		description: null,
-		route: '/clients',
+		route: '/companies',
 		icon: 'users',
 		category: 'platform',
 		sort_order: 10,
@@ -90,7 +90,7 @@ describe('loadOrgContext', () => {
 					roles: {
 						id: 'r1',
 						name: 'Support',
-						role_permissions: [{ feature_id: 'clients', level: 'read' }]
+						role_permissions: [{ feature_id: 'companies', level: 'read' }]
 					}
 				}
 			]
@@ -104,9 +104,9 @@ describe('loadOrgContext', () => {
 			tierId: 'pro',
 			tierName: 'Pro'
 		});
-		expect(ctx.features.clients.mode).toBe('enabled');
+		expect(ctx.features.companies.mode).toBe('enabled');
 		expect(ctx.features.deals.mode).toBe('disabled');
-		expect(ctx.access.grants).toEqual(new Map([['clients', 'read']]));
+		expect(ctx.access.grants).toEqual(new Map([['companies', 'read']]));
 		expect(h.from).toHaveBeenCalledWith('member_roles');
 		expect(h.builders.member_roles.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		// Cookie already matched: nothing to repair.
@@ -148,7 +148,7 @@ describe('loadOrgContext', () => {
 		expect(ctx.activeOrg.id).toBe(GLOBEX_ID);
 		// Outside construction and the free tier, yet enabled by the pilot override.
 		expect(ctx.features.deals.mode).toBe('enabled');
-		expect(ctx.features.clients.mode).toBe('enabled');
+		expect(ctx.features.companies.mode).toBe('enabled');
 	});
 
 	it('fails closed with a 500 when memberships cannot be loaded', async () => {

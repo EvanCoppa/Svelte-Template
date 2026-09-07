@@ -33,7 +33,7 @@ describe('getUserAccess', () => {
 					name: 'Support',
 					role_permissions: [
 						{ feature_id: 'tickets', level: 'manage' },
-						{ feature_id: 'clients', level: 'read' }
+						{ feature_id: 'companies', level: 'read' }
 					]
 				}
 			},
@@ -42,7 +42,7 @@ describe('getUserAccess', () => {
 					id: 'b0000000-0000-0000-0000-000000000002',
 					name: 'Sales',
 					role_permissions: [
-						{ feature_id: 'clients', level: 'manage' },
+						{ feature_id: 'companies', level: 'manage' },
 						{ feature_id: 'deals', level: 'read' }
 					]
 				}
@@ -61,7 +61,7 @@ describe('getUserAccess', () => {
 		expect(access.grants).toEqual(
 			new Map([
 				['tickets', 'manage'],
-				['clients', 'manage'],
+				['companies', 'manage'],
 				['deals', 'read']
 			])
 		);
@@ -89,16 +89,16 @@ describe('unionGrants', () => {
 	it('keeps manage over read regardless of order', () => {
 		expect(
 			unionGrants([
-				[{ feature_id: 'clients', level: 'manage' }],
-				[{ feature_id: 'clients', level: 'read' }]
+				[{ feature_id: 'companies', level: 'manage' }],
+				[{ feature_id: 'companies', level: 'read' }]
 			])
-		).toEqual(new Map([['clients', 'manage']]));
+		).toEqual(new Map([['companies', 'manage']]));
 		expect(
 			unionGrants([
-				[{ feature_id: 'clients', level: 'read' }],
-				[{ feature_id: 'clients', level: 'manage' }]
+				[{ feature_id: 'companies', level: 'read' }],
+				[{ feature_id: 'companies', level: 'manage' }]
 			])
-		).toEqual(new Map([['clients', 'manage']]));
+		).toEqual(new Map([['companies', 'manage']]));
 	});
 
 	it('keeps delete over manage regardless of order', () => {
@@ -119,18 +119,18 @@ describe('unionGrants', () => {
 
 describe('can', () => {
 	it('hides everything from a member with no grant', () => {
-		expect(can(member([]), 'clients')).toBe(false);
-		expect(can(member([]), 'clients', 'manage')).toBe(false);
+		expect(can(member([]), 'companies')).toBe(false);
+		expect(can(member([]), 'companies', 'manage')).toBe(false);
 	});
 
 	it('read grants read but not manage; manage implies read', () => {
-		const reader = member([['clients', 'read']]);
-		expect(can(reader, 'clients')).toBe(true);
-		expect(can(reader, 'clients', 'manage')).toBe(false);
+		const reader = member([['companies', 'read']]);
+		expect(can(reader, 'companies')).toBe(true);
+		expect(can(reader, 'companies', 'manage')).toBe(false);
 
-		const manager = member([['clients', 'manage']]);
-		expect(can(manager, 'clients')).toBe(true);
-		expect(can(manager, 'clients', 'manage')).toBe(true);
+		const manager = member([['companies', 'manage']]);
+		expect(can(manager, 'companies')).toBe(true);
+		expect(can(manager, 'companies', 'manage')).toBe(true);
 	});
 
 	it('delete is the top of the ladder and implies manage and read', () => {
@@ -146,7 +146,7 @@ describe('can', () => {
 	it('owners and admins bypass grants entirely, delete included', () => {
 		for (const role of ['owner', 'admin'] as const) {
 			const access: UserAccess = { role, roles: [], grants: new Map() };
-			expect(can(access, 'clients', 'manage')).toBe(true);
+			expect(can(access, 'companies', 'manage')).toBe(true);
 			expect(can(access, 'staff', 'delete')).toBe(true);
 		}
 	});
@@ -154,21 +154,21 @@ describe('can', () => {
 
 describe('hasGrant', () => {
 	it('checks any feature id, for ids that come from the registry', () => {
-		expect(hasGrant(member([['clients', 'read']]), 'clients')).toBe(true);
-		expect(hasGrant(member([['clients', 'read']]), 'not-a-feature')).toBe(false);
+		expect(hasGrant(member([['companies', 'read']]), 'companies')).toBe(true);
+		expect(hasGrant(member([['companies', 'read']]), 'not-a-feature')).toBe(false);
 		expect(hasGrant({ role: 'admin', roles: [], grants: new Map() }, 'not-a-feature')).toBe(true);
 	});
 });
 
 describe('requirePermission', () => {
 	it('passes silently when access suffices', () => {
-		expect(() => requirePermission(member([['clients', 'read']]), 'clients')).not.toThrow();
+		expect(() => requirePermission(member([['companies', 'read']]), 'companies')).not.toThrow();
 	});
 
 	it('throws a 403 HttpError when it does not', () => {
 		let thrown: unknown;
 		try {
-			requirePermission(member([]), 'clients');
+			requirePermission(member([]), 'companies');
 		} catch (err) {
 			thrown = err;
 		}

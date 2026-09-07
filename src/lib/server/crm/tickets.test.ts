@@ -20,7 +20,7 @@ describe('tickets data access', () => {
 
 		await expect(listTickets(supabase, ORG_ID)).resolves.toEqual(rows);
 		expect(from).toHaveBeenCalledWith('support_tickets');
-		expect(builder.select).toHaveBeenCalledWith('*, clients(id, name)');
+		expect(builder.select).toHaveBeenCalledWith('*, companies(id, name), contacts(id, name)');
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
 	});
@@ -37,7 +37,9 @@ describe('tickets data access', () => {
 		const { supabase, builder } = supabaseMock({ data: { id: TICKET_ID } });
 
 		await getTicket(supabase, ORG_ID, TICKET_ID);
-		expect(builder.select).toHaveBeenCalledWith('*, clients(id, name), ticket_comments(*)');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, companies(id, name), contacts(id, name), ticket_comments(*)'
+		);
 		expect(builder.order).toHaveBeenCalledWith('created_at', {
 			referencedTable: 'ticket_comments',
 			ascending: true

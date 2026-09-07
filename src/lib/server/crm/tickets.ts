@@ -4,7 +4,7 @@ import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `support_tickets` and `ticket_comments`. Same contract as
- * clients.ts. The human-facing `number` is assigned by the database and never
+ * companies.ts. The human-facing `number` is assigned by the database and never
  * written from here; `created_by`/`author_id` default to the caller. A
  * ticket's status is update-only — new tickets always open as 'open'.
  */
@@ -13,30 +13,38 @@ export type Ticket = Tables<'support_tickets'>;
 export type TicketComment = Tables<'ticket_comments'>;
 export type TicketStatus = Enums<'ticket_status'>;
 
-/** A ticket with the client it concerns, for list screens. */
-export type TicketWithClient = Ticket & {
-	clients: Pick<Tables<'clients'>, 'id' | 'name'> | null;
+/** A ticket with the parties it concerns, for list screens. */
+export type TicketWithParties = Ticket & {
+	companies: Pick<Tables<'companies'>, 'id' | 'name'> | null;
+	contacts: Pick<Tables<'contacts'>, 'id' | 'name'> | null;
 };
 
 /** A full ticket thread, for detail screens. */
-export type TicketThread = TicketWithClient & { ticket_comments: TicketComment[] };
+export type TicketThread = TicketWithParties & { ticket_comments: TicketComment[] };
 
-type TicketInsertColumn = 'client_id' | 'subject' | 'description' | 'priority' | 'assigned_to';
+type TicketInsertColumn =
+	'company_id' | 'contact_id' | 'subject' | 'description' | 'priority' | 'assigned_to';
 type TicketUpdateColumn = TicketInsertColumn | 'status';
 type CommentColumn = 'body' | 'is_internal';
 
 export async function listTickets(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { status?: TicketStatus; clientId?: string; assignedTo?: string } = {}
-): Promise<TicketWithClient[]> {
+	filter: {
+		status?: TicketStatus;
+		companyId?: string;
+		contactId?: string;
+		assignedTo?: string;
+	} = {}
+): Promise<TicketWithParties[]> {
 	let query = supabase
 		.from('support_tickets')
-		.select('*, clients(id, name)')
+		.select('*, companies(id, name), contacts(id, name)')
 		.eq('org_id', orgId)
 		.order('created_at', { ascending: false });
 	if (filter.status) query = query.eq('status', filter.status);
-	if (filter.clientId) query = query.eq('client_id', filter.clientId);
+	if (filter.companyId) query = query.eq('company_id', filter.companyId);
+	if (filter.contactId) query = query.eq('contact_id', filter.contactId);
 	if (filter.assignedTo) query = query.eq('assigned_to', filter.assignedTo);
 	return unwrap(await query);
 }
@@ -49,7 +57,7 @@ export async function getTicket(
 	return unwrap(
 		await supabase
 			.from('support_tickets')
-			.select('*, clients(id, name), ticket_comments(*)')
+			.select('*, companies(id, name), contacts(id, name), ticket_comments(*)')
 			.eq('org_id', orgId)
 			.eq('id', ticketId)
 			.order('created_at', { referencedTable: 'ticket_comments', ascending: true })

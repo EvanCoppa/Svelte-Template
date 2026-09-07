@@ -3,7 +3,7 @@ import { QUERY } from '$lib/queries';
 import { listTasks } from '$lib/server/crm/tasks';
 import type { PageServerLoad } from './$types';
 
-// Gated by the hook on the `tasks` feature + read grant; see clients.
+// Gated by the hook on the `tasks` feature + read grant; see companies.
 export const load: PageServerLoad = async ({ locals, depends }) => {
 	if (!locals.activeOrgId) throw redirect(303, '/login');
 	depends(QUERY.tasks);

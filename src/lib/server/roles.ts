@@ -31,7 +31,7 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
  * feature route, so a page load needs no check of its own. Writes still
  * gate themselves inside the action:
  *
- *   requirePermission(locals.org.access, 'clients', 'manage');
+ *   requirePermission(locals.org.access, 'companies', 'manage');
  */
 
 export type PermissionLevel = Enums<'permission_level'>;
