@@ -7,14 +7,15 @@
 
 	let {
 		name,
-		canManage = false,
+		canAssignRoles = false,
 		canRemove = false,
 		onManage,
 		onRemove
 	}: {
 		/** The member this row is about — it names the trigger for screen readers. */
 		name: string;
-		canManage?: boolean;
+		/** Owner/admin only — what the member_roles policies accept. */
+		canAssignRoles?: boolean;
 		canRemove?: boolean;
 		onManage: () => void;
 		onRemove: () => void;
@@ -22,7 +23,7 @@
 </script>
 
 <!-- A reader with neither permission gets no menu at all rather than an empty one. -->
-{#if canManage || canRemove}
+{#if canAssignRoles || canRemove}
 	<div class="flex justify-end">
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -34,14 +35,14 @@
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end">
-				{#if canManage}
+				{#if canAssignRoles}
 					<DropdownMenu.Item onclick={onManage}>
 						<UserCogIcon />
 						Manage roles
 					</DropdownMenu.Item>
 				{/if}
 				{#if canRemove}
-					{#if canManage}
+					{#if canAssignRoles}
 						<DropdownMenu.Separator />
 					{/if}
 					<DropdownMenu.Item variant="destructive" onclick={onRemove}>

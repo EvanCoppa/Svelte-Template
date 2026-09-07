@@ -133,14 +133,14 @@
 				cell: ({ row }) =>
 					renderComponent(Staff.RowActions, {
 						name: Staff.memberName(row.original),
-						canManage: data.canManage,
+						canAssignRoles: data.canAssignRoles,
 						canRemove: canRemoveMember(row.original),
 						onManage: () => (managingId = row.original.userId),
 						onRemove: () => (removingId = row.original.userId)
 					})
 			})
 		]);
-		if (data.canManage || data.canRemove) return defs;
+		if (data.canAssignRoles || data.canRemove) return defs;
 		return defs.filter((def) => def.id !== 'actions');
 	});
 

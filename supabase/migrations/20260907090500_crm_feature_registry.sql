@@ -56,21 +56,22 @@ insert into public.pages (id, feature_id, path, title) values
 	('products', 'products', '/products', 'Products')
 on conflict (id) do nothing;
 
--- Both verticals have people. Only 'general' sells a catalog out of the box —
--- construction is the fixture proving an industry can lack a feature entirely,
--- and a roofer's materials list is a genuine example of something a vertical
--- may not want on day one. An org that needs it gets a row in
--- organization_feature_overrides, which is exactly what that table is for.
-insert into public.industry_features (industry_id, feature_id) values
-	('general', 'contacts'),
-	('general', 'products'),
-	('construction', 'contacts')
+-- Every vertical has people, and every one of them sells something it would
+-- rather not retype — a dental procedure, a roofing material, a case of beer.
+-- So both features go to the whole catalog, derived rather than listed: the
+-- statement is the intent, and an industry added later cannot silently miss
+-- them. (`hidden` keeps plenty of fixtures from the industry_role_catalog
+-- migration — cosmetic has no ticket queue, dentistry no deal pipeline.)
+insert into public.industry_features (industry_id, feature_id)
+select i.id, f.feature_id
+from public.industries i
+cross join (values ('contacts'), ('products')) as f (feature_id)
 on conflict (industry_id, feature_id) do nothing;
 
 -- Contacts ships in every plan: a CRM whose free tier cannot store a person is
 -- not a CRM. The catalog is the paid step up, so `products` starts at pro —
--- which also gives the free tier a locked_visible entry to upsell from, the
--- state `deals` already demonstrates.
+-- which also gives every free-tier org a locked_visible entry to upsell from,
+-- the state `deals` already demonstrates.
 insert into public.tier_features (tier_id, feature_id) values
 	('free', 'contacts'),
 	('pro', 'contacts'),
@@ -79,16 +80,48 @@ insert into public.tier_features (tier_id, feature_id) values
 	('enterprise', 'products')
 on conflict (tier_id, feature_id) do nothing;
 
--- The starter roles, extended to match what they already granted on clients:
--- Sales runs the accounts and the people in them, Support looks them up. Only
--- Sales touches the catalog, and only to read it — pricing is owner/admin work
--- until an org says otherwise.
-insert into public.role_permissions (role_id, feature_id, level) values
-	-- general / Support
-	('b0000000-0000-0000-0000-000000000001', 'contacts', 'read'),
-	-- general / Sales
-	('b0000000-0000-0000-0000-000000000002', 'contacts', 'manage'),
-	('b0000000-0000-0000-0000-000000000002', 'products', 'read'),
-	-- construction / Support
-	('b0000000-0000-0000-0000-000000000003', 'contacts', 'manage')
+-- Contacts inherit the authority a role already held over companies, and that
+-- is not a convenience — it is what keeps the reshape from quietly changing
+-- who can do what. People used to be `client_contacts`, reachable only through
+-- the client they hung off and carrying no grant of their own, so whatever a
+-- role could do to a client it could already do to the people inside it.
+-- Deriving preserves that exactly, for every role in every industry, including
+-- ones added after this migration was written.
+insert into public.role_permissions (role_id, feature_id, level)
+select rp.role_id, 'contacts', rp.level
+from public.role_permissions rp
+where rp.feature_id = 'companies'
+on conflict (role_id, feature_id) do nothing;
+
+-- The catalog is a genuinely new capability nobody held before, so it goes to
+-- the whole-industry ladder rungs only — a specialist gets it when its
+-- industry decides it should, not by default. The ladder is listed the way the
+-- industry_role_catalog migration lists it, and joined to industry_features so
+-- an industry that lacks the feature grants nothing; that migration's own
+-- closing note says a feature added later still needs its grants, and this is
+-- them.
+insert into public.role_permissions (role_id, feature_id, level)
+select ladder.role_id, f.feature_id, ladder.level
+from (values
+	('b0000000-0000-0000-0001-000000000001'::uuid, 'crm', 'read'::public.permission_level),
+	('b0000000-0000-0000-0001-000000000003', 'crm', 'manage'),
+	('b0000000-0000-0000-0001-000000000004', 'crm', 'delete'),
+	('b0000000-0000-0000-0002-000000000001', 'roofing', 'read'),
+	('b0000000-0000-0000-0002-000000000004', 'roofing', 'manage'),
+	('b0000000-0000-0000-0002-000000000005', 'roofing', 'delete'),
+	('b0000000-0000-0000-0003-000000000001', 'medical-supplies', 'read'),
+	('b0000000-0000-0000-0003-000000000005', 'medical-supplies', 'manage'),
+	('b0000000-0000-0000-0003-000000000006', 'medical-supplies', 'delete'),
+	('b0000000-0000-0000-0004-000000000001', 'cosmetic', 'read'),
+	('b0000000-0000-0000-0004-000000000005', 'cosmetic', 'manage'),
+	('b0000000-0000-0000-0004-000000000006', 'cosmetic', 'delete'),
+	('b0000000-0000-0000-0005-000000000001', 'dentistry', 'read'),
+	('b0000000-0000-0000-0005-000000000005', 'dentistry', 'manage'),
+	('b0000000-0000-0000-0005-000000000006', 'dentistry', 'delete'),
+	('b0000000-0000-0000-0006-000000000001', 'beverage', 'read'),
+	('b0000000-0000-0000-0006-000000000005', 'beverage', 'manage'),
+	('b0000000-0000-0000-0006-000000000006', 'beverage', 'delete')
+) as ladder (role_id, industry_id, level)
+join public.industry_features f
+	on f.industry_id = ladder.industry_id and f.feature_id = 'products'
 on conflict (role_id, feature_id) do nothing;

@@ -5,6 +5,7 @@ import {
 	can,
 	getUserAccess,
 	hasGrant,
+	isSystemAdmin,
 	listRoles,
 	requirePermission,
 	unassignRole,
@@ -82,6 +83,30 @@ describe('getUserAccess', () => {
 
 		const access = await getUserAccess(supabase, ORG_ID, USER_ID, 'member', INDUSTRY_ID);
 		expect(access).toEqual({ role: 'member', roles: [], grants: new Map() });
+	});
+});
+
+describe('isSystemAdmin', () => {
+	it('is true when the caller has a system_admins row', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { user_id: USER_ID } });
+
+		expect(await isSystemAdmin(supabase, USER_ID)).toBe(true);
+		// One indexed lookup of the caller's own row — RLS shows nobody else's.
+		expect(from).toHaveBeenCalledWith('system_admins');
+		expect(builder.eq).toHaveBeenCalledWith('user_id', USER_ID);
+		expect(builder.maybeSingle).toHaveBeenCalled();
+	});
+
+	it('is false for everyone else', async () => {
+		const { supabase } = supabaseMock({ data: null });
+
+		expect(await isSystemAdmin(supabase, USER_ID)).toBe(false);
+	});
+
+	it('throws when the lookup fails, so the org context fails closed', async () => {
+		const { supabase } = supabaseMock({ error: { message: 'boom' } });
+
+		await expect(isSystemAdmin(supabase, USER_ID)).rejects.toThrow('boom');
 	});
 });
 

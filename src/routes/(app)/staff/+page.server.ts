@@ -1,4 +1,4 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { QUERY } from '$lib/queries';
@@ -6,15 +6,14 @@ import { sendEmail } from '$lib/server/email';
 import { orgInviteEmail } from '$lib/server/email-templates';
 import {
 	can,
-	getUserAccess,
 	listRoles,
 	requirePermission,
 	assignRole,
-	unassignRole
+	unassignRole,
+	type UserAccess
 } from '$lib/server/roles';
 import {
 	createInvite,
-	getMembership,
 	inviteUrl,
 	listInvites,
 	listStaff,
@@ -36,13 +35,19 @@ import type { Actions, PageServerLoad } from './$types';
  * invited. The page that uses all three permission levels:
  *
  *   read    the roster
- *   manage  invite, revoke an invite, assign and unassign roles
+ *   manage  invite, revoke an invite
  *   delete  remove a member from the org
  *
- * Every action re-derives the caller's access from the database rather than
- * trusting anything posted, and RLS backs each one independently (see the
- * staff_management migration) — the checks here decide what the screen
- * offers and produce a readable failure, they are not the boundary.
+ * Assigning and unassigning roles is not a level of the feature but an act
+ * of the org hierarchy — owner/admin only, exactly what the member_roles
+ * policies accept — because a role can hand out `delete` on everything.
+ *
+ * Every load and action reads the caller's access from `locals.org`, which
+ * the hook derived from the database on this request (memberships, the
+ * operator flag, a plain member's grants) — nothing posted is trusted — and
+ * RLS backs each one independently (see the staff_management migration).
+ * The checks here decide what the screen offers and produce a readable
+ * failure; they are not the boundary.
  */
 
 /**
@@ -63,42 +68,41 @@ const FORM_IDS = {
 	removeMember: 'remove-member'
 } as const;
 
-/** The caller's access in the active org, rebuilt for an action. */
-async function accessFor(locals: App.Locals) {
-	const { supabase, user, activeOrgId } = locals;
-	if (!user) throw redirect(303, '/login');
-	if (!activeOrgId) throw error(400, 'No active organization.');
+/**
+ * Role assignment follows the org role, not the staff grant: the
+ * member_roles policies (roles_permissions migration) accept owners and
+ * admins only, so offering the editor to a staff `manage` holder would end
+ * in an RLS refusal. System admins are owners everywhere and pass.
+ */
+function canAssignRoles(access: UserAccess): boolean {
+	return access.role === 'owner' || access.role === 'admin';
+}
 
-	const membership = await getMembership(supabase, activeOrgId, user.id);
-	if (!membership) throw error(403, 'You are not a member of this organization.');
-
+/**
+ * The caller's access in the active org, the way the feature settings page
+ * reads it: from the context the hook resolved for this request, not from a
+ * second membership lookup. That is also what lets a system admin — who has
+ * no membership row to find in an org they never joined — act on any org's
+ * roster.
+ */
+function accessFor(locals: App.Locals) {
+	const { user, org } = locals;
+	if (!user || !org) throw redirect(303, '/login');
+	const { activeOrg, access } = org;
 	return {
-		orgId: activeOrgId,
-		orgName: membership.orgName,
+		orgId: activeOrg.id,
+		orgName: activeOrg.name,
+		industryId: activeOrg.industryId,
 		user,
-		access: await getUserAccess(
-			supabase,
-			activeOrgId,
-			user.id,
-			membership.role,
-			membership.industryId
-		)
+		access
 	};
 }
 
-export const load: PageServerLoad = async ({ locals, parent, depends }) => {
-	const { supabase, user } = locals;
-	if (!user) throw redirect(303, '/login');
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	const { supabase } = locals;
+	const { orgId, industryId, access } = accessFor(locals);
 	depends(QUERY.staff);
 
-	const { activeOrg } = await parent();
-	const access = await getUserAccess(
-		supabase,
-		activeOrg.id,
-		user.id,
-		activeOrg.role,
-		activeOrg.industryId
-	);
 	// No `read` and the page does not exist for you.
 	requirePermission(access, 'staff');
 
@@ -115,11 +119,11 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 		revokeForm,
 		removeForm
 	] = await Promise.all([
-		listStaff(supabase, activeOrg.id),
-		listRoles(supabase, activeOrg.industryId),
+		listStaff(supabase, orgId),
+		listRoles(supabase, industryId),
 		// Invite rows carry join tokens; only a manager may see them, and RLS
 		// would return zero rows anyway.
-		manages ? listInvites(supabase, activeOrg.id) : [],
+		manages ? listInvites(supabase, orgId) : [],
 		superValidate(zod4(inviteSchema), { id: FORM_IDS.invite }),
 		superValidate(zod4(inviteLinkSchema), { id: FORM_IDS.inviteLink }),
 		superValidate(zod4(assignRoleSchema), { id: FORM_IDS.assignRole }),
@@ -134,6 +138,7 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 		invites,
 		/** What the screen may offer — the load already proved `read`. */
 		canManage: manages,
+		canAssignRoles: canAssignRoles(access),
 		canRemove: can(access, 'staff', 'delete'),
 		inviteForm,
 		inviteLinkForm,
@@ -147,7 +152,7 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 export const actions: Actions = {
 	invite: async (event) => {
 		const { locals, request, url } = event;
-		const { orgId, orgName, user, access } = await accessFor(locals);
+		const { orgId, orgName, user, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(inviteSchema), { id: FORM_IDS.invite });
 		if (!form.valid) return fail(400, { form });
 		if (!can(access, 'staff', 'manage')) {
@@ -186,7 +191,7 @@ export const actions: Actions = {
 	},
 
 	createLink: async ({ locals, request }) => {
-		const { orgId, access } = await accessFor(locals);
+		const { orgId, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(inviteLinkSchema), { id: FORM_IDS.inviteLink });
 		if (!can(access, 'staff', 'manage')) {
 			return message(form, 'You do not have permission to create invite links.', { status: 403 });
@@ -204,7 +209,7 @@ export const actions: Actions = {
 	},
 
 	revokeInvite: async ({ locals, request }) => {
-		const { orgId, access } = await accessFor(locals);
+		const { orgId, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(revokeInviteSchema), {
 			id: FORM_IDS.revokeInvite
 		});
@@ -225,11 +230,11 @@ export const actions: Actions = {
 	},
 
 	assignRole: async ({ locals, request }) => {
-		const { orgId, access } = await accessFor(locals);
+		const { orgId, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(assignRoleSchema), { id: FORM_IDS.assignRole });
 		if (!form.valid) return fail(400, { form });
-		if (!can(access, 'staff', 'manage')) {
-			return message(form, 'You do not have permission to change roles.', { status: 403 });
+		if (!canAssignRoles(access)) {
+			return message(form, 'Only owners and admins can change roles.', { status: 403 });
 		}
 
 		try {
@@ -244,13 +249,13 @@ export const actions: Actions = {
 	},
 
 	unassignRole: async ({ locals, request }) => {
-		const { orgId, access } = await accessFor(locals);
+		const { orgId, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(unassignRoleSchema), {
 			id: FORM_IDS.unassignRole
 		});
 		if (!form.valid) return fail(400, { form });
-		if (!can(access, 'staff', 'manage')) {
-			return message(form, 'You do not have permission to change roles.', { status: 403 });
+		if (!canAssignRoles(access)) {
+			return message(form, 'Only owners and admins can change roles.', { status: 403 });
 		}
 
 		try {
@@ -265,7 +270,7 @@ export const actions: Actions = {
 	},
 
 	removeMember: async ({ locals, request }) => {
-		const { orgId, user, access } = await accessFor(locals);
+		const { orgId, user, access } = accessFor(locals);
 		const form = await superValidate(request, zod4(removeMemberSchema), {
 			id: FORM_IDS.removeMember
 		});
