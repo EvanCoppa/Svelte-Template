@@ -12,7 +12,8 @@ export const taskSummarySchema = z.object({
 	details: z.string().nullable(),
 	dueAt: z.string().nullable(),
 	completedAt: z.string().nullable(),
-	clientId: z.string().nullable()
+	companyId: z.string().nullable(),
+	contactId: z.string().nullable()
 });
 
 export function summarizeTask(task: Task): z.infer<typeof taskSummarySchema> {
@@ -22,16 +23,18 @@ export function summarizeTask(task: Task): z.infer<typeof taskSummarySchema> {
 		details: task.details,
 		dueAt: task.due_at,
 		completedAt: task.completed_at,
-		clientId: task.client_id
+		companyId: task.company_id,
+		contactId: task.contact_id
 	};
 }
 
 export const listTasks = tool({
 	description:
-		'List tasks, soonest due first. Open tasks by default; ' +
-		'narrow to one client with its id from searchClients.',
+		'List tasks, soonest due first. Open tasks by default; narrow to one company or ' +
+		'contact with its id from searchCompanies or searchContacts.',
 	inputSchema: z.object({
-		clientId: z.guid().optional().describe('Only tasks for this client.'),
+		companyId: z.guid().optional().describe('Only tasks for this company.'),
+		contactId: z.guid().optional().describe('Only tasks for this contact.'),
 		openOnly: z
 			.boolean()
 			.default(true)
@@ -39,9 +42,9 @@ export const listTasks = tool({
 	}),
 	outputSchema: z.object({ tasks: z.array(taskSummarySchema) }),
 	contextSchema: toolContextSchema,
-	execute: async ({ clientId, openOnly }, { context }) => {
+	execute: async ({ companyId, contactId, openOnly }, { context }) => {
 		const { supabase, orgId } = requireToolContext(context, listTasksAccess);
-		const tasks = await loadTasks(supabase, orgId, { clientId, openOnly });
+		const tasks = await loadTasks(supabase, orgId, { companyId, contactId, openOnly });
 		return { tasks: tasks.map(summarizeTask) };
 	}
 });

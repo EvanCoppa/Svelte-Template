@@ -12,11 +12,11 @@ describe('toUIMessages', () => {
 				parts: [
 					{ type: 'step-start' },
 					{
-						type: 'tool-searchClients',
+						type: 'tool-searchCompanies',
 						toolCallId: 'call-1',
 						state: 'output-available',
 						input: { query: 'wayne' },
-						output: { clients: [], total: 0 }
+						output: { companies: [], total: 0 }
 					},
 					{ type: 'text', text: 'None.' }
 				],
@@ -28,7 +28,7 @@ describe('toUIMessages', () => {
 		expect(messages[0]).toEqual({ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] });
 		expect(messages[1].metadata).toEqual({ model: 'm', createdAt: 1 });
 		expect(messages[1].parts[1]).toMatchObject({
-			type: 'tool-searchClients',
+			type: 'tool-searchCompanies',
 			state: 'output-available'
 		});
 	});

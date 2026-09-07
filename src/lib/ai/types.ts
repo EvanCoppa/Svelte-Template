@@ -25,7 +25,7 @@ export type AssistantUIMessage = UIMessage<
 export type AssistantUIMessagePart = AssistantUIMessage['parts'][number];
 
 /**
- * The tool parts of that union — `tool-searchClients`, `tool-createTask`, …
+ * The tool parts of that union — `tool-searchCompanies`, `tool-createTask`, …
  * — with the SDK's states and the tool's typed input and output. The
  * predicate is the SDK's `isToolUIPart` test (`type` starts with `tool-`),
  * written against this union so it narrows it exactly.

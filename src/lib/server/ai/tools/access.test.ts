@@ -29,13 +29,13 @@ describe('isToolActive', () => {
 describe('requireToolContext', () => {
 	it('returns the context when the tool is active', () => {
 		const context = toolContext();
-		expect(requireToolContext(context, { feature: 'clients', level: 'read' })).toBe(context);
+		expect(requireToolContext(context, { feature: 'companies', level: 'read' })).toBe(context);
 	});
 
 	it('throws a readable error the model can relay when it is not', () => {
-		const context = toolContext(orgContext({ role: 'member', grants: { clients: 'read' } }));
-		expect(() => requireToolContext(context, { feature: 'clients', level: 'manage' })).toThrow(
-			/does not allow "manage" on clients/
+		const context = toolContext(orgContext({ role: 'member', grants: { companies: 'read' } }));
+		expect(() => requireToolContext(context, { feature: 'companies', level: 'manage' })).toThrow(
+			/does not allow "manage" on companies/
 		);
 	});
 });

@@ -42,7 +42,7 @@ describe('activeToolNames — tools are linked to features', () => {
 		expect(names).not.toContain('createTask');
 		expect(names).not.toContain('completeTask');
 		expect(names).not.toContain('deleteTask');
-		expect(names).toContain('searchClients');
+		expect(names).toContain('searchCompanies');
 	});
 
 	it.each(['locked_visible', 'hidden'] as const)(
@@ -55,9 +55,9 @@ describe('activeToolNames — tools are linked to features', () => {
 	);
 
 	it('gives a member only what their grants reach', () => {
-		expect(activeToolNames(orgContext({ role: 'member', grants: { clients: 'read' } }))).toEqual([
-			'searchClients',
-			'getClient'
+		expect(activeToolNames(orgContext({ role: 'member', grants: { companies: 'read' } }))).toEqual([
+			'searchCompanies',
+			'getCompany'
 		]);
 	});
 

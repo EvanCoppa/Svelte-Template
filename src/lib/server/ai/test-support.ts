@@ -9,14 +9,22 @@ import type { AssistantToolContext } from './context';
 /**
  * Fixtures for the assistant's tests: an org context with chosen feature modes
  * and grants, and a tool context around it. Shared by the tool, agent and
- * endpoint tests so "a member who may only read clients" is spelled once.
+ * endpoint tests so "a member who may only read companies" is spelled once.
  */
 
 export const ORG_ID = '10000000-0000-0000-0000-000000000001';
 export const USER_ID = '00000000-0000-0000-0000-000000000001';
 export const CONVERSATION_ID = 'c0000000-0000-0000-0000-000000000001';
 
-const FEATURE_IDS = ['clients', 'deals', 'tasks', 'tickets', 'staff', 'assistant'] as const;
+const FEATURE_IDS = [
+	'companies',
+	'contacts',
+	'deals',
+	'tasks',
+	'tickets',
+	'staff',
+	'assistant'
+] as const;
 
 function featureRow(id: string): Feature {
 	return {

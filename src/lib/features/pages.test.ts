@@ -27,8 +27,8 @@ const registry: PageMeta[] = [
 	page('dashboard', '/'),
 	page('settings', '/settings'),
 	page('settings-features', '/settings/features'),
-	page('clients', '/clients', 'clients'),
-	page('client-detail', '/clients/pipeline', 'clients'),
+	page('companies', '/companies', 'companies'),
+	page('company-detail', '/companies/pipeline', 'companies'),
 	page('deals', '/deals', 'deals'),
 	page('tasks', '/tasks', 'tasks'),
 	page('tickets', '/tickets', 'tickets')
@@ -36,17 +36,17 @@ const registry: PageMeta[] = [
 
 describe('matchPage', () => {
 	it('matches a path exactly', () => {
-		expect(matchPage('/clients', registry)?.id).toBe('clients');
+		expect(matchPage('/companies', registry)?.id).toBe('companies');
 		expect(matchPage('/settings', registry)?.id).toBe('settings');
 	});
 
 	it('falls back to the page a nested path sits under', () => {
-		expect(matchPage('/clients/42', registry)?.id).toBe('clients');
+		expect(matchPage('/companies/42', registry)?.id).toBe('companies');
 	});
 
 	it('prefers the longest registered path', () => {
 		expect(matchPage('/settings/features', registry)?.id).toBe('settings-features');
-		expect(matchPage('/clients/pipeline/7', registry)?.id).toBe('client-detail');
+		expect(matchPage('/companies/pipeline/7', registry)?.id).toBe('company-detail');
 	});
 
 	it('never matches home as a prefix, nor a path as a partial segment', () => {
@@ -58,7 +58,7 @@ describe('matchPage', () => {
 
 describe('visiblePages', () => {
 	const map = features([
-		['clients', 'enabled'],
+		['companies', 'enabled'],
 		['deals', 'locked_visible'],
 		['tasks', 'disabled'],
 		['tickets', 'hidden']
@@ -71,8 +71,8 @@ describe('visiblePages', () => {
 
 	it('keeps the pages of a feature the nav would show, and drops the rest', () => {
 		const ids = visiblePages(registry, map, () => true).map((p) => p.id);
-		expect(ids).toContain('clients');
-		expect(ids).toContain('client-detail');
+		expect(ids).toContain('companies');
+		expect(ids).toContain('company-detail');
 		// Locked features are linked (with an upgrade prompt), so they title too.
 		expect(ids).toContain('deals');
 		expect(ids).not.toContain('tasks');
@@ -84,8 +84,8 @@ describe('visiblePages', () => {
 	});
 
 	it('drops an enabled feature the caller cannot read', () => {
-		const ids = visiblePages(registry, map, (id) => id !== 'clients').map((p) => p.id);
-		expect(ids).not.toContain('clients');
+		const ids = visiblePages(registry, map, (id) => id !== 'companies').map((p) => p.id);
+		expect(ids).not.toContain('companies');
 		expect(ids).toContain('deals');
 	});
 });

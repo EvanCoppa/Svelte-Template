@@ -174,11 +174,18 @@ application data is scoped to an organization, never to a bare user. The
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
   and `role_permissions` ship by migration, and an org's `industry_id` (default
-  `general`, set by onboarding/service-role code like `tier_id`) decides which
+  `crm`, set by onboarding/service-role code like `tier_id`) decides which
   roles its owners/admins can hand out — so onboarding an org needs zero role
   setup, and two industries can each have a same-named role granting different
-  things. Custom per-org roles are a deliberate future extension, not built
-  yet. Members can hold several roles and access is the union of their grants.
+  things. The catalog (`industry_role_catalog` migration) ships six industries —
+  crm, roofing, medical-supplies, cosmetic, dentistry, beverage — each with a
+  full ladder: a Viewer (read on everything in the industry), the vertical's
+  specialists, a Manager (manage on everything) and a Director (delete on
+  everything); ids follow `b0000000-0000-0000-00II-0000000000RR` (II =
+  industry, RR = role), and adding an industry is one migration (that file's
+  closing comment is the checklist). Custom per-org roles are a deliberate
+  future extension, not built yet. Members can hold several roles and access
+  is the union of their grants.
   Levels are a ladder — `read` < `manage` < `delete`, each implying the ones
   below — and owner/admin implicitly hold `delete` on everything. A policy
   gating on a level therefore compares with `in ('manage','delete')`, never
@@ -191,10 +198,25 @@ application data is scoped to an organization, never to a bare user. The
   a feature is a real security boundary (the `staff` feature is: invite rows
   carry join tokens). Assigning/unassigning roles is owner/admin via RLS (only
   roles from the org's industry), never a feature.
+- **System admins are the one role outside the catalog** (`system_admins`
+  migration): a table of user ids, written by SQL/service-role code only (like
+  `tier_id`), never a `roles` row — roles are industry-scoped and need a
+  membership, and an operator has neither. `private.org_role()` answers
+  `owner` for a system admin on every org, so every policy written against it
+  and `private.feature_level()` honour the role with no per-table wiring, and
+  `private.shares_org_with()` lets them see any roster's names. The app
+  mirrors that: `loadOrgContext()` lists every org RLS shows them with
+  `role: 'owner'`, and `PUT /api/org` and the staff actions check org
+  visibility, never a membership row — copy that when a new surface needs
+  "may this user act in this org". A user can only read their own
+  `system_admins` row, so nothing can list operators. Locally,
+  `evancoppa@gmail.com` is the seeded operator.
 - **Staff management is the reference gated page** (`staff_management`
   migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
   all three levels: `read` shows the roster, `manage` invites people and
-  assigns roles, `delete` removes a member. Invitations are rows in
+  revokes invites, `delete` removes a member — while assigning roles stays an
+  owner/admin act (what the `member_roles` policies accept), since a role can
+  hand out `delete`. Invitations are rows in
   `organization_invites` — single-use, database-generated tokens, 7-day
   expiry, either addressed to an email or shareable as a link — consumed at
   `/invite/[token]`, which lives outside `(app)` because the person accepting
@@ -218,7 +240,7 @@ features, access }` on `locals.org` — the hook gates the route on it, and
 /api/org` (the team switcher) + `invalidate(QUERY.org)`.
 - **CRM working data is member-writable** — a documented extension of the canonical
   shape, not a drift. The `crm_core` migration is the reference: members create and
-  edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
+  edit companies/contacts/deals/tasks/tickets, authored content (activities, ticket
   comments) is editable by its author or owner/admin, deletes stay owner/admin, and
   notifications belong to their recipient (created server-side only, via
   `src/lib/server/crm/notifications.ts` + the service-role client). Column-level
@@ -226,6 +248,42 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **The party model is two tables, split by what a row IS** (`crm_party_model`
+  migration). `companies` are organizations you deal with — `relationship` says
+  customer, supplier or partner, so a vendor is not a second table — and `contacts`
+  are people, with a **nullable `company_id`**: a dental patient or a homeowner is a
+  contact who belongs to no company, and the same list and picker serve them and the
+  buyer at a 500-person account. Records that involve a party (deals, tasks,
+  tickets) carry both `company_id` and `contact_id`, both nullable. `contact_profiles`
+  links an auth user to the contact they are, for a client-facing app; a portal user
+  is **not** an `organization_member`, so every existing policy already excludes
+  them, and `handle_new_user` skips the personal org when signup metadata says
+  `account_type: 'portal'`.
+- **One polymorphic link, not one per table.** "This row is about some CRM record"
+  is answered everywhere by the same three pieces: the `crm_entity_type` enum plus
+  an `entity_id`, `private.crm_entity_exists()` as the foreign key Postgres cannot
+  express, and `public.on_crm_entity_deleted()` as the one place that says what
+  happens when a record goes (proposals detach, addresses/activities/taggings/custom
+  values are deleted). `addresses`, `activities`, `taggings` and `custom_field_values`
+  all use it; app code names the pair once in `src/lib/server/crm/entity.ts`. A new
+  table that points at "some record" adds a branch to those functions — never a
+  second mechanism, and never a column per kind.
+- **Org-definable sets are rows; vocabularies we own are enums.** `pipelines` +
+  `pipeline_stages` replaced the `deal_stage` enum, because a dental practice and a
+  roofer do not run the same board — a deal's `stage_id` is pinned to its own
+  pipeline by a composite foreign key, every org gets a default board by trigger, and
+  an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
+  board has exactly those three. Custom fields follow the same rule and now apply to
+  **any** kind of record — a definition declares its `entity_type` and values
+  reference `(field_definition_id, entity_type)`, so a contact's field cannot be
+  filled in on a product. That is where industry specifics belong: a column if two
+  unrelated industries would ever query on it, a custom field otherwise.
+- **`products` is one catalog for goods and services** (`kind`), because a dental
+  procedure, a roofing labor line and a stocked part all become priced lines on a
+  proposal. Inventory columns are guarded by a check constraint so a service cannot
+  track stock, and `proposal_line_items.product_id` is **provenance, not a live
+  lookup** — the line keeps its own label and `unit_cost` so repricing the catalog
+  never rewrites a quote that was already sent.
 
 ## Database
 

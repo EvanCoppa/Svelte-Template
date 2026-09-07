@@ -14,12 +14,18 @@
 		class: className,
 		pageSizeOptions = [10, 20, 30, 40, 50],
 		noun = 'row',
+		nounPlural,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		/** Choices offered in the rows-per-page picker. */
 		pageSizeOptions?: number[];
 		/** What a row is called in the readout, singularised as needed. */
 		noun?: string;
+		/**
+		 * The plural, for the nouns `noun + 's'` gets wrong — company/companies,
+		 * person/people. Defaults to the regular form.
+		 */
+		nounPlural?: string;
 	} = $props();
 
 	const dataTable = useDataTable();
@@ -27,7 +33,7 @@
 	const shown = $derived(dataTable.table.getFilteredRowModel().rows.length);
 	const total = $derived(dataTable.table.getCoreRowModel().rows.length);
 	const selected = $derived(dataTable.table.getFilteredSelectedRowModel().rows.length);
-	const plural = $derived((count: number) => (count === 1 ? noun : `${noun}s`));
+	const plural = $derived((count: number) => (count === 1 ? noun : (nounPlural ?? `${noun}s`)));
 </script>
 
 <div

@@ -6,11 +6,12 @@ import { addNote, addNoteAccess } from './add-note';
 import { completeTask, completeTaskAccess } from './complete-task';
 import { createTask, createTaskAccess } from './create-task';
 import { deleteTask, deleteTaskAccess } from './delete-task';
-import { getClient, getClientAccess } from './get-client';
+import { getCompany, getCompanyAccess } from './get-company';
 import { listDeals, listDealsAccess } from './list-deals';
 import { listTasks, listTasksAccess } from './list-tasks';
 import { listTickets, listTicketsAccess } from './list-tickets';
-import { searchClients, searchClientsAccess } from './search-clients';
+import { searchCompanies, searchCompaniesAccess } from './search-companies';
+import { searchContacts, searchContactsAccess } from './search-contacts';
 
 /**
  * The assistant's tools, one file each: an AI SDK `tool()` — zod
@@ -25,8 +26,9 @@ import { searchClients, searchClientsAccess } from './search-clients';
  * `activeToolNames()`, passed as `activeTools`.
  */
 export const assistantTools = {
-	searchClients,
-	getClient,
+	searchCompanies,
+	getCompany,
+	searchContacts,
 	addNote,
 	listTasks,
 	createTask,
@@ -40,8 +42,9 @@ export type AssistantTools = typeof assistantTools;
 export type AssistantToolName = keyof AssistantTools;
 
 export const TOOL_ACCESS = {
-	searchClients: searchClientsAccess,
-	getClient: getClientAccess,
+	searchCompanies: searchCompaniesAccess,
+	getCompany: getCompanyAccess,
+	searchContacts: searchContactsAccess,
 	addNote: addNoteAccess,
 	listTasks: listTasksAccess,
 	createTask: createTaskAccess,

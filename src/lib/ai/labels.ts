@@ -6,8 +6,9 @@ import type { AssistantToolName } from '$lib/server/ai/tools';
  * strings only, and the tool-name type is erased at build time.
  */
 export const TOOL_LABELS = {
-	searchClients: { running: 'Searching clients', done: 'Searched clients' },
-	getClient: { running: 'Opening the client record', done: 'Read the client record' },
+	searchCompanies: { running: 'Searching companies', done: 'Searched companies' },
+	getCompany: { running: 'Opening the company record', done: 'Read the company record' },
+	searchContacts: { running: 'Searching contacts', done: 'Searched contacts' },
 	addNote: { running: 'Adding a note', done: 'Added a note' },
 	listTasks: { running: 'Listing tasks', done: 'Listed tasks' },
 	createTask: { running: 'Creating a task', done: 'Created a task' },

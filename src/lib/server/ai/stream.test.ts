@@ -17,7 +17,7 @@ const FORGED_TASK_ID = '50000000-0000-0000-0000-000000000099';
 const userMessage: IncomingMessage = {
 	id: 'u1',
 	role: 'user',
-	parts: [{ type: 'text', text: 'Which clients are leads?' }],
+	parts: [{ type: 'text', text: 'Which companies are leads?' }],
 	metadata: { createdAt: 1757155200000 }
 };
 
@@ -104,7 +104,7 @@ describe('streamAssistantTurn', () => {
 		const { sse, saved } = await h.finish(response);
 		expect(sse).toContain('Two of them are leads.');
 
-		expect(h.generateTitle).toHaveBeenCalledWith(h.model, 'Which clients are leads?');
+		expect(h.generateTitle).toHaveBeenCalledWith(h.model, 'Which companies are leads?');
 		expect(h.db.builders.assistant_conversations.update).toHaveBeenCalledWith({
 			title: 'A short title'
 		});
@@ -142,14 +142,14 @@ describe('streamAssistantTurn', () => {
 
 	it('gives the model only the tools this caller may use', async () => {
 		const h = harness();
-		const org = orgContext({ role: 'member', grants: { clients: 'read' } });
+		const org = orgContext({ role: 'member', grants: { companies: 'read' } });
 
 		await h.finish(
 			await h.turn({ trigger: 'submit-message', id: CONVERSATION_ID, message: userMessage }, org)
 		);
 
 		const sent = (h.model.doStreamCalls[0]?.tools ?? []).map((tool) => tool.name).sort();
-		expect(sent).toEqual(['getClient', 'searchClients']);
+		expect(sent).toEqual(['getCompany', 'searchCompanies']);
 	});
 
 	it('regenerates by dropping the answer and asking again from the prompt before it', async () => {
@@ -167,7 +167,7 @@ describe('streamAssistantTurn', () => {
 		expect(h.db.builders.assistant_messages.delete).toHaveBeenCalled();
 		const prompt = h.model.doStreamCalls[0]?.prompt ?? [];
 		expect(prompt.filter((m) => m.role === 'assistant')).toEqual([]);
-		expect(JSON.stringify(prompt)).toContain('Which clients are leads?');
+		expect(JSON.stringify(prompt)).toContain('Which companies are leads?');
 		expect(saved.map((m) => m.role)).toEqual(['user', 'assistant']);
 		expect(saved[1].id).not.toBe('a1');
 	});

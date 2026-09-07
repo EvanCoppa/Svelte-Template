@@ -192,9 +192,15 @@ Worth knowing:
 ### Seed data
 
 `supabase/seed.sql` runs after the migrations on every `db:reset`. It creates
-two users — `dev@example.com` and `e2e@example.com`, both with password
-`password123` — by writing the `auth.users` and `auth.identities` rows GoTrue
-expects, then lets the `profiles` trigger from the starter migration do its job.
+three users — `dev@example.com`, `e2e@example.com` and `evancoppa@gmail.com`,
+all with password `password123` — by writing the `auth.users` and
+`auth.identities` rows GoTrue expects, then lets the `profiles` trigger from the
+starter migration do its job. On top of their personal orgs it seeds Acme and
+Globex plus two organizations in every industry the catalog ships, with `dev`
+and `e2e` holding each industry's roles as plain members, and makes
+`evancoppa@gmail.com` the system admin: every org in the switcher, owner-level
+access in each. Sign in as `dev@example.com` to see the app as a regular
+member instead.
 
 These credentials are fixed and public on purpose: they only ever exist in a
 throwaway local database. **Never put a real credential in that file** — it is

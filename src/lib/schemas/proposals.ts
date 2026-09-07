@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Constants } from '$lib/database.types';
+import { Constants, type Enums } from '$lib/database.types';
 
 /**
  * Proposal payloads at the application boundary, and the parsers for the
@@ -16,7 +16,20 @@ import { Constants } from '$lib/database.types';
  */
 
 export const proposalStatusSchema = z.enum(Constants.public.Enums.proposal_status);
-export const proposalEntityTypeSchema = z.enum(Constants.public.Enums.proposal_entity_type);
+/**
+ * What a proposal hangs off. `crm_entity_type` is deliberately wider — it names
+ * every record the shared polymorphic link can point at — and `proposals`
+ * narrows it with a check constraint to these three. The `satisfies` keeps the
+ * two in step: drop or rename one of these in the database and this stops
+ * compiling instead of failing at insert time.
+ */
+const PROPOSAL_ENTITY_TYPES = [
+	'company',
+	'contact',
+	'deal'
+] as const satisfies readonly Enums<'crm_entity_type'>[];
+
+export const proposalEntityTypeSchema = z.enum(PROPOSAL_ENTITY_TYPES);
 export const durationUnitSchema = z.enum(Constants.public.Enums.duration_unit);
 
 /** numeric(12, 2): the largest amount the money columns hold. */

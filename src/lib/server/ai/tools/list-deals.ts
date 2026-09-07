@@ -7,39 +7,51 @@ import { requireToolContext, type ToolAccess } from './access';
 
 export const listDealsAccess: ToolAccess = { feature: 'deals', level: 'read' };
 
-const dealStageSchema = z.enum(Constants.public.Enums.deal_stage);
+const stageOutcomeSchema = z.enum(Constants.public.Enums.stage_outcome);
 
 const dealSummarySchema = z.object({
 	id: z.string(),
 	title: z.string(),
 	amount: z.number().nullable(),
-	stage: dealStageSchema,
-	clientId: z.string(),
-	clientName: z.string(),
+	/** The stage's name on the org's own board; stages are rows, not a fixed list. */
+	stage: z.string(),
+	outcome: stageOutcomeSchema,
+	companyId: z.string().nullable(),
+	companyName: z.string().nullable(),
+	contactId: z.string().nullable(),
+	contactName: z.string().nullable(),
 	expectedCloseDate: z.string().nullable()
 });
 
 export const listDeals = tool({
 	description:
-		'List deals in the pipeline, newest first, with the client each belongs to. ' +
-		'Narrow by stage, or to one client with its id from searchClients.',
+		'List deals, newest first, with the stage each sits in and the company or contact it ' +
+		'belongs to. Narrow to open, won or lost deals, or to one company or contact by id.',
 	inputSchema: z.object({
-		clientId: z.guid().optional().describe('Only deals with this client.'),
-		stage: dealStageSchema.optional().describe('Only deals in this stage.')
+		companyId: z.guid().optional().describe('Only deals with this company, from searchCompanies.'),
+		contactId: z.guid().optional().describe('Only deals with this contact, from searchContacts.'),
+		outcome: stageOutcomeSchema
+			.optional()
+			.describe('Only deals whose stage has this outcome: open, won or lost.')
 	}),
 	outputSchema: z.object({ deals: z.array(dealSummarySchema) }),
 	contextSchema: toolContextSchema,
-	execute: async ({ clientId, stage }, { context }) => {
+	execute: async ({ companyId, contactId, outcome }, { context }) => {
 		const { supabase, orgId } = requireToolContext(context, listDealsAccess);
-		const deals = await loadDeals(supabase, orgId, { clientId, stage });
+		const deals = (await loadDeals(supabase, orgId, { companyId, contactId })).filter(
+			(deal) => !outcome || deal.pipeline_stages.outcome === outcome
+		);
 		return {
 			deals: deals.map((deal) => ({
 				id: deal.id,
 				title: deal.title,
 				amount: deal.amount,
-				stage: deal.stage,
-				clientId: deal.clients.id,
-				clientName: deal.clients.name,
+				stage: deal.pipeline_stages.name,
+				outcome: deal.pipeline_stages.outcome,
+				companyId: deal.companies?.id ?? null,
+				companyName: deal.companies?.name ?? null,
+				contactId: deal.contacts?.id ?? null,
+				contactName: deal.contacts?.name ?? null,
 				expectedCloseDate: deal.expected_close_date
 			}))
 		};

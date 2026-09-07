@@ -1,59 +1,106 @@
 import { describe, expect, it } from 'vitest';
 import { createDeal, deleteDeal, getDeal, listDeals, updateDeal } from './deals';
-import { ORG_ID, supabaseMock } from './test-support';
+import { ORG_ID, supabaseMock, supabaseMockSequence } from './test-support';
 
 const DEAL_ID = '40000000-0000-0000-0000-000000000001';
-const CLIENT_ID = '20000000-0000-0000-0000-000000000001';
+const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
+const CONTACT_ID = '30000000-0000-0000-0000-000000000001';
+const STAGE_ID = '50000000-0000-0000-0000-000000000001';
+const PIPELINE_ID = '51000000-0000-0000-0000-000000000001';
 
 describe('deals data access', () => {
-	it('lists deals with their client, newest first', async () => {
+	it('lists deals with both parties and their stage, newest first', async () => {
 		const rows = [{ id: DEAL_ID, title: 'Annual support contract' }];
 		const { supabase, from, builder } = supabaseMock({ data: rows });
 
 		await expect(listDeals(supabase, ORG_ID)).resolves.toEqual(rows);
 		expect(from).toHaveBeenCalledWith('deals');
-		expect(builder.select).toHaveBeenCalledWith('*, clients(id, name)');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, companies(id, name), contacts(id, name), pipeline_stages!inner(id, name, outcome, sort_order)'
+		);
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 	});
 
-	it('filters by client and stage only when asked', async () => {
+	it('filters by party and board position only when asked', async () => {
 		const { supabase, builder } = supabaseMock({ data: [] });
 
-		await listDeals(supabase, ORG_ID, { clientId: CLIENT_ID, stage: 'proposal' });
-		expect(builder.eq).toHaveBeenCalledWith('client_id', CLIENT_ID);
-		expect(builder.eq).toHaveBeenCalledWith('stage', 'proposal');
+		await listDeals(supabase, ORG_ID, { companyId: COMPANY_ID, stageId: STAGE_ID });
+		expect(builder.eq).toHaveBeenCalledWith('company_id', COMPANY_ID);
+		expect(builder.eq).toHaveBeenCalledWith('stage_id', STAGE_ID);
 	});
 
-	it('fetches one deal with its client, tolerating absence', async () => {
+	it('fetches one deal with its parties, tolerating absence', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 
 		await expect(getDeal(supabase, ORG_ID, DEAL_ID)).resolves.toBeNull();
-		expect(builder.select).toHaveBeenCalledWith('*, clients(id, name)');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, companies(id, name), contacts(id, name), pipeline_stages!inner(id, name, outcome, sort_order)'
+		);
 		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
 		expect(builder.maybeSingle).toHaveBeenCalled();
 	});
 
-	it('creates a deal under the org without touching created_by', async () => {
-		const { supabase, builder } = supabaseMock({ data: { id: DEAL_ID } });
+	it('places an unplaced deal in the org’s default board, at the first stage', async () => {
+		const board = {
+			id: PIPELINE_ID,
+			is_default: true,
+			pipeline_stages: [
+				{ id: STAGE_ID, name: 'Lead', sort_order: 10 },
+				{ id: 'later', name: 'Qualified', sort_order: 20 }
+			]
+		};
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: board },
+			{ data: { id: DEAL_ID } }
+		]);
 
 		await createDeal(supabase, ORG_ID, {
-			client_id: CLIENT_ID,
+			company_id: COMPANY_ID,
+			contact_id: CONTACT_ID,
 			title: 'Renewal',
 			amount: 24000
 		});
 		expect(builder.insert).toHaveBeenCalledWith({
-			client_id: CLIENT_ID,
+			company_id: COMPANY_ID,
+			contact_id: CONTACT_ID,
 			title: 'Renewal',
 			amount: 24000,
+			pipeline_id: PIPELINE_ID,
+			stage_id: STAGE_ID,
 			org_id: ORG_ID
 		});
 	});
 
-	it('updates scoped to org and id', async () => {
+	it('takes an explicit placement as given, without looking a board up', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: DEAL_ID } });
+
+		await createDeal(supabase, ORG_ID, {
+			title: 'Private security retainer',
+			pipeline_id: PIPELINE_ID,
+			stage_id: STAGE_ID
+		});
+		expect(from).toHaveBeenCalledTimes(1);
+		expect(builder.insert).toHaveBeenCalledWith({
+			title: 'Private security retainer',
+			pipeline_id: PIPELINE_ID,
+			stage_id: STAGE_ID,
+			org_id: ORG_ID
+		});
+	});
+
+	it('refuses to create a deal when the org has no default board', async () => {
+		const { supabase } = supabaseMockSequence([{ data: null }]);
+
+		await expect(createDeal(supabase, ORG_ID, { title: 'Orphan' })).rejects.toThrow(
+			'no default pipeline'
+		);
+	});
+
+	it('moves a deal across the board scoped to org and id', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: DEAL_ID } });
 
-		await updateDeal(supabase, ORG_ID, DEAL_ID, { stage: 'won' });
-		expect(builder.update).toHaveBeenCalledWith({ stage: 'won' });
+		await updateDeal(supabase, ORG_ID, DEAL_ID, { stage_id: STAGE_ID });
+		expect(builder.update).toHaveBeenCalledWith({ stage_id: STAGE_ID });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
 	});

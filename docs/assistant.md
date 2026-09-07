@@ -58,17 +58,18 @@ column grants and the `unwrap` error contract apply exactly as they do for a per
 Next to each tool sits its **access**: the feature whose data it touches and the level it
 needs there, on the same `read < manage < delete` ladder the rest of the app is gated on.
 
-| tool            | feature | level  | approval |
-| --------------- | ------- | ------ | -------- |
-| `searchClients` | clients | read   |          |
-| `getClient`     | clients | read   |          |
-| `addNote`       | clients | manage |          |
-| `listTasks`     | tasks   | read   |          |
-| `createTask`    | tasks   | manage |          |
-| `completeTask`  | tasks   | manage |          |
-| `deleteTask`    | tasks   | delete | user     |
-| `listDeals`     | deals   | read   |          |
-| `listTickets`   | tickets | read   |          |
+| tool              | feature   | level  | approval |
+| ----------------- | --------- | ------ | -------- |
+| `searchCompanies` | companies | read   |          |
+| `getCompany`      | companies | read   |          |
+| `searchContacts`  | contacts  | read   |          |
+| `addNote`         | companies | manage |          |
+| `listTasks`       | tasks     | read   |          |
+| `createTask`      | tasks     | manage |          |
+| `completeTask`    | tasks     | manage |          |
+| `deleteTask`      | tasks     | delete | user     |
+| `listDeals`       | deals     | read   |          |
+| `listTickets`     | tickets   | read   |          |
 
 `activeToolNames(org)` (`tools/index.ts`) keeps a tool only when the feature's mode for
 the org is `enabled` **and** the caller holds the level — the same intersection the hook

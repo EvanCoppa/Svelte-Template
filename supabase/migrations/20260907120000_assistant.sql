@@ -194,9 +194,12 @@ insert into public.pages (id, feature_id, path, title) values
 	('assistant', 'assistant', '/assistant', 'Assistant')
 on conflict (id) do nothing;
 
-insert into public.industry_features (industry_id, feature_id) values
-	('general', 'assistant'),
-	('construction', 'assistant')
+-- Every industry gets the assistant: it is a way of working with whatever
+-- data an org already has, not a capability of one vertical. Derived from
+-- the catalog, so an industry added later cannot silently miss it.
+insert into public.industry_features (industry_id, feature_id)
+select i.id, 'assistant'
+from public.industries i
 on conflict (industry_id, feature_id) do nothing;
 
 insert into public.tier_features (tier_id, feature_id) values
@@ -207,9 +210,12 @@ on conflict (tier_id, feature_id) do nothing;
 -- Plain members may open the assistant. What it can DO for them is decided
 -- tool by tool from the grants they already hold on the features the tools
 -- touch (src/lib/server/ai/tools/index.ts) — this row grants nothing beyond
--- the page itself.
-insert into public.role_permissions (role_id, feature_id, level) values
-	('b0000000-0000-0000-0000-000000000001', 'assistant', 'read'),
-	('b0000000-0000-0000-0000-000000000002', 'assistant', 'read'),
-	('b0000000-0000-0000-0000-000000000003', 'assistant', 'read')
+-- the page itself. Derived from the companies grants the way the CRM feature
+-- registry derives contacts: whoever a role lets read the CRM may ask the
+-- assistant about it, in every industry, including roles added after this
+-- migration was written.
+insert into public.role_permissions (role_id, feature_id, level)
+select rp.role_id, 'assistant', 'read'::public.permission_level
+from public.role_permissions rp
+where rp.feature_id = 'companies'
 on conflict (role_id, feature_id) do nothing;

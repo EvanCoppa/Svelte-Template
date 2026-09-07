@@ -29,8 +29,8 @@ test.describe('unauthenticated visitor', () => {
 	test('asks for a login before the feature gate can answer', async ({ page }) => {
 		// Feature routes are behind the same default-deny guard: an anonymous
 		// visitor learns nothing about what the org has.
-		await page.goto('/clients');
-		await expect(page).toHaveURL('/login?next=%2Fclients');
+		await page.goto('/companies');
+		await expect(page).toHaveURL('/login?next=%2Fcompanies');
 	});
 
 	test('asks for a login before the assistant can answer', async ({ page }) => {

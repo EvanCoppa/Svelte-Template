@@ -25,7 +25,7 @@
 
 	/** Openers for the empty thread — each is just a message sent for the user. */
 	const SUGGESTIONS = [
-		'Which of our clients are still leads?',
+		'Which companies are still leads?',
 		'What is open in the ticket queue?',
 		'Summarize the pipeline by stage'
 	];
@@ -94,8 +94,8 @@
 	<div class="space-y-1">
 		<h1 class="text-2xl font-bold tracking-tight">Assistant</h1>
 		<p class="text-muted-foreground">
-			Ask about {data.activeOrg.name}'s clients, deals, tasks and tickets — answered from your data,
-			with anything that removes data asking you first.
+			Ask about {data.activeOrg.name}'s companies, contacts, deals, tasks and tickets — answered
+			from your data, with anything that removes data asking you first.
 		</p>
 	</div>
 

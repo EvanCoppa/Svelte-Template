@@ -15,7 +15,9 @@ export const QUERY = {
 	staff: 'app:staff',
 	/** The resolved feature map — the org's own opt-outs change it. */
 	features: 'app:features',
-	clients: 'app:clients',
+	companies: 'app:companies',
+	contacts: 'app:contacts',
+	products: 'app:products',
 	deals: 'app:deals',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',

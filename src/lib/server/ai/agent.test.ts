@@ -11,7 +11,7 @@ import { activeToolNames } from './tools';
 
 describe('createAssistantAgent', () => {
 	it('sends the model only the tools the caller may use', async () => {
-		const org = orgContext({ role: 'member', grants: { clients: 'read', tasks: 'manage' } });
+		const org = orgContext({ role: 'member', grants: { companies: 'read', tasks: 'manage' } });
 		const model = streamingModel('Hello');
 		const agent = createAssistantAgent({ model, context: toolContext(org) });
 
@@ -20,7 +20,13 @@ describe('createAssistantAgent', () => {
 
 		const sent = (model.doStreamCalls[0]?.tools ?? []).map((tool) => tool.name).sort();
 		expect(sent).toEqual([...activeToolNames(org)].sort());
-		expect(sent).toEqual(['completeTask', 'createTask', 'getClient', 'listTasks', 'searchClients']);
+		expect(sent).toEqual([
+			'completeTask',
+			'createTask',
+			'getCompany',
+			'listTasks',
+			'searchCompanies'
+		]);
 	});
 
 	it('sends no tools at all to a member without grants', async () => {

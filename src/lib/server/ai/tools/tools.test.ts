@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { orgContext, toolContext, ORG_ID } from '../test-support';
 import { createTask } from './create-task';
 import { deleteTask } from './delete-task';
-import { searchClients } from './search-clients';
+import { searchCompanies } from './search-companies';
+import { searchContacts } from './search-contacts';
 
 /**
  * The tools call the CRM data modules with the request client and org id —
  * the same road a page takes — and refuse when the caller may not.
  */
 
-const CLIENT_ID = '20000000-0000-0000-0000-000000000001';
+const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
+const CONTACT_ID = '30000000-0000-0000-0000-000000000001';
 const TASK_ID = '50000000-0000-0000-0000-000000000001';
 
 const options = (context: ReturnType<typeof toolContext>) => ({
@@ -19,29 +21,108 @@ const options = (context: ReturnType<typeof toolContext>) => ({
 	context
 });
 
-describe('searchClients', () => {
-	it('lists the org’s clients and filters them in memory, capped and counted', async () => {
+describe('searchCompanies', () => {
+	it('lists the org’s companies and filters them in memory, capped and counted', async () => {
 		const rows = [
-			{ id: CLIENT_ID, name: 'Wayne Enterprises', company: 'Wayne', email: null, status: 'active' },
-			{ id: 'x', name: 'Stark Industries', company: null, email: 'c@stark.example', status: 'lead' }
+			{
+				id: COMPANY_ID,
+				name: 'Wayne Enterprises',
+				email: null,
+				relationship: 'customer',
+				status: 'active'
+			},
+			{
+				id: 'x',
+				name: 'Stark Industries',
+				email: 'contact@stark.example',
+				relationship: 'supplier',
+				status: 'lead'
+			}
 		];
 		const context = toolContext(orgContext(), { data: rows });
 
-		const result = await searchClients.execute!({ query: 'stark' }, options(context));
+		const result = await searchCompanies.execute!({ query: 'stark' }, options(context));
 
-		expect(context.mock.from).toHaveBeenCalledWith('clients');
+		expect(context.mock.from).toHaveBeenCalledWith('companies');
 		expect(context.mock.builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(result).toEqual({
-			clients: [
+			companies: [
 				{
 					id: 'x',
 					name: 'Stark Industries',
-					company: null,
-					email: 'c@stark.example',
+					email: 'contact@stark.example',
+					relationship: 'supplier',
 					status: 'lead'
 				}
 			],
 			total: 1
+		});
+	});
+
+	it('hands the relationship filter to the query instead of filtering in memory', async () => {
+		const context = toolContext(orgContext(), { data: [] });
+
+		await searchCompanies.execute!({ relationship: 'supplier' }, options(context));
+
+		expect(context.mock.builder.eq).toHaveBeenCalledWith('relationship', 'supplier');
+	});
+});
+
+describe('searchContacts', () => {
+	it('names the company a person belongs to, or null when they stand alone', async () => {
+		const rows = [
+			{
+				id: CONTACT_ID,
+				name: 'Lucius Fox',
+				email: 'lucius@wayne.example',
+				phone: null,
+				title: 'CEO',
+				is_primary: true,
+				status: 'active',
+				companies: { id: COMPANY_ID, name: 'Wayne Enterprises' }
+			},
+			{
+				id: 'y',
+				name: 'Bruce Wayne',
+				email: null,
+				phone: null,
+				title: null,
+				is_primary: false,
+				status: 'lead',
+				companies: null
+			}
+		];
+		const context = toolContext(orgContext(), { data: rows });
+
+		const result = await searchContacts.execute!({}, options(context));
+
+		expect(context.mock.from).toHaveBeenCalledWith('contacts');
+		expect(result).toEqual({
+			contacts: [
+				{
+					id: CONTACT_ID,
+					name: 'Lucius Fox',
+					email: 'lucius@wayne.example',
+					phone: null,
+					title: 'CEO',
+					isPrimary: true,
+					status: 'active',
+					companyId: COMPANY_ID,
+					companyName: 'Wayne Enterprises'
+				},
+				{
+					id: 'y',
+					name: 'Bruce Wayne',
+					email: null,
+					phone: null,
+					title: null,
+					isPrimary: false,
+					status: 'lead',
+					companyId: null,
+					companyName: null
+				}
+			],
+			total: 2
 		});
 	});
 });
@@ -54,19 +135,21 @@ describe('createTask', () => {
 			details: null,
 			due_at: null,
 			completed_at: null,
-			client_id: CLIENT_ID
+			company_id: COMPANY_ID,
+			contact_id: null
 		};
 		const context = toolContext(orgContext(), { data: row });
 
 		const result = await createTask.execute!(
-			{ title: 'Send renewal quote', clientId: CLIENT_ID },
+			{ title: 'Send renewal quote', companyId: COMPANY_ID },
 			options(context)
 		);
 
 		expect(context.mock.from).toHaveBeenCalledWith('tasks');
 		expect(context.mock.builder.insert).toHaveBeenCalledWith({
 			title: 'Send renewal quote',
-			client_id: CLIENT_ID,
+			company_id: COMPANY_ID,
+			contact_id: null,
 			details: null,
 			due_at: null,
 			org_id: ORG_ID
@@ -78,7 +161,8 @@ describe('createTask', () => {
 				details: null,
 				dueAt: null,
 				completedAt: null,
-				clientId: CLIENT_ID
+				companyId: COMPANY_ID,
+				contactId: null
 			}
 		});
 	});
