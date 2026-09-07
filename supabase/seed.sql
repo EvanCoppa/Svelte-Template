@@ -653,3 +653,20 @@ insert into public.system_admins (user_id, note) values
 on conflict (user_id) do nothing;
 
 drop table seed_users;
+
+-- One assistant thread for Acme's owner, stored in the AI SDK's UIMessage
+-- shape exactly as the stream endpoint persists it, so the assistant page
+-- opens with a conversation in its history rail straight after a reset.
+insert into public.assistant_conversations (id, org_id, user_id, title) values
+	('c0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001', 'Which companies are still leads')
+on conflict (id) do nothing;
+
+insert into public.assistant_messages (conversation_id, id, role, position, parts, metadata) values
+	('c0000000-0000-0000-0000-000000000001', 'seed-user-000000000001', 'user', 0,
+		'[{"type": "text", "text": "Which of our companies are still leads?"}]'::jsonb,
+		'{"createdAt": 1757155200000}'::jsonb),
+	('c0000000-0000-0000-0000-000000000001', 'seed-assistant-00000001', 'assistant', 1,
+		'[{"type": "step-start"}, {"type": "text", "text": "One company is still a lead: **Stark Industries**. Wayne Enterprises is already active."}]'::jsonb,
+		'{"createdAt": 1757155203000, "model": "claude-opus-5"}'::jsonb)
+on conflict (conversation_id, id) do nothing;

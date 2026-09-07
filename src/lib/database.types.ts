@@ -133,6 +133,79 @@ export type Database = {
           },
         ]
       }
+      assistant_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_conversations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          parts: Json
+          position: number
+          role: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id: string
+          metadata?: Json | null
+          parts: Json
+          position: number
+          role: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          parts?: Json
+          position?: number
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string

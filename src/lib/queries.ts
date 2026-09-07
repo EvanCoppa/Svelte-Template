@@ -20,5 +20,7 @@ export const QUERY = {
 	products: 'app:products',
 	deals: 'app:deals',
 	tasks: 'app:tasks',
-	tickets: 'app:tickets'
+	tickets: 'app:tickets',
+	/** The signed-in member's assistant conversations — the history rail and a thread's title. */
+	assistant: 'app:assistant'
 } as const;

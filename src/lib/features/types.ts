@@ -24,7 +24,8 @@ export const FEATURE_IDS = [
 	'tickets',
 	'staff',
 	'components',
-	'best-practices'
+	'best-practices',
+	'assistant'
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];

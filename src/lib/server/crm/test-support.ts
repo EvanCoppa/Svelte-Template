@@ -16,6 +16,7 @@ const METHODS = [
 	'update',
 	'delete',
 	'eq',
+	'gte',
 	'in',
 	'is',
 	'order',
