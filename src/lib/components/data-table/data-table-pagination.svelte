@@ -35,6 +35,9 @@
 	// The page size is fitted to the viewport, so a shrinking table can leave the
 	// index past the last page for a frame; the readout never shows that.
 	const page = $derived(Math.min(pagination.pageIndex + 1, pageCount));
+
+	// Both readouts sit in the same box, so the row reads the same from either end.
+	const pill = 'bg-background flex h-9 items-center rounded-lg border shadow-xs';
 </script>
 
 <div
@@ -43,21 +46,25 @@
 	class={cn('flex items-center justify-between gap-4', className)}
 	{...restProps}
 >
-	<!-- The count is always there; a selection is mentioned only once one exists. -->
-	<div class="text-muted-foreground truncate text-sm">
-		{#if selected > 0}
-			{selected} of {shown} {plural(shown)} selected
-		{:else if shown === total}
-			{total} {plural(total)}
-		{:else}
-			{shown} of {total} {plural(total)}
-		{/if}
+	<!-- The count is always there; a selection is mentioned only once one exists.
+	     It is the one readout that can outgrow its half of the row, so it is also
+	     the one allowed to shrink. -->
+	<div class={cn(pill, 'min-w-0')}>
+		<p class="truncate px-3 text-sm tabular-nums">
+			{#if selected > 0}
+				<span class="font-semibold">{selected}</span>
+				<span class="text-muted-foreground">of {shown} {plural(shown)} selected</span>
+			{:else if shown === total}
+				<span class="font-semibold">{total}</span>
+				<span class="text-muted-foreground">{plural(total)}</span>
+			{:else}
+				<span class="font-semibold">{shown}</span>
+				<span class="text-muted-foreground">of {total} {plural(total)}</span>
+			{/if}
+		</p>
 	</div>
 
-	<nav
-		aria-label="Pagination"
-		class="bg-background flex shrink-0 items-center rounded-lg border shadow-xs"
-	>
+	<nav aria-label="Pagination" class={cn(pill, 'shrink-0')}>
 		<p class="px-3 text-sm whitespace-nowrap tabular-nums">
 			<span class="font-semibold">{page}</span>
 			<span class="text-muted-foreground">of {pageCount}</span>
