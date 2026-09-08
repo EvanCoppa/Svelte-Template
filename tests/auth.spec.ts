@@ -160,13 +160,18 @@ test.describe('the app shell', () => {
 		);
 	});
 
-	test('opens the palette from the header and navigates', async ({ page }) => {
-		await clickWhenLive(page.locator('.search-bar'), () =>
-			expect(page.getByRole('dialog')).toBeVisible()
+	test('opens the palette from the sidebar and navigates', async ({ page }) => {
+		// The search button lives in the sidebar header, above the nav it jumps
+		// to — the top bar carries no search of its own.
+		await clickWhenLive(
+			page.locator('[data-slot="sidebar-header"]').getByRole('button', { name: 'Search' }),
+			() => expect(page.getByRole('dialog')).toBeVisible()
 		);
 
 		const palette = page.getByRole('dialog');
-		await palette.getByRole('combobox').fill('shadcn');
+		// Entries are scored against their `value` — the label plus its aliases
+		// (see search-dialog.svelte), not the prose on the page they open.
+		await palette.getByRole('combobox').fill('compon');
 		await palette
 			.getByRole('option', { name: /components/i })
 			.first()
@@ -300,11 +305,12 @@ test.describe('the workspace switcher', () => {
 	// from colliding with the same text elsewhere on the page (strict mode).
 	const switcher = (page: Page) => page.locator('[data-slot="sidebar-header"]');
 
-	test('shows the active workspace and its tier', async ({ page }) => {
+	test('shows the active workspace on one line, without its tier', async ({ page }) => {
 		// seed.sql: e2e@example.com is a member of "Acme Inc" (pro) plus their
 		// personal org; "Acme Inc" sorts first, so it is the default active org.
 		await expect(switcher(page).getByText('Acme Inc')).toBeVisible();
-		await expect(switcher(page).getByText('Pro')).toBeVisible();
+		// The tier moved out of the switcher — the row is logo, name, chevron.
+		await expect(switcher(page).getByText('Pro')).toHaveCount(0);
 	});
 
 	test('switches workspaces and persists the choice across reloads', async ({ page }) => {

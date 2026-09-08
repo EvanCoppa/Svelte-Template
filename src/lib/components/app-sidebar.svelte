@@ -3,11 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import NavUser from '$lib/components/nav-user.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { iconFor } from '$lib/features/icons';
 	import { groupNav, isNavItemActive } from '$lib/navigation';
+	import { showSearch } from '$lib/search.svelte';
 	import { showUpgrade } from '$lib/upgrade.svelte';
 	import type { OrgMembership } from '$lib/org';
 
@@ -29,9 +31,34 @@
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
 	<Sidebar.Header>
-		{#if activeOrg}
-			<TeamSwitcher {organizations} {activeOrg} />
-		{/if}
+		<!-- One row: logo, workspace name, its dropdown chevron — and the sidebar's
+		     own collapse button, sitting where the switcher's chevrons used to. -->
+		<div class="flex items-center gap-1">
+			{#if activeOrg}
+				<div class="min-w-0 flex-1">
+					<TeamSwitcher {organizations} {activeOrg} />
+				</div>
+			{/if}
+			<Sidebar.Trigger class="text-sidebar-foreground/70 shrink-0" />
+		</div>
+
+		<!-- The ⌘K palette's button, above the nav it jumps to. The dialog itself
+		     is the one the (app) layout mounts; `showSearch()` opens it. -->
+		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton
+					class="border-sidebar-border bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent border"
+					tooltipContent="Search"
+					onclick={() => showSearch()}
+				>
+					<SearchIcon />
+					<span class="flex-1 text-left">Search ...</span>
+					<kbd class="border-sidebar-border rounded border px-1 py-px text-[10px] leading-none">
+						&#8984;K
+					</kbd>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content class="scrollable-sidebar">
 		{#each groups as group (group.key)}
