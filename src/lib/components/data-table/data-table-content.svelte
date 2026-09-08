@@ -41,7 +41,10 @@
 								: sorted === 'desc'
 									? 'descending'
 									: undefined}
-							class="[&:has([role=checkbox])]:ps-3"
+							class={cn(
+								header.column.id === 'select' && 'w-8 ps-3 pe-0',
+								header.column.id === 'actions' && 'w-8 pe-3'
+							)}
 						>
 							{#if !header.isPlaceholder}
 								<FlexRender {header} />
@@ -55,7 +58,12 @@
 			{#each dataTable.table.getRowModel().rows as row (row.id)}
 				<Table.Row data-state={row.getIsSelected() && 'selected'}>
 					{#each row.getVisibleCells() as cell (cell.id)}
-						<Table.Cell class="[&:has([role=checkbox])]:ps-3">
+						<Table.Cell
+							class={cn(
+								cell.column.id === 'select' && 'w-8 ps-3 pe-0',
+								cell.column.id === 'actions' && 'w-8 pe-3'
+							)}
+						>
 							<FlexRender {cell} />
 						</Table.Cell>
 					{/each}
