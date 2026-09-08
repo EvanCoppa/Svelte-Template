@@ -110,14 +110,14 @@
 	</Modal.Trigger>
 
 	<!-- Roomier than the default tray: these forms lay their fields out in two columns. -->
-	<Modal.Content class="sm:max-w-xl">
+	<Modal.Content class="sm:max-w-2xl">
 		<!-- The form wraps the card and the footer so `Modal.Action type="submit"` posts it. -->
 		<form method="POST" {action} use:enhance>
 			<Modal.Card>
 				<Modal.Header>
 					<Modal.Title><PlusIcon /> New {terms.noun}</Modal.Title>
 				</Modal.Header>
-				<Modal.Body class="grid gap-4 sm:grid-cols-2">
+				<Modal.Body class="grid gap-5 py-1 sm:grid-cols-2">
 					<FormAlert message={$message} class="mb-0 sm:col-span-2" />
 
 					{#each definition.fields as field (field.name)}
