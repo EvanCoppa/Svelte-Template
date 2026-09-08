@@ -1,446 +1,268 @@
 <script lang="ts">
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
-	import XIcon from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
-	import { dateProxy, superForm } from 'sveltekit-superforms';
+	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
 	import * as PageHeader from '$lib/components/page-header/index.js';
+	import * as Builder from '$lib/components/proposal-builder/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import type { ComboboxGroup, ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
+	import type { ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
 	import { Combobox } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { billableQuantity } from '$lib/crm/billables';
 	import { estimateOptionTotal } from '$lib/crm/proposals';
-	import { recordListHref, recordTerms } from '$lib/crm/records';
-	import { capitalize } from '$lib/utils.js';
+	import { recordTerms } from '$lib/crm/records';
+	import { term } from '$lib/features/vocabulary';
 	import {
 		MAX_OPTIONS,
-		emptyLineItem,
 		emptyOption,
-		parentValue,
-		proposalBuilderSchema
-	} from './schema';
+		proposalBuilderSchema,
+		type ProposalBuilderOption
+	} from '$lib/schemas/proposal-builder';
+	import { capitalize, cn } from '$lib/utils.js';
 
 	/**
-	 * The proposal builder. One nested document — the proposal, the record it
-	 * is for, and its options with their lines — edited in place and posted as
-	 * JSON to `?/create`, which lands on the new record's page. Every list the
-	 * pickers draw from arrived with the load; nothing here fetches.
+	 * The proposal builder — Yes Smile's treatment plan form, class for class,
+	 * on the template's primitives: the person it is for and the two people on
+	 * it, then "No. Plans" and the notes, then one fieldset per option, then
+	 * the two blue save buttons. One nested document, posted as JSON to
+	 * `?/create`. Every list the pickers draw from arrived with the load.
+	 *
+	 * The look is Yes Smile's on purpose — literal greys and blues rather than
+	 * the theme's tokens — so those classes live in
+	 * `$lib/components/proposal-builder/classes.ts` with their dark pairs, and
+	 * nothing here re-spells them. Photos, insurance coverage and the cash
+	 * offer toggle have no home in the model and are not here.
 	 */
 	let { data } = $props();
 
-	// What a proposal is called here — "quote", "treatment plan".
+	// The words as the org's industry says them.
 	const terms = $derived(recordTerms(page.data.terms, 'proposal'));
+	const contactTerms = $derived(recordTerms(page.data.terms, 'contact'));
+	const presenterLabel = $derived(term(page.data.vocabulary, 'proposal_presenter'));
+	const responsibleLabel = $derived(term(page.data.vocabulary, 'proposal_responsible'));
 
-	const { form, errors, message, constraints, submitting, enhance } = superForm(data.form, {
+	const { form, errors, message, submitting, enhance } = superForm(data.form, {
 		// Options and lines are arrays: the document is posted, not the inputs.
 		dataType: 'json',
 		validators: zod4Client(proposalBuilderSchema),
 		invalidateAll: false,
+		// The first field in error scrolls into view, the way the source form did.
+		scrollToError: { behavior: 'smooth', block: 'center' },
 		onResult({ result }) {
-			// Success is a redirect to the new record; the toast rides along.
+			// Success is a redirect; the toast rides along.
 			if (result.type === 'redirect') toast.success(`${capitalize(terms.noun)} created`);
 		}
 	});
 
-	// A datetime-local input speaks wall-clock strings; the form holds an instant.
-	const validUntil = dateProxy(form, 'valid_until', { format: 'datetime-local', empty: 'null' });
-
-	// The record the proposal is for: every kind the reader may open, in one
-	// list, each group named as the org's industry names the kind.
-	const parentGroups = $derived<ComboboxGroup[]>(
-		data.parents.map((group) => ({
-			label: group.name,
-			options: group.records.map((record) => ({
-				value: parentValue({ entity_type: group.kind, entity_id: record.id }),
-				label: record.name,
-				sublabel: record.detail ?? undefined
-			}))
+	const contactOptions = $derived<ComboboxOption[]>(
+		data.contacts.map((contact) => ({
+			value: contact.id,
+			label: contact.name,
+			sublabel: [contact.email, contact.phone].filter(Boolean).join(' • ') || undefined
 		}))
 	);
 
-	// A product carries its own currency; format each in its own.
-	const money = (value: number, currency: string) =>
-		new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+	/** Picking a person fills their details in, the way the source form did. */
+	function prefillContact(contactId: string) {
+		const contact = data.contacts.find((entry) => entry.id === contactId);
+		$form.contact_email = contact?.email ?? '';
+		$form.contact_phone = contact?.phone ?? '';
+	}
 
-	// The catalog, filed by category, priced on the right of each row.
-	const catalogGroups = $derived.by(() => {
-		const groups: { label: string; options: ComboboxOption[] }[] = [];
-		for (const product of data.catalog) {
-			const label = product.category ?? 'Uncategorised';
-			let group = groups.find((candidate) => candidate.label === label);
-			if (!group) {
-				group = { label, options: [] };
-				groups.push(group);
-			}
-			group.options.push({
-				value: product.id,
-				label: product.name,
-				sublabel: product.sku ?? undefined,
-				hint: `${money(product.unit_price, product.currency)}${product.unit ? ` / ${product.unit}` : ''}`
-			});
+	/** "No. Plans": the count, kept between one and the ceiling; new options come in blank. */
+	function resizeOptions(event: Event) {
+		const wanted = Math.min(
+			MAX_OPTIONS,
+			Math.max(
+				1,
+				Number(event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : 1) || 1
+			)
+		);
+		if (wanted < $form.options.length) {
+			$form.options = $form.options.slice(0, wanted);
+		} else {
+			$form.options = [
+				...$form.options,
+				...Array.from({ length: wanted - $form.options.length }, (_, i) =>
+					emptyOption(`Option ${String($form.options.length + i + 1)}`)
+				)
+			];
 		}
-		return groups;
-	});
-
-	// What every option's catalog picker has selected — nothing, once the pick
-	// has become a line. Bound so the trigger resets after each add.
-	let catalogPick = $state('');
-
-	function addOption() {
-		if ($form.options.length >= MAX_OPTIONS) return;
-		$form.options = [...$form.options, emptyOption(`Option ${String($form.options.length + 1)}`)];
 	}
 
-	function removeOption(index: number) {
-		if ($form.options.length <= 1) return;
-		$form.options = $form.options.filter((_, i) => i !== index);
-	}
-
-	function addLine(index: number, line = emptyLineItem()) {
-		$form.options[index].line_items = [...$form.options[index].line_items, line];
-	}
-
-	/** A catalog pick becomes a line that snapshots the price: repricing later never rewrites it. */
-	function addCatalogLine(index: number, productId: string) {
-		const product = data.catalog.find((entry) => entry.id === productId);
-		if (product) {
-			addLine(index, {
-				product_id: product.id,
-				label: product.name,
-				quantity: 1,
-				unit_cost: product.unit_price
-			});
-		}
-		catalogPick = '';
-	}
-
-	function removeLine(index: number, position: number) {
-		$form.options[index].line_items = $form.options[index].line_items.filter(
-			(_, j) => j !== position
+	// An estimate only — the database owns the stored figure.
+	function estimateFor(option: ProposalBuilderOption): number {
+		return estimateOptionTotal(
+			{
+				fee_override: option.fee_override,
+				discount_pct: option.discount_pct,
+				line_items: [
+					...option.billables.map((line) => ({
+						quantity: billableQuantity(line.detail, line.not_applicable),
+						unit_cost: line.unit_cost
+					})),
+					...option.products
+				]
+			},
+			{ default_fee: null, tax_rate: null }
 		);
 	}
-
-	/** At most one option is recommended: ticking one unticks the rest. */
-	function recommend(index: number, checked: boolean) {
-		$form.options = $form.options.map((option, i) => ({
-			...option,
-			is_recommended: i === index ? checked : checked ? false : option.is_recommended
-		}));
-	}
-
-	// Estimates only — the database owns the stored figure.
-	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-	const estimates = $derived(
-		$form.options.map((option) =>
-			estimateOptionTotal(option, { default_fee: $form.default_fee, tax_rate: $form.tax_rate })
-		)
-	);
 </script>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader.Root>
 		<PageHeader.Title />
 	</PageHeader.Root>
 
-	<form method="POST" action="?/create" class="space-y-6" use:enhance>
-		<FormAlert message={$message} />
+	<Card.Root class="dark:bg-card m-2 mb-12 max-w-3xl rounded-lg bg-white shadow-md lg:mx-auto">
+		<Card.Content>
+			<form
+				method="POST"
+				action="?/create"
+				class="flex flex-col gap-6"
+				autocomplete="off"
+				novalidate
+				use:enhance
+			>
+				<FormAlert message={$message} />
 
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Details</Card.Title>
-				<Card.Description>
-					Who the {terms.noun} is for and the terms every option shares.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content class="grid gap-5 sm:grid-cols-2">
-				<div class="grid gap-2 sm:col-span-2">
-					<Label for="proposal-title" required>Title</Label>
-					<Input
-						id="proposal-title"
-						placeholder="Crown and whitening"
-						aria-invalid={$errors.title ? 'true' : undefined}
-						aria-describedby={$errors.title ? 'proposal-title-error' : undefined}
-						bind:value={$form.title}
-						{...$constraints.title}
-					/>
-					{#if $errors.title}
-						<p id="proposal-title-error" class="text-destructive text-sm">{$errors.title}</p>
-					{/if}
-				</div>
-
-				<div class="grid gap-2">
-					<Label for="proposal-parent">For</Label>
-					<Combobox
-						id="proposal-parent"
-						groups={parentGroups}
-						bind:value={$form.parent}
-						placeholder="Unattached draft"
-						searchPlaceholder="Search by name…"
-						emptyText="Nothing to attach it to yet"
-						clearable
-						invalid={Boolean($errors.parent)}
-					/>
-					{#if $errors.parent}
-						<p class="text-destructive text-sm">{$errors.parent}</p>
-					{/if}
-				</div>
-
-				<div class="grid gap-2">
-					<Label for="proposal-valid-until">Valid until</Label>
-					<Input
-						id="proposal-valid-until"
-						type="datetime-local"
-						aria-invalid={$errors.valid_until ? 'true' : undefined}
-						bind:value={$validUntil}
-					/>
-					{#if $errors.valid_until}
-						<p class="text-destructive text-sm">{$errors.valid_until}</p>
-					{/if}
-				</div>
-
-				<div class="grid gap-2">
-					<Label for="proposal-default-fee">Default fee</Label>
-					<Input
-						id="proposal-default-fee"
-						type="number"
-						min="0"
-						step="0.01"
-						placeholder="0.00"
-						aria-invalid={$errors.default_fee ? 'true' : undefined}
-						bind:value={$form.default_fee}
-					/>
-					{#if $errors.default_fee}
-						<p class="text-destructive text-sm">{$errors.default_fee}</p>
-					{/if}
-				</div>
-
-				<div class="grid gap-2">
-					<Label for="proposal-tax-rate">Tax rate %</Label>
-					<Input
-						id="proposal-tax-rate"
-						type="number"
-						min="0"
-						max="100"
-						step="0.01"
-						placeholder="0"
-						aria-invalid={$errors.tax_rate ? 'true' : undefined}
-						bind:value={$form.tax_rate}
-					/>
-					{#if $errors.tax_rate}
-						<p class="text-destructive text-sm">{$errors.tax_rate}</p>
-					{/if}
-				</div>
-
-				<div class="grid gap-2 sm:col-span-2">
-					<Label for="proposal-notes">Notes</Label>
-					<Textarea
-						id="proposal-notes"
-						placeholder="Anything worth remembering about this {terms.noun}"
-						aria-invalid={$errors.notes ? 'true' : undefined}
-						bind:value={$form.notes}
-						{...$constraints.notes}
-					/>
-					{#if $errors.notes}
-						<p class="text-destructive text-sm">{$errors.notes}</p>
-					{/if}
-				</div>
-			</Card.Content>
-		</Card.Root>
-
-		{#if $errors.options?._errors}
-			<FormAlert message={$errors.options._errors.join(' ')} />
-		{/if}
-
-		{#each $form.options, i (i)}
-			{@const optionErrors = $errors.options?.[i]}
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Option {i + 1}</Card.Title>
-					<Card.Description>
-						Estimated {usd.format(estimates[i] ?? 0)} — the stored total is computed on save.
-					</Card.Description>
-					{#if $form.options.length > 1}
-						<Card.Action>
-							<Button
-								variant="ghost"
-								size="icon"
-								aria-label="Remove option {i + 1}"
-								onclick={() => removeOption(i)}
-							>
-								<Trash2Icon />
-							</Button>
-						</Card.Action>
-					{/if}
-				</Card.Header>
-				<Card.Content class="space-y-5">
-					<div class="grid gap-5 sm:grid-cols-3">
-						<div class="grid gap-2">
-							<Label for="option-{i}-label" required>Label</Label>
-							<Input
-								id="option-{i}-label"
-								placeholder="Option {i + 1}"
-								aria-invalid={optionErrors?.label ? 'true' : undefined}
-								bind:value={$form.options[i].label}
-								{...$constraints.options?.label}
-							/>
-							{#if optionErrors?.label}
-								<p class="text-destructive text-sm">{optionErrors.label}</p>
-							{/if}
-						</div>
-
-						<div class="grid gap-2">
-							<Label for="option-{i}-fee">Fee</Label>
-							<Input
-								id="option-{i}-fee"
-								type="number"
-								min="0"
-								step="0.01"
-								placeholder="Inherits the default fee"
-								aria-invalid={optionErrors?.fee_override ? 'true' : undefined}
-								bind:value={$form.options[i].fee_override}
-							/>
-							{#if optionErrors?.fee_override}
-								<p class="text-destructive text-sm">{optionErrors.fee_override}</p>
-							{/if}
-						</div>
-
-						<div class="grid gap-2">
-							<Label for="option-{i}-discount">Discount %</Label>
-							<Input
-								id="option-{i}-discount"
-								type="number"
-								min="0"
-								max="100"
-								step="0.01"
-								placeholder="0"
-								aria-invalid={optionErrors?.discount_pct ? 'true' : undefined}
-								bind:value={$form.options[i].discount_pct}
-							/>
-							{#if optionErrors?.discount_pct}
-								<p class="text-destructive text-sm">{optionErrors.discount_pct}</p>
-							{/if}
-						</div>
-					</div>
-
-					<div class="flex flex-wrap items-center gap-6">
-						<Label for="option-{i}-recommended">
-							<Checkbox
-								id="option-{i}-recommended"
-								checked={$form.options[i].is_recommended}
-								onCheckedChange={(checked) => recommend(i, checked === true)}
-							/>
-							Recommended
+				<!-- Who it is for, and who is responsible for it. -->
+				<div class="flex flex-col gap-8 md:flex-row">
+					<div data-field="contact_id" class="block md:w-1/2">
+						<Label for="builder-contact" class={Builder.builderLabel}>
+							{capitalize(contactTerms.noun)}:
 						</Label>
-						<Label for="option-{i}-financing">
-							<Switch
-								id="option-{i}-financing"
-								bind:checked={$form.options[i].financing_available}
+						<Combobox
+							id="builder-contact"
+							options={contactOptions}
+							bind:value={$form.contact_id}
+							onchange={prefillContact}
+							placeholder="Enter {contactTerms.noun} name"
+							searchPlaceholder="Search {contactTerms.plural}…"
+							emptyText="No {contactTerms.plural} yet"
+							required
+							invalid={Boolean($errors.contact_id)}
+							class={cn(Builder.builderInput, $errors.contact_id && Builder.builderInputInvalid)}
+						/>
+						{#if $errors.contact_id}
+							<p class={Builder.builderError}>{$errors.contact_id}</p>
+						{/if}
+					</div>
+
+					<div class="block md:w-1/2">
+						<Builder.PersonPicker
+							id="builder-responsible"
+							field="responsible_id"
+							label={responsibleLabel}
+							roster={data.roster}
+							bind:value={$form.responsible_id}
+							error={$errors.responsible_id}
+						/>
+					</div>
+				</div>
+
+				<div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+					<div class="block">
+						<Label for="builder-email" class={Builder.builderLabel}>Email:</Label>
+						<Input
+							id="builder-email"
+							type="email"
+							placeholder="Enter email"
+							autocomplete="off"
+							disabled={!data.canEditContact}
+							aria-invalid={$errors.contact_email ? 'true' : undefined}
+							bind:value={$form.contact_email}
+							class={Builder.builderInput}
+						/>
+						{#if $errors.contact_email}
+							<p class={Builder.builderError}>{$errors.contact_email}</p>
+						{/if}
+					</div>
+					<div class="block">
+						<Label for="builder-phone" class={Builder.builderLabel}>Phone:</Label>
+						<Input
+							id="builder-phone"
+							type="tel"
+							placeholder="Enter phone (optional)"
+							autocomplete="off"
+							disabled={!data.canEditContact}
+							bind:value={$form.contact_phone}
+							class={Builder.builderInput}
+						/>
+					</div>
+				</div>
+
+				<!-- How many options, who presents, and the notes. -->
+				<div class="flex flex-col gap-5">
+					<div class="flex flex-col gap-4 md:flex-row md:items-end">
+						<label class="dark:text-foreground block font-semibold text-gray-700">
+							No. {capitalize(terms.plural)}:
+							<Input
+								type="number"
+								min="1"
+								max={MAX_OPTIONS}
+								value={$form.options.length}
+								oninput={resizeOptions}
+								class="{Builder.builderInput} w-24"
 							/>
-							Financing available
-						</Label>
+						</label>
 					</div>
 
-					<div class="space-y-3">
-						<div class="flex flex-wrap items-center justify-between gap-2">
-							<span class="text-sm font-medium">Lines</span>
-							<div class="flex items-center gap-2">
-								<Combobox
-									groups={catalogGroups}
-									bind:value={catalogPick}
-									onchange={(productId) => addCatalogLine(i, productId)}
-									placeholder="Add from the catalog…"
-									searchPlaceholder="Search the catalog…"
-									emptyText="No active products in the catalog"
-									ariaLabel="Add a catalog line to option {i + 1}"
-									size="sm"
-									class="w-64"
-									contentClass="w-96"
-								/>
-								<Button variant="outline" size="sm" onclick={() => addLine(i)}>
-									<PlusIcon />
-									Custom line
-								</Button>
-							</div>
-						</div>
+					<Builder.PersonPicker
+						id="builder-presenter"
+						field="presenter_id"
+						label={presenterLabel}
+						roster={data.roster}
+						bind:value={$form.presenter_id}
+						error={$errors.presenter_id}
+					/>
 
-						{#each $form.options[i].line_items, j (j)}
-							{@const lineErrors = optionErrors?.line_items?.[j]}
-							<div class="grid grid-cols-[minmax(0,1fr)_5rem_7rem_auto] items-start gap-2">
-								<div class="grid gap-1">
-									<Input
-										aria-label="Line {j + 1} label"
-										placeholder="What the line is for"
-										aria-invalid={lineErrors?.label ? 'true' : undefined}
-										bind:value={$form.options[i].line_items[j].label}
-									/>
-									{#if lineErrors?.label}
-										<p class="text-destructive text-sm">{lineErrors.label}</p>
-									{/if}
-								</div>
-								<div class="grid gap-1">
-									<Input
-										type="number"
-										min="0"
-										step="1"
-										aria-label="Line {j + 1} quantity"
-										aria-invalid={lineErrors?.quantity ? 'true' : undefined}
-										bind:value={$form.options[i].line_items[j].quantity}
-									/>
-									{#if lineErrors?.quantity}
-										<p class="text-destructive text-sm">{lineErrors.quantity}</p>
-									{/if}
-								</div>
-								<div class="grid gap-1">
-									<Input
-										type="number"
-										min="0"
-										step="0.01"
-										aria-label="Line {j + 1} unit cost"
-										aria-invalid={lineErrors?.unit_cost ? 'true' : undefined}
-										bind:value={$form.options[i].line_items[j].unit_cost}
-									/>
-									{#if lineErrors?.unit_cost}
-										<p class="text-destructive text-sm">{lineErrors.unit_cost}</p>
-									{/if}
-								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									aria-label="Remove line {j + 1} from option {i + 1}"
-									onclick={() => removeLine(i, j)}
-								>
-									<XIcon />
-								</Button>
-							</div>
-						{:else}
-							<p class="text-muted-foreground text-sm">
-								No lines yet. Pick from the catalog, or add a custom line.
-							</p>
-						{/each}
-					</div>
-				</Card.Content>
-			</Card.Root>
-		{/each}
+					<label class="dark:text-foreground block font-semibold text-gray-700">
+						Notes:
+						<Textarea
+							placeholder="Enter notes"
+							aria-invalid={$errors.notes ? 'true' : undefined}
+							bind:value={$form.notes}
+							class={Builder.builderInput}
+						/>
+						{#if $errors.notes}
+							<p class={Builder.builderError}>{$errors.notes}</p>
+						{/if}
+					</label>
+				</div>
 
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			<Button variant="outline" onclick={addOption} disabled={$form.options.length >= MAX_OPTIONS}>
-				<PlusIcon />
-				Add option
-			</Button>
-			<div class="flex items-center gap-2">
-				<Button variant="ghost" href={recordListHref('proposal')}>Cancel</Button>
-				<Button type="submit" disabled={$submitting}>
-					{$submitting ? 'Creating…' : `Create ${terms.noun}`}
-				</Button>
-			</div>
-		</div>
-	</form>
+				{#if $errors.options?._errors}
+					<FormAlert message={$errors.options._errors.join(' ')} />
+				{/if}
+
+				<!-- The options. -->
+				<div class="flex flex-col gap-6">
+					{#each $form.options as option, i (i)}
+						<Builder.Option
+							index={i}
+							bind:option={$form.options[i]}
+							errors={$errors.options?.[i]}
+							noun={terms.noun}
+							billables={data.billables}
+							quickPlans={data.quickPlans}
+							products={data.products}
+							estimate={estimateFor(option)}
+						/>
+					{/each}
+				</div>
+
+				<Builder.SaveBar
+					submitting={$submitting}
+					primaryLabel="Save {capitalize(terms.noun)} & open"
+					secondaryLabel="Save & go to {terms.name}"
+					onPrimary={() => ($form.redirect_to = 'record')}
+					onSecondary={() => ($form.redirect_to = 'list')}
+				/>
+			</form>
+		</Card.Content>
+	</Card.Root>
 </div>

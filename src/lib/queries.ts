@@ -20,6 +20,8 @@ export const QUERY = {
 	products: 'app:products',
 	deals: 'app:deals',
 	proposals: 'app:proposals',
+	billables: 'app:billables',
+	quickPlans: 'app:quick-plans',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

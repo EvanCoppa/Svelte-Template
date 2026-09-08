@@ -31,7 +31,15 @@ import { QUERY } from '$lib/queries';
  */
 
 /** Kinds of record the generic form can create. */
-export const RECORD_TYPES = ['company', 'contact', 'deal', 'product', 'task', 'ticket'] as const;
+export const RECORD_TYPES = [
+	'company',
+	'contact',
+	'deal',
+	'product',
+	'billable',
+	'task',
+	'ticket'
+] as const;
 
 export type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -168,6 +176,17 @@ export const productRecordSchema = z.object({
 	description: optionalLongText
 });
 
+export const billableRecordSchema = z.object({
+	name: requiredText('Name'),
+	code: optionalText,
+	unit_price: optionalAmount,
+	unit: optionalText,
+	/** Comma-separated; the server splits it into the array the column holds. */
+	unit_choices: optionalText,
+	is_featured: z.enum(['true', 'false']).default('false'),
+	description: optionalLongText
+});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	due_at: optionalInstant,
@@ -193,6 +212,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	contact: contactRecordSchema,
 	deal: dealRecordSchema,
 	product: productRecordSchema,
+	billable: billableRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
@@ -267,6 +287,33 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'unit_price', label: 'Unit price', type: 'number', placeholder: '499.00' },
 			{ name: 'unit_cost', label: 'Unit cost', type: 'number', placeholder: '250.00' },
 			{ name: 'unit', label: 'Unit', type: 'text', placeholder: 'each' },
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	billable: {
+		feature: 'billables',
+		query: QUERY.billables,
+		fields: [
+			{ name: 'name', label: 'Name', type: 'text', placeholder: 'Porcelain crown' },
+			{ name: 'code', label: 'Code', type: 'text', placeholder: 'D2740' },
+			{ name: 'unit_price', label: 'Unit price', type: 'number', placeholder: '1450.00' },
+			{ name: 'unit', label: 'Unit', type: 'text', placeholder: 'tooth' },
+			{
+				name: 'unit_choices',
+				label: 'Unit choices',
+				type: 'text',
+				placeholder: 'UR, UL, BR, BL — blank to type units in',
+				wide: true
+			},
+			{
+				name: 'is_featured',
+				label: 'Featured',
+				type: 'select',
+				options: [
+					{ value: 'false', label: 'Found by search' },
+					{ value: 'true', label: 'Shown on every option' }
+				]
+			},
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
 		]
 	},

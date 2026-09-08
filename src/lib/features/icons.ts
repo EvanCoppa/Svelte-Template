@@ -7,9 +7,11 @@ import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
 import FileTextIcon from '@lucide/svelte/icons/file-text';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
+import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import PackageIcon from '@lucide/svelte/icons/package';
+import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import ShieldIcon from '@lucide/svelte/icons/shield';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import TicketIcon from '@lucide/svelte/icons/ticket';
@@ -31,9 +33,11 @@ export const ICONS = {
 	contact: ContactIcon,
 	'file-text': FileTextIcon,
 	handshake: HandshakeIcon,
+	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
 	package: PackageIcon,
+	'receipt-text': ReceiptTextIcon,
 	shield: ShieldIcon,
 	sparkles: SparklesIcon,
 	ticket: TicketIcon,

@@ -45,7 +45,9 @@ type ProposalColumn =
 	| 'default_fee'
 	| 'tax_rate'
 	| 'valid_until'
-	| 'deck_id';
+	| 'deck_id'
+	| 'presenter_id'
+	| 'responsible_id';
 
 /**
  * The kinds of record a proposal may hang off. `crm_entity_type` is wider —
@@ -133,7 +135,8 @@ type ProposalOptionColumn =
 	| 'custom_fields';
 
 /** The columns a member sets on a line at insert; `total` is generated. */
-type ProposalLineItemColumn = 'product_id' | 'label' | 'quantity' | 'unit_cost' | 'sort_order';
+type ProposalLineItemColumn =
+	'product_id' | 'billable_id' | 'label' | 'quantity' | 'unit_cost' | 'detail' | 'sort_order';
 
 export type ProposalOptionInsert = Pick<TablesInsert<'proposal_options'>, ProposalOptionColumn>;
 export type ProposalLineItemInsert = Pick<

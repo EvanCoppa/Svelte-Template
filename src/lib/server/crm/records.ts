@@ -14,7 +14,9 @@ import {
 	taskState
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
+import type { Vocabulary } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
+import { getBillable, type Billable } from './billables';
 import { getCompany, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
@@ -27,6 +29,7 @@ import {
 	type ProposalParentKind,
 	type ProposalWithOptions
 } from './proposals';
+import type { CrmEntityType } from './entity';
 import { getTask, listTasks, type Task, type TaskWithParties } from './tasks';
 import { getTicket, listTickets, type TicketThread, type TicketWithParties } from './tickets';
 
@@ -199,6 +202,30 @@ function moneyText(value: number, currency: string): string {
 // Describers — one per kind. Pure, so a test can hand one a row.
 // ---------------------------------------------------------------------------
 
+export function describeBillable(row: Billable): RecordDetail {
+	const pills: Pill[] = [];
+	// Featured is the exception worth a pill: it is on every option's checklist.
+	if (row.is_featured) pills.push(pill('featured', 'info'));
+	if (!row.is_active) pills.push(pill('inactive', 'neutral'));
+	return {
+		kind: 'billable',
+		id: row.id,
+		name: row.name,
+		pills,
+		fields: [
+			{ label: 'Code', value: text(row.code) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Unit price', value: money(row.unit_price, row.currency, row.unit) },
+			// The units the builder offers as chips; blank means they are typed in.
+			{ label: 'Unit choices', value: text(row.unit_choices?.join(', ') ?? null) },
+			{ label: 'Featured', value: yesNo(row.is_featured) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
 export function describeCompany(row: CompanyWithContacts): RecordDetail {
 	return {
 		kind: 'company',
@@ -293,10 +320,17 @@ export function describeDeal(row: DealWithParties, canOpen: CanOpen): RecordDeta
 /** The record a proposal hangs off, resolved through that kind's own module. */
 export type ProposalParent = { kind: ProposalParentKind; id: string; name: string };
 
+/**
+ * The two people every proposal names, labelled as the org's industry
+ * labels them ("Presenter" / "Provider", "Estimator" / "Project manager") —
+ * the one describer that needs the vocabulary, because the labels are not
+ * the columns' names.
+ */
 export function describeProposal(
 	row: ProposalWithOptions,
 	parent: ProposalParent | null,
-	canOpen: CanOpen
+	canOpen: CanOpen,
+	vocabulary: Vocabulary
 ): RecordDetail {
 	const options = [...row.proposal_options].sort((a, b) => a.sort_order - b.sort_order);
 	const recommended = recommendedOption(options);
@@ -310,6 +344,8 @@ export function describeProposal(
 			// Unattached is a legitimate state (a draft), and a deleted parent
 			// detaches rather than cascades — so blank, never an error.
 			{ label: 'For', value: parent ? record(parent.kind, parent, canOpen) : EMPTY },
+			{ label: vocabulary.proposal_presenter, value: person(row.presenter_id) },
+			{ label: vocabulary.proposal_responsible, value: person(row.responsible_id) },
 			{ label: 'Options', value: count(options.length) },
 			{ label: 'Recommended option', value: text(recommended?.label ?? null) },
 			{
@@ -411,9 +447,14 @@ export async function getRecord(
 	orgId: string,
 	kind: RecordKind,
 	id: string,
-	canOpen: CanOpen
+	canOpen: CanOpen,
+	vocabulary: Vocabulary
 ): Promise<RecordDetail | null> {
 	switch (kind) {
+		case 'billable': {
+			const row = await getBillable(supabase, orgId, id);
+			return row && describeBillable(row);
+		}
 		case 'company': {
 			const row = await getCompany(supabase, orgId, id);
 			return row && describeCompany(row);
@@ -432,7 +473,15 @@ export async function getRecord(
 		}
 		case 'proposal': {
 			const row = await getProposal(supabase, orgId, id);
-			return row && describeProposal(row, await proposalParent(supabase, orgId, row), canOpen);
+			return (
+				row &&
+				describeProposal(
+					row,
+					await resolveProposalParent(supabase, orgId, row),
+					canOpen,
+					vocabulary
+				)
+			);
 		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
@@ -446,29 +495,32 @@ export async function getRecord(
 }
 
 /**
- * The record a proposal hangs off, read through that kind's own module —
- * one branch per parent kind, the way `private.crm_entity_exists()` has one.
- * Null when the proposal is unattached, or when the parent is gone or RLS
- * hides it.
+ * The record a proposal hangs off (or is about to), read through that
+ * kind's own module — one branch per parent kind, the way
+ * `private.crm_entity_exists()` has one. Null when the link is unset or
+ * names no kind a proposal may hang off, or when the parent is gone or RLS
+ * hides it. The builder resolves the link it is about to write with the
+ * same function, so a proposal is never created for a record the writer
+ * cannot see.
  */
-async function proposalParent(
+export async function resolveProposalParent(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	row: ProposalWithOptions
+	link: { entity_type: CrmEntityType | null; entity_id: string | null }
 ): Promise<ProposalParent | null> {
-	const kind = proposalParentKind(row.entity_type);
-	if (kind === null || row.entity_id === null) return null;
+	const kind = proposalParentKind(link.entity_type);
+	if (kind === null || link.entity_id === null) return null;
 	switch (kind) {
 		case 'company': {
-			const parent = await getCompany(supabase, orgId, row.entity_id);
+			const parent = await getCompany(supabase, orgId, link.entity_id);
 			return parent && { kind, id: parent.id, name: parent.name };
 		}
 		case 'contact': {
-			const parent = await getContact(supabase, orgId, row.entity_id);
+			const parent = await getContact(supabase, orgId, link.entity_id);
 			return parent && { kind, id: parent.id, name: parent.name };
 		}
 		case 'deal': {
-			const parent = await getDeal(supabase, orgId, row.entity_id);
+			const parent = await getDeal(supabase, orgId, link.entity_id);
 			return parent && { kind, id: parent.id, name: parent.title };
 		}
 	}

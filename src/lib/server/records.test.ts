@@ -152,6 +152,35 @@ describe('createRecord', () => {
 		);
 	});
 
+	it('writes a billable, splitting its unit choices and reading the featured pick as a boolean', async () => {
+		const chips = supabaseMock({ data: { id: 'billable' } });
+		await submit(chips.supabase, OWNER, 'billable', {
+			name: 'Scaling and root planing',
+			code: 'D4341',
+			unit_price: '275',
+			unit: 'quadrant',
+			unit_choices: 'UR, UL,, BR , BL',
+			is_featured: 'true'
+		});
+		expect(chips.from).toHaveBeenCalledWith('billables');
+		expect(chips.builder.insert).toHaveBeenCalledWith({
+			name: 'Scaling and root planing',
+			code: 'D4341',
+			unit_price: 275,
+			unit: 'quadrant',
+			unit_choices: ['UR', 'UL', 'BR', 'BL'],
+			is_featured: true,
+			description: null,
+			org_id: ORG_ID
+		});
+
+		const typed = supabaseMock({ data: { id: 'billable' } });
+		await submit(typed.supabase, OWNER, 'billable', { name: 'Porcelain crown' });
+		expect(typed.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ unit_choices: null, is_featured: false, unit_price: undefined })
+		);
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 

@@ -5,6 +5,7 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
 import {
+	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
 	dealRecordSchema,
@@ -16,6 +17,7 @@ import {
 	type RecordFormValues,
 	type RecordType
 } from '$lib/schemas/records';
+import { createBillable } from './crm/billables';
 import { createCompany } from './crm/companies';
 import { createContact } from './crm/contacts';
 import { createDeal } from './crm/deals';
@@ -153,6 +155,19 @@ async function insertRecord(
 			});
 			return;
 		}
+		case 'billable': {
+			const data = billableRecordSchema.parse(values);
+			await createBillable(supabase, orgId, {
+				name: data.name,
+				code: text(data.code),
+				unit_price: amount(data.unit_price),
+				unit: text(data.unit),
+				unit_choices: list(data.unit_choices),
+				is_featured: data.is_featured === 'true',
+				description: text(data.description)
+			});
+			return;
+		}
 		case 'task': {
 			const data = taskRecordSchema.parse(values);
 			await createTask(supabase, orgId, {
@@ -177,6 +192,15 @@ async function insertRecord(
 /** Blank is not a value: an untouched field becomes a null column. */
 function text(value: string): string | null {
 	return value === '' ? null : value;
+}
+
+/** A comma-separated list as typed, or null when nothing was: the units a billable offers as chips. */
+function list(value: string): string[] | null {
+	const items = value
+		.split(',')
+		.map((item) => item.trim())
+		.filter(Boolean);
+	return items.length > 0 ? items : null;
 }
 
 /**

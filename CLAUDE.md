@@ -320,6 +320,31 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   track stock, and `proposal_line_items.product_id` is **provenance, not a live
   lookup** — the line keeps its own label and `unit_cost` so repricing the catalog
   never rewrites a quote that was already sent.
+- **`billables` is the fee schedule, a table and a feature apart from products**
+  (`billables_and_quick_plans` migration + `src/lib/server/crm/billables.ts`): what
+  an org charges for on a proposal — a procedure with its CDT code, a labor line —
+  priced per unit, counted in the units the row names, either a fixed set the
+  builder offers as chips (`unit_choices`: UR/UL/BR/BL, Upper/Lower) or typed in
+  ("12, 13"; `unitTokens()` in `src/lib/crm/billables.ts` counts them). `is_featured`
+  puts one on every option's checklist; the rest are found by search. A line cites
+  it through `proposal_line_items.billable_id` (provenance, like `product_id`, and
+  never both) and keeps the units in `detail`. `quick_plans` +
+  `quick_plan_billables` are named bundles that fill an option in one click (the
+  builder's Quick Select; `src/lib/server/crm/quick-plans.ts`), kept on their own
+  page because a bundle's one field is a multi-select the generic form cannot
+  render. Both are member-writable working data like products, and both are
+  features named by the industry — "Procedures" and "Quick plans" in a practice,
+  "Services" and "Packages" on a roof.
+- **Every proposal names two people, both members** (`proposal_people` migration):
+  `presenter_id` and `responsible_id`, each a composite key onto the membership like
+  `deals.assigned_to`, so nobody outside the org can be named and leaving clears it.
+  What the two are CALLED is a **term** (`industry_vocabulary` migration +
+  `src/lib/features/vocabulary.ts`): `terms` holds the default word and
+  `industry_terms` an industry's own ("Presenter" / "Provider" in a practice,
+  "Estimator" / "Project manager" on a roof), the `(app)` layout ships the resolved
+  `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
+  accessor. A word that is not a feature's name is never a constant in `src/` — it is
+  a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
 
 ## Database
 
@@ -413,8 +438,9 @@ schema so the enum unions come back without a cast). Adding a kind of record = a
 schema, a `RECORD_FORMS` entry and one `case` in that switch; never a second create
 modal, action or field-rendering loop. A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
-builder at `/proposals/new`, which writes options and catalog lines with the row —
-docs/proposals.md, "The page") keeps its own form and says why.
+builder at `/proposals/new`, which writes the two people, the options and their
+billable and product lines with the row — docs/proposals.md, "The page"; the quick
+plans page, whose one field is a multi-select) keeps its own form and says why.
 
 ## Data loading & invalidation
 

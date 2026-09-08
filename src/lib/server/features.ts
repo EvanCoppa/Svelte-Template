@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
 import type { FeatureRegistryRow, PageRow } from '$lib/features/types';
+import { resolveVocabulary, type TermRegistryRow, type Vocabulary } from '$lib/features/vocabulary';
 import { ensure, unwrap } from './crm/unwrap';
 
 /**
@@ -40,6 +41,26 @@ export async function loadFeatureRegistry(
  */
 export async function loadPageRegistry(supabase: SupabaseClient<Database>): Promise<PageRow[]> {
 	return unwrap(await supabase.from('pages').select('id, feature_id, path, title').order('path'));
+}
+
+/**
+ * Every term with each industry's own word for it — the input
+ * `resolveVocabulary()` folds per org. Reference data, like the features.
+ */
+export async function loadTermRegistry(
+	supabase: SupabaseClient<Database>
+): Promise<TermRegistryRow[]> {
+	return unwrap(
+		await supabase.from('terms').select('*, industry_terms(industry_id, label)').order('id')
+	);
+}
+
+/** The words as one org's industry says them — what the (app) layout ships as `vocabulary`. */
+export async function loadVocabulary(
+	supabase: SupabaseClient<Database>,
+	industryId: string
+): Promise<Vocabulary> {
+	return resolveVocabulary(await loadTermRegistry(supabase), industryId);
 }
 
 export async function listTiersWithFeatures(
