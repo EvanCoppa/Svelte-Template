@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref } from '$lib/crm/records';
 	import { TASK_STATE_TONE, taskState } from '$lib/crm/tones';
 	import type { Task } from '$lib/server/crm/tasks';
@@ -41,10 +43,14 @@
 </script>
 
 <div class="space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Tasks</h1>
-		<p class="text-muted-foreground">Follow-ups and to-dos, with due dates and owners.</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Tasks</PageHeader.Title>
+		{#if data.canCreate}
+			<PageHeader.Actions>
+				<CreateRecord type="task" form={data.createForm} />
+			</PageHeader.Actions>
+		{/if}
+	</PageHeader.Root>
 
 	<DataTable.Root {table}>
 		<DataTable.Content />

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref } from '$lib/crm/records';
 	import { COMPANY_RELATIONSHIP_TONE, PARTY_STATUS_TONE } from '$lib/crm/tones';
 	import type { Company } from '$lib/server/crm/companies';
@@ -45,12 +47,14 @@
 </script>
 
 <div class="space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Companies</h1>
-		<p class="text-muted-foreground">
-			The organizations you work with — customers, suppliers and partners.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Companies</PageHeader.Title>
+		{#if data.canCreate}
+			<PageHeader.Actions>
+				<CreateRecord type="company" form={data.createForm} />
+			</PageHeader.Actions>
+		{/if}
+	</PageHeader.Root>
 
 	<DataTable.Root {table}>
 		<DataTable.Content />

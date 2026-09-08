@@ -3,6 +3,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -42,13 +43,9 @@
 </script>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Features</h1>
-		<p class="text-muted-foreground">
-			Choose what your organization uses. Features outside your plan show an upgrade prompt;
-			anything not listed is not part of your industry.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Features</PageHeader.Title>
+	</PageHeader.Root>
 
 	{#if highlighted && highlighted.mode === 'disabled'}
 		<Alert.Root>

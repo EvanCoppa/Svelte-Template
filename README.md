@@ -269,10 +269,13 @@ _Contacts › Acme_ when you got there through the list, and _Treatments › Acm
 got there from a treatment. All of it lives in `src/lib/breadcrumbs.svelte.ts` and the
 component beside it; nothing per page.
 
-The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
-or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it
-out as a floating overlay. Collapse state persists via cookie (read back server-side —
-no flash on reload). On mobile it becomes a sheet drawer.
+The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button
+in its header, or dragging the rail; when collapsed, moving the cursor to the screen
+edge **peeks** it out as a floating overlay — the trigger lives there, not in the page
+header, so there is never a second one. Opening from a peek **docks** the panel: the
+content moves aside first, then the floating panel eases out to the edges. Collapse
+state persists via cookie (read back server-side — no flash on reload). On mobile it
+becomes a sheet drawer, opened from the header.
 
 ## Components
 

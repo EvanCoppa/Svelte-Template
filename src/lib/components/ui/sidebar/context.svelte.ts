@@ -38,12 +38,19 @@ class SidebarState {
 	 * from under them.
 	 */
 	openPopoverCount = $state(0);
-	setOpen: SidebarStateProps['setOpen'];
+	/**
+	 * True from the moment a peeked sidebar is opened until it has settled
+	 * into place. The panel is already where it will end up, so `Sidebar.Root`
+	 * keeps its floating look on top of the content while the content moves
+	 * aside, and only then eases it out to the edges — opening out of a peek
+	 * reads as the panel docking, not as one panel vanishing and another
+	 * sliding in. Raised by `setOpen`, cleared by `Sidebar.Root`.
+	 */
+	docking = $state(false);
 	#isMobile: IsMobile;
 	state = $derived.by(() => (this.open ? 'expanded' : 'collapsed'));
 
 	constructor(props: SidebarStateProps) {
-		this.setOpen = props.setOpen;
 		this.#isMobile = new IsMobile();
 		this.props = props;
 	}
@@ -72,6 +79,12 @@ class SidebarState {
 
 	notifyPopoverOpenChange = (open: boolean) => {
 		this.openPopoverCount = Math.max(0, this.openPopoverCount + (open ? 1 : -1));
+	};
+
+	setOpen = (open: boolean) => {
+		// Opening out of a peek is a dock — see `docking`.
+		if (open && this.peek) this.docking = true;
+		this.props.setOpen(open);
 	};
 
 	toggle = () => {

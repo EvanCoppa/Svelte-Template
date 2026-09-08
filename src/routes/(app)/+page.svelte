@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -35,17 +36,12 @@
 </script>
 
 <div class="mx-auto max-w-5xl space-y-8">
-	<div class="space-y-1">
-		<div class="flex items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">Welcome back</h1>
-			<Badge variant="secondary">Signed in</Badge>
-		</div>
-		<p class="text-muted-foreground">
-			You are signed in as <span class="text-foreground font-medium">{user?.email}</span>. This page
-			— like every page outside <code>/login</code> and <code>/auth</code> — is only reachable with a
-			verified session.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Welcome back</PageHeader.Title>
+		<PageHeader.Actions>
+			<Badge variant="secondary">Signed in as {user?.email}</Badge>
+		</PageHeader.Actions>
+	</PageHeader.Root>
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		{#each features as feature (feature.title)}

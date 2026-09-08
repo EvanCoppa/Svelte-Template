@@ -2,6 +2,7 @@
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -21,10 +22,9 @@
 </script>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Security</h1>
-		<p class="text-muted-foreground">How you sign in to this account.</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Security</PageHeader.Title>
+	</PageHeader.Root>
 
 	<Card.Root>
 		<Card.Header>

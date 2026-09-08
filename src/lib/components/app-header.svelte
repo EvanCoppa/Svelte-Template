@@ -9,17 +9,17 @@
 
 	const sidebar = useSidebar();
 
-	// The toggle lives in the sidebar header now, so the header only carries it
-	// while the sidebar is away — otherwise there would be two of them, and no
-	// way back once it is closed.
-	const sidebarClosed = $derived(
-		sidebar.isMobile ? !sidebar.openMobile : sidebar.state === 'collapsed'
-	);
+	// The toggle lives in the sidebar header: on desktop a collapsed sidebar
+	// peeks out when the cursor reaches the screen edge, so the button is
+	// always reachable and a second one here would only double it. Mobile is
+	// the exception — the sidebar is a sheet there, with nothing to hover, so
+	// the header keeps the one way in while the sheet is closed.
+	const needsTrigger = $derived(sidebar.isMobile && !sidebar.openMobile);
 </script>
 
 <header class="header">
 	<div class="header-inner">
-		{#if sidebarClosed}
+		{#if needsTrigger}
 			<Sidebar.Trigger class="-ml-1" />
 		{/if}
 

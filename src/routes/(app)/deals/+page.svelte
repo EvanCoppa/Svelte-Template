@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref } from '$lib/crm/records';
 	import { STAGE_OUTCOME_TONE } from '$lib/crm/tones';
 	import type { DealWithParties } from '$lib/server/crm/deals';
@@ -59,10 +61,14 @@
 </script>
 
 <div class="space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Deals</h1>
-		<p class="text-muted-foreground">Pipeline of opportunities, by stage and value.</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Deals</PageHeader.Title>
+		{#if data.canCreate}
+			<PageHeader.Actions>
+				<CreateRecord type="deal" form={data.createForm} />
+			</PageHeader.Actions>
+		{/if}
+	</PageHeader.Root>
 
 	<DataTable.Root {table}>
 		<DataTable.Content />

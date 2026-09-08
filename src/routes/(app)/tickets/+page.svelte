@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref } from '$lib/crm/records';
 	import { TICKET_PRIORITY_TONE, TICKET_STATUS_TONE } from '$lib/crm/tones';
 	import type { TicketWithParties } from '$lib/server/crm/tickets';
@@ -43,10 +45,14 @@
 </script>
 
 <div class="space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Tickets</h1>
-		<p class="text-muted-foreground">Support requests and their threads.</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Tickets</PageHeader.Title>
+		{#if data.canCreate}
+			<PageHeader.Actions>
+				<CreateRecord type="ticket" form={data.createForm} />
+			</PageHeader.Actions>
+		{/if}
+	</PageHeader.Root>
 
 	<DataTable.Root {table}>
 		<DataTable.Content />
