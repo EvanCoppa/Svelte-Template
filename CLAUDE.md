@@ -352,7 +352,7 @@ fields (passwords) before returning a form from an action — superforms echoes
 `form.data` back to the browser. The full convention, including multiple forms per
 page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
-/settings are the reference implementations.
+/settings/profile are the reference implementations.
 
 ## Data loading & invalidation
 
@@ -420,7 +420,7 @@ version; read them before the website. The full account is `docs/assistant.md`.
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
 come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
-`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
+`staticNavItems` (Dashboard — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
 Adding a page = create the route under `(app)` + register the feature and its `pages`
 row by migration; nothing in `navigation.ts` changes, and the page's `<title>` comes
@@ -429,6 +429,16 @@ renders with a lock and a click opens the upgrade prompt (`showUpgrade()`) inste
 navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
+
+**Settings is its own shell, not a nav entry.** It is reached from the user menu in the
+sidebar footer (`nav-user.svelte`), and while the pathname is under `/settings` the
+`(app)` layout swaps `AppSidebar` for `SettingsSidebar`, whose sections are the
+hand-kept `settingsNav` list at the bottom of `navigation.ts` — a list, not a registry
+read, because these pages exist for every org and are exempt from the feature gate.
+`/settings` itself only redirects to the first section. Adding a settings page = the
+route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
+the settings sidebar and the palette's Settings group both render from that one list.
+Never put Settings back in `staticNavItems`, and never build a second settings nav.
 
 The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
 on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings

@@ -76,9 +76,9 @@ test.describe('signing in', () => {
 	});
 
 	test('returns to the page that triggered the login', async ({ page }) => {
-		await signIn(page, { next: '/settings' });
+		await signIn(page, { next: '/settings/profile' });
 
-		await expect(page).toHaveURL('/settings');
+		await expect(page).toHaveURL('/settings/profile');
 	});
 
 	test('refuses to follow ?next= off-site', async ({ page }) => {
@@ -227,12 +227,26 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('cell', { name: 'Bruce Wayne' })).toBeVisible();
 	});
 
-	test('shows the signed-in user their profile on /settings', async ({ page }) => {
+	test('opens settings on its first section, in its own sidebar', async ({ page }) => {
+		// /settings is the door: it redirects to the first entry in
+		// `settingsNav`, and the shell swaps the app nav for the settings one.
 		await page.goto('/settings');
 
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(page).toHaveTitle('Profile');
+		await expect(page.getByRole('button', { name: 'Back to app' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Security' })).toBeVisible();
 		// Loaded through RLS, so this row can only be the caller's own. Matches
 		// the page body and the sidebar user menu, hence first().
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
+	});
+
+	test('keeps Settings out of the app sidebar', async ({ page }) => {
+		await page.goto('/');
+
+		// It is reached from the user menu in the sidebar footer instead — the
+		// nav lists the places you work, not the place you configure them.
+		await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
 	});
 });
 
