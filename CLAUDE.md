@@ -430,16 +430,24 @@ navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
 
-The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
-on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings
-under one shell and the same screen is reached from a dozen places, so a tree would be
-fiction. All of its behaviour (dedupe, cap, storage) is in `src/lib/breadcrumbs.svelte.ts`;
-`src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
-the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
-document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
-user + org (this tab's own; no cookie on every request, and switching org or user starts a
-fresh one). Never add a second breadcrumb surface, a per-page crumb prop, or a
-hierarchy-from-the-URL variant.
+The header carries a **breadcrumb trail**: how deep this tab has gone since it last
+jumped from the shell, newest last, capped at `MAX_CRUMBS` (3). It is a **depth trail,
+not a hierarchy** — these pages are siblings under one shell and the same screen is
+reached from a dozen places, so a tree read off the URL would be fiction (a contact
+opened from `/treatments` shows _Treatments › Contact_, not _Contacts › Contact_). The
+depth is the walk actually taken: **a click in a shell surface starts the trail over at
+depth 1** (the sidebar, the ⌘K palette and the user menu each call
+`breadcrumbs.startAt(href)` immediately before their `goto(href)` — a surface that
+navigates without pairing the two would look like a step deeper), a link inside a page
+pushes onto it, and landing on a page the trail already holds truncates back to it, so
+the trail only grows by going deeper. Browser back rewinds it — to the crumb it lands on,
+or to that page alone when it lands outside the trail. All of that behaviour is in
+`src/lib/breadcrumbs.svelte.ts`; `src/lib/components/breadcrumbs.svelte` records one
+visit in `afterNavigate` and renders the trail with `ui/breadcrumb`. Crumbs are named by
+the same `titleFor()` that titles the document, so a page never has two names, and the
+trail lives in `sessionStorage` keyed by user + org (this tab's own; no cookie on every
+request, and switching org or user starts a fresh one). Never add a second breadcrumb
+surface, a per-page crumb prop, or a hierarchy-from-the-URL variant.
 
 ## Svelte reference docs
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { User } from '@supabase/supabase-js';
 	import { goto } from '$app/navigation';
+	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -88,7 +89,13 @@
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
-					<DropdownMenu.Item onclick={() => goto('/settings')}>
+					<!-- Part of the shell, so it jumps like the sidebar does. -->
+					<DropdownMenu.Item
+						onclick={() => {
+							breadcrumbs.startAt('/settings');
+							goto('/settings');
+						}}
+					>
 						<SettingsIcon />
 						Settings
 					</DropdownMenu.Item>
