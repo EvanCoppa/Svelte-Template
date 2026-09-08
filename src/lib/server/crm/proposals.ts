@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
 import { proposalEntityTypeSchema } from '$lib/schemas/proposals';
 import type { CrmEntityRef } from './entity';
-import { unwrap, unwrapDeleted } from './unwrap';
+import { ensure, unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `proposals` — the decision every vertical shares
@@ -111,6 +111,95 @@ export async function createProposal(
 			.select()
 			.single()
 	);
+}
+
+/** The columns the migration lets a member set on an option at insert. */
+type ProposalOptionColumn =
+	| 'label'
+	| 'sort_order'
+	| 'is_recommended'
+	| 'base_price'
+	| 'fee_override'
+	| 'discount_amount'
+	| 'discount_pct'
+	| 'currency'
+	| 'duration_value'
+	| 'duration_unit'
+	| 'start_offset_days'
+	| 'financing_available'
+	| 'financing_term_months'
+	| 'financing_apr'
+	| 'primary_image_url'
+	| 'custom_fields';
+
+/** The columns a member sets on a line at insert; `total` is generated. */
+type ProposalLineItemColumn = 'product_id' | 'label' | 'quantity' | 'unit_cost' | 'sort_order';
+
+export type ProposalOptionInsert = Pick<TablesInsert<'proposal_options'>, ProposalOptionColumn>;
+export type ProposalLineItemInsert = Pick<
+	TablesInsert<'proposal_line_items'>,
+	ProposalLineItemColumn
+>;
+
+/**
+ * An option with its lines, as the builder posts them. Sort orders are not
+ * in the payload: an option's is its position among the options, a line's
+ * its position within the option, and this module assigns both.
+ */
+export type ProposalOptionDraft = {
+	option: Omit<ProposalOptionInsert, 'sort_order'>;
+	line_items: Omit<ProposalLineItemInsert, 'sort_order'>[];
+};
+
+/**
+ * Creates a proposal together with its options and their lines — what the
+ * builder page posts in one go. Three inserts, one per table, each batched:
+ * the proposal, then every option in one statement, then every line in one.
+ *
+ * PostgREST offers no transaction across them. A refusal part-way (a check
+ * constraint the form did not mirror, a policy) leaves what was written — a
+ * draft with fewer options than asked for — and throws the message; the
+ * form shows it, and the draft is on the list to open or delete.
+ */
+export async function createProposalWithOptions(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	values: Pick<TablesInsert<'proposals'>, ProposalColumn>,
+	options: readonly ProposalOptionDraft[]
+): Promise<Proposal> {
+	const proposal = await createProposal(supabase, orgId, values);
+
+	const optionRows = unwrap(
+		await supabase
+			.from('proposal_options')
+			.insert(
+				options.map(({ option }, index) => ({
+					...option,
+					org_id: orgId,
+					proposal_id: proposal.id,
+					sort_order: index
+				}))
+			)
+			.select('id, sort_order')
+	);
+
+	// Lines join their option by the sort order this call assigned, not by
+	// the order rows came back in — the one key both sides are sure of.
+	const lines = options.flatMap(({ line_items }, index) => {
+		const optionId = optionRows.find((row) => row.sort_order === index)?.id;
+		if (optionId === undefined) {
+			throw new Error(`Option ${String(index + 1)} was not created.`);
+		}
+		return line_items.map((line, position) => ({
+			...line,
+			org_id: orgId,
+			proposal_option_id: optionId,
+			sort_order: position
+		}));
+	});
+	if (lines.length > 0) ensure(await supabase.from('proposal_line_items').insert(lines));
+
+	return proposal;
 }
 
 export async function updateProposal(

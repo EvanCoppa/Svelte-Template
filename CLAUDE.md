@@ -412,8 +412,9 @@ amount → a number, a wall-clock pick → an ISO instant, re-parsed with the co
 schema so the enum unions come back without a cast). Adding a kind of record = a
 schema, a `RECORD_FORMS` entry and one `case` in that switch; never a second create
 modal, action or field-rendering loop. A screen whose creation is genuinely special
-(the staff page's invite, which sends an email and mints a token) keeps its own form
-and says why.
+(the staff page's invite, which sends an email and mints a token; the proposal
+builder at `/proposals/new`, which writes options and catalog lines with the row —
+docs/proposals.md, "The page") keeps its own form and says why.
 
 ## Data loading & invalidation
 

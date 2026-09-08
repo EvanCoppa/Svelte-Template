@@ -223,9 +223,33 @@ icons. A template never meets a string it has to guess at.
 is `src/routes/(app)/proposals/`, built exactly like `/deals` on
 `src/lib/server/crm/proposals.ts`; `proposal` is a record kind, so a row opens on the
 generic record page (status, the record it hangs off, its options' count and
-recommended total, validity, fee and tax), a company, contact or deal page lists the
-proposals hanging off it, and the generic "Add …" form creates an unattached draft
-(title, valid until). It ships in every industry and every plan.
+recommended total, validity, fee and tax), and a company, contact or deal page lists
+the proposals hanging off it. It ships in every industry and every plan.
+
+**Creating one is a page, not the generic modal.** A proposal is a title plus one to
+five priced options each made of catalog lines — more than one row of strings — so the
+"Add …" button on the list links to the builder at `/proposals/new`
+(`src/routes/(app)/proposals/new/`, its own `pages` row by the `proposal_builder_page`
+migration), the one kind whose creation is a screen. The builder is a port of Yes
+Smile's treatment plan form onto this model:
+
+| the source form                      | here                                                          |
+| ------------------------------------ | ------------------------------------------------------------- |
+| the patient (typed or picked)        | the record the proposal is for — a contact, company or deal   |
+| a plan (1–5)                         | a `proposal_options` row, in position order                   |
+| case fee, courtesy %, show financing | `fee_override`, `discount_pct`, `financing_available`         |
+| a procedure or a product on a plan   | a `proposal_line_items` row citing the catalog (`product_id`) |
+| teeth / units                        | the line's `quantity`                                         |
+| notes                                | a note activity logged against the new proposal               |
+
+The whole document posts as one JSON form (`dataType: 'json'`, superforms) validated
+by `schema.ts`; the action hands it to `createProposalWithOptions()`, one batched
+insert per table, and lands on the new record's page. Totals on screen are
+`estimateOptionTotal()` (`src/lib/crm/proposals.ts`), the stored formula replayed as
+a preview — the database still computes the real figure on save. What had no home in
+the model — doctor and presenter, before/after photos, insurance coverage, the cash
+discount toggle, teeth surfaces — was left behind rather than parked in jsonb, and a
+quick-select bundle is the catalog's categories.
 
 It is also the reason names live in the registry (docs/features.md, "Names by
 industry"): the nouns differ per vertical while the shape does not, so the feature's
@@ -235,8 +259,9 @@ dentistry). Nothing in the page names it.
 
 ## Deliberately not here (yet)
 
-- **Editing options and line items, and attaching a draft to its record.** The list
-  and the record page read them; the forms that write them are still to build.
+- **Editing a proposal after creation.** The builder writes options and lines once;
+  the list and the record page read them, and the form that edits them in place is
+  still to build.
 - **The deck editor and the presenter.** `slide_decks` stores a deck and
   `proposals.deck_id` points at one; authoring slides, expanding them per option and
   resolving variables at present time are all still to build.

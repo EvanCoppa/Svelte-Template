@@ -41,14 +41,14 @@ function hasAtMostTwoDecimals(value: number) {
 }
 
 /** Money as stored: non-negative, cents precision, inside numeric(12, 2). */
-const money = z
+export const moneySchema = z
 	.number()
 	.min(0, 'Cannot be negative.')
 	.max(MONEY_MAX, 'Amount is too large.')
 	.refine(hasAtMostTwoDecimals, 'Use at most two decimal places.');
 
 /** A percentage as stored in numeric(5, 2): 8.25 means 8.25%. */
-const percent = z
+export const percentSchema = z
 	.number()
 	.min(0, 'Cannot be negative.')
 	.max(100, 'Cannot exceed 100%.')
@@ -94,8 +94,8 @@ const proposalFields = z.object({
 		.max(200, 'Keep the title under 200 characters.'),
 	base_config: jsonObject.optional(),
 	status: proposalStatusSchema.optional(),
-	default_fee: money.nullable().optional(),
-	tax_rate: percent.nullable().optional(),
+	default_fee: moneySchema.nullable().optional(),
+	tax_rate: percentSchema.nullable().optional(),
 	valid_until: z.iso.datetime({ offset: true }).nullable().optional()
 });
 
@@ -153,11 +153,11 @@ const proposalOptionFields = z.object({
 		.max(120, 'Keep the label under 120 characters.'),
 	sort_order: z.int().min(0).optional(),
 	is_recommended: z.boolean().optional(),
-	base_price: money.optional(),
+	base_price: moneySchema.optional(),
 	/** null inherits the proposal's default_fee. */
-	fee_override: money.nullable().optional(),
-	discount_amount: money.optional(),
-	discount_pct: percent.nullable().optional(),
+	fee_override: moneySchema.nullable().optional(),
+	discount_amount: moneySchema.optional(),
+	discount_pct: percentSchema.nullable().optional(),
 	currency: z
 		.string()
 		.trim()
@@ -169,7 +169,7 @@ const proposalOptionFields = z.object({
 	start_offset_days: z.int().min(0, 'Cannot be negative.').nullable().optional(),
 	financing_available: z.boolean().optional(),
 	financing_term_months: z.int().min(1, 'At least one month.').nullable().optional(),
-	financing_apr: percent.nullable().optional(),
+	financing_apr: percentSchema.nullable().optional(),
 	primary_image_url: z.url('Enter a full URL.').nullable().optional(),
 	custom_fields: jsonObject.optional()
 });
@@ -192,7 +192,7 @@ export const proposalLineItemSchema = z.object({
 		.min(1, 'Give the line a label.')
 		.max(200, 'Keep the label under 200 characters.'),
 	quantity: z.number().min(0, 'Cannot be negative.').optional(),
-	unit_cost: money.optional(),
+	unit_cost: moneySchema.optional(),
 	sort_order: z.int().min(0).optional()
 });
 
