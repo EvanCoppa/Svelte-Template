@@ -2150,8 +2150,7 @@ export type Database = {
           id?: string
           label?: string
         }
-        Relationships: [
-        ]
+        Relationships: []
       }
       ticket_comments: {
         Row: {
