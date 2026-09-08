@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
 import { proposalEntityTypeSchema } from '$lib/schemas/proposals';
 import type { CrmEntityRef } from './entity';
-import { unwrap, unwrapDeleted } from './unwrap';
+import { ensure, unwrap, unwrapDeleted } from './unwrap';
 
 /**
  * Data access for `proposals` — the decision every vertical shares
@@ -111,6 +111,95 @@ export async function createProposal(
 			.select()
 			.single()
 	);
+}
+
+/** The columns the migration lets a member set on an option. */
+type ProposalOptionColumn =
+	| 'label'
+	| 'sort_order'
+	| 'is_recommended'
+	| 'base_price'
+	| 'fee_override'
+	| 'discount_amount'
+	| 'discount_pct'
+	| 'currency'
+	| 'duration_value'
+	| 'duration_unit'
+	| 'start_offset_days'
+	| 'financing_available'
+	| 'financing_term_months'
+	| 'financing_apr'
+	| 'primary_image_url'
+	| 'custom_fields';
+
+/** The columns the migration lets a member set on a line. */
+type ProposalLineItemColumn = 'label' | 'quantity' | 'unit_cost' | 'sort_order' | 'product_id';
+
+export type ProposalLineItemInsert = Pick<
+	TablesInsert<'proposal_line_items'>,
+	ProposalLineItemColumn
+>;
+
+/** One option as the builder posts it: its own columns, and the lines inside it. */
+export type ProposalOptionInsert = Pick<TablesInsert<'proposal_options'>, ProposalOptionColumn> & {
+	line_items: ProposalLineItemInsert[];
+};
+
+/**
+ * The builder's write: one proposal, its options and their lines, in that
+ * order, because each child needs its parent's id. PostgREST has no
+ * transaction, so a failure after the first insert leaves the proposal as a
+ * draft with fewer options than were asked for — a legitimate row (the
+ * migration allows an option-less proposal), reported to the caller as the
+ * thrown message, and finishable from the record page.
+ *
+ * `sort_order` is the position in the array: what the builder lays out left
+ * to right is the grid's column order.
+ */
+export async function createProposalWithOptions(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	values: Pick<TablesInsert<'proposals'>, ProposalColumn>,
+	options: readonly ProposalOptionInsert[]
+): Promise<Proposal> {
+	const proposal = await createProposal(supabase, orgId, values);
+	if (options.length === 0) return proposal;
+
+	// An option's lines are not columns of its row — they wait for its id —
+	// so each option is split into the row to insert now and the lines to
+	// insert after.
+	const split = options.map(({ line_items, ...columns }, index) => ({
+		row: { ...columns, sort_order: index, org_id: orgId, proposal_id: proposal.id },
+		lines: line_items
+	}));
+
+	const inserted = unwrap(
+		await supabase
+			.from('proposal_options')
+			.insert(split.map((option) => option.row))
+			.select('id, sort_order')
+	);
+
+	// The insert answers in no promised order; the position pins each row
+	// back to the option it came from.
+	const optionIds = new Map(inserted.map((row) => [row.sort_order, row.id]));
+	const lines = split.flatMap((option, index) => {
+		const proposalOptionId = optionIds.get(index);
+		if (proposalOptionId === undefined) {
+			throw new Error(`Option ${String(index + 1)} was not created.`);
+		}
+		return option.lines.map((line, position) => ({
+			...line,
+			sort_order: position,
+			org_id: orgId,
+			proposal_option_id: proposalOptionId
+		}));
+	});
+	if (lines.length > 0) {
+		ensure(await supabase.from('proposal_line_items').insert(lines));
+	}
+
+	return proposal;
 }
 
 export async function updateProposal(

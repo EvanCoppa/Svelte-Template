@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createProposal,
+	createProposalWithOptions,
 	deleteProposal,
 	getProposal,
 	listProposals,
 	proposalParentKind,
 	updateProposal
 } from './proposals';
-import { ORG_ID, supabaseMock } from './test-support';
+import { ORG_ID, supabaseMock, supabaseMockSequence } from './test-support';
 
 const PROPOSAL_ID = 'a1000000-0000-0000-0000-000000000001';
 const DEAL_ID = '40000000-0000-0000-0000-000000000001';
@@ -66,6 +67,130 @@ describe('proposals data access', () => {
 			org_id: ORG_ID
 		});
 		expect(builder.single).toHaveBeenCalled();
+	});
+
+	it('creates a proposal, then its options in position, then their lines', async () => {
+		const OPTION_A = 'a2000000-0000-0000-0000-00000000000a';
+		const OPTION_B = 'a2000000-0000-0000-0000-00000000000b';
+		const { supabase, from, builder } = supabaseMockSequence([
+			{ data: { id: PROPOSAL_ID, title: 'Crown and whitening' } },
+			// Options come back in no promised order; sort_order pins them.
+			{
+				data: [
+					{ id: OPTION_B, sort_order: 1 },
+					{ id: OPTION_A, sort_order: 0 }
+				]
+			},
+			{ data: null }
+		]);
+
+		const proposal = await createProposalWithOptions(
+			supabase,
+			ORG_ID,
+			{ title: 'Crown and whitening', entity_type: 'contact', entity_id: DEAL_ID },
+			[
+				{
+					label: 'Basic',
+					base_price: 1200,
+					is_recommended: false,
+					line_items: [{ label: 'Crown', quantity: 1, unit_cost: 1200, product_id: null }]
+				},
+				{
+					label: 'Complete',
+					base_price: 0,
+					is_recommended: true,
+					line_items: [
+						{ label: 'Crown', quantity: 1, unit_cost: 1200, product_id: null },
+						{
+							label: 'Whitening',
+							quantity: 2,
+							unit_cost: 300,
+							product_id: '50000000-0000-0000-0000-000000000001'
+						}
+					]
+				}
+			]
+		);
+
+		expect(proposal.id).toBe(PROPOSAL_ID);
+		expect(from).toHaveBeenNthCalledWith(1, 'proposals');
+		expect(from).toHaveBeenNthCalledWith(2, 'proposal_options');
+		expect(from).toHaveBeenNthCalledWith(3, 'proposal_line_items');
+		expect(builder.insert).toHaveBeenNthCalledWith(2, [
+			{
+				label: 'Basic',
+				base_price: 1200,
+				is_recommended: false,
+				sort_order: 0,
+				org_id: ORG_ID,
+				proposal_id: PROPOSAL_ID
+			},
+			{
+				label: 'Complete',
+				base_price: 0,
+				is_recommended: true,
+				sort_order: 1,
+				org_id: ORG_ID,
+				proposal_id: PROPOSAL_ID
+			}
+		]);
+		expect(builder.insert).toHaveBeenNthCalledWith(3, [
+			{
+				label: 'Crown',
+				quantity: 1,
+				unit_cost: 1200,
+				product_id: null,
+				sort_order: 0,
+				org_id: ORG_ID,
+				proposal_option_id: OPTION_A
+			},
+			{
+				label: 'Crown',
+				quantity: 1,
+				unit_cost: 1200,
+				product_id: null,
+				sort_order: 0,
+				org_id: ORG_ID,
+				proposal_option_id: OPTION_B
+			},
+			{
+				label: 'Whitening',
+				quantity: 2,
+				unit_cost: 300,
+				product_id: '50000000-0000-0000-0000-000000000001',
+				sort_order: 1,
+				org_id: ORG_ID,
+				proposal_option_id: OPTION_B
+			}
+		]);
+	});
+
+	it('skips the line insert when no option has lines, and the option insert when there are none', async () => {
+		const bare = supabaseMockSequence([{ data: { id: PROPOSAL_ID } }]);
+		await createProposalWithOptions(bare.supabase, ORG_ID, { title: 'Draft' }, []);
+		expect(bare.from).toHaveBeenCalledTimes(1);
+
+		const lineless = supabaseMockSequence([
+			{ data: { id: PROPOSAL_ID } },
+			{ data: [{ id: 'a2000000-0000-0000-0000-00000000000a', sort_order: 0 }] }
+		]);
+		await createProposalWithOptions(lineless.supabase, ORG_ID, { title: 'Draft' }, [
+			{ label: 'Only', line_items: [] }
+		]);
+		expect(lineless.from).toHaveBeenCalledTimes(2);
+	});
+
+	it('reports an option the database did not create instead of orphaning its lines', async () => {
+		const { supabase } = supabaseMockSequence([{ data: { id: PROPOSAL_ID } }, { data: [] }]);
+
+		await expect(
+			createProposalWithOptions(supabase, ORG_ID, { title: 'Draft' }, [
+				{
+					label: 'Lost',
+					line_items: [{ label: 'Line', quantity: 1, unit_cost: 1, product_id: null }]
+				}
+			])
+		).rejects.toThrow('Option 1 was not created.');
 	});
 
 	it('updates scoped to org and id', async () => {

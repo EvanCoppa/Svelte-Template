@@ -412,8 +412,11 @@ amount → a number, a wall-clock pick → an ISO instant, re-parsed with the co
 schema so the enum unions come back without a cast). Adding a kind of record = a
 schema, a `RECORD_FORMS` entry and one `case` in that switch; never a second create
 modal, action or field-rendering loop. A screen whose creation is genuinely special
-(the staff page's invite, which sends an email and mints a token) keeps its own form
-and says why.
+keeps its own form and says why — the staff page's invite (it sends an email and mints
+a token), and the **proposal builder** at `(app)/proposals/new/` (a proposal is born
+with its options side by side, each priced from the catalog, posted as one nested
+superforms JSON form and written by `createProposalWithOptions()`; the list page's
+"Add …" button links there instead of opening the modal).
 
 ## Data loading & invalidation
 
