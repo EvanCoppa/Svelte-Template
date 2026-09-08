@@ -5,7 +5,7 @@
 
 :root {
 	/* ── Layout & typography ── */
-	--header-height: 64px;
+	--header-height: 48px;
 	--site-padding: 40px;
 
 	--font-sans:
@@ -210,6 +210,39 @@ html.dark input:-webkit-autofill:active {
 	-webkit-text-fill-color: var(--text-primary) !important;
 	caret-color: var(--text-primary);
 	transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Sidebar chrome — shared by the app sidebar and the settings sidebar
+   (src/lib/components/*-sidebar.svelte). Lives here rather than in one of
+   them because only one is mounted at a time. */
+.scrollable-sidebar {
+	overflow-y: auto;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
+	-webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+	mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
+}
+
+.scrollable-sidebar::-webkit-scrollbar {
+	display: none; /* Chrome, Safari, Opera */
+}
+
+.nav-hover-effect {
+	transition: all 0.3s ease;
+}
+
+.nav-hover-effect:hover {
+	transform: translateX(4px);
+}
+
+.nav-active {
+	background-color: white;
+	border-radius: 0.5rem;
+}
+
+/* A white active pill would flare on the dark sidebar — use its accent. */
+html.dark .nav-active {
+	background-color: var(--sidebar-accent);
 }
 
 @layer utilities {

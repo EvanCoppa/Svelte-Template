@@ -63,10 +63,6 @@
 	];
 </script>
 
-<svelte:head>
-	<title>Best Practices</title>
-</svelte:head>
-
 <div class="mx-auto max-w-3xl space-y-6">
 	<div class="space-y-1">
 		<h1 class="text-2xl font-bold tracking-tight">Best practices</h1>

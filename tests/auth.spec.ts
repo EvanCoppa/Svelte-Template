@@ -43,6 +43,9 @@ test.describe('signing in', () => {
 		await signIn(page);
 
 		await expect(page).toHaveURL('/');
+		// Titles come from the `pages` table, resolved by the (app) layout — the
+		// dashboard is a shell page, belonging to no feature.
+		await expect(page).toHaveTitle('Dashboard');
 		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 		// Rendered in the page body and again in the sidebar's user menu.
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
@@ -73,9 +76,9 @@ test.describe('signing in', () => {
 	});
 
 	test('returns to the page that triggered the login', async ({ page }) => {
-		await signIn(page, { next: '/settings' });
+		await signIn(page, { next: '/settings/profile' });
 
-		await expect(page).toHaveURL('/settings');
+		await expect(page).toHaveURL('/settings/profile');
 	});
 
 	test('refuses to follow ?next= off-site', async ({ page }) => {
@@ -95,18 +98,81 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
+	test('names the pages walked through in the header breadcrumb trail', async ({ page }) => {
+		// The walk taken, not a hierarchy: the crumbs are named from the
+		// `pages` registry and kept in this tab's sessionStorage, so they
+		// survive the full page load below.
+		await page.goto('/companies');
+
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		await expect(trail.getByRole('link', { name: 'Companies' })).toBeVisible();
+
+		// And the way back is a plain link, so it works before hydration.
+		await trail.getByRole('link', { name: 'Dashboard' }).click();
+		await expect(page).toHaveURL('/');
+	});
+
+	test('restarts the trail where the shell jumps, and follows a link deeper', async ({ page }) => {
+		// `Breadcrumb.Page` is a span carrying role="link" too, so the crumbs
+		// are told apart by slot: a link is a page walked through, the page
+		// slot is where the reader is now.
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		const walked = trail.locator('[data-slot="breadcrumb-link"]');
+		const here = trail.locator('[data-slot="breadcrumb-page"]');
+
+		// Signed in on the dashboard: one page, nothing walked to reach it.
+		await expect(here).toHaveText('Dashboard');
+		await expect(walked).toHaveCount(0);
+
+		// A link inside the page is a step deeper, which is the depth the
+		// trail exists to show.
+		await clickWhenLive(page.getByRole('link', { name: 'Browse components' }), () =>
+			expect(page).toHaveURL('/components')
+		);
+		await expect(walked).toHaveText(['Dashboard']);
+		await expect(here).toHaveText('Components');
+
+		// The sidebar jumps: nothing was walked to get here whatever was on
+		// screen before, so there is no way back to offer.
+		await clickWhenLive(page.getByRole('button', { name: 'Companies' }).first(), () =>
+			expect(page).toHaveURL('/companies')
+		);
+		await expect(here).toHaveText('Companies');
+		await expect(walked).toHaveCount(0);
+	});
+
+	test('starts a fresh trail from the settings sidebar too', async ({ page }) => {
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		const walked = trail.locator('[data-slot="breadcrumb-link"]');
+
+		// A full load into the settings shell, two crumbs deep...
+		await page.goto('/settings');
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(walked).toHaveText(['Dashboard']);
+
+		// ...and its sections are a nav like any other: siblings, not steps.
+		await clickWhenLive(page.getByRole('button', { name: 'Security' }), () =>
+			expect(page).toHaveURL('/settings/security')
+		);
+		await expect(trail.locator('[data-slot="breadcrumb-page"]')).toHaveText('Security');
+		await expect(walked).toHaveCount(0);
+	});
+
 	test('renders every navigation entry the session may see', async ({ page }) => {
 		// The static pages plus the features resolved for the active org and
 		// readable by the user (seed.sql: e2e is an Acme member holding the
-		// general 'Support' role, which grants staff, clients, tickets and the
-		// library pages at read). Tasks is switched off by the org and Deals
-		// carries no grant for Support, so neither may appear.
+		// crm 'Support' role, which grants staff, companies, contacts, tickets
+		// and the library pages at read). Tasks is switched off by the org,
+		// and Deals and Products carry no grant for Support, so none of the
+		// three may appear. Settings is not here either: it is a shell of its
+		// own, entered from the user menu (see $lib/navigation).
 		for (const label of [
 			'Dashboard',
-			'Clients',
+			'Companies',
+			'Contacts',
 			'Tickets',
 			'Staff',
-			'Settings',
 			'Components',
 			'Best Practices'
 		]) {
@@ -114,18 +180,22 @@ test.describe('the app shell', () => {
 		}
 		await expect(page.getByRole('button', { name: 'Tasks' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Products' })).toHaveCount(0);
 	});
 
-	test('marks a feature outside the plan as locked and sends it to the upgrade page', async ({
+	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
 		page
 	}) => {
 		// Best Practices is enterprise-only; Acme is on Pro -> locked_visible.
 		const entry = page.getByRole('button', { name: /Best Practices/ }).first();
 		await expect(entry.locator('..').locator('[data-slot="sidebar-menu-badge"]')).toBeVisible();
 
-		await clickWhenLive(entry, () => expect(page).toHaveURL('/upgrade?feature=best-practices'));
-		await expect(page).toHaveTitle('Upgrade');
-		await expect(page.getByText(/Best Practices isn't included in the Pro plan/)).toBeVisible();
+		// No navigation: the pitch opens in place.
+		await clickWhenLive(entry, () => expect(page.getByRole('dialog')).toBeVisible());
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).not.toHaveURL(/upgrade/);
 	});
 
 	test('navigates when a sidebar entry is clicked', async ({ page }) => {
@@ -136,13 +206,18 @@ test.describe('the app shell', () => {
 		);
 	});
 
-	test('opens the palette from the header and navigates', async ({ page }) => {
-		await clickWhenLive(page.locator('.search-bar'), () =>
-			expect(page.getByRole('dialog')).toBeVisible()
+	test('opens the palette from the sidebar and navigates', async ({ page }) => {
+		// The search button lives in the sidebar header, above the nav it jumps
+		// to — the top bar carries no search of its own.
+		await clickWhenLive(
+			page.locator('[data-slot="sidebar-header"]').getByRole('button', { name: 'Search' }),
+			() => expect(page.getByRole('dialog')).toBeVisible()
 		);
 
 		const palette = page.getByRole('dialog');
-		await palette.getByRole('combobox').fill('shadcn');
+		// Entries are scored against their `value` — the label plus its aliases
+		// (see search-dialog.svelte), not the prose on the page they open.
+		await palette.getByRole('combobox').fill('compon');
 		await palette
 			.getByRole('option', { name: /components/i })
 			.first()
@@ -160,11 +235,17 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('combobox')).toBeVisible();
 	});
 
-	test('bounces a locked feature route to the upgrade page', async ({ page }) => {
+	test('bounces a locked feature route to the dashboard and opens the upgrade prompt', async ({
+		page
+	}) => {
 		// Gated in hooks.server.ts before any load runs — typing the URL is no
-		// way around a missing plan.
+		// way around a missing plan. The prompt then takes `?upgrade=` off the URL.
 		await page.goto('/best-practices');
-		await expect(page).toHaveURL('/upgrade?feature=best-practices');
+		await expect(page.getByRole('dialog')).toBeVisible();
+		await expect(
+			page.getByRole('dialog').getByText(/Best Practices isn't included in the Pro plan/)
+		).toBeVisible();
+		await expect(page).toHaveURL('/');
 	});
 
 	test('sends a feature the org switched off to the feature settings', async ({ page }) => {
@@ -184,17 +265,39 @@ test.describe('the app shell', () => {
 	});
 
 	test('lists a readable feature page with its seeded rows', async ({ page }) => {
-		await page.goto('/clients');
-		await expect(page).toHaveTitle('Clients');
+		await page.goto('/companies');
+		await expect(page).toHaveTitle('Companies');
 		await expect(page.getByRole('cell', { name: 'Wayne Enterprises' })).toBeVisible();
 	});
 
-	test('shows the signed-in user their profile on /settings', async ({ page }) => {
+	test('lists a person who belongs to no company at all', async ({ page }) => {
+		// The party model's whole point: a customer who is a person, with an
+		// em dash where a company would be rather than an invented one.
+		await page.goto('/contacts');
+		await expect(page).toHaveTitle('Contacts');
+		await expect(page.getByRole('cell', { name: 'Bruce Wayne' })).toBeVisible();
+	});
+
+	test('opens settings on its first section, in its own sidebar', async ({ page }) => {
+		// /settings is the door: it redirects to the first entry in
+		// `settingsNav`, and the shell swaps the app nav for the settings one.
 		await page.goto('/settings');
 
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(page).toHaveTitle('Profile');
+		await expect(page.getByRole('button', { name: 'Back to app' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Security' })).toBeVisible();
 		// Loaded through RLS, so this row can only be the caller's own. Matches
 		// the page body and the sidebar user menu, hence first().
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
+	});
+
+	test('keeps Settings out of the app sidebar', async ({ page }) => {
+		await page.goto('/');
+
+		// It is reached from the user menu in the sidebar footer instead — the
+		// nav lists the places you work, not the place you configure them.
+		await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
 	});
 });
 
@@ -262,11 +365,12 @@ test.describe('the workspace switcher', () => {
 	// from colliding with the same text elsewhere on the page (strict mode).
 	const switcher = (page: Page) => page.locator('[data-slot="sidebar-header"]');
 
-	test('shows the active workspace and its tier', async ({ page }) => {
+	test('shows the active workspace on one line, without its tier', async ({ page }) => {
 		// seed.sql: e2e@example.com is a member of "Acme Inc" (pro) plus their
 		// personal org; "Acme Inc" sorts first, so it is the default active org.
 		await expect(switcher(page).getByText('Acme Inc')).toBeVisible();
-		await expect(switcher(page).getByText('Pro')).toBeVisible();
+		// The tier moved out of the switcher — the row is logo, name, chevron.
+		await expect(switcher(page).getByText('Pro')).toHaveCount(0);
 	});
 
 	test('switches workspaces and persists the choice across reloads', async ({ page }) => {

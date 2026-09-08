@@ -23,8 +23,8 @@ function features(entries: [id: string, route: string, mode: FeatureMode][]): Fe
 
 const map = features([
 	['home', '/', 'enabled'],
-	['clients', '/clients', 'enabled'],
-	['pipeline', '/clients/pipeline', 'locked_visible'],
+	['companies', '/companies', 'enabled'],
+	['pipeline', '/companies/pipeline', 'locked_visible'],
 	['best-practices', '/best-practices', 'locked_visible'],
 	['deals', '/deals', 'hidden'],
 	['tasks', '/tasks', 'disabled'],
@@ -36,44 +36,44 @@ const readNone = () => false;
 
 describe('matchFeature', () => {
 	it('matches a route and everything nested under it', () => {
-		expect(matchFeature('/clients', map)?.feature.id).toBe('clients');
-		expect(matchFeature('/clients/42', map)?.feature.id).toBe('clients');
+		expect(matchFeature('/companies', map)?.feature.id).toBe('companies');
+		expect(matchFeature('/companies/42', map)?.feature.id).toBe('companies');
 	});
 
 	it('prefers the longest route', () => {
-		expect(matchFeature('/clients/pipeline', map)?.feature.id).toBe('pipeline');
-		expect(matchFeature('/clients/pipeline/7', map)?.feature.id).toBe('pipeline');
+		expect(matchFeature('/companies/pipeline', map)?.feature.id).toBe('pipeline');
+		expect(matchFeature('/companies/pipeline/7', map)?.feature.id).toBe('pipeline');
 	});
 
 	it('never matches home as a prefix, nor a route as a partial segment', () => {
 		expect(matchFeature('/', map)?.feature.id).toBe('home');
 		expect(matchFeature('/anything', map)).toBeNull();
-		expect(matchFeature('/clientsx', map)).toBeNull();
+		expect(matchFeature('/companiesx', map)).toBeNull();
 	});
 });
 
 describe('featureGateFor', () => {
 	it('lets an enabled feature through when the caller can read it', () => {
-		expect(featureGateFor('/clients', map, readAll)).toBeNull();
-		expect(featureGateFor('/clients/42', map, readAll)).toBeNull();
+		expect(featureGateFor('/companies', map, readAll)).toBeNull();
+		expect(featureGateFor('/companies/42', map, readAll)).toBeNull();
 		expect(featureGateFor('/', map, readAll)).toBeNull();
 	});
 
 	it('refuses an enabled feature the caller has no read grant on', () => {
-		expect(featureGateFor('/clients', map, readNone)).toEqual({
+		expect(featureGateFor('/companies', map, readNone)).toEqual({
 			status: 403,
 			message: 'You do not have access to this page.'
 		});
-		expect(featureGateFor('/clients', map, (id) => id === 'clients')).toBeNull();
+		expect(featureGateFor('/companies', map, (id) => id === 'companies')).toBeNull();
 	});
 
-	it('sends a locked feature to the upgrade page with its id', () => {
+	it('sends a locked feature to the dashboard with its id, for the upgrade prompt', () => {
 		expect(featureGateFor('/best-practices', map, readAll)).toEqual({
-			redirectTo: '/upgrade?feature=best-practices'
+			redirectTo: '/?upgrade=best-practices'
 		});
 		// Mode is decided before the grant: locked is locked even without read.
 		expect(featureGateFor('/best-practices', map, readNone)).toEqual({
-			redirectTo: '/upgrade?feature=best-practices'
+			redirectTo: '/?upgrade=best-practices'
 		});
 	});
 
@@ -92,8 +92,8 @@ describe('featureGateFor', () => {
 	});
 
 	it('inherits the more specific feature on nested paths', () => {
-		expect(featureGateFor('/clients/pipeline', map, readAll)).toEqual({
-			redirectTo: '/upgrade?feature=pipeline'
+		expect(featureGateFor('/companies/pipeline', map, readAll)).toEqual({
+			redirectTo: '/?upgrade=pipeline'
 		});
 	});
 
@@ -101,16 +101,14 @@ describe('featureGateFor', () => {
 		expect(featureGateFor('/notes', map, readNone)).toBeNull();
 	});
 
-	it('exempts the settings, upgrade, api and logout surfaces', () => {
+	it('exempts the settings, api and logout surfaces', () => {
 		const blocked = features([
 			['settings', '/settings', 'hidden'],
-			['upgrade', '/upgrade', 'hidden'],
 			['api', '/api', 'hidden'],
 			['logout', '/logout', 'hidden']
 		]);
 		expect(featureGateFor('/settings', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/settings/features', blocked, readNone)).toBeNull();
-		expect(featureGateFor('/upgrade', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/api/org', blocked, readNone)).toBeNull();
 		expect(featureGateFor('/logout', blocked, readNone)).toBeNull();
 		// A prefix exemption is by path segment, not by string prefix.
@@ -121,7 +119,7 @@ describe('featureGateFor', () => {
 
 	it('url-encodes the feature id in redirects', () => {
 		const odd = features([['a b', '/odd', 'locked_visible']]);
-		expect(featureGateFor('/odd', odd, readAll)).toEqual({ redirectTo: '/upgrade?feature=a%20b' });
+		expect(featureGateFor('/odd', odd, readAll)).toEqual({ redirectTo: '/?upgrade=a%20b' });
 	});
 
 	it('treats an empty map as no gate at all', () => {
@@ -131,8 +129,8 @@ describe('featureGateFor', () => {
 
 describe('passesFeatureGate', () => {
 	it('is the boolean form of featureGateFor', () => {
-		expect(passesFeatureGate('/clients', map, readAll)).toBe(true);
-		expect(passesFeatureGate('/clients', map, readNone)).toBe(false);
+		expect(passesFeatureGate('/companies', map, readAll)).toBe(true);
+		expect(passesFeatureGate('/companies', map, readNone)).toBe(false);
 		expect(passesFeatureGate('/best-practices', map, readAll)).toBe(false);
 		expect(passesFeatureGate('/deals', map, readAll)).toBe(false);
 	});

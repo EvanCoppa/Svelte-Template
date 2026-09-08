@@ -3,6 +3,7 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import X from '@lucide/svelte/icons/x';
+	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
 	import {
 		normalizeOption,
@@ -55,6 +56,8 @@
 		clearable?: boolean;
 		/** `sm` matches an h-8 toolbar control; `default` matches an h-9 form input. */
 		size?: 'sm' | 'default';
+		/** Leading icon in the trigger, before the label. Sized to 4 by the trigger. */
+		icon?: Snippet;
 		/** Classes for the trigger button — width lives here. */
 		class?: string;
 		/** Classes for the floating panel, e.g. a wider `w-80`. */
@@ -96,6 +99,7 @@
 		searchThreshold = 8,
 		clearable = false,
 		size = 'default',
+		icon,
 		class: className = '',
 		contentClass = '',
 		onchange,
@@ -443,8 +447,15 @@
 			className
 		)}
 	>
-		<span class={cn('truncate', hasSelection ? 'font-medium' : 'text-muted-foreground')}>
-			{triggerLabel}
+		<span class="flex min-w-0 items-center gap-2">
+			{#if icon}
+				<span class="flex shrink-0 items-center [&_svg]:size-4">
+					{@render icon()}
+				</span>
+			{/if}
+			<span class={cn('truncate', hasSelection ? 'font-medium' : 'text-muted-foreground')}>
+				{triggerLabel}
+			</span>
 		</span>
 		<span class="flex shrink-0 items-center gap-1">
 			{#if clearable && hasSelection && !disabled}

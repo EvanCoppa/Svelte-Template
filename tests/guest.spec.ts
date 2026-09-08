@@ -27,13 +27,17 @@ test.describe('unauthenticated visitor', () => {
 	});
 
 	test('asks for a login before the feature gate can answer', async ({ page }) => {
-		// Feature routes and the upgrade page are behind the same default-deny
-		// guard: an anonymous visitor learns nothing about what the org has.
-		await page.goto('/clients');
-		await expect(page).toHaveURL('/login?next=%2Fclients');
+		// Feature routes are behind the same default-deny guard: an anonymous
+		// visitor learns nothing about what the org has.
+		await page.goto('/companies');
+		await expect(page).toHaveURL('/login?next=%2Fcompanies');
+	});
 
-		await page.goto('/upgrade?feature=deals');
-		await expect(page).toHaveURL('/login?next=%2Fupgrade%3Ffeature%3Ddeals');
+	test('asks for a login before the assistant can answer', async ({ page }) => {
+		// The assistant is a feature route like any other, and its stream
+		// endpoint sits under it: neither says anything to an anonymous visitor.
+		await page.goto('/assistant');
+		await expect(page).toHaveURL('/login?next=%2Fassistant');
 	});
 
 	test('sends an invite link through login and back again', async ({ page }) => {

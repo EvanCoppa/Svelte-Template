@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureMap, FeatureMode } from './features/types';
-import { buildNav, groupNav, isNavItemActive, navItemTarget, staticNavItems } from './navigation';
+import { isIconName } from './features/icons';
+import {
+	buildNav,
+	groupNav,
+	isNavItemActive,
+	settingsNav,
+	settingsNavItems,
+	staticNavItems
+} from './navigation';
 
 function map(
 	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
@@ -31,7 +39,7 @@ describe('buildNav', () => {
 	it('lists enabled and locked features and drops disabled and hidden ones', () => {
 		const nav = buildNav(
 			map([
-				['clients', 'enabled'],
+				['companies', 'enabled'],
 				['deals', 'locked_visible'],
 				['tasks', 'disabled'],
 				['tickets', 'hidden']
@@ -40,7 +48,7 @@ describe('buildNav', () => {
 		);
 		const features = nav.filter((i) => i.featureId);
 		expect(features.map((i) => [i.featureId, i.locked])).toEqual([
-			['clients', false],
+			['companies', false],
 			['deals', true]
 		]);
 	});
@@ -48,12 +56,12 @@ describe('buildNav', () => {
 	it('hides features the user has no read grant on, locked ones included', () => {
 		const nav = buildNav(
 			map([
-				['clients', 'enabled'],
+				['companies', 'enabled'],
 				['deals', 'locked_visible']
 			]),
-			(id) => id === 'clients'
+			(id) => id === 'companies'
 		);
-		expect(nav.filter((i) => i.featureId).map((i) => i.featureId)).toEqual(['clients']);
+		expect(nav.filter((i) => i.featureId).map((i) => i.featureId)).toEqual(['companies']);
 	});
 
 	it('keeps the static pages and orders by category, then sortOrder, then label', () => {
@@ -66,16 +74,9 @@ describe('buildNav', () => {
 			]),
 			readAll
 		);
-		expect(nav.map((i) => i.label)).toEqual([
-			'Dashboard',
-			'Early',
-			'Alpha',
-			'Zeta',
-			'Settings',
-			'Docs'
-		]);
+		expect(nav.map((i) => i.label)).toEqual(['Dashboard', 'Early', 'Alpha', 'Zeta', 'Docs']);
 		expect(groupNav(nav).map((g) => [g.key, g.items.length])).toEqual([
-			['platform', 5],
+			['platform', 4],
 			['library', 1]
 		]);
 	});
@@ -87,22 +88,6 @@ describe('buildNav', () => {
 
 	it('returns only the static pages for an empty map', () => {
 		expect(buildNav({}, readAll)).toEqual(staticNavItems);
-	});
-});
-
-describe('navItemTarget', () => {
-	it('sends locked entries to the upgrade page and the rest to their own', () => {
-		const nav = buildNav(
-			map([
-				['clients', 'enabled'],
-				['best-practices', 'locked_visible']
-			]),
-			readAll
-		);
-		const item = (id: string) => nav.find((i) => i.featureId === id)!;
-		expect(navItemTarget(item('clients'))).toBe('/clients');
-		expect(navItemTarget(item('best-practices'))).toBe('/upgrade?feature=best-practices');
-		expect(navItemTarget(staticNavItems[0])).toBe('/');
 	});
 });
 
@@ -121,5 +106,27 @@ describe('isNavItemActive', () => {
 		expect(isNavItemActive(staff, '/staff')).toBe(true);
 		expect(isNavItemActive(staff, '/staff/123')).toBe(true);
 		expect(isNavItemActive(staff, '/staffing')).toBe(false);
+	});
+});
+
+describe('settingsNav', () => {
+	it('stays out of the app nav — settings is entered from the user menu', () => {
+		const nav = buildNav(map([['companies', 'enabled']]), readAll);
+		expect(nav.some((item) => item.href.startsWith('/settings'))).toBe(false);
+	});
+
+	it('lists every section under /settings with an icon the app ships', () => {
+		const items = settingsNavItems();
+		expect(items.length).toBe(settingsNav.reduce((n, g) => n + g.items.length, 0));
+		for (const item of items) {
+			expect(item.href.startsWith('/settings/')).toBe(true);
+			expect(isIconName(item.icon)).toBe(true);
+		}
+	});
+
+	it('marks the section you are on, and only that one', () => {
+		const [profile, security] = settingsNav[0].items;
+		expect(isNavItemActive(profile, '/settings/profile')).toBe(true);
+		expect(isNavItemActive(security, '/settings/profile')).toBe(false);
 	});
 });

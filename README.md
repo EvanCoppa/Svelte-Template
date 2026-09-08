@@ -192,9 +192,15 @@ Worth knowing:
 ### Seed data
 
 `supabase/seed.sql` runs after the migrations on every `db:reset`. It creates
-two users — `dev@example.com` and `e2e@example.com`, both with password
-`password123` — by writing the `auth.users` and `auth.identities` rows GoTrue
-expects, then lets the `profiles` trigger from the starter migration do its job.
+three users — `dev@example.com`, `e2e@example.com` and `evancoppa@gmail.com`,
+all with password `password123` — by writing the `auth.users` and
+`auth.identities` rows GoTrue expects, then lets the `profiles` trigger from the
+starter migration do its job. On top of their personal orgs it seeds Acme and
+Globex plus two organizations in every industry the catalog ships, with `dev`
+and `e2e` holding each industry's roles as plain members, and makes
+`evancoppa@gmail.com` the system admin: every org in the switcher, owner-level
+access in each. Sign in as `dev@example.com` to see the app as a regular
+member instead.
 
 These credentials are fixed and public on purpose: they only ever exist in a
 throwaway local database. **Never put a real credential in that file** — it is
@@ -234,17 +240,34 @@ type NewProfile = TablesInsert<'profiles'>;
 
 The sidebar sections and the ⌘K palette both render from the **feature registry**
 (`features` table, resolved per org in `src/lib/server/org-context.ts` and filtered by
-`buildNav()` in `src/lib/navigation.ts`). Adding a page:
+`buildNav()` in `src/lib/navigation.ts`), and every browser title comes from the **page
+registry** (`pages` table — a feature is made of pages, and a page has a title). Adding
+a page:
 
 1. Create `src/routes/(app)/reports/+page.svelte` — it's automatically protected and
    gets the sidebar/header shell.
 2. Register the feature in a migration: its row in `features` (route, icon slug,
    category), which industries include it, which tiers unlock it. Add its id to
    `FEATURE_IDS` in `src/lib/features/types.ts`.
+3. In the same migration, insert the page's `pages` row (`feature_id`, `path`, `title`)
+   — one row per screen the feature is made of.
 
 That's the whole checklist. The route is now gated by `hooks.server.ts`: an org whose
-plan lacks it is sent to `/upgrade`, one whose industry lacks it gets a 404, and the
-org can switch it off for itself under `/settings/features`. See `docs/features.md`.
+plan lacks it gets the upgrade prompt, one whose industry lacks it gets a 404, and the
+org can switch it off for itself under `/settings/features`. Its title needs no
+`<svelte:head>` either — the `(app)` layout matches the pathname against the page
+registry and titles the whole group. See `docs/features.md`.
+
+The header shows a **breadcrumb trail** of how deep you have gone since you last jumped
+from the shell (up to three pages), named from the same page registry. It is a depth
+trail, not a hierarchy — the pages are siblings and the same screen is reached from many
+places, so a tree off the URL would be made up. Clicking a sidebar, the ⌘K palette or the
+user menu starts the trail over at that page — a door like `/settings` that redirects into
+its first section included; links inside a page push onto it, and coming back to a page
+already in the trail truncates to it. So `/contacts/42` reads
+_Contacts › Acme_ when you got there through the list, and _Treatments › Acme_ when you
+got there from a treatment. All of it lives in `src/lib/breadcrumbs.svelte.ts` and the
+component beside it; nothing per page.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
 or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it
@@ -322,15 +345,14 @@ is silently dropped; `clickWhenLive()` in `tests/auth.spec.ts` retries until the
 effect appears. And **`Card.Title` renders a `<div>`**, so pages built from
 cards have no heading to target — assert on `<title>` or a `data-slot` instead.
 
-**CI** (`.github/workflows/ci.yml`) runs five parallel jobs on every pull
-request and push to `main`: `check` (svelte-check — Svelte + TS correctness),
+**CI** (`.github/workflows/ci.yml`) runs parallel jobs on every pull request
+and push to `main`: `check` (svelte-check — Svelte + TS correctness),
 `lint:oxlint` (oxlint's standard rules plus the vendored
 [anti-slop](https://github.com/dmmulroy/anti-slop) rules), `knip` (unused
-files, exports, and dependencies), the unit tests, and `test:e2e` (the
-Playwright specs that need no database). `lint` (prettier + eslint) and the
-production build remain local commands. To cover the signed-in specs in CI too,
-add a `npx supabase start && npm run db:env` step to the `e2e` job before
-`npm run test:e2e`.
+files, exports, and dependencies), the unit tests, and `database` (replaying
+migrations and checking generated types). `lint` (prettier + eslint), the
+production build, and `test:e2e` (Playwright) remain local commands — see
+"End-to-end tests" above for running them yourself.
 
 ## Development auto-login
 
@@ -351,6 +373,15 @@ created if it doesn't exist. Safety properties (all unit-tested): inert unless t
 is set, hard-refuses on `VERCEL_ENV=production`, `/logout` still signs out (an opt-out
 cookie stops instant re-login; clear it by visiting any page with `?autologin=1`), and
 the `/auth` emailed-link flows keep their signed-out behavior.
+
+## AI assistant
+
+`/assistant` is a chat over the organization's data, built on the Vercel AI SDK. Set
+`ANTHROPIC_API_KEY` (and optionally `AI_MODEL`) in `.env` to turn it on; without a key the
+page renders but says it is not configured. The assistant's tools are linked to features —
+a tool is available only when its feature is enabled for the org and the signed-in member
+holds the level it needs — and anything destructive asks for approval in the thread. The
+architecture, the tool contract and how to add a tool are in `docs/assistant.md`.
 
 ## Conventions
 

@@ -3,11 +3,14 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import NavUser from '$lib/components/nav-user.svelte';
+	import SidebarSearch from '$lib/components/sidebar-search.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { iconFor } from '$lib/features/icons';
-	import { groupNav, isNavItemActive, navItemTarget } from '$lib/navigation';
+	import { groupNav, isNavItemActive } from '$lib/navigation';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import type { OrgMembership } from '$lib/org';
 
 	let {
@@ -24,13 +27,30 @@
 	let user = $derived(page.data.user);
 	// Already filtered by mode and grant on the server; nothing to check here.
 	let groups = $derived(groupNav(page.data.nav ?? []));
+
+	// The sidebar jumps: wherever the reader was, arriving from here is the
+	// start of a walk, not a step in the one before it. Every shell surface
+	// that navigates pairs `startAt()` with its `goto()` — see
+	// `$lib/breadcrumbs.svelte`.
+	function jumpTo(href: string) {
+		breadcrumbs.startAt(href);
+		goto(href);
+	}
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
 	<Sidebar.Header>
-		{#if activeOrg}
-			<TeamSwitcher {organizations} {activeOrg} />
-		{/if}
+		<!-- One row: logo, workspace name, its dropdown chevron — and the sidebar's
+		     own collapse button, sitting where the switcher's chevrons used to. -->
+		<div class="flex items-center gap-1">
+			{#if activeOrg}
+				<div class="min-w-0 flex-1">
+					<TeamSwitcher {organizations} {activeOrg} />
+				</div>
+			{/if}
+			<Sidebar.Trigger class="text-sidebar-foreground/70 shrink-0" />
+		</div>
+		<SidebarSearch />
 	</Sidebar.Header>
 	<Sidebar.Content class="scrollable-sidebar">
 		{#each groups as group (group.key)}
@@ -40,11 +60,12 @@
 					{#each group.items as item (item.href)}
 						{@const Icon = iconFor(item.icon)}
 						{@const active = !item.locked && isNavItemActive(item, page.url.pathname)}
+						<!-- A locked entry never navigates: the upgrade prompt opens in place. -->
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								class={['nav-hover-effect', active && 'nav-active', item.locked && 'opacity-60']}
 								tooltipContent={item.locked ? `${item.label} — upgrade required` : item.label}
-								onclick={() => goto(navItemTarget(item))}
+								onclick={() => (item.locked ? showUpgrade(item.featureId) : jumpTo(item.href))}
 							>
 								<Icon class="h-6 w-6" />
 								<span class="sidebar-text">{item.label}</span>
@@ -68,35 +89,3 @@
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
-
-<style>
-	:global(.scrollable-sidebar) {
-		overflow-y: auto;
-		scrollbar-width: none; /* Firefox */
-		-ms-overflow-style: none; /* IE and Edge */
-		-webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
-		mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
-	}
-
-	:global(.scrollable-sidebar::-webkit-scrollbar) {
-		display: none; /* Chrome, Safari, Opera */
-	}
-
-	:global(.nav-hover-effect) {
-		transition: all 0.3s ease;
-	}
-
-	:global(.nav-hover-effect:hover) {
-		transform: translateX(4px);
-	}
-
-	:global(.nav-active) {
-		background-color: white;
-		border-radius: 0.5rem;
-	}
-
-	/* A white active pill would flare on the dark sidebar — use its accent. */
-	:global(html.dark .nav-active) {
-		background-color: var(--sidebar-accent);
-	}
-</style>

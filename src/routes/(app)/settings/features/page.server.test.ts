@@ -27,7 +27,7 @@ function context(role: 'owner' | 'member'): OrgContext {
 			industryId: 'general'
 		},
 		features: {
-			clients: { feature: feature('clients', 'platform', 10), mode: 'enabled' },
+			companies: { feature: feature('companies', 'platform', 10), mode: 'enabled' },
 			tasks: { feature: feature('tasks', 'platform', 30), mode: 'disabled' },
 			tickets: { feature: feature('tickets', 'platform', 40), mode: 'enabled' },
 			'best-practices': {
@@ -81,12 +81,12 @@ describe('features settings load', () => {
 		);
 
 		expect(data.rows.map((r: { id: string; mode: string }) => [r.id, r.mode])).toEqual([
-			['clients', 'enabled'],
+			['companies', 'enabled'],
 			['best-practices', 'locked_visible'],
 			['tasks', 'disabled'],
 			['tickets', 'enabled']
 		]);
-		expect(data.form.data.enabled).toEqual(['clients', 'tickets']);
+		expect(data.form.data.enabled).toEqual(['companies', 'tickets']);
 		expect(data.canManage).toBe(false);
 		expect(data.highlight).toBe('tasks');
 	});
@@ -95,7 +95,7 @@ describe('features settings load', () => {
 describe('features settings save', () => {
 	it('refuses a plain member with a 403', async () => {
 		const h = harness('member');
-		await expect(actions.save(h.post(['clients']))).rejects.toSatisfy(
+		await expect(actions.save(h.post(['companies']))).rejects.toSatisfy(
 			(e) => isHttpError(e) && e.status === 403
 		);
 		expect(h.from).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ describe('features settings save', () => {
 	it('turns off what was unchecked and on what was checked, nothing else', async () => {
 		const h = harness('owner', { data: null });
 		// tickets unchecked (was enabled) -> disable; tasks checked (was disabled) -> enable.
-		const result = await actions.save(h.post(['clients', 'tasks']));
+		const result = await actions.save(h.post(['companies', 'tasks']));
 
 		expect(isActionFailure(result)).toBe(false);
 		expect(h.from).toHaveBeenCalledWith('organization_disabled_features');
@@ -115,7 +115,7 @@ describe('features settings save', () => {
 
 	it('rejects an id outside the plan with an inline message, touching nothing', async () => {
 		const h = harness('owner');
-		const result = await actions.save(h.post(['clients', 'best-practices']));
+		const result = await actions.save(h.post(['companies', 'best-practices']));
 
 		expect(isActionFailure(result)).toBe(true);
 		expect(result).toMatchObject({

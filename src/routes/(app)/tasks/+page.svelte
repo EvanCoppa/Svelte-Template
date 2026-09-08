@@ -33,14 +33,9 @@
 		get data() {
 			return data.tasks;
 		},
-		columns,
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		columns
 	});
 </script>
-
-<svelte:head>
-	<title>Tasks</title>
-</svelte:head>
 
 <div class="space-y-6">
 	<div class="space-y-1">

@@ -153,21 +153,39 @@ application data is scoped to an organization, never to a bare user. The
   (industry has it, plan doesn't — the tier axis, shown with an upgrade prompt),
   `disabled` (the org switched it off), `hidden` (not in the industry — does not
   exist). **`hooks.server.ts` enforces the mode** next to the auth check via
-  `featureGateFor()` (locked → `/upgrade?feature=`, disabled →
-  `/settings/features?feature=`, hidden → 404), so a page is gated by being
+  `featureGateFor()` (locked → `/?upgrade=<id>`, where the upgrade prompt opens,
+  disabled → `/settings/features?feature=`, hidden → 404), so a page is gated by being
   registered, never by a check in its load. Adding a page = the route + one
   migration inserting its rows (the migration's closing comment is the
   checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
-  the registry, and `/settings` and `/upgrade` are the gate's exempt surfaces.
+  the registry, and `/settings` (with `/api/` and `/logout`) is exempt from the gate.
+- **A feature is made of pages, and a page has a title** (`pages` migration +
+  `src/lib/features/pages.ts`). One row per screen — `path`, `title`, and the
+  `feature_id` it belongs to (null for the shell pages, dashboard and settings).
+  The `(app)` layout ships the pages the session may see (`visiblePages()`,
+  filtered by the same predicate as the nav) and renders **the one `<title>` for
+  the whole group** from `matchPage(page.url.pathname, …)`, re-resolved on every
+  navigation. **Never put `<svelte:head><title>` in a page file** — a title is a
+  row, so the migration adding a route adds its page row too. A title that
+  depends on a record is the one exception: that page's load returns `title` and
+  page data wins. Public screens (`/login`, `/reset-password`, `/invite`) keep
+  static titles — they render before a session exists.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
   and `role_permissions` ship by migration, and an org's `industry_id` (default
-  `general`, set by onboarding/service-role code like `tier_id`) decides which
+  `crm`, set by onboarding/service-role code like `tier_id`) decides which
   roles its owners/admins can hand out — so onboarding an org needs zero role
   setup, and two industries can each have a same-named role granting different
-  things. Custom per-org roles are a deliberate future extension, not built
-  yet. Members can hold several roles and access is the union of their grants.
+  things. The catalog (`industry_role_catalog` migration) ships six industries —
+  crm, roofing, medical-supplies, cosmetic, dentistry, beverage — each with a
+  full ladder: a Viewer (read on everything in the industry), the vertical's
+  specialists, a Manager (manage on everything) and a Director (delete on
+  everything); ids follow `b0000000-0000-0000-00II-0000000000RR` (II =
+  industry, RR = role), and adding an industry is one migration (that file's
+  closing comment is the checklist). Custom per-org roles are a deliberate
+  future extension, not built yet. Members can hold several roles and access
+  is the union of their grants.
   Levels are a ladder — `read` < `manage` < `delete`, each implying the ones
   below — and owner/admin implicitly hold `delete` on everything. A policy
   gating on a level therefore compares with `in ('manage','delete')`, never
@@ -180,10 +198,25 @@ application data is scoped to an organization, never to a bare user. The
   a feature is a real security boundary (the `staff` feature is: invite rows
   carry join tokens). Assigning/unassigning roles is owner/admin via RLS (only
   roles from the org's industry), never a feature.
+- **System admins are the one role outside the catalog** (`system_admins`
+  migration): a table of user ids, written by SQL/service-role code only (like
+  `tier_id`), never a `roles` row — roles are industry-scoped and need a
+  membership, and an operator has neither. `private.org_role()` answers
+  `owner` for a system admin on every org, so every policy written against it
+  and `private.feature_level()` honour the role with no per-table wiring, and
+  `private.shares_org_with()` lets them see any roster's names. The app
+  mirrors that: `loadOrgContext()` lists every org RLS shows them with
+  `role: 'owner'`, and `PUT /api/org` and the staff actions check org
+  visibility, never a membership row — copy that when a new surface needs
+  "may this user act in this org". A user can only read their own
+  `system_admins` row, so nothing can list operators. Locally,
+  `evancoppa@gmail.com` is the seeded operator.
 - **Staff management is the reference gated page** (`staff_management`
   migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
   all three levels: `read` shows the roster, `manage` invites people and
-  assigns roles, `delete` removes a member. Invitations are rows in
+  revokes invites, `delete` removes a member — while assigning roles stays an
+  owner/admin act (what the `member_roles` policies accept), since a role can
+  hand out `delete`. Invitations are rows in
   `organization_invites` — single-use, database-generated tokens, 7-day
   expiry, either addressed to an email or shareable as a link — consumed at
   `/invite/[token]`, which lives outside `(app)` because the person accepting
@@ -207,7 +240,7 @@ features, access }` on `locals.org` — the hook gates the route on it, and
 /api/org` (the team switcher) + `invalidate(QUERY.org)`.
 - **CRM working data is member-writable** — a documented extension of the canonical
   shape, not a drift. The `crm_core` migration is the reference: members create and
-  edit clients/contacts/deals/tasks/tickets, authored content (notes, ticket
+  edit companies/contacts/deals/tasks/tickets, authored content (activities, ticket
   comments) is editable by its author or owner/admin, deletes stay owner/admin, and
   notifications belong to their recipient (created server-side only, via
   `src/lib/server/crm/notifications.ts` + the service-role client). Column-level
@@ -215,6 +248,42 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **The party model is two tables, split by what a row IS** (`crm_party_model`
+  migration). `companies` are organizations you deal with — `relationship` says
+  customer, supplier or partner, so a vendor is not a second table — and `contacts`
+  are people, with a **nullable `company_id`**: a dental patient or a homeowner is a
+  contact who belongs to no company, and the same list and picker serve them and the
+  buyer at a 500-person account. Records that involve a party (deals, tasks,
+  tickets) carry both `company_id` and `contact_id`, both nullable. `contact_profiles`
+  links an auth user to the contact they are, for a client-facing app; a portal user
+  is **not** an `organization_member`, so every existing policy already excludes
+  them, and `handle_new_user` skips the personal org when signup metadata says
+  `account_type: 'portal'`.
+- **One polymorphic link, not one per table.** "This row is about some CRM record"
+  is answered everywhere by the same three pieces: the `crm_entity_type` enum plus
+  an `entity_id`, `private.crm_entity_exists()` as the foreign key Postgres cannot
+  express, and `public.on_crm_entity_deleted()` as the one place that says what
+  happens when a record goes (proposals detach, addresses/activities/taggings/custom
+  values are deleted). `addresses`, `activities`, `taggings` and `custom_field_values`
+  all use it; app code names the pair once in `src/lib/server/crm/entity.ts`. A new
+  table that points at "some record" adds a branch to those functions — never a
+  second mechanism, and never a column per kind.
+- **Org-definable sets are rows; vocabularies we own are enums.** `pipelines` +
+  `pipeline_stages` replaced the `deal_stage` enum, because a dental practice and a
+  roofer do not run the same board — a deal's `stage_id` is pinned to its own
+  pipeline by a composite foreign key, every org gets a default board by trigger, and
+  an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
+  board has exactly those three. Custom fields follow the same rule and now apply to
+  **any** kind of record — a definition declares its `entity_type` and values
+  reference `(field_definition_id, entity_type)`, so a contact's field cannot be
+  filled in on a product. That is where industry specifics belong: a column if two
+  unrelated industries would ever query on it, a custom field otherwise.
+- **`products` is one catalog for goods and services** (`kind`), because a dental
+  procedure, a roofing labor line and a stocked part all become priced lines on a
+  proposal. Inventory columns are guarded by a check constraint so a service cannot
+  track stock, and `proposal_line_items.product_id` is **provenance, not a live
+  lookup** — the line keeps its own label and `unit_cost` so repricing the catalog
+  never rewrites a quote that was already sent.
 
 ## Database
 
@@ -283,7 +352,7 @@ fields (passwords) before returning a form from an action — superforms echoes
 `form.data` back to the browser. The full convention, including multiple forms per
 page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
-/settings are the reference implementations.
+/settings/profile are the reference implementations.
 
 ## Data loading & invalidation
 
@@ -313,17 +382,85 @@ Config is env-only (`RESEND_API_KEY`, `EMAIL_FROM`, optional `EMAIL_REPLY_TO` �
 `.env.example`); unconfigured sends log to the console instead. Both modules have
 tests — keep them green and extend them.
 
+## AI assistant
+
+The assistant (`/assistant`, feature id `assistant`) is built on the Vercel AI SDK, and
+**the SDK's own mechanism is the answer to every AI concern** — never a parallel one. The
+SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the installed
+version; read them before the website. The full account is `docs/assistant.md`.
+
+- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
+  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
+  unconfigured the page says so and the endpoint answers 503, never a crash.
+- **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
+  instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
+  `activeTools` live there, not in the endpoint.
+- **A tool is one file** in `src/lib/server/ai/tools/`: `tool()` with a zod `inputSchema`
+  and `outputSchema`, the shared `contextSchema`, and an `execute` that calls a data
+  module (`src/lib/server/crm/*`) — never `.from()` directly. Next to it, its
+  `ToolAccess`: the feature it touches and the level it needs. **Tools are linked to
+  features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
+  org and the caller holds the level, and every tool re-checks with
+  `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+- **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
+  tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
+  result is a data part; a message-level fact is metadata (`messageMetadataSchema`).
+- **The browser sends only the last message** (`prepareSendMessagesRequest` in
+  `Assistant.Root`); `src/lib/server/ai/conversations.ts` owns the thread and the endpoint
+  saves it from `onEnd`. The browser's copy of an assistant message is never trusted —
+  only its approval decisions are merged.
+- **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
+  HTML disabled, never `{@html}`.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+  Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
+  the real agent with `MockLanguageModelV4` from `ai/test`.
+
 ## Navigation
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
 come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
-`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
+`staticNavItems` (Dashboard — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
-Adding a page = create the route under `(app)` + register the feature by migration;
-nothing in `navigation.ts` changes. A locked entry renders with a lock and sends
-clicks to `/upgrade`. Icons are named by lucide slug (`features.icon`) and resolved
+Adding a page = create the route under `(app)` + register the feature and its `pages`
+row by migration; nothing in `navigation.ts` changes, and the page's `<title>` comes
+from that row (see "A feature is made of pages" under Multi-tenancy). A locked entry
+renders with a lock and a click opens the upgrade prompt (`showUpgrade()`) instead of
+navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
+
+**Settings is its own shell, not a nav entry.** It is reached from the user menu in the
+sidebar footer (`nav-user.svelte`), and while the pathname is under `/settings` the
+`(app)` layout swaps `AppSidebar` for `SettingsSidebar`, whose sections are the
+hand-kept `settingsNav` list at the bottom of `navigation.ts` — a list, not a registry
+read, because these pages exist for every org and are exempt from the feature gate.
+`/settings` itself only redirects to the first section. Adding a settings page = the
+route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
+the settings sidebar and the palette's Settings group both render from that one list.
+Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
+The header carries a **breadcrumb trail**: how deep this tab has gone since it last
+jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
+trail, not a hierarchy** — these pages are siblings under one shell and the same screen
+is reached from a dozen places, so a tree read off the URL would be fiction (a contact
+opened from `/treatments` shows _Treatments › Contact_, not _Contacts › Contact_). The
+depth is the walk actually taken: **a click in a shell surface starts the trail over at
+depth 1** — the app sidebar, the settings sidebar, the ⌘K palette and the user menu each
+call `breadcrumbs.startAt(href)` immediately before navigating, so a new surface that
+navigates must pair the two or its jumps read as steps deeper — while a link inside a
+page pushes onto the trail, and landing on a page the trail already holds truncates back
+to it, so the trail only grows by going deeper. A jump is matched to the page that
+arrives with `isPathUnder()`, the same rule that marks the sidebar active, so a door like
+`/settings` redirecting into its first section is still that jump. Browser back rewinds
+the trail — to the crumb it lands on, or to that page alone when it lands outside. All of
+that behaviour is in `src/lib/breadcrumbs.svelte.ts`;
+`src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
+the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
+document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
+user + org (this tab's own; no cookie on every request, and switching org or user starts a
+fresh one). Never add a second breadcrumb surface, a per-page crumb prop, or a
+hierarchy-from-the-URL variant.
 
 ## Svelte reference docs
 
@@ -359,6 +496,21 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   `<textarea>` → `ui/input` / `ui/textarea`. `title="…"` as a tooltip → `ui/tooltip`. Hand-built
   menus, popovers, modals and side panels → `ui/dropdown-menu`, `ui/popover`, `ui/dialog`,
   `ui/sheet`.
+- **A dialog is `Modal`** (`src/lib/components/modal/`), the app-level compound over `ui/dialog`
+  and `ui/card`: `Modal.Content` is the muted tray, `Modal.Card` the white card inside it holding
+  `Modal.Header` (an icon-led `Modal.Title`; the close button is pinned to the card) and
+  `Modal.Body`, and `Modal.Footer` sits on the tray pairing `Modal.Cancel` (`esc`) with
+  `Modal.Action` (`↵` on a submit button) — both `UntitledButton`s. Wrap `Modal.Card` +
+  `Modal.Footer` in the page's `<form>` so `Modal.Action type="submit"` posts it. Reach for bare
+  `ui/dialog` only when a screen needs a different frame; `/components` → Overlays → Modal is the
+  reference.
+- **Selling a plan is `showUpgrade(featureId?)`** from `$lib/upgrade.svelte`. It opens the one
+  `UpgradePrompt` the `(app)` layout mounts — `UpgradeModal` (`src/lib/components/upgrade-modal/`,
+  the pitch as a dialog frame) fed the plans from the layout load — with the smallest plan that
+  unlocks the feature and what else it adds. Call it where a locked click or a tier limit lands
+  (the sidebar, the palette and the feature gate already do); never navigate somewhere to pitch
+  a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
+  the reference.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted
@@ -380,6 +532,17 @@ exception to fix: there the card is the demo frame around a primitive, not a pag
 Cards still earn their place around everything that is _not_ the table: a form, and the summary
 or grouped panels that sit beside a roster — the staff page's organization panel and its pending
 invites are the reference.
+
+**A table sizes its own page, and never asks.** A rows-per-page picker makes the reader solve a
+layout problem the browser already has the answer to, so there isn't one: `DataTable.Root`
+measures the room between the table and the bottom of the viewport and shows as many rows as fit,
+re-measuring when that changes (`page-size.ts`; `DataTable.Content` marks its empty-state row
+`data-empty` so it never gets mistaken for a row to measure). A page therefore says nothing about
+page size — no `initialState.pagination` — and the one screen that wants a fixed number, because a
+card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
+That prop is the only way to set a page size; never reintroduce a picker or a second knob.
+`DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
+holding **page of pages** and the four controls (first, previous, next, last).
 
 ### Enhanced primitives
 

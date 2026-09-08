@@ -133,14 +133,14 @@
 				cell: ({ row }) =>
 					renderComponent(Staff.RowActions, {
 						name: Staff.memberName(row.original),
-						canManage: data.canManage,
+						canAssignRoles: data.canAssignRoles,
 						canRemove: canRemoveMember(row.original),
 						onManage: () => (managingId = row.original.userId),
 						onRemove: () => (removingId = row.original.userId)
 					})
 			})
 		]);
-		if (data.canManage || data.canRemove) return defs;
+		if (data.canAssignRoles || data.canRemove) return defs;
 		return defs.filter((def) => def.id !== 'actions');
 	});
 
@@ -151,8 +151,7 @@
 		},
 		get columns() {
 			return columns;
-		},
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		}
 	});
 
 	const search = $derived(String(table.getColumn('member')?.getFilterValue() ?? ''));
@@ -273,10 +272,6 @@
 		{/if}
 	</div>
 {/snippet}
-
-<svelte:head>
-	<title>Staff</title>
-</svelte:head>
 
 <div class="space-y-6">
 	<div class="flex flex-wrap items-start justify-between gap-4">

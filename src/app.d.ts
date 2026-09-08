@@ -1,5 +1,6 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
+import type { PageMeta } from '$lib/features/types';
 import type { NavItem } from '$lib/navigation';
 import type { OrgMembership } from '$lib/org';
 import type { OrgContext } from '$lib/server/org-context';
@@ -23,8 +24,8 @@ declare global {
 			 * The active-organization cookie's value, when it parses as a UUID.
 			 * A convenience for child loads (filter tenant data without an
 			 * `await parent()` waterfall) — never an auth decision: RLS returns
-			 * zero rows for an org the user is not a member of, and the (app)
-			 * layout load repairs a stale cookie.
+			 * zero rows for an org the user may not act in (not a member, not a
+			 * system admin), and the (app) layout load repairs a stale cookie.
 			 */
 			activeOrgId: string | null;
 			/**
@@ -44,6 +45,15 @@ declare global {
 			activeOrg?: OrgMembership;
 			/** The sidebar/palette entries this session may see, from the (app) layout. */
 			nav?: NavItem[];
+			/** Every page this session may see, with its title, from the (app) layout. */
+			pages?: PageMeta[];
+			/**
+			 * A page title that overrides the `pages` registry, for a title that
+			 * depends on a record ("Acme Inc — Clients"). Returned by that page's
+			 * load; page data wins over the layout's, so the shell picks it up.
+			 * Every other page leaves this unset — see the pages migration.
+			 */
+			title?: string;
 		}
 		interface Error {
 			message: string;

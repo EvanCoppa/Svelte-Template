@@ -3,7 +3,6 @@ import {
 	acceptInvite,
 	acceptanceFor,
 	createInvite,
-	getMembership,
 	inviteUrl,
 	listInvites,
 	listStaff,
@@ -135,32 +134,6 @@ describe('revokeInvite and removeMember', () => {
 		await expect(removeMember(empty.supabase, ORG_ID, USER_ID)).rejects.toThrow(
 			'Member was not deleted'
 		);
-	});
-});
-
-describe('getMembership', () => {
-	it('returns the caller’s role, the org industry and its name', async () => {
-		const { supabase, builder } = supabaseMock({
-			data: { role: 'admin', organizations: { name: 'Acme Inc', industry_id: 'general' } }
-		});
-
-		expect(await getMembership(supabase, ORG_ID, USER_ID)).toEqual({
-			role: 'admin',
-			industryId: 'general',
-			orgName: 'Acme Inc'
-		});
-		// Several tables reference both organization_members and organizations,
-		// so the embed must name its foreign key or PostgREST refuses it
-		// (PGRST201) and every form action on /staff answers 500.
-		expect(builder.select).toHaveBeenCalledWith(
-			'role, organizations!organization_members_org_id_fkey(name, industry_id)'
-		);
-	});
-
-	it('returns null for a non-member', async () => {
-		const { supabase } = supabaseMock({ data: null });
-
-		expect(await getMembership(supabase, ORG_ID, USER_ID)).toBeNull();
 	});
 });
 

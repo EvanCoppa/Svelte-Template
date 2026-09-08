@@ -3,7 +3,7 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database
 import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
- * Data access for `tasks`. Same contract as clients.ts. "Done" is
+ * Data access for `tasks`. Same contract as companies.ts. "Done" is
  * `completed_at` being set — there is no separate status flag, and the
  * column is update-only (a task is never born completed; the insert grant
  * excludes it).
@@ -11,13 +11,14 @@ import { unwrap, unwrapDeleted } from './unwrap';
 
 export type Task = Tables<'tasks'>;
 
-type TaskInsertColumn = 'client_id' | 'title' | 'details' | 'due_at' | 'assigned_to';
+type TaskInsertColumn =
+	'company_id' | 'contact_id' | 'title' | 'details' | 'due_at' | 'assigned_to';
 type TaskUpdateColumn = TaskInsertColumn | 'completed_at';
 
 export async function listTasks(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { clientId?: string; assignedTo?: string; openOnly?: boolean } = {}
+	filter: { companyId?: string; contactId?: string; assignedTo?: string; openOnly?: boolean } = {}
 ): Promise<Task[]> {
 	let query = supabase
 		.from('tasks')
@@ -25,7 +26,8 @@ export async function listTasks(
 		.eq('org_id', orgId)
 		.order('due_at', { ascending: true, nullsFirst: false })
 		.order('created_at', { ascending: false });
-	if (filter.clientId) query = query.eq('client_id', filter.clientId);
+	if (filter.companyId) query = query.eq('company_id', filter.companyId);
+	if (filter.contactId) query = query.eq('contact_id', filter.contactId);
 	if (filter.assignedTo) query = query.eq('assigned_to', filter.assignedTo);
 	if (filter.openOnly) query = query.is('completed_at', null);
 	return unwrap(await query);
