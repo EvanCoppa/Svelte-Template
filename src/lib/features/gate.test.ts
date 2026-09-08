@@ -6,6 +6,7 @@ function feature(id: string, route: string): Feature {
 	return {
 		id,
 		name: id,
+		noun: null,
 		description: null,
 		route,
 		icon: null,

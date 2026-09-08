@@ -152,6 +152,26 @@ describe('createRecord', () => {
 		);
 	});
 
+	it('writes a proposal unattached, with its validity as an instant', async () => {
+		const dated = supabaseMock({ data: { id: 'proposal' } });
+		await submit(dated.supabase, OWNER, 'proposal', {
+			title: 'Crown and whitening',
+			valid_until: '2026-10-01T09:00'
+		});
+		expect(dated.from).toHaveBeenCalledWith('proposals');
+		expect(dated.builder.insert).toHaveBeenCalledWith({
+			title: 'Crown and whitening',
+			valid_until: '2026-10-01T09:00:00.000Z',
+			org_id: ORG_ID
+		});
+
+		const open = supabaseMock({ data: { id: 'proposal' } });
+		await submit(open.supabase, OWNER, 'proposal', { title: 'Crown and whitening' });
+		expect(open.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ valid_until: null })
+		);
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 

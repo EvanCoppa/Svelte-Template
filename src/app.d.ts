@@ -1,5 +1,6 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
+import type { TermsMap } from '$lib/features/terms';
 import type { PageMeta } from '$lib/features/types';
 import type { NavItem } from '$lib/navigation';
 import type { OrgMembership } from '$lib/org';
@@ -47,6 +48,11 @@ declare global {
 			nav?: NavItem[];
 			/** Every page this session may see, with its title, from the (app) layout. */
 			pages?: PageMeta[];
+			/**
+			 * What each feature this session may see is called, as the org's
+			 * industry words it, from the (app) layout — see `$lib/features/terms`.
+			 */
+			terms?: TermsMap;
 			/**
 			 * A page title that overrides the `pages` registry, for a title that
 			 * depends on a record ("Acme Inc — Clients"). Returned by that page's

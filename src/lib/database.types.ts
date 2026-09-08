@@ -629,6 +629,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          noun: string | null
           route: string
           sort_order: number
         }
@@ -639,6 +640,7 @@ export type Database = {
           icon?: string | null
           id: string
           name: string
+          noun?: string | null
           route: string
           sort_order?: number
         }
@@ -649,6 +651,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          noun?: string | null
           route?: string
           sort_order?: number
         }
@@ -677,16 +680,22 @@ export type Database = {
           created_at: string
           feature_id: string
           industry_id: string
+          name: string | null
+          noun: string | null
         }
         Insert: {
           created_at?: string
           feature_id: string
           industry_id: string
+          name?: string | null
+          noun?: string | null
         }
         Update: {
           created_at?: string
           feature_id?: string
           industry_id?: string
+          name?: string | null
+          noun?: string | null
         }
         Relationships: [
           {
@@ -993,21 +1002,21 @@ export type Database = {
           feature_id: string | null
           id: string
           path: string
-          title: string
+          title: string | null
         }
         Insert: {
           created_at?: string
           feature_id?: string | null
           id: string
           path: string
-          title: string
+          title?: string | null
         }
         Update: {
           created_at?: string
           feature_id?: string | null
           id?: string
           path?: string
-          title?: string
+          title?: string | null
         }
         Relationships: [
           {

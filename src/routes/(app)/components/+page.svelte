@@ -1137,7 +1137,7 @@
 
 <div class="mx-auto max-w-5xl space-y-6">
 	<PageHeader.Root>
-		<PageHeader.Title>Components</PageHeader.Title>
+		<PageHeader.Title />
 	</PageHeader.Root>
 
 	<div class="grid gap-6 lg:grid-cols-2">

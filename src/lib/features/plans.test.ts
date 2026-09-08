@@ -7,6 +7,7 @@ function feature(id: string, name: string, mode: FeatureMode, sort_order = 0) {
 		feature: {
 			id,
 			name,
+			noun: null,
 			description: `${name} description`,
 			route: `/${id}`,
 			icon: null,

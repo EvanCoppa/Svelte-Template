@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import { recordHref } from '$lib/crm/records';
+	import { recordHref, recordTerms } from '$lib/crm/records';
 	import { COMPANY_RELATIONSHIP_TONE, PARTY_STATUS_TONE } from '$lib/crm/tones';
 	import type { Company } from '$lib/server/crm/companies';
 
 	let { data } = $props();
+
+	const terms = $derived(recordTerms(page.data.terms, 'company'));
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Company>();
 	const columns = columnHelper.columns([
@@ -48,7 +51,7 @@
 
 <div class="space-y-6">
 	<PageHeader.Root>
-		<PageHeader.Title>Companies</PageHeader.Title>
+		<PageHeader.Title />
 		{#if data.canCreate}
 			<PageHeader.Actions>
 				<CreateRecord type="company" form={data.createForm} />
@@ -58,6 +61,6 @@
 
 	<DataTable.Root {table}>
 		<DataTable.Content />
-		<DataTable.Pagination noun="company" nounPlural="companies" />
+		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>

@@ -1,11 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
 import {
-	RECORD_KIND_META,
 	recordKindForSegment,
 	recordListHref,
+	recordTerms,
 	type RecordKind
 } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
+import { visibleTerms } from '$lib/features/terms';
 import { QUERY } from '$lib/queries';
 import { listActivities } from '$lib/server/crm/activities';
 import { listAddresses } from '$lib/server/crm/addresses';
@@ -14,6 +15,7 @@ import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/
 import { listTagsFor } from '$lib/server/crm/tags';
 import { getDisplayNames } from '$lib/server/profiles';
 import { hasGrant } from '$lib/server/roles';
+import { capitalize } from '$lib/utils.js';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -44,8 +46,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// the hook makes for that kind's routes, so a link here is never a link to
 	// a refusal, and a related-records group nobody may open is never fetched.
 	const { features, access } = org;
+	const canRead = (featureId: string) => hasGrant(access, featureId);
 	const canOpen = (other: RecordKind) =>
-		passesFeatureGate(recordListHref(other), features, (featureId) => hasGrant(access, featureId));
+		passesFeatureGate(recordListHref(other), features, canRead);
 
 	// Everything the CRM attaches to a record hangs off the shared entity link,
 	// so the same six reads serve every kind; only a party has addresses.
@@ -61,7 +64,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
-	if (!record) throw error(404, `${RECORD_KIND_META[kind].noun} not found.`);
+	// Named the way the org's industry names the kind: "Quote not found."
+	if (!record) {
+		const { noun } = recordTerms(visibleTerms(features, canRead), kind);
+		throw error(404, `${capitalize(noun)} not found.`);
+	}
 
 	// Everyone the page names — who created it, who it is assigned to, who
 	// logged each activity — resolved in one query.

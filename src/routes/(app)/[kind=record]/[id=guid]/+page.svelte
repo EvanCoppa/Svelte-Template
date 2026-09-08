@@ -7,13 +7,15 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
-	import { RECORD_KIND_META, recordListHref } from '$lib/crm/records';
+	import { recordListHref, recordTerms } from '$lib/crm/records';
 	import { iconFor } from '$lib/features/icons';
 	import { iconForPath } from '$lib/navigation';
+	import { capitalize } from '$lib/utils.js';
 
 	let { data } = $props();
 
-	const meta = $derived(RECORD_KIND_META[data.record.kind]);
+	// What this kind is called, as the org's industry says it — "Quote", "All quotes".
+	const terms = $derived(recordTerms(page.data.terms, data.record.kind));
 	// The record wears its feature's icon — the one its sidebar entry carries,
 	// found the way the breadcrumb trail finds it.
 	const KindIcon = $derived(iconFor(iconForPath(page.url.pathname, page.data.nav ?? [])));
@@ -29,7 +31,7 @@
 		<div class="space-y-2">
 			<p class="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
 				<KindIcon class="size-4" />
-				{meta.noun}
+				{capitalize(terms.noun)}
 			</p>
 			<div class="flex flex-wrap items-center gap-3">
 				<h1 class="text-2xl font-bold tracking-tight">{data.record.name}</h1>
@@ -50,7 +52,7 @@
 		     way back everywhere else. -->
 		<Button href={recordListHref(data.record.kind)} variant="outline">
 			<ArrowLeftIcon />
-			All {meta.nounPlural.toLowerCase()}
+			All {terms.plural}
 		</Button>
 	</div>
 
@@ -74,8 +76,7 @@
 					<Card.Header>
 						<Card.Title>Custom fields</Card.Title>
 						<Card.Description>
-							What this organization records about its {meta.nounPlural.toLowerCase()} beyond the built-in
-							columns.
+							What this organization records about its {terms.plural} beyond the built-in columns.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>
@@ -122,14 +123,15 @@
 			{/if}
 
 			{#each data.related as group (group.kind)}
+				{@const related = recordTerms(page.data.terms, group.kind)}
 				<Card.Root>
 					<Card.Header>
-						<Card.Title>{RECORD_KIND_META[group.kind].nounPlural}</Card.Title>
+						<Card.Title>{related.name}</Card.Title>
 						<Card.Description>
 							{group.records.length === 1
-								? `One ${RECORD_KIND_META[group.kind].noun.toLowerCase()}`
-								: `${String(group.records.length)} ${RECORD_KIND_META[group.kind].nounPlural.toLowerCase()}`}
-							linked to this {meta.noun.toLowerCase()}.
+								? `One ${related.noun}`
+								: `${String(group.records.length)} ${related.plural}`}
+							linked to this {terms.noun}.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>
@@ -148,8 +150,7 @@
 				<Card.Header>
 					<Card.Title>Activity</Card.Title>
 					<Card.Description>
-						Calls, emails, meetings and notes logged against this {meta.noun.toLowerCase()}, newest
-						first.
+						Calls, emails, meetings and notes logged against this {terms.noun}, newest first.
 					</Card.Description>
 				</Card.Header>
 				<Card.Content>
@@ -164,7 +165,7 @@
 							<Empty.Header>
 								<Empty.Title class="text-base">Nothing logged yet</Empty.Title>
 								<Empty.Description>
-									Interactions with this {meta.noun.toLowerCase()} will show up here.
+									Interactions with this {terms.noun} will show up here.
 								</Empty.Description>
 							</Empty.Header>
 						</Empty.Root>

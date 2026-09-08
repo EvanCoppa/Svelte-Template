@@ -20,6 +20,7 @@ export const FEATURE_IDS = [
 	'contacts',
 	'products',
 	'deals',
+	'proposals',
 	'tasks',
 	'tickets',
 	'staff',
@@ -44,9 +45,14 @@ export type FeatureMode = Enums<'feature_mode'>;
 
 export type Feature = Tables<'features'>;
 
-/** A registry row with its industry and tier maps embedded, as loaded. */
+/**
+ * A registry row with its industry and tier maps embedded, as loaded. An
+ * industry row may carry the industry's own words for the feature (`name`,
+ * `noun`); null inherits the feature's — see the feature_names_by_industry
+ * migration.
+ */
 export type FeatureRegistryRow = Feature & {
-	industry_features: { industry_id: string }[];
+	industry_features: Pick<Tables<'industry_features'>, 'industry_id' | 'name' | 'noun'>[];
 	tier_features: { tier_id: string }[];
 };
 
@@ -59,9 +65,13 @@ export type ResolvedFeature = { feature: Feature; mode: FeatureMode };
 export type FeatureMap = Record<string, ResolvedFeature>;
 
 /**
- * One registered page: a titled screen under a feature's route, or one of
+ * One registered page as loaded: a screen under a feature's route, or one of
  * the shell pages that belong to no feature (`feature_id` null — the
- * dashboard and settings). The columns the browser needs; `created_at`
- * stays on the server.
+ * dashboard and settings). A null `title` means "the owning feature's name,
+ * as the org's industry says it" (the feature_names_by_industry migration);
+ * `created_at` stays on the server.
  */
-export type PageMeta = Pick<Tables<'pages'>, 'id' | 'feature_id' | 'path' | 'title'>;
+export type PageRow = Pick<Tables<'pages'>, 'id' | 'feature_id' | 'path' | 'title'>;
+
+/** A page as the browser sees it — the title already filled in by `visiblePages()`. */
+export type PageMeta = Omit<PageRow, 'title'> & { title: string };

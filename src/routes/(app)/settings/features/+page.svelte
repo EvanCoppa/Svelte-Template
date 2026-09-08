@@ -44,7 +44,7 @@
 
 <div class="mx-auto max-w-2xl space-y-6">
 	<PageHeader.Root>
-		<PageHeader.Title>Features</PageHeader.Title>
+		<PageHeader.Title />
 	</PageHeader.Root>
 
 	{#if highlighted && highlighted.mode === 'disabled'}

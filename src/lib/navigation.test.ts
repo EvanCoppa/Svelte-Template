@@ -21,6 +21,7 @@ function map(
 				feature: {
 					id,
 					name: id[0].toUpperCase() + id.slice(1),
+					noun: null,
 					description: null,
 					route: `/${id}`,
 					icon: 'users',

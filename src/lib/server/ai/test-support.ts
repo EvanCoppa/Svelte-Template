@@ -30,6 +30,7 @@ function featureRow(id: string): Feature {
 	return {
 		id,
 		name: id,
+		noun: null,
 		description: null,
 		route: `/${id}`,
 		icon: null,

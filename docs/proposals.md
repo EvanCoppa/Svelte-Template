@@ -217,11 +217,26 @@ numbers (dashes and blanks read as "not offered"), the recommended column is a s
 `*`-suffixed header cell, and yes/no cells come from the known sets the slide draws as
 icons. A template never meets a string it has to guess at.
 
+## The page, and what it is called
+
+`/proposals` is a feature like any other (`proposals_feature` migration): the list page
+is `src/routes/(app)/proposals/`, built exactly like `/deals` on
+`src/lib/server/crm/proposals.ts`; `proposal` is a record kind, so a row opens on the
+generic record page (status, the record it hangs off, its options' count and
+recommended total, validity, fee and tax), a company, contact or deal page lists the
+proposals hanging off it, and the generic "Add …" form creates an unattached draft
+(title, valid until). It ships in every industry and every plan.
+
+It is also the reason names live in the registry (docs/features.md, "Names by
+industry"): the nouns differ per vertical while the shape does not, so the feature's
+row says "Proposals" / "proposal" and the industry rows say "Quotes" / "quote"
+(roofing, medical-supplies) and "Treatment plans" / "treatment plan" (cosmetic,
+dentistry). Nothing in the page names it.
+
 ## Deliberately not here (yet)
 
-- **A `proposals` feature and page.** The registry gates pages by existing; register the
-  feature (rows in `features`, `industry_features`, `tier_features`, its id in
-  `FEATURE_IDS`) in the migration that adds the route.
+- **Editing options and line items, and attaching a draft to its record.** The list
+  and the record page read them; the forms that write them are still to build.
 - **The deck editor and the presenter.** `slide_decks` stores a deck and
   `proposals.deck_id` points at one; authoring slides, expanding them per option and
   resolving variables at present time are all still to build.

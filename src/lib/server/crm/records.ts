@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
+import { recommendedOption } from '$lib/crm/proposals';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	COMPANY_RELATIONSHIP_TONE,
 	PARTY_STATUS_TONE,
 	PRODUCT_KIND_TONE,
+	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TASK_STATE_TONE,
 	TICKET_PRIORITY_TONE,
@@ -12,11 +14,19 @@ import {
 	taskState
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
+import { capitalize } from '$lib/utils.js';
 import { getCompany, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
 import { getProduct, type ProductWithCategory } from './products';
+import {
+	getProposal,
+	listProposals,
+	proposalParentKind,
+	type ProposalParentKind,
+	type ProposalWithOptions
+} from './proposals';
 import { getTask, listTasks, type Task, type TaskWithParties } from './tasks';
 import { getTicket, listTickets, type TicketThread, type TicketWithParties } from './tickets';
 
@@ -177,7 +187,12 @@ function record(
 
 /** A pill labelled the way `DataTable.statusCell` labels an enum: title-cased. */
 function pill(value: string, tone: BadgeTone): Pill {
-	return { label: value.charAt(0).toUpperCase() + value.slice(1), tone };
+	return { label: capitalize(value), tone };
+}
+
+/** Money the way the list pages print it, in the row's own currency. */
+function moneyText(value: number, currency: string): string {
+	return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +283,43 @@ export function describeDeal(row: DealWithParties, canOpen: CanOpen): RecordDeta
 			{ label: 'Amount', value: money(row.amount) },
 			{ label: 'Expected close', value: date(row.expected_close_date) },
 			{ label: 'Assigned to', value: person(row.assigned_to) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/** The record a proposal hangs off, resolved through that kind's own module. */
+export type ProposalParent = { kind: ProposalParentKind; id: string; name: string };
+
+export function describeProposal(
+	row: ProposalWithOptions,
+	parent: ProposalParent | null,
+	canOpen: CanOpen
+): RecordDetail {
+	const options = [...row.proposal_options].sort((a, b) => a.sort_order - b.sort_order);
+	const recommended = recommendedOption(options);
+	const selected = options.find((option) => option.id === row.selected_option_id) ?? null;
+	return {
+		kind: 'proposal',
+		id: row.id,
+		name: row.title,
+		pills: [pill(row.status, PROPOSAL_STATUS_TONE[row.status])],
+		fields: [
+			// Unattached is a legitimate state (a draft), and a deleted parent
+			// detaches rather than cascades — so blank, never an error.
+			{ label: 'For', value: parent ? record(parent.kind, parent, canOpen) : EMPTY },
+			{ label: 'Options', value: count(options.length) },
+			{ label: 'Recommended option', value: text(recommended?.label ?? null) },
+			{
+				label: 'Recommended total',
+				value: recommended ? money(recommended.computed_total, recommended.currency) : EMPTY
+			},
+			{ label: 'Selected option', value: text(selected?.label ?? null) },
+			{ label: 'Valid until', value: datetime(row.valid_until) },
+			{ label: 'Default fee', value: money(row.default_fee) },
+			{ label: 'Tax rate', value: row.tax_rate === null ? EMPTY : text(`${String(row.tax_rate)}%`) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -378,6 +430,10 @@ export async function getRecord(
 			const row = await getDeal(supabase, orgId, id);
 			return row && describeDeal(row, canOpen);
 		}
+		case 'proposal': {
+			const row = await getProposal(supabase, orgId, id);
+			return row && describeProposal(row, await proposalParent(supabase, orgId, row), canOpen);
+		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
 			return row && describeTask(row, canOpen);
@@ -385,6 +441,35 @@ export async function getRecord(
 		case 'ticket': {
 			const row = await getTicket(supabase, orgId, id);
 			return row && describeTicket(row, canOpen);
+		}
+	}
+}
+
+/**
+ * The record a proposal hangs off, read through that kind's own module —
+ * one branch per parent kind, the way `private.crm_entity_exists()` has one.
+ * Null when the proposal is unattached, or when the parent is gone or RLS
+ * hides it.
+ */
+async function proposalParent(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	row: ProposalWithOptions
+): Promise<ProposalParent | null> {
+	const kind = proposalParentKind(row.entity_type);
+	if (kind === null || row.entity_id === null) return null;
+	switch (kind) {
+		case 'company': {
+			const parent = await getCompany(supabase, orgId, row.entity_id);
+			return parent && { kind, id: parent.id, name: parent.name };
+		}
+		case 'contact': {
+			const parent = await getContact(supabase, orgId, row.entity_id);
+			return parent && { kind, id: parent.id, name: parent.name };
+		}
+		case 'deal': {
+			const parent = await getDeal(supabase, orgId, row.entity_id);
+			return parent && { kind, id: parent.id, name: parent.title };
 		}
 	}
 }
@@ -413,6 +498,21 @@ function relatedDeal(row: DealWithParties): RelatedRecord {
 	};
 }
 
+function relatedProposal(row: ProposalWithOptions): RelatedRecord {
+	const recommended = recommendedOption(row.proposal_options);
+	const n = row.proposal_options.length;
+	return {
+		id: row.id,
+		name: row.title,
+		href: recordHref('proposal', row.id),
+		pill: pill(row.status, PROPOSAL_STATUS_TONE[row.status]),
+		meta:
+			recommended?.computed_total != null
+				? moneyText(recommended.computed_total, recommended.currency)
+				: `${String(n)} ${n === 1 ? 'option' : 'options'}`
+	};
+}
+
 function relatedTask(row: Task): RelatedRecord {
 	const state = taskState(row);
 	return {
@@ -436,12 +536,14 @@ function relatedTicket(row: TicketWithParties): RelatedRecord {
 
 /**
  * The records that reference this one, grouped by kind, in the order the
- * sidebar lists those kinds. Only the parties collect other records — a
- * deal, a task and a ticket each name a company and a person, so a company
- * or a contact page lists the ones naming it. A group is fetched only when
- * the reader may open that kind (`canOpen`), so nothing is shown that its
- * own list page would refuse, and an empty group is omitted rather than
- * rendered as an empty card.
+ * sidebar lists those kinds. The parties collect other records — a deal, a
+ * task and a ticket each name a company and a person, so a company or a
+ * contact page lists the ones naming it — and a proposal hangs off a
+ * company, a contact or a deal through the shared entity link, so those
+ * three list their proposals. A group is fetched only when the reader may
+ * open that kind (`canOpen`), so nothing is shown that its own list page
+ * would refuse, and an empty group is omitted rather than rendered as an
+ * empty card.
  */
 export async function listRelatedRecords(
 	supabase: SupabaseClient<Database>,
@@ -450,30 +552,36 @@ export async function listRelatedRecords(
 	id: string,
 	canOpen: CanOpen
 ): Promise<RelatedGroup[]> {
-	if (kind !== 'company' && kind !== 'contact') return [];
-	const filter = kind === 'company' ? { companyId: id } : { contactId: id };
+	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return [];
+	const party =
+		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
 
 	const groups = await Promise.all([
 		kind === 'company' && canOpen('contact')
-			? listContacts(supabase, orgId, filter).then((rows): RelatedGroup => ({
+			? listContacts(supabase, orgId, party ?? {}).then((rows): RelatedGroup => ({
 					kind: 'contact',
 					records: rows.map(relatedContact)
 				}))
 			: null,
-		canOpen('deal')
-			? listDeals(supabase, orgId, filter).then((rows): RelatedGroup => ({
+		party && canOpen('deal')
+			? listDeals(supabase, orgId, party).then((rows): RelatedGroup => ({
 					kind: 'deal',
 					records: rows.map(relatedDeal)
 				}))
 			: null,
-		canOpen('task')
-			? listTasks(supabase, orgId, filter).then((rows): RelatedGroup => ({
+		canOpen('proposal')
+			? listProposals(supabase, orgId, { entity: { entityType: kind, entityId: id } }).then(
+					(rows): RelatedGroup => ({ kind: 'proposal', records: rows.map(relatedProposal) })
+				)
+			: null,
+		party && canOpen('task')
+			? listTasks(supabase, orgId, party).then((rows): RelatedGroup => ({
 					kind: 'task',
 					records: rows.map(relatedTask)
 				}))
 			: null,
-		canOpen('ticket')
-			? listTickets(supabase, orgId, filter).then((rows): RelatedGroup => ({
+		party && canOpen('ticket')
+			? listTickets(supabase, orgId, party).then((rows): RelatedGroup => ({
 					kind: 'ticket',
 					records: rows.map(relatedTicket)
 				}))

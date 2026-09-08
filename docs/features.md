@@ -11,14 +11,14 @@ is protected by existing rather than by remembering a check in its load.
 All in the `features` migration except `pages`, which has its own; all reference data
 except the two per-org tables.
 
-| table                            | one row means                                           | written by                     |
-| -------------------------------- | ------------------------------------------------------- | ------------------------------ |
-| `features`                       | a navigable capability owning a route prefix            | migration                      |
-| `industry_features`              | this industry includes the feature at all               | migration                      |
-| `tier_features`                  | this plan unlocks the feature                           | migration                      |
-| `organization_feature_overrides` | for this org, force `enabled`/`locked_visible`/`hidden` | operators (SQL / service role) |
-| `organization_disabled_features` | this org switched the feature off itself                | owner/admin (RLS)              |
-| `pages`                          | a titled screen a feature is made of                    | migration                      |
+| table                            | one row means                                             | written by                     |
+| -------------------------------- | --------------------------------------------------------- | ------------------------------ |
+| `features`                       | a navigable capability owning a route prefix              | migration                      |
+| `industry_features`              | this industry includes the feature — and what it calls it | migration                      |
+| `tier_features`                  | this plan unlocks the feature                             | migration                      |
+| `organization_feature_overrides` | for this org, force `enabled`/`locked_visible`/`hidden`   | operators (SQL / service role) |
+| `organization_disabled_features` | this org switched the feature off itself                  | owner/admin (RLS)              |
+| `pages`                          | a titled screen a feature is made of                      | migration                      |
 
 Overrides are the escape hatch for pilots and one-off deals; a trial is just another
 `tiers` row with its own `tier_features`. Members can read their org's rows of both
@@ -83,13 +83,48 @@ route lands on the dashboard with `?upgrade=<id>`, which `UpgradePrompt` (mounte
 `+error.svelte`. The same matcher builds the nav, so nothing is ever linked that the
 server would bounce.
 
+## Names by industry
+
+A feature's row is where a thing is named, and the industry axis can rename it. A
+proposal is a "quote" to a roofer and a "treatment plan" to a dentist; the sidebar
+entry, the tab title, the heading, the "Add …" button and the record page all say the
+industry's word, and none of those words is a constant in `src/`. Three columns
+(`feature_names_by_industry` migration):
+
+| column                            | says                                                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `features.name` / `features.noun` | the default words: the list ("Deals") and one row of it ("deal", lower-case; null for a feature that is not a list of records) |
+| `industry_features.name` / `noun` | the industry's own words for it; null inherits the feature's                                                                   |
+| `pages.title` null                | "the owning feature's name, as the org's industry says it"                                                                     |
+
+`resolveFeatures()` applies the active industry's row, so the resolved `feature.name` is
+already the industry's word and every surface that reads it — `buildNav()`, the ⌘K
+palette, the upgrade prompt, `/settings/features` — follows with no change. Modes are
+untouched: `private.feature_mode()` mirrors modes only, and no policy ever needs a name.
+
+The surfaces that name **one record** read `terms`, which the `(app)` layout ships
+next to `nav` and `pages` (`visibleTerms()` in `src/lib/features/terms.ts`, filtered by
+the same `isVisible()` predicate): `recordTerms(page.data.terms, kind)` in
+`src/lib/crm/records.ts` answers `{ name, noun, plural }` for a kind of record —
+"Treatment plans" / "treatment plan" / "treatment plans" — and throws for a kind whose
+feature is not on screen, which cannot happen on a page the gate served. `CreateRecord`
+("Add quote", "Quote created"), `DataTable.Pagination` ("3 quotes"), the generic record
+page ("Quote", "All quotes") and its 404 ("Quote not found.") all read it. On the
+server, `visibleTerms(features, canRead)` gives the same map.
+
+`<PageHeader.Title />` with no children heads the page with the same `titleFor()` the
+shell and the breadcrumb use, so a list page never spells its own name.
+
 ## Pages and titles
 
 A feature is made of **pages**, and a page has a **title**. `pages` is the registry of
 those screens: `path` (the exact pathname it is served at), `title` (the browser
 `<title>`, in full — app code appends nothing to it), and the `feature_id` it belongs
 to. The dashboard and settings belong to no feature, so their rows carry `feature_id`
-null — the same split as `staticNavItems` in `src/lib/navigation.ts`.
+null — the same split as `staticNavItems` in `src/lib/navigation.ts`. A feature's own
+list page leaves `title` null: it is named after the feature, as the org's industry
+says it, and `visiblePages()` fills the name in before the row reaches the browser. A
+sub-screen keeps a title of its own.
 
 Nothing renders a title itself. The `(app)` layout load ships the pages this session
 may see — `visiblePages()` filters them by exactly the predicate `buildNav()` uses, so
@@ -157,11 +192,14 @@ exists, and `pages` is readable by signed-in users only.
 ## Adding a feature
 
 1. Create the route under `src/routes/(app)/<route>/`.
-2. A migration inserts its `features` row (id, name, description, route, icon slug,
-   category, sort_order), its `industry_features` rows and its `tier_features` rows —
-   plus `role_permissions` grants if plain members need it.
+2. A migration inserts its `features` row (id, name, noun — lower-case singular when
+   the feature is a list of records — description, route, icon slug, category,
+   sort_order), its `industry_features` rows (with the industry's own `name` / `noun`
+   where it calls the feature something else) and its `tier_features` rows — plus
+   `role_permissions` grants if plain members need it.
 3. The same migration inserts a `pages` row per screen the feature is made of
-   (`feature_id`, `path`, `title`).
+   (`feature_id`, `path`, `title` — null for the feature's own list page, so it follows
+   the feature's name).
 4. Add the id to `FEATURE_IDS` in `src/lib/features/types.ts`; make sure the icon slug
    is in `src/lib/features/icons.ts`.
 5. `npm run db:types`, commit `src/lib/database.types.ts`.
@@ -189,6 +227,9 @@ No nav edit, no `<title>`, no per-page check. Writes inside the page still open 
   (Lumen Cosmetics, Marigold Beverage Co), and features outside an industry are `hidden`
   (deals in a dental practice, tickets in a beauty brand). `dev` and `e2e` hold each
   industry's roles as plain members; the seed's comment block lists who holds what.
+- **Proposals in three industries' words**: Acme's two proposals are "Proposals"; a
+  draft in Bright Smile Dental is a "Treatment plan" and one in Ridgeline Roofing a
+  "Quote" — the same `/proposals` page, named by the org's industry.
 - **`evancoppa@gmail.com` is the system admin**: every org above is in their switcher and
   they are owner-level in each, whatever their membership row says. Sign in as
   `dev@example.com` for the member view.
