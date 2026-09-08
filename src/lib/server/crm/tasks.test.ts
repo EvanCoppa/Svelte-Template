@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { completeTask, createTask, deleteTask, listTasks } from './tasks';
+import { completeTask, createTask, deleteTask, getTask, listTasks } from './tasks';
 import { ORG_ID, supabaseMock } from './test-support';
 
 const TASK_ID = '50000000-0000-0000-0000-000000000001';
@@ -22,6 +22,16 @@ describe('tasks data access', () => {
 		await listTasks(supabase, ORG_ID, { assignedTo: 'user-1', openOnly: true });
 		expect(builder.eq).toHaveBeenCalledWith('assigned_to', 'user-1');
 		expect(builder.is).toHaveBeenCalledWith('completed_at', null);
+	});
+
+	it('fetches one task with both parties, tolerating absence', async () => {
+		const { supabase, builder } = supabaseMock({ data: null });
+
+		await expect(getTask(supabase, ORG_ID, TASK_ID)).resolves.toBeNull();
+		expect(builder.select).toHaveBeenCalledWith('*, companies(id, name), contacts(id, name)');
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', TASK_ID);
+		expect(builder.maybeSingle).toHaveBeenCalled();
 	});
 
 	it('creates a task under the org without touching created_by', async () => {

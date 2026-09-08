@@ -1,35 +1,25 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
-	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
+	import { recordHref } from '$lib/crm/records';
+	import { COMPANY_RELATIONSHIP_TONE, PARTY_STATUS_TONE } from '$lib/crm/tones';
 	import type { Company } from '$lib/server/crm/companies';
 
 	let { data } = $props();
-
-	const statusTone = {
-		lead: 'info',
-		prospect: 'violet',
-		active: 'success',
-		inactive: 'neutral'
-	} satisfies Record<Company['status'], BadgeTone>;
-
-	const relationshipTone = {
-		customer: 'success',
-		supplier: 'cyan',
-		partner: 'indigo',
-		other: 'neutral'
-	} satisfies Record<Company['relationship'], BadgeTone>;
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Company>();
 	const columns = columnHelper.columns([
 		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('name', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' }),
+			cell: ({ getValue, row }) =>
+				DataTable.linkCell(getValue(), recordHref('company', row.original.id))
 		}),
 		columnHelper.accessor('relationship', {
 			header: ({ column }) =>
 				renderComponent(DataTable.ColumnHeader, { column, title: 'Relationship' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), relationshipTone[getValue()])
+			cell: ({ getValue }) =>
+				DataTable.statusCell(getValue(), COMPANY_RELATIONSHIP_TONE[getValue()])
 		}),
 		columnHelper.accessor('email', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' }),
@@ -41,7 +31,7 @@
 		}),
 		columnHelper.accessor('status', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), statusTone[getValue()])
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), PARTY_STATUS_TONE[getValue()])
 		})
 	]);
 

@@ -1,28 +1,24 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
-	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
+	import { recordHref } from '$lib/crm/records';
+	import { STAGE_OUTCOME_TONE } from '$lib/crm/tones';
 	import type { DealWithParties } from '$lib/server/crm/deals';
 
 	let { data } = $props();
 
-	// Stages are org-defined rows now, so their names are not a union to key a
-	// palette off. The outcome is: every board has open, won and lost columns
-	// whatever an org calls them.
-	const tone = {
-		open: 'info',
-		won: 'success',
-		lost: 'error'
-	} satisfies Record<DealWithParties['pipeline_stages']['outcome'], BadgeTone>;
-
 	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-	const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+	// A `date` column has no time zone: read it as the day it names, not
+	// shifted into the viewer's zone.
+	const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, DealWithParties>();
 	const columns = columnHelper.columns([
 		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Deal' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Deal' }),
+			cell: ({ getValue, row }) =>
+				DataTable.linkCell(getValue(), recordHref('deal', row.original.id))
 		}),
 		// A deal names a company, a person, or neither — an opportunity nobody is
 		// attached to yet is a legitimate row.
@@ -34,7 +30,7 @@
 			id: 'stage',
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Stage' }),
 			cell: ({ row, getValue }) =>
-				DataTable.statusCell(getValue(), tone[row.original.pipeline_stages.outcome])
+				DataTable.statusCell(getValue(), STAGE_OUTCOME_TONE[row.original.pipeline_stages.outcome])
 		}),
 		columnHelper.accessor('amount', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Amount' }),

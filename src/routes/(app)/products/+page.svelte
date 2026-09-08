@@ -1,15 +1,11 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import * as DataTable from '$lib/components/data-table/index.js';
-	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
+	import { recordHref } from '$lib/crm/records';
+	import { PRODUCT_KIND_TONE } from '$lib/crm/tones';
 	import type { ProductWithCategory } from '$lib/server/crm/products';
 
 	let { data } = $props();
-
-	const kindTone = {
-		good: 'cyan',
-		service: 'violet'
-	} satisfies Record<ProductWithCategory['kind'], BadgeTone>;
 
 	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -17,11 +13,13 @@
 	const columns = columnHelper.columns([
 		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('name', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' }),
+			cell: ({ getValue, row }) =>
+				DataTable.linkCell(getValue(), recordHref('product', row.original.id))
 		}),
 		columnHelper.accessor('kind', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Kind' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), kindTone[getValue()])
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), PRODUCT_KIND_TONE[getValue()])
 		}),
 		columnHelper.accessor((row) => row.product_categories?.name ?? '—', {
 			id: 'category',

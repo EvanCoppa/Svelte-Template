@@ -112,6 +112,40 @@ Two consequences worth knowing:
 `+error.svelte` still renders its own title, and the layout stands down while an error
 is showing — two `<title>` tags in one head and the first one wins.
 
+## Records: one page for any kind
+
+A row on a list page opens as a **record**, and there is one page for all of them:
+`src/routes/(app)/[kind=record]/[id=guid]/`. `src/lib/crm/records.ts` lists the kinds
+that have a list page (`RECORD_KINDS`: company, contact, product, deal, task, ticket)
+and where each lives; `recordHref(kind, id)` is what a list row links to, and the
+`[kind=record]` matcher (`src/params/record.ts`) accepts exactly those list-route
+segments, so `/contacts/<id>` reaches the page and `/settings/<id>` never does.
+
+Sitting under the kind's list route is what gates it. The hook already decides whether
+this session may open anything under `/contacts` — mode and read grant — so the record
+page needs no check of its own, and a deal record answers 403 to exactly the users the
+deals list does. The page has no `pages` row: its load returns the record's name as
+`title` (the record-title exception above), and until the load answers, the shell titles
+it after the list it belongs to.
+
+`src/lib/server/crm/records.ts` is the registry. `getRecord()` branches on the kind — one
+branch per table, like `private.crm_entity_exists()` — reads the row through that kind's
+own data module, and describes it as one `RecordDetail`: a name, lifecycle pills, and
+fields typed by how they render (`money`, `date`, `datetime`, `link`, `record`,
+`person`, …), so the page never inspects a value to decide how to draw it. Everything
+the CRM attaches through the shared entity link — activities, tags, addresses, custom
+fields — is read the same way for every kind, and `listRelatedRecords()` lists the deals,
+tasks, tickets and people that point at a company or a contact. Where a field or a group
+names another kind, it links only when `passesFeatureGate()` says the reader may open
+that kind's route; otherwise the field is plain text and the group is never fetched.
+
+**A kind that outgrows the generic page** adds `src/routes/(app)/<kind>/[id]/`. A static
+segment outranks `[kind=record]`, so the specific page takes over with no other change,
+and the generic page stays the default for every other kind. Build it from the same
+`RecordDetail` and the parts in `src/lib/components/detail/` rather than a second
+renderer. A new list page joins the generic page by adding its kind to `RECORD_KINDS`, a
+branch to `getRecord()`, and `DataTable.linkCell()` on its primary column.
+
 The header's breadcrumb trail (`src/lib/breadcrumbs.svelte.ts`) names its crumbs with
 the same `titleFor()`, so a page is called one thing everywhere: in the tab, in the
 trail, and in the sidebar entry its feature registers.

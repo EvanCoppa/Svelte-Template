@@ -21,6 +21,8 @@ export const QUERY = {
 	deals: 'app:deals',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
+	/** One CRM record of any kind, as the generic record page shows it. */
+	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */
 	assistant: 'app:assistant'
 } as const;
