@@ -9,6 +9,7 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import * as Assistant from '$lib/components/assistant/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -91,13 +92,9 @@
 </script>
 
 <div class="flex h-[calc(100dvh-var(--header-height)-72px)] min-h-[32rem] flex-col gap-4">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Assistant</h1>
-		<p class="text-muted-foreground">
-			Ask about {data.activeOrg.name}'s companies, contacts, deals, tasks and tickets — answered
-			from your data, with anything that removes data asking you first.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Assistant</PageHeader.Title>
+	</PageHeader.Root>
 
 	<!-- Keyed on the conversation: another thread is another Chat. -->
 	{#key data.conversationId}

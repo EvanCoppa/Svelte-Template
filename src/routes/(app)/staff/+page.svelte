@@ -9,6 +9,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import { CopyButton, HoldToConfirm } from '$lib/components/enhanced/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as Staff from '$lib/components/staff/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { StatusBadge, TagBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
@@ -274,17 +275,11 @@
 {/snippet}
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-4">
-		<div class="space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">Staff</h1>
-			<p class="text-muted-foreground">
-				Everyone with access to <span class="text-foreground font-medium">{activeOrg.name}</span>,
-				the roles they hold, and the invites still waiting to be accepted.
-			</p>
-		</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Staff</PageHeader.Title>
 
 		{#if data.canManage}
-			<div class="flex flex-wrap items-center gap-2">
+			<PageHeader.Actions>
 				<form method="POST" action="?/createLink" use:linkEnhance>
 					<Button type="submit" variant="outline" disabled={$creatingLink}>
 						<LinkIcon />
@@ -340,9 +335,9 @@
 						</form>
 					</Dialog.Content>
 				</Dialog.Root>
-			</div>
+			</PageHeader.Actions>
 		{/if}
-	</div>
+	</PageHeader.Root>
 
 	<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="space-y-4">

@@ -354,6 +354,30 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
 /settings/profile are the reference implementations.
 
+### Creating a record is one form, not one per page
+
+Adding a row of any kind goes through the **generic record form**: the registry in
+`src/lib/schemas/records.ts` (what each kind of object is called, the feature that
+owns it, the query key its list depends on, its fields and its zod schema), the
+`CreateRecord` component behind every list page's "Add …" button, and
+`src/lib/server/records.ts`, which validates the post, checks `manage` on the feature
+and hands the values to the matching `$lib/server/crm/*` module. A list page's server
+file is therefore the same two lines everywhere:
+
+```typescript
+return { companies: …, ...(await loadCreateRecord(locals, 'company')) };
+export const actions: Actions = { create: (event) => createRecord(event, 'company') };
+```
+
+Every field posts a **string** — that is what lets one component render them all — and
+the server's insert switch is the one place strings become columns (blank → null, an
+amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
+schema so the enum unions come back without a cast). Adding a kind of record = a
+schema, a `RECORD_FORMS` entry and one `case` in that switch; never a second create
+modal, action or field-rendering loop. A screen whose creation is genuinely special
+(the staff page's invite, which sends an email and mints a token) keeps its own form
+and says why.
+
 ## Data loading & invalidation
 
 Server data comes from load functions (never `onMount` fetches), using the load-provided
@@ -520,6 +544,20 @@ Need something not vendored yet? Add it with `npx shadcn-svelte@latest add <name
 writing it yourself. These files are project source, so extend one in place — a new variant or
 prop — before creating a parallel component. `/components` renders the full inventory; check it
 before you build.
+
+### A page is its name and its actions
+
+Every `(app)` screen opens with `PageHeader` (`src/lib/components/page-header/`): the
+title on the start side, whatever the page lets you do on the end side, one line.
+**There is no subtitle.** A page is named once — by its `pages` row, which also titles
+the document and names the breadcrumb — and a paragraph under the heading explaining
+what "Companies" means is the third copy of that name, so it was removed everywhere
+and no new one goes in. Explanation belongs where the thing is: a `Card.Description`,
+an empty state, an `Alert`.
+
+`PageHeader.Actions` is where a page's own buttons live, and on a list page the first
+of them is the "Add …" button — `<CreateRecord type="company" form={data.createForm} />`,
+rendered only when the load says `canCreate`. See "Creating a record is one form".
 
 ### A data table is not a card
 

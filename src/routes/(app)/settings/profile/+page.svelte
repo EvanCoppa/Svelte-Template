@@ -3,6 +3,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -25,10 +26,9 @@
 </script>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Profile</h1>
-		<p class="text-muted-foreground">How you appear in this app, and the account behind it.</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Profile</PageHeader.Title>
+	</PageHeader.Root>
 
 	<Card.Root>
 		<Card.Header>
