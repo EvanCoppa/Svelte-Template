@@ -11,6 +11,12 @@ import { unwrap, unwrapDeleted } from './unwrap';
 
 export type Task = Tables<'tasks'>;
 
+/** A task with the parties it concerns, for detail screens. */
+export type TaskWithParties = Task & {
+	companies: Pick<Tables<'companies'>, 'id' | 'name'> | null;
+	contacts: Pick<Tables<'contacts'>, 'id' | 'name'> | null;
+};
+
 type TaskInsertColumn =
 	'company_id' | 'contact_id' | 'title' | 'details' | 'due_at' | 'assigned_to';
 type TaskUpdateColumn = TaskInsertColumn | 'completed_at';
@@ -31,6 +37,21 @@ export async function listTasks(
 	if (filter.assignedTo) query = query.eq('assigned_to', filter.assignedTo);
 	if (filter.openOnly) query = query.is('completed_at', null);
 	return unwrap(await query);
+}
+
+export async function getTask(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	taskId: string
+): Promise<TaskWithParties | null> {
+	return unwrap(
+		await supabase
+			.from('tasks')
+			.select('*, companies(id, name), contacts(id, name)')
+			.eq('org_id', orgId)
+			.eq('id', taskId)
+			.maybeSingle()
+	);
 }
 
 export async function createTask(
