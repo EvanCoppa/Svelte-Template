@@ -12,16 +12,9 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { billableQuantity } from '$lib/crm/billables';
-	import { estimateOptionTotal } from '$lib/crm/proposals';
 	import { recordTerms } from '$lib/crm/records';
 	import { term } from '$lib/features/vocabulary';
-	import {
-		MAX_OPTIONS,
-		emptyOption,
-		proposalBuilderSchema,
-		type ProposalBuilderOption
-	} from '$lib/schemas/proposal-builder';
+	import { MAX_OPTIONS, emptyOption, proposalBuilderSchema } from '$lib/schemas/proposal-builder';
 	import { capitalize, cn } from '$lib/utils.js';
 
 	/**
@@ -92,24 +85,6 @@
 				)
 			];
 		}
-	}
-
-	// An estimate only — the database owns the stored figure.
-	function estimateFor(option: ProposalBuilderOption): number {
-		return estimateOptionTotal(
-			{
-				fee_override: option.fee_override,
-				discount_pct: option.discount_pct,
-				line_items: [
-					...option.billables.map((line) => ({
-						quantity: billableQuantity(line.detail, line.not_applicable),
-						unit_cost: line.unit_cost
-					})),
-					...option.products
-				]
-			},
-			{ default_fee: null, tax_rate: null }
-		);
 	}
 </script>
 
@@ -241,7 +216,7 @@
 
 				<!-- The options. -->
 				<div class="flex flex-col gap-6">
-					{#each $form.options as option, i (i)}
+					{#each $form.options, i (i)}
 						<Builder.Option
 							index={i}
 							bind:option={$form.options[i]}
@@ -250,7 +225,6 @@
 							billables={data.billables}
 							quickPlans={data.quickPlans}
 							products={data.products}
-							estimate={estimateFor(option)}
 						/>
 					{/each}
 				</div>
