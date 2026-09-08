@@ -339,15 +339,14 @@ is silently dropped; `clickWhenLive()` in `tests/auth.spec.ts` retries until the
 effect appears. And **`Card.Title` renders a `<div>`**, so pages built from
 cards have no heading to target — assert on `<title>` or a `data-slot` instead.
 
-**CI** (`.github/workflows/ci.yml`) runs five parallel jobs on every pull
-request and push to `main`: `check` (svelte-check — Svelte + TS correctness),
+**CI** (`.github/workflows/ci.yml`) runs parallel jobs on every pull request
+and push to `main`: `check` (svelte-check — Svelte + TS correctness),
 `lint:oxlint` (oxlint's standard rules plus the vendored
 [anti-slop](https://github.com/dmmulroy/anti-slop) rules), `knip` (unused
-files, exports, and dependencies), the unit tests, and `test:e2e` (the
-Playwright specs that need no database). `lint` (prettier + eslint) and the
-production build remain local commands. To cover the signed-in specs in CI too,
-add a `npx supabase start && npm run db:env` step to the `e2e` job before
-`npm run test:e2e`.
+files, exports, and dependencies), the unit tests, and `database` (replaying
+migrations and checking generated types). `lint` (prettier + eslint), the
+production build, and `test:e2e` (Playwright) remain local commands — see
+"End-to-end tests" above for running them yourself.
 
 ## Development auto-login
 
