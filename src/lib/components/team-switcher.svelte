@@ -7,7 +7,7 @@
 	import type { OrgMembership } from '$lib/org';
 	import { QUERY } from '$lib/queries';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { toast } from 'svelte-sonner';
 
 	let { organizations, activeOrg }: { organizations: OrgMembership[]; activeOrg: OrgMembership } =
@@ -41,17 +41,13 @@
 				{#snippet child({ props })}
 					<Sidebar.MenuButton
 						{...props}
-						size="lg"
 						class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 					>
-						<div class="flex aspect-square size-8 items-center justify-center rounded-lg">
-							<AppLogo class="size-6" />
+						<div class="flex aspect-square size-5 shrink-0 items-center justify-center">
+							<AppLogo class="size-5" />
 						</div>
-						<div class="grid flex-1 text-left text-sm leading-tight">
-							<span class="truncate font-medium">{activeOrg.name}</span>
-							<span class="truncate text-xs">{activeOrg.tierName}</span>
-						</div>
-						<ChevronsUpDownIcon class="ml-auto" />
+						<span class="truncate font-medium">{activeOrg.name}</span>
+						<ChevronDownIcon class="shrink-0 opacity-60" />
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>

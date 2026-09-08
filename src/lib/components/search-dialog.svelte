@@ -6,9 +6,14 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { iconFor, type NavIcon } from '$lib/features/icons';
 	import { groupNav, settingsNavItems, type NavItem, type SettingsNavItem } from '$lib/navigation';
+	import { searchPalette } from '$lib/search.svelte';
 	import { showUpgrade } from '$lib/upgrade.svelte';
 
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	/**
+	 * The one palette, mounted by the (app) layout. It is opened from the
+	 * sidebar's search button via `showSearch()` and by the shortcut below,
+	 * so the two can never disagree about whether it is showing.
+	 */
 
 	// Derived, not const: the entries change with the active org.
 	let groups = $derived(groupNav(page.data.nav ?? []));
@@ -18,7 +23,7 @@
 	const settings = settingsNavItems();
 
 	function handleSelect(item: NavItem) {
-		open = false;
+		searchPalette.dismiss();
 		// A locked entry never navigates: the upgrade prompt opens in place.
 		if (item.locked) {
 			showUpgrade(item.featureId);
@@ -33,12 +38,27 @@
 	// A settings entry navigates through its own anchor, so declaring the jump
 	// is all this has to do.
 	function handleSettingsSelect(item: SettingsNavItem) {
-		open = false;
+		searchPalette.dismiss();
 		breadcrumbs.startAt(item.href);
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+			e.preventDefault();
+			searchPalette.toggle();
+		}
 	}
 </script>
 
-<Command.Dialog bind:open title="Search" description="Jump to a page">
+<svelte:window onkeydown={handleKeydown} />
+
+<Command.Dialog
+	bind:open={
+		() => searchPalette.open, (open) => (open ? searchPalette.show() : searchPalette.dismiss())
+	}
+	title="Search"
+	description="Jump to a page"
+>
 	<Command.Input placeholder="Type to search..." />
 	<Command.List>
 		<Command.Empty>No results found.</Command.Empty>

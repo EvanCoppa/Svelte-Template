@@ -1,35 +1,27 @@
 <script lang="ts">
 	import Breadcrumbs from '$lib/components/breadcrumbs.svelte';
-	import SearchDialog from '$lib/components/search-dialog.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { theme } from '$lib/theme.svelte';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MoonIcon from '@lucide/svelte/icons/moon';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import SunIcon from '@lucide/svelte/icons/sun';
 
-	let searchOpen = $state(false);
+	const sidebar = useSidebar();
 
-	function handleKeydown(e: KeyboardEvent) {
-		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-			e.preventDefault();
-			searchOpen = !searchOpen;
-		}
-	}
+	// The toggle lives in the sidebar header now, so the header only carries it
+	// while the sidebar is away — otherwise there would be two of them, and no
+	// way back once it is closed.
+	const sidebarClosed = $derived(
+		sidebar.isMobile ? !sidebar.openMobile : sidebar.state === 'collapsed'
+	);
 </script>
-
-<svelte:window onkeydown={handleKeydown} />
-
-<SearchDialog bind:open={searchOpen} />
 
 <header class="header">
 	<div class="header-inner">
-		<Sidebar.Trigger class="-ml-1" />
-		<button class="search-bar" onclick={() => (searchOpen = true)}>
-			<SearchIcon size={16} />
-			<span>Search ...</span>
-			<kbd>&#8984;K</kbd>
-		</button>
+		{#if sidebarClosed}
+			<Sidebar.Trigger class="-ml-1" />
+		{/if}
 
 		<!-- Where you have just been; hidden on narrow screens, where the
 		     header has no room for it. Still mounted there, so the trail keeps
@@ -41,14 +33,14 @@
 		<div class="header-right">
 			<button class="icon-btn" aria-label="Toggle theme" onclick={() => theme.toggle()}>
 				{#if theme.current === 'dark'}
-					<MoonIcon size={18} />
+					<MoonIcon size={16} />
 				{:else}
-					<SunIcon size={18} />
+					<SunIcon size={16} />
 				{/if}
 			</button>
 			<form method="POST" action="/logout" style="display: contents;">
 				<button type="submit" class="icon-btn" aria-label="Log out">
-					<LogOutIcon size={18} />
+					<LogOutIcon size={16} />
 				</button>
 			</form>
 		</div>
@@ -75,54 +67,15 @@
 		gap: 8px;
 	}
 
-	.search-bar {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border-primary);
-		border-radius: var(--radius-md);
-		padding: 8px 16px;
-		color: var(--text-tertiary);
-		cursor: pointer;
-		width: 320px;
-		font-size: 14px;
-		font-family: var(--font-sans);
-		transition:
-			border-color 0.2s,
-			background 0.2s;
-	}
-
-	.search-bar:hover {
-		border-color: var(--border-secondary);
-		background: var(--bg-hover);
-	}
-
-	.search-bar span {
-		flex: 1;
-		text-align: left;
-	}
-
-	.search-bar kbd {
-		font-family: var(--font-sans);
-		font-size: 12px;
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border-primary);
-		border-radius: 4px;
-		padding: 2px 6px;
-		color: var(--text-tertiary);
-	}
-
 	.trail {
 		min-width: 0;
 		overflow: hidden;
-		padding-left: 8px;
 	}
 
 	.header-right {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 4px;
 		margin-left: auto;
 	}
 
@@ -130,8 +83,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 36px;
-		height: 36px;
+		width: 32px;
+		height: 32px;
 		border: none;
 		border-radius: var(--radius-md);
 		background: transparent;
@@ -150,17 +103,7 @@
 	@media (max-width: 768px) {
 		.header-inner {
 			padding: 0 16px;
-			height: 56px;
-		}
-		.search-bar {
-			padding: 10px 16px;
-			width: auto;
-			flex: 1;
-			max-width: 280px;
-			font-size: 15px;
-		}
-		.search-bar kbd {
-			display: none;
+			height: 44px;
 		}
 		.trail {
 			display: none;
