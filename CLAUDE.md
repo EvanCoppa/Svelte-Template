@@ -512,6 +512,17 @@ Cards still earn their place around everything that is _not_ the table: a form, 
 or grouped panels that sit beside a roster — the staff page's organization panel and its pending
 invites are the reference.
 
+**A table sizes its own page, and never asks.** A rows-per-page picker makes the reader solve a
+layout problem the browser already has the answer to, so there isn't one: `DataTable.Root`
+measures the room between the table and the bottom of the viewport and shows as many rows as fit,
+re-measuring when that changes (`page-size.ts`; `DataTable.Content` marks its empty-state row
+`data-empty` so it never gets mistaken for a row to measure). A page therefore says nothing about
+page size — no `initialState.pagination` — and the one screen that wants a fixed number, because a
+card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
+That prop is the only way to set a page size; never reintroduce a picker or a second knob.
+`DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
+holding **page of pages** and the four controls (first, previous, next, last).
+
 ### Enhanced primitives
 
 `src/lib/components/enhanced/` is the second shelf: richer, motion-aware controls ported from
