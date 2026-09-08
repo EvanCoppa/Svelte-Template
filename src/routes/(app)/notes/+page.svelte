@@ -97,11 +97,17 @@
 			</div>
 		</div>
 
-		<!-- One grid, rendered under whichever shelf is showing: `shown` already
-		     knows which that is, and a tab panel per shelf is what makes the
-		     tabs real rather than two buttons wearing a tab list. -->
-		<Tabs.Content value="open">{@render grid()}</Tabs.Content>
-		<Tabs.Content value="archived">{@render grid()}</Tabs.Content>
+		<!-- A panel per shelf is what makes these tabs real rather than two
+		     buttons wearing a tab list — but both panels stay mounted (the
+		     inactive one merely `hidden`), so the content is guarded: without
+		     the check every note would exist twice, with two editors and two
+		     autosave timers behind the one you can see. -->
+		<Tabs.Content value="open">
+			{#if shelf === 'open'}{@render grid()}{/if}
+		</Tabs.Content>
+		<Tabs.Content value="archived">
+			{#if shelf === 'archived'}{@render grid()}{/if}
+		</Tabs.Content>
 	</Tabs.Root>
 </div>
 

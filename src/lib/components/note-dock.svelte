@@ -104,7 +104,10 @@
 				class="border-border/60 bg-background/80 hover:bg-background focus-visible:ring-ring flex max-h-[70vh] flex-col items-center gap-1 overflow-hidden rounded-l-lg border border-r-0 py-2.5 pr-1 pl-1.5 shadow-sm outline-none focus-visible:ring-2"
 			>
 				{#each notes as note (note.id)}
-					<span class={cn('h-5 w-1.5 shrink-0 rounded-full', noteDash(note.color))}></span>
+					<span
+						data-slot="note-dash"
+						class={cn('h-5 w-1.5 shrink-0 rounded-full', noteDash(note.color))}
+					></span>
 				{/each}
 				{#if notes.length === 0}
 					<StickyNoteIcon class="text-muted-foreground size-4" />

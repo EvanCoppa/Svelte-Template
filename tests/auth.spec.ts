@@ -519,10 +519,17 @@ test.describe('the note dock', () => {
 		await expect(page).toHaveURL('/');
 	});
 
-	/** The rail fans out on hover, which only answers once Svelte has hydrated. */
+	/**
+	 * The rail fans out on hover, which only answers once Svelte has hydrated —
+	 * so the hover is retried like every other pre-hydration interaction here.
+	 * The mouse leaves first on each attempt: hovering an element the pointer
+	 * is already sitting on dispatches no fresh `pointerenter`, so a retry
+	 * without this only ever repeats the miss.
+	 */
 	async function fan(page: Page) {
 		const dock = page.getByRole('complementary', { name: 'Notes' });
 		await expect(async () => {
+			await page.mouse.move(0, 0);
 			await dock.hover();
 			await expect(dock.getByRole('button', { name: 'New note' })).toBeVisible({ timeout: 2000 });
 		}).toPass({ timeout: 20_000 });
@@ -530,14 +537,19 @@ test.describe('the note dock', () => {
 	}
 
 	test('docks one dash per open note to the edge of every screen', async ({ page }) => {
-		// seed.sql gives Acme three open notes and one archived; the rail draws
-		// the open ones and the archive stays off it.
+		// seed.sql gives Acme three open notes and one archived: the rail draws
+		// the open ones and the archive stays off it. Counted as "at least",
+		// not exactly — the spec below writes a note, and a test that only
+		// passes when it runs first is a test that will fail one day.
 		const dock = page.getByRole('complementary', { name: 'Notes' });
-		await expect(dock.getByRole('button', { name: '3 notes' })).toBeVisible();
+		const dashes = dock.locator('[data-slot="note-dash"]');
+		await expect(dock.getByRole('button', { name: /^\d+ notes?$/ })).toBeVisible();
+		expect(await dashes.count()).toBeGreaterThanOrEqual(3);
 
 		// It is the shell's, not the dashboard's: it follows you to another page.
 		await page.goto('/companies');
-		await expect(dock.getByRole('button', { name: '3 notes' })).toBeVisible();
+		await expect(dock.getByRole('button', { name: /^\d+ notes?$/ })).toBeVisible();
+		expect(await dashes.count()).toBeGreaterThanOrEqual(3);
 	});
 
 	test('fans out with a label per note, and opens one in place', async ({ page }) => {
@@ -593,8 +605,9 @@ test.describe('the notes page', () => {
 		await expect(page.getByText('Renewal call prep')).toBeVisible();
 		await expect(page.getByText('Old standup order')).toHaveCount(0);
 
-		await page.getByRole('tab', { name: 'Archived' }).click();
-		await expect(page.getByText('Old standup order')).toBeVisible();
+		await clickWhenLive(page.getByRole('tab', { name: 'Archived' }), () =>
+			expect(page.getByText('Old standup order')).toBeVisible()
+		);
 		await expect(page.getByText('Renewal call prep')).toHaveCount(0);
 	});
 

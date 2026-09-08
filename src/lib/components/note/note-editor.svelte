@@ -2,7 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { AUTOSAVE_DELAY, noteLabel, type NotePatch } from '$lib/notes';
+	import { AUTOSAVE_DELAY, type NotePatch } from '$lib/notes';
 	import { NOTE_BODY_MAX, NOTE_TITLE_MAX } from '$lib/schemas/notes';
 	import type { Note } from '$lib/server/crm/notes';
 	import { cn } from '$lib/utils.js';
@@ -80,7 +80,7 @@
 		maxlength={NOTE_TITLE_MAX}
 		placeholder="Title"
 		aria-label="Note title"
-		class="h-auto border-0 bg-transparent px-0 py-0 text-sm font-semibold shadow-none focus-visible:ring-0 dark:bg-transparent"
+		class="h-auto border-0 bg-transparent px-0 py-0 text-sm font-semibold shadow-none placeholder:font-normal placeholder:opacity-55 focus-visible:ring-0 dark:bg-transparent"
 	/>
 	<Textarea
 		bind:ref={bodyRef}
@@ -99,7 +99,12 @@
 		)}
 	/>
 {:else}
-	<p class="text-sm font-semibold">{noteLabel(note)}</p>
+	<!-- Only a real title gets a line of its own: an untitled note is named by
+	     its first line (`noteLabel`), and printing that above the body would
+	     say the same words twice. -->
+	{#if note.title?.trim()}
+		<p class="text-sm font-semibold">{note.title}</p>
+	{/if}
 	<p class={cn('overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap', bodyClass)}>
 		{note.body}
 	</p>
