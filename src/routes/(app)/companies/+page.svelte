@@ -50,8 +50,7 @@
 		get data() {
 			return data.companies;
 		},
-		columns,
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		columns
 	});
 </script>
 

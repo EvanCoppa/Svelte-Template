@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import NavUser from '$lib/components/nav-user.svelte';
 	import SidebarSearch from '$lib/components/sidebar-search.svelte';
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
@@ -26,6 +27,15 @@
 	let user = $derived(page.data.user);
 	// Already filtered by mode and grant on the server; nothing to check here.
 	let groups = $derived(groupNav(page.data.nav ?? []));
+
+	// The sidebar jumps: wherever the reader was, arriving from here is the
+	// start of a walk, not a step in the one before it. Every shell surface
+	// that navigates pairs `startAt()` with its `goto()` — see
+	// `$lib/breadcrumbs.svelte`.
+	function jumpTo(href: string) {
+		breadcrumbs.startAt(href);
+		goto(href);
+	}
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
@@ -55,7 +65,7 @@
 							<Sidebar.MenuButton
 								class={['nav-hover-effect', active && 'nav-active', item.locked && 'opacity-60']}
 								tooltipContent={item.locked ? `${item.label} — upgrade required` : item.label}
-								onclick={() => (item.locked ? showUpgrade(item.featureId) : goto(item.href))}
+								onclick={() => (item.locked ? showUpgrade(item.featureId) : jumpTo(item.href))}
 							>
 								<Icon class="h-6 w-6" />
 								<span class="sidebar-text">{item.label}</span>

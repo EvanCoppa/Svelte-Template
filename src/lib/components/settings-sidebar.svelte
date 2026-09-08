@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import NavUser from '$lib/components/nav-user.svelte';
 	import SidebarSearch from '$lib/components/sidebar-search.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -27,6 +28,13 @@
 	}: ComponentProps<typeof Sidebar.Root> = $props();
 
 	let user = $derived(page.data.user);
+
+	// A nav, so its entries jump rather than step deeper — the same pairing
+	// `AppSidebar` makes; see `$lib/breadcrumbs.svelte`.
+	function jumpTo(href: string) {
+		breadcrumbs.startAt(href);
+		goto(href);
+	}
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
@@ -40,7 +48,7 @@
 						<Sidebar.MenuButton
 							class="nav-hover-effect"
 							tooltipContent="Back to app"
-							onclick={() => goto('/')}
+							onclick={() => jumpTo('/')}
 						>
 							<ArrowLeftIcon class="h-6 w-6" />
 							<span class="sidebar-text font-medium">Back to app</span>
@@ -64,7 +72,7 @@
 							<Sidebar.MenuButton
 								class={['nav-hover-effect', active && 'nav-active']}
 								tooltipContent={item.label}
-								onclick={() => goto(item.href)}
+								onclick={() => jumpTo(item.href)}
 							>
 								<Icon class="h-6 w-6" />
 								<span class="sidebar-text">{item.label}</span>

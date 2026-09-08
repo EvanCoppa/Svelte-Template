@@ -98,10 +98,10 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
-	test('names the last pages visited in the header breadcrumb trail', async ({ page }) => {
-		// A trail of where you have been, not a hierarchy: the crumbs are named
-		// from the `pages` registry and kept in this tab's sessionStorage, so
-		// they survive the full page load below.
+	test('names the pages walked through in the header breadcrumb trail', async ({ page }) => {
+		// The walk taken, not a hierarchy: the crumbs are named from the
+		// `pages` registry and kept in this tab's sessionStorage, so they
+		// survive the full page load below.
 		await page.goto('/companies');
 
 		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
@@ -111,6 +111,52 @@ test.describe('the app shell', () => {
 		// And the way back is a plain link, so it works before hydration.
 		await trail.getByRole('link', { name: 'Dashboard' }).click();
 		await expect(page).toHaveURL('/');
+	});
+
+	test('restarts the trail where the shell jumps, and follows a link deeper', async ({ page }) => {
+		// `Breadcrumb.Page` is a span carrying role="link" too, so the crumbs
+		// are told apart by slot: a link is a page walked through, the page
+		// slot is where the reader is now.
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		const walked = trail.locator('[data-slot="breadcrumb-link"]');
+		const here = trail.locator('[data-slot="breadcrumb-page"]');
+
+		// Signed in on the dashboard: one page, nothing walked to reach it.
+		await expect(here).toHaveText('Dashboard');
+		await expect(walked).toHaveCount(0);
+
+		// A link inside the page is a step deeper, which is the depth the
+		// trail exists to show.
+		await clickWhenLive(page.getByRole('link', { name: 'Browse components' }), () =>
+			expect(page).toHaveURL('/components')
+		);
+		await expect(walked).toHaveText(['Dashboard']);
+		await expect(here).toHaveText('Components');
+
+		// The sidebar jumps: nothing was walked to get here whatever was on
+		// screen before, so there is no way back to offer.
+		await clickWhenLive(page.getByRole('button', { name: 'Companies' }).first(), () =>
+			expect(page).toHaveURL('/companies')
+		);
+		await expect(here).toHaveText('Companies');
+		await expect(walked).toHaveCount(0);
+	});
+
+	test('starts a fresh trail from the settings sidebar too', async ({ page }) => {
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		const walked = trail.locator('[data-slot="breadcrumb-link"]');
+
+		// A full load into the settings shell, two crumbs deep...
+		await page.goto('/settings');
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(walked).toHaveText(['Dashboard']);
+
+		// ...and its sections are a nav like any other: siblings, not steps.
+		await clickWhenLive(page.getByRole('button', { name: 'Security' }), () =>
+			expect(page).toHaveURL('/settings/security')
+		);
+		await expect(trail.locator('[data-slot="breadcrumb-page"]')).toHaveText('Security');
+		await expect(walked).toHaveCount(0);
 	});
 
 	test('renders every navigation entry the session may see', async ({ page }) => {

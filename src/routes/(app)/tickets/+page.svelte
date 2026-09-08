@@ -48,8 +48,7 @@
 		get data() {
 			return data.tickets;
 		},
-		columns,
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		columns
 	});
 </script>
 

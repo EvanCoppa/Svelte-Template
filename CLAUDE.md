@@ -440,10 +440,21 @@ route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by mig
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
 
-The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
-on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings
-under one shell and the same screen is reached from a dozen places, so a tree would be
-fiction. All of its behaviour (dedupe, cap, storage) is in `src/lib/breadcrumbs.svelte.ts`;
+The header carries a **breadcrumb trail**: how deep this tab has gone since it last
+jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
+trail, not a hierarchy** — these pages are siblings under one shell and the same screen
+is reached from a dozen places, so a tree read off the URL would be fiction (a contact
+opened from `/treatments` shows _Treatments › Contact_, not _Contacts › Contact_). The
+depth is the walk actually taken: **a click in a shell surface starts the trail over at
+depth 1** — the app sidebar, the settings sidebar, the ⌘K palette and the user menu each
+call `breadcrumbs.startAt(href)` immediately before navigating, so a new surface that
+navigates must pair the two or its jumps read as steps deeper — while a link inside a
+page pushes onto the trail, and landing on a page the trail already holds truncates back
+to it, so the trail only grows by going deeper. A jump is matched to the page that
+arrives with `isPathUnder()`, the same rule that marks the sidebar active, so a door like
+`/settings` redirecting into its first section is still that jump. Browser back rewinds
+the trail — to the crumb it lands on, or to that page alone when it lands outside. All of
+that behaviour is in `src/lib/breadcrumbs.svelte.ts`;
 `src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
 the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
 document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
@@ -521,6 +532,17 @@ exception to fix: there the card is the demo frame around a primitive, not a pag
 Cards still earn their place around everything that is _not_ the table: a form, and the summary
 or grouped panels that sit beside a roster — the staff page's organization panel and its pending
 invites are the reference.
+
+**A table sizes its own page, and never asks.** A rows-per-page picker makes the reader solve a
+layout problem the browser already has the answer to, so there isn't one: `DataTable.Root`
+measures the room between the table and the bottom of the viewport and shows as many rows as fit,
+re-measuring when that changes (`page-size.ts`; `DataTable.Content` marks its empty-state row
+`data-empty` so it never gets mistaken for a row to measure). A page therefore says nothing about
+page size — no `initialState.pagination` — and the one screen that wants a fixed number, because a
+card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
+That prop is the only way to set a page size; never reintroduce a picker or a second knob.
+`DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
+holding **page of pages** and the four controls (first, previous, next, last).
 
 ### Enhanced primitives
 

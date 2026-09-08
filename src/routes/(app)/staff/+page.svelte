@@ -151,8 +151,7 @@
 		},
 		get columns() {
 			return columns;
-		},
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		}
 	});
 
 	const search = $derived(String(table.getColumn('member')?.getFilterValue() ?? ''));
