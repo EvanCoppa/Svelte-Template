@@ -5,11 +5,11 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
 import {
+	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
 	dealRecordSchema,
 	productRecordSchema,
-	proposalRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -17,10 +17,10 @@ import {
 	type RecordFormValues,
 	type RecordType
 } from '$lib/schemas/records';
+import { createBillable } from './crm/billables';
 import { createCompany } from './crm/companies';
 import { createContact } from './crm/contacts';
 import { createDeal } from './crm/deals';
-import { createProposal } from './crm/proposals';
 import { createProduct } from './crm/products';
 import { createTask } from './crm/tasks';
 import { createTicket } from './crm/tickets';
@@ -142,16 +142,6 @@ async function insertRecord(
 			});
 			return;
 		}
-		case 'proposal': {
-			const data = proposalRecordSchema.parse(values);
-			// Unattached: the parent record is picked on the record page, not at
-			// creation — an unattached draft is a legitimate row.
-			await createProposal(supabase, orgId, {
-				title: data.title,
-				valid_until: instant(data.valid_until)
-			});
-			return;
-		}
 		case 'product': {
 			const data = productRecordSchema.parse(values);
 			await createProduct(supabase, orgId, {
@@ -161,6 +151,19 @@ async function insertRecord(
 				unit_price: amount(data.unit_price),
 				unit_cost: amount(data.unit_cost),
 				unit: text(data.unit),
+				description: text(data.description)
+			});
+			return;
+		}
+		case 'billable': {
+			const data = billableRecordSchema.parse(values);
+			await createBillable(supabase, orgId, {
+				name: data.name,
+				code: text(data.code),
+				unit_price: amount(data.unit_price),
+				unit: text(data.unit),
+				unit_choices: list(data.unit_choices),
+				is_featured: data.is_featured === 'true',
 				description: text(data.description)
 			});
 			return;
@@ -189,6 +192,15 @@ async function insertRecord(
 /** Blank is not a value: an untouched field becomes a null column. */
 function text(value: string): string | null {
 	return value === '' ? null : value;
+}
+
+/** A comma-separated list as typed, or null when nothing was: the units a billable offers as chips. */
+function list(value: string): string[] | null {
+	const items = value
+		.split(',')
+		.map((item) => item.trim())
+		.filter(Boolean);
+	return items.length > 0 ? items : null;
 }
 
 /**

@@ -20,6 +20,8 @@ export const QUERY = {
 	products: 'app:products',
 	deals: 'app:deals',
 	proposals: 'app:proposals',
+	billables: 'app:billables',
+	quickPlans: 'app:quick-plans',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	tasks: 'app:tasks',

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import { RECORD_KINDS, recordHref, recordListHref, type RecordKind } from '$lib/crm/records';
 import { featureGateFor, passesFeatureGate } from '$lib/features/gate';
+import type { Vocabulary } from '$lib/features/vocabulary';
 import type { NoteAccess } from '$lib/notes';
 import type { UpdateNoteBody } from '$lib/schemas/notes';
 import { loadOrgContext, type OrgContext } from './org-context';
@@ -109,7 +110,8 @@ export async function noteLinks(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	notes: readonly Note[],
-	canOpen: CanOpen
+	canOpen: CanOpen,
+	vocabulary: Vocabulary
 ): Promise<Record<string, NoteLink>> {
 	const targets = new Map<string, { kind: RecordKind; id: string }>();
 	for (const note of notes) {
@@ -125,7 +127,7 @@ export async function noteLinks(
 		(
 			await Promise.all(
 				[...targets].map(async ([key, { kind, id }]) => {
-					const record = await getRecord(supabase, orgId, kind, id, canOpen);
+					const record = await getRecord(supabase, orgId, kind, id, canOpen, vocabulary);
 					return record
 						? ([key, { label: record.name, href: recordHref(kind, id) }] as const)
 						: null;

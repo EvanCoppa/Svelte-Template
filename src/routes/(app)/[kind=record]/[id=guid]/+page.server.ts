@@ -15,6 +15,7 @@ import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
 import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
+import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
 import { hasGrant } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
@@ -62,8 +63,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// Notes are the general table, not a CRM one: a record shows the ones
 	// pointed at it, and only when this session has the feature at all.
 	const notesShown = passesFeatureGate('/notes', features, canRead);
+	// The words the record's labels use — who presents a proposal, who is
+	// responsible for it — as the org's industry says them.
+	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
 	const [record, activities, tags, addresses, customFields, related, notes] = await Promise.all([
-		getRecord(supabase, activeOrgId, kind, id, canOpen),
+		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
 		listTagsFor(supabase, activeOrgId, entity),
 		isParty ? listAddresses(supabase, activeOrgId, entity) : [],

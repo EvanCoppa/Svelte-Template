@@ -1,6 +1,7 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import type { TermsMap } from '$lib/features/terms';
+import type { Vocabulary } from '$lib/features/vocabulary';
 import type { PageMeta } from '$lib/features/types';
 import type { NavItem } from '$lib/navigation';
 import type { NoteDeck } from '$lib/notes';
@@ -60,6 +61,12 @@ declare global {
 			 * industry words it, from the (app) layout — see `$lib/features/terms`.
 			 */
 			terms?: TermsMap;
+			/**
+			 * The words that are not a feature's name — the roles on a proposal —
+			 * as the org's industry says them, from the (app) layout; see
+			 * `$lib/features/vocabulary`.
+			 */
+			vocabulary?: Vocabulary;
 			/**
 			 * A page title that overrides the `pages` registry, for a title that
 			 * depends on a record ("Acme Inc — Clients"). Returned by that page's

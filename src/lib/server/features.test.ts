@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { loadFeatureRegistry, listTiersWithFeatures, setDisabledFeatures } from './features';
+import {
+	loadFeatureRegistry,
+	loadTermRegistry,
+	loadVocabulary,
+	listTiersWithFeatures,
+	setDisabledFeatures
+} from './features';
 import { ORG_ID, supabaseMock } from './crm/test-support';
 
 describe('loadFeatureRegistry', () => {
@@ -20,6 +26,36 @@ describe('loadFeatureRegistry', () => {
 		const { supabase } = supabaseMock({ error: { message: 'permission denied' } });
 
 		await expect(loadFeatureRegistry(supabase)).rejects.toThrow('permission denied');
+	});
+});
+
+describe('loadTermRegistry', () => {
+	it("loads every term with each industry's own word, by id", async () => {
+		const rows = [{ id: 'proposal_presenter', label: 'Presenter', industry_terms: [] }];
+		const { supabase, from, builder } = supabaseMock({ data: rows });
+
+		await expect(loadTermRegistry(supabase)).resolves.toBe(rows);
+		expect(from).toHaveBeenCalledWith('terms');
+		expect(builder.select).toHaveBeenCalledWith('*, industry_terms(industry_id, label)');
+		expect(builder.order).toHaveBeenCalledWith('id');
+	});
+
+	it('resolves the vocabulary for one industry in the same round trip', async () => {
+		const { supabase } = supabaseMock({
+			data: [
+				{
+					id: 'proposal_presenter',
+					label: 'Presenter',
+					industry_terms: [{ industry_id: 'roofing', label: 'Estimator' }]
+				},
+				{ id: 'proposal_responsible', label: 'Responsible', industry_terms: [] }
+			]
+		});
+
+		await expect(loadVocabulary(supabase, 'roofing')).resolves.toEqual({
+			proposal_presenter: 'Estimator',
+			proposal_responsible: 'Responsible'
+		});
 	});
 });
 

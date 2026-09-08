@@ -115,6 +115,28 @@ server, `visibleTerms(features, canRead)` gives the same map.
 `<PageHeader.Title />` with no children heads the page with the same `titleFor()` the
 shell and the breadcrumb use, so a list page never spells its own name.
 
+Three features are named per industry today: **proposals** ("Quotes" for roofing and
+medical-supplies, "Treatment plans" for cosmetic and dentistry), **contacts** ("Patients"
+in dentistry, "Clients" in cosmetic, "Homeowners" in roofing — the `industry_vocabulary`
+migration) and the two the proposal builder draws from, **billables** ("Procedures",
+"Services", "Billable items", "Line items") and **quick-plans** ("Bundles", "Packages",
+"Treatment packages", "Order templates", "Standing orders").
+
+### Words that are not a feature's name
+
+Some words belong to no feature: the two people on a proposal are a "Presenter" and a
+"Provider" in a practice, an "Estimator" and a "Project manager" on a roof. Those are
+**terms** — rows in `terms` (id, default label) with an industry's own word in
+`industry_terms` (a missing row inherits), the same shape as features /
+industry_features minus the modes (`industry_vocabulary` migration). `resolveVocabulary()`
+(`src/lib/features/vocabulary.ts`) folds them per industry, `loadVocabulary()` in
+`src/lib/server/features.ts` reads them, the `(app)` layout ships the result as
+`vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the accessor —
+`TERM_IDS` is the typed key list, in lockstep with the table. The builder labels its two
+pickers with them and `describeProposal()` labels the two `person` fields on the record
+page with them. Nothing is settable per org: an org that needs its own word asks for a
+migration, exactly like a feature's name.
+
 ## Pages and titles
 
 A feature is made of **pages**, and a page has a **title**. `pages` is the registry of
@@ -151,7 +173,8 @@ is showing — two `<title>` tags in one head and the first one wins.
 
 A row on a list page opens as a **record**, and there is one page for all of them:
 `src/routes/(app)/[kind=record]/[id=guid]/`. `src/lib/crm/records.ts` lists the kinds
-that have a list page (`RECORD_KINDS`: company, contact, product, deal, task, ticket)
+that have a list page (`RECORD_KINDS`: billable, company, contact, product, deal, proposal,
+task, ticket)
 and where each lives; `recordHref(kind, id)` is what a list row links to, and the
 `[kind=record]` matcher (`src/params/record.ts`) accepts exactly those list-route
 segments, so `/contacts/<id>` reaches the page and `/settings/<id>` never does.
@@ -229,7 +252,15 @@ No nav edit, no `<title>`, no per-page check. Writes inside the page still open 
   industry's roles as plain members; the seed's comment block lists who holds what.
 - **Proposals in three industries' words**: Acme's two proposals are "Proposals"; a
   draft in Bright Smile Dental is a "Treatment plan" and one in Ridgeline Roofing a
-  "Quote" — the same `/proposals` page, named by the org's industry.
+  "Quote" — the same `/proposals` page, named by the org's industry. Each names its
+  presenter and its responsible person (Evan and dev), and Bright Smile's is for Dana
+  Reyes, one of its two patients.
+- **A fee schedule and bundles in two industries' words**: Bright Smile Dental has five
+  procedures with CDT codes (crowns per tooth, scaling per quadrant with UR/UL/BR/BL
+  chips, whitening per arch) and two quick plans; Ridgeline Roofing has four services
+  per square and one package. Bright Smile's draft option is built from the schedule —
+  two crowns on teeth 12 and 13 — so `detail` and a unit count are on screen after a
+  reset.
 - **`evancoppa@gmail.com` is the system admin**: every org above is in their switcher and
   they are owner-level in each, whatever their membership row says. Sign in as
   `dev@example.com` for the member view.

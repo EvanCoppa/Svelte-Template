@@ -1,5 +1,5 @@
 import type { Enums } from '$lib/database.types';
-import type { TermsMap } from '$lib/features/terms';
+import { featureTerms, type Terms, type TermsMap } from '$lib/features/terms';
 import type { FeatureId } from '$lib/features/types';
 
 /**
@@ -21,6 +21,7 @@ import type { FeatureId } from '$lib/features/types';
  * is read through its proposal.
  */
 export const RECORD_KINDS = [
+	'billable',
 	'company',
 	'contact',
 	'product',
@@ -44,6 +45,7 @@ export type RecordKindMeta = {
  * the org's industry says them (`recordTerms()` below), never a constant.
  */
 export const RECORD_KIND_META = {
+	billable: { feature: 'billables', segment: 'billables' },
 	company: { feature: 'companies', segment: 'companies' },
 	contact: { feature: 'contacts', segment: 'contacts' },
 	product: { feature: 'products', segment: 'products' },
@@ -82,27 +84,12 @@ export function recordKindForSegment(segment: RecordSegment): RecordKind {
 }
 
 /** What a kind of record is called, as the org's industry words it. */
-export type RecordTerms = {
-	/** The list, as the sidebar names it: "Treatment plans". */
-	name: string;
-	/** One of them, lower-case: "treatment plan" — "Add treatment plan". */
-	noun: string;
-	/** The list in running text: "treatment plans" — "3 treatment plans". */
-	plural: string;
-};
+export type RecordTerms = Terms;
 
 /**
- * The words for a kind of record, from the terms the `(app)` layout shipped
- * (`visibleTerms()` in `$lib/features/terms`; the server calls it directly).
- * Throws for a kind whose feature is not on screen or names no noun —
- * unreachable on a page the gate served, so the throw keeps the return type
- * honest without a cast, the `recordKindForSegment` rule.
+ * The words for a kind of record — `featureTerms()` keyed by the feature
+ * that owns the kind: "Add quote", "3 quotes", "Quote not found".
  */
 export function recordTerms(terms: TermsMap | undefined, kind: RecordKind): RecordTerms {
-	const feature = RECORD_KIND_META[kind].feature;
-	const found = terms?.[feature];
-	if (!found?.noun) {
-		throw new Error(`No terms for ${kind}: the ${feature} feature is not on screen.`);
-	}
-	return { name: found.name, noun: found.noun, plural: found.name.toLowerCase() };
+	return featureTerms(terms, RECORD_KIND_META[kind].feature);
 }

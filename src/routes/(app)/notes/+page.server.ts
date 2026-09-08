@@ -3,6 +3,7 @@ import { recordListHref, type RecordKind } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
 import { QUERY } from '$lib/queries';
 import { listNotes } from '$lib/server/crm/notes';
+import { loadVocabulary } from '$lib/server/features';
 import { noteAccess, noteLinks } from '$lib/server/notes';
 import { hasGrant } from '$lib/server/roles';
 import type { PageServerLoad } from './$types';
@@ -28,10 +29,13 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		passesFeatureGate(recordListHref(kind), org.features, canRead);
 
 	const notes = await listNotes(supabase, activeOrgId);
+	// The words a record's labels use, which is what names the record a note
+	// points at — the same vocabulary the record page resolves.
+	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
 
 	return {
 		notes,
-		links: await noteLinks(supabase, activeOrgId, notes, canOpen),
+		links: await noteLinks(supabase, activeOrgId, notes, canOpen, vocabulary),
 		access: noteAccess(org, user.id)
 	};
 };

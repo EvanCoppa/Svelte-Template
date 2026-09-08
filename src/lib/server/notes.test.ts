@@ -29,6 +29,9 @@ const company = {
 
 const openEverything = () => true;
 
+/** The record labels main's vocabulary supplies; `noteLinks` only passes them through. */
+const vocabulary = { proposal_presenter: 'Presenter', proposal_responsible: 'Responsible' };
+
 describe('noteColumns', () => {
 	it('writes only what the browser sent, so one surface never clobbers another', () => {
 		expect(noteColumns({ body: 'edited' })).toEqual({ body: 'edited' });
@@ -51,9 +54,9 @@ describe('noteLinks', () => {
 	it('asks nothing when no note is about anything', async () => {
 		const { supabase, from } = supabaseTablesMock({});
 
-		await expect(noteLinks(supabase, ORG_ID, [note(), note()], openEverything)).resolves.toEqual(
-			{}
-		);
+		await expect(
+			noteLinks(supabase, ORG_ID, [note(), note()], openEverything, vocabulary)
+		).resolves.toEqual({});
 		expect(from).not.toHaveBeenCalled();
 	});
 
@@ -63,7 +66,9 @@ describe('noteLinks', () => {
 		});
 
 		const attached = note({ entity_type: 'company', entity_id: COMPANY_ID });
-		await expect(noteLinks(supabase, ORG_ID, [attached], openEverything)).resolves.toEqual({
+		await expect(
+			noteLinks(supabase, ORG_ID, [attached], openEverything, vocabulary)
+		).resolves.toEqual({
 			[attached.id]: { label: 'Wayne Enterprises', href: `/companies/${COMPANY_ID}` }
 		});
 	});
@@ -78,7 +83,7 @@ describe('noteLinks', () => {
 			note({ id: 'd0000000-0000-0000-0000-00000000000b' })
 		].map((row) => ({ ...row, entity_type: 'company' as const, entity_id: COMPANY_ID }));
 
-		const links = await noteLinks(supabase, ORG_ID, notes, openEverything);
+		const links = await noteLinks(supabase, ORG_ID, notes, openEverything, vocabulary);
 		expect(Object.keys(links)).toHaveLength(2);
 		expect(from).toHaveBeenCalledTimes(1);
 	});
@@ -93,7 +98,8 @@ describe('noteLinks', () => {
 				supabase,
 				ORG_ID,
 				[note({ entity_type: 'company', entity_id: COMPANY_ID })],
-				() => false
+				() => false,
+				vocabulary
 			)
 		).resolves.toEqual({});
 		expect(from).not.toHaveBeenCalled();
@@ -107,7 +113,8 @@ describe('noteLinks', () => {
 				supabase,
 				ORG_ID,
 				[note({ entity_type: 'company', entity_id: COMPANY_ID })],
-				openEverything
+				openEverything,
+				vocabulary
 			)
 		).resolves.toEqual({});
 	});
@@ -120,7 +127,8 @@ describe('noteLinks', () => {
 				supabase,
 				ORG_ID,
 				[note({ entity_type: 'proposal_option', entity_id: COMPANY_ID })],
-				openEverything
+				openEverything,
+				vocabulary
 			)
 		).resolves.toEqual({});
 		expect(from).not.toHaveBeenCalled();
