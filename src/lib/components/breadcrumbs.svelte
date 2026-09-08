@@ -6,8 +6,9 @@
 	import { titleFor } from '$lib/features/pages';
 
 	/**
-	 * The last few pages this tab was on, newest last — mounted once by the
-	 * app header. The trail's rules (dedupe, cap, storage) live in
+	 * How far this tab has gone since it last jumped from the shell, newest
+	 * last — mounted once by the app header. The trail's rules (where a walk
+	 * starts, what deepens it, cap, storage) live in
 	 * `$lib/breadcrumbs.svelte`; this file only records and renders.
 	 */
 
@@ -27,8 +28,13 @@
 	// Runs after every navigation and once on mount (the 'enter' navigation),
 	// which is how a full page load enters the trail. A page with no
 	// registered title has no name to show, so it is not recorded.
-	afterNavigate(() => {
-		if (title) breadcrumbs.visit(scope, { path: page.url.pathname, title });
+	afterNavigate((navigation) => {
+		if (!title) return;
+		// Going back rewinds the walk rather than extending it; going forward
+		// through the same history is an ordinary step. A jump from the sidebar
+		// or the palette announced itself before navigating — see `startAt()`.
+		const rewound = navigation.type === 'popstate' && (navigation.delta ?? 0) < 0;
+		breadcrumbs.visit(scope, { path: page.url.pathname, title }, rewound);
 	});
 </script>
 

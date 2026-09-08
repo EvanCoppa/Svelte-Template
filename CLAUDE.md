@@ -440,10 +440,21 @@ route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by mig
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
 
-The header carries a **breadcrumb trail**: the last `MAX_CRUMBS` (3) pages this tab was
-on, newest last. It is a **history trail, not a hierarchy** — these pages are siblings
-under one shell and the same screen is reached from a dozen places, so a tree would be
-fiction. All of its behaviour (dedupe, cap, storage) is in `src/lib/breadcrumbs.svelte.ts`;
+The header carries a **breadcrumb trail**: how deep this tab has gone since it last
+jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
+trail, not a hierarchy** — these pages are siblings under one shell and the same screen
+is reached from a dozen places, so a tree read off the URL would be fiction (a contact
+opened from `/treatments` shows _Treatments › Contact_, not _Contacts › Contact_). The
+depth is the walk actually taken: **a click in a shell surface starts the trail over at
+depth 1** — the app sidebar, the settings sidebar, the ⌘K palette and the user menu each
+call `breadcrumbs.startAt(href)` immediately before navigating, so a new surface that
+navigates must pair the two or its jumps read as steps deeper — while a link inside a
+page pushes onto the trail, and landing on a page the trail already holds truncates back
+to it, so the trail only grows by going deeper. A jump is matched to the page that
+arrives with `isPathUnder()`, the same rule that marks the sidebar active, so a door like
+`/settings` redirecting into its first section is still that jump. Browser back rewinds
+the trail — to the crumb it lands on, or to that page alone when it lands outside. All of
+that behaviour is in `src/lib/breadcrumbs.svelte.ts`;
 `src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
 the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
 document, so a page never has two names, and the trail lives in `sessionStorage` keyed by

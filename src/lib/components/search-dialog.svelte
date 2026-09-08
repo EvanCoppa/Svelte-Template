@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { iconFor, type NavIcon } from '$lib/features/icons';
 	import { groupNav, settingsNavItems, type NavItem, type SettingsNavItem } from '$lib/navigation';
@@ -19,8 +20,21 @@
 	function handleSelect(item: NavItem) {
 		open = false;
 		// A locked entry never navigates: the upgrade prompt opens in place.
-		if (item.locked) showUpgrade(item.featureId);
-		else goto(item.href);
+		if (item.locked) {
+			showUpgrade(item.featureId);
+			return;
+		}
+		// The palette jumps from anywhere to anywhere, so it starts a walk the
+		// same way the sidebar does — see `$lib/breadcrumbs.svelte`.
+		breadcrumbs.startAt(item.href);
+		goto(item.href);
+	}
+
+	// A settings entry navigates through its own anchor, so declaring the jump
+	// is all this has to do.
+	function handleSettingsSelect(item: SettingsNavItem) {
+		open = false;
+		breadcrumbs.startAt(item.href);
 	}
 </script>
 
@@ -49,7 +63,7 @@
 			{#each settings as item (item.href)}
 				{@const Icon = iconFor(item.icon)}
 				{@const value = ['Settings', item.label, ...(item.aliases ?? [])].join(' ')}
-				<Command.LinkItem href={item.href} {value} onSelect={() => (open = false)}>
+				<Command.LinkItem href={item.href} {value} onSelect={() => handleSettingsSelect(item)}>
 					{@render entry(item, Icon)}
 				</Command.LinkItem>
 			{/each}

@@ -107,10 +107,22 @@ export function groupNav(items: NavItem[]): NavGroup[] {
 	})).filter((group) => group.items.length > 0);
 }
 
-/** Exact match for the root page, prefix match for everything else. */
+/**
+ * Does `pathname` sit at `href`, or inside it? Exact match for the root
+ * page, whole-segment prefix match for everything else — the one answer to
+ * "does this pathname belong to that entry". The sidebars mark themselves
+ * active with it, and the breadcrumb trail matches a declared jump against
+ * the page that actually arrives (`startAt()` in `$lib/breadcrumbs.svelte`),
+ * which a door like `/settings` may have redirected into a section.
+ */
+export function isPathUnder(href: string, pathname: string): boolean {
+	if (href === '/') return pathname === '/';
+	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Whether a nav entry is the one the current pathname belongs to. */
 export function isNavItemActive(item: { href: string }, pathname: string): boolean {
-	if (item.href === '/') return pathname === '/';
-	return pathname === item.href || pathname.startsWith(`${item.href}/`);
+	return isPathUnder(item.href, pathname);
 }
 
 /**

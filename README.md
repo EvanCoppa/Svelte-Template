@@ -258,10 +258,16 @@ org can switch it off for itself under `/settings/features`. Its title needs no
 `<svelte:head>` either — the `(app)` layout matches the pathname against the page
 registry and titles the whole group. See `docs/features.md`.
 
-The header shows a **breadcrumb trail** of the last three pages this tab was on, named
-from the same page registry. It is a trail, not a hierarchy — the pages are siblings and
-the same screen is reached from many places, so what helps is the way back. All of it
-lives in `src/lib/breadcrumbs.svelte.ts` and the component beside it; nothing per page.
+The header shows a **breadcrumb trail** of how deep you have gone since you last jumped
+from the shell (up to three pages), named from the same page registry. It is a depth
+trail, not a hierarchy — the pages are siblings and the same screen is reached from many
+places, so a tree off the URL would be made up. Clicking a sidebar, the ⌘K palette or the
+user menu starts the trail over at that page — a door like `/settings` that redirects into
+its first section included; links inside a page push onto it, and coming back to a page
+already in the trail truncates to it. So `/contacts/42` reads
+_Contacts › Acme_ when you got there through the list, and _Treatments › Acme_ when you
+got there from a treatment. All of it lives in `src/lib/breadcrumbs.svelte.ts` and the
+component beside it; nothing per page.
 
 The sidebar (ported from the Yes-Smile apps) collapses with **⌘B**, the trigger button,
 or dragging the rail; when collapsed, moving the cursor to the screen edge **peeks** it
