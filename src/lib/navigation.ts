@@ -126,6 +126,21 @@ export function isNavItemActive(item: { href: string }, pathname: string): boole
 }
 
 /**
+ * The icon slug for the entry `pathname` sits at or under — the app nav and
+ * the settings nav, whichever registers it. Longest `href` wins, the same
+ * tie-break `matchPage()` uses for titles, so `/companies/42` inherits
+ * Companies' icon rather than Dashboard's `/`. Used by the breadcrumb trail
+ * to lead with the page's icon; a pathname neither nav lists (a record page
+ * with no entry of its own) has none.
+ */
+export function iconForPath(pathname: string, nav: readonly NavItem[]): string | undefined {
+	const candidates = [...nav, ...settingsNavItems()]
+		.filter((item) => isPathUnder(item.href, pathname))
+		.sort((a, b) => b.href.length - a.href.length);
+	return candidates[0]?.icon;
+}
+
+/**
  * The settings shell's own nav — the second half of this file.
  *
  * Settings is entered from the user menu, and while you are under

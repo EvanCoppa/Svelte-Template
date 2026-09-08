@@ -3,7 +3,9 @@
 	import { page } from '$app/state';
 	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
+	import { iconFor } from '$lib/features/icons';
 	import { titleFor } from '$lib/features/pages';
+	import { iconForPath } from '$lib/navigation';
 
 	/**
 	 * How far this tab has gone since it last jumped from the shell, newest
@@ -24,6 +26,13 @@
 	let crumbs = $derived(
 		trail.length > 0 ? trail : title ? [{ path: page.url.pathname, title }] : []
 	);
+	// Only the first crumb leads with an icon — it names where the trail
+	// started, so it is the one place an icon helps orient rather than
+	// repeating down every step.
+	let LeadIcon = $derived.by(() => {
+		const slug = crumbs[0] && iconForPath(crumbs[0].path, page.data.nav ?? []);
+		return slug ? iconFor(slug) : null;
+	});
 
 	// Runs after every navigation and once on mount (the 'enter' navigation),
 	// which is how a full page load enters the trail. A page with no
@@ -47,9 +56,19 @@
 				{/if}
 				<Breadcrumb.Item>
 					{#if i === crumbs.length - 1}
-						<Breadcrumb.Page>{crumb.title}</Breadcrumb.Page>
+						<Breadcrumb.Page class="flex items-center gap-1.5">
+							{#if i === 0 && LeadIcon}
+								<LeadIcon class="size-4" />
+							{/if}
+							{crumb.title}
+						</Breadcrumb.Page>
 					{:else}
-						<Breadcrumb.Link href={crumb.path}>{crumb.title}</Breadcrumb.Link>
+						<Breadcrumb.Link href={crumb.path} class="flex items-center gap-1.5">
+							{#if i === 0 && LeadIcon}
+								<LeadIcon class="size-4" />
+							{/if}
+							{crumb.title}
+						</Breadcrumb.Link>
 					{/if}
 				</Breadcrumb.Item>
 			{/each}
