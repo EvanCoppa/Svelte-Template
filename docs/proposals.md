@@ -223,9 +223,23 @@ icons. A template never meets a string it has to guess at.
 is `src/routes/(app)/proposals/`, built exactly like `/deals` on
 `src/lib/server/crm/proposals.ts`; `proposal` is a record kind, so a row opens on the
 generic record page (status, the record it hangs off, its options' count and
-recommended total, validity, fee and tax), a company, contact or deal page lists the
-proposals hanging off it, and the generic "Add …" form creates an unattached draft
-(title, valid until). It ships in every industry and every plan.
+recommended total, validity, fee and tax), and a company, contact or deal page lists
+the proposals hanging off it. It ships in every industry and every plan.
+
+**Creating one is the builder**, `src/routes/(app)/proposals/new/` (its `pages` row is
+the `proposal_builder_page` migration) — not the generic "Add …" modal, because a
+proposal is born with its options. The page asks who it is for (a company, contact or
+deal the writer may open, or nothing yet — `?contact=<id>` prefills it), the terms every
+option shares (fee, tax rate, validity), then lays the options out side by side: a
+label, a price, a courtesy percentage, the recommended flag (one at most), financing
+with its term and APR, and the lines inside it — picked from the active catalog
+(`product_id` kept as provenance, label and `unit_cost` copied) or typed in. It is one
+nested superforms form (`dataType: 'json'`, the one form that needs JavaScript),
+validated by `schema.ts` there, and written by `createProposalWithOptions()` in
+`src/lib/server/crm/proposals.ts`: the proposal, then its options in position, then
+their lines. PostgREST has no transaction, so a failure after the first insert leaves a
+draft with fewer options than asked for — a legitimate row, finishable from the record
+page. Success opens the new record.
 
 It is also the reason names live in the registry (docs/features.md, "Names by
 industry"): the nouns differ per vertical while the shape does not, so the feature's
@@ -235,8 +249,9 @@ dentistry). Nothing in the page names it.
 
 ## Deliberately not here (yet)
 
-- **Editing options and line items, and attaching a draft to its record.** The list
-  and the record page read them; the forms that write them are still to build.
+- **Editing a proposal after it is created** — its options and lines, and attaching a
+  draft to its record. The builder writes them once; the list and the record page read
+  them; the forms that change them are still to build.
 - **The deck editor and the presenter.** `slide_decks` stores a deck and
   `proposals.deck_id` points at one; authoring slides, expanding them per option and
   resolving variables at present time are all still to build.

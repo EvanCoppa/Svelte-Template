@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
-	import CreateRecord from '$lib/components/create-record.svelte';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { recommendedOption } from '$lib/crm/proposals';
-	import { recordHref, recordTerms } from '$lib/crm/records';
+	import { recordHref, recordListHref, recordTerms } from '$lib/crm/records';
 	import { PROPOSAL_STATUS_TONE } from '$lib/crm/tones';
 	import type { ProposalWithOptions } from '$lib/server/crm/proposals';
 	import { capitalize } from '$lib/utils.js';
@@ -82,7 +83,11 @@
 		<PageHeader.Title />
 		{#if data.canCreate}
 			<PageHeader.Actions>
-				<CreateRecord type="proposal" form={data.createForm} />
+				<!-- A proposal is born with its options, so "Add" opens the builder, not the generic modal. -->
+				<Button href="{recordListHref('proposal')}/new">
+					<PlusIcon />
+					Add {terms.noun}
+				</Button>
 			</PageHeader.Actions>
 		{/if}
 	</PageHeader.Root>

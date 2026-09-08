@@ -25,16 +25,11 @@ import { QUERY } from '$lib/queries';
  * whose options are loaded per request, not as a second form.
  */
 
-/** Kinds of record the generic form can create. */
-export const RECORD_TYPES = [
-	'company',
-	'contact',
-	'deal',
-	'proposal',
-	'product',
-	'task',
-	'ticket'
-] as const;
+/**
+ * Kinds of record the generic form can create. A proposal is not one: it is
+ * born with its options, so it has a page of its own (`/proposals/new`).
+ */
+export const RECORD_TYPES = ['company', 'contact', 'deal', 'product', 'task', 'ticket'] as const;
 
 export type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -161,11 +156,6 @@ export const dealRecordSchema = z.object({
 	expected_close_date: optionalDate
 });
 
-export const proposalRecordSchema = z.object({
-	title: requiredText('Title'),
-	valid_until: optionalInstant
-});
-
 export const productRecordSchema = z.object({
 	name: requiredText('Name'),
 	kind: z.enum(['good', 'service']).default('good'),
@@ -200,7 +190,6 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	company: companyRecordSchema,
 	contact: contactRecordSchema,
 	deal: dealRecordSchema,
-	proposal: proposalRecordSchema,
 	product: productRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
@@ -256,14 +245,6 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual renewal' },
 			{ name: 'amount', label: 'Amount', type: 'number', placeholder: '12000' },
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
-		]
-	},
-	proposal: {
-		feature: 'proposals',
-		query: QUERY.proposals,
-		fields: [
-			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual support — options' },
-			{ name: 'valid_until', label: 'Valid until', type: 'datetime' }
 		]
 	},
 	product: {
