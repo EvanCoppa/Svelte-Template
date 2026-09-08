@@ -5,10 +5,13 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
 	import LinkIcon from '@lucide/svelte/icons/link';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 	import XIcon from '@lucide/svelte/icons/x';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import { CopyButton, HoldToConfirm } from '$lib/components/enhanced/index.js';
+	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as Staff from '$lib/components/staff/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
@@ -17,7 +20,6 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import type { ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
 	import { Combobox } from '$lib/components/ui/combobox/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { StaffMember } from '$lib/server/staff';
@@ -287,54 +289,59 @@
 					</Button>
 				</form>
 
-				<Dialog.Root bind:open={inviteOpen}>
-					<Dialog.Trigger>
+				<Modal.Root bind:open={inviteOpen}>
+					<Modal.Trigger>
 						{#snippet child({ props })}
 							<Button {...props}>
 								<UserPlusIcon />
 								Invite staff
 							</Button>
 						{/snippet}
-					</Dialog.Trigger>
-					<Dialog.Content class="sm:max-w-md">
-						<Dialog.Header>
-							<Dialog.Title>Invite staff</Dialog.Title>
-							<Dialog.Description>
-								We email a join link for {activeOrg.name}. It only works for this address, and it
-								replaces any invite already sent there.
-							</Dialog.Description>
-						</Dialog.Header>
+					</Modal.Trigger>
+					<Modal.Content>
+						<!-- The form wraps the card and the footer so `Modal.Action type="submit"` posts it. -->
+						<form method="POST" action="?/invite" use:inviteEnhance>
+							<Modal.Card>
+								<Modal.Header>
+									<Modal.Title><UserPlusIcon /> Invite staff</Modal.Title>
+									<Modal.Description>
+										We email a join link for {activeOrg.name}. It only works for this address, and
+										it replaces any invite already sent there.
+									</Modal.Description>
+								</Modal.Header>
+								<Modal.Body>
+									<FormAlert message={$inviteMessage} class="mb-0" />
 
-						<FormAlert message={$inviteMessage} />
-
-						<form method="POST" action="?/invite" class="grid gap-4" use:inviteEnhance>
-							<div class="grid gap-2">
-								<Label for="invite-email">Email</Label>
-								<Input
-									id="invite-email"
-									name="email"
-									type="email"
-									autocomplete="off"
-									placeholder="teammate@example.com"
-									aria-invalid={$inviteErrors.email ? 'true' : undefined}
-									aria-describedby={$inviteErrors.email ? 'invite-email-error' : undefined}
-									bind:value={$inviteFormData.email}
-									{...$inviteConstraints.email}
-								/>
-								{#if $inviteErrors.email}
-									<p id="invite-email-error" class="text-destructive text-sm">
-										{$inviteErrors.email}
-									</p>
-								{/if}
-							</div>
-							<Dialog.Footer>
-								<Button type="submit" disabled={$inviting}>
+									<div class="grid gap-2">
+										<Label for="invite-email">Email</Label>
+										<Input
+											id="invite-email"
+											name="email"
+											type="email"
+											autocomplete="off"
+											placeholder="teammate@example.com"
+											aria-invalid={$inviteErrors.email ? 'true' : undefined}
+											aria-describedby={$inviteErrors.email ? 'invite-email-error' : undefined}
+											bind:value={$inviteFormData.email}
+											{...$inviteConstraints.email}
+										/>
+										{#if $inviteErrors.email}
+											<p id="invite-email-error" class="text-destructive text-sm">
+												{$inviteErrors.email}
+											</p>
+										{/if}
+									</div>
+								</Modal.Body>
+							</Modal.Card>
+							<Modal.Footer>
+								<Modal.Cancel>Cancel</Modal.Cancel>
+								<Modal.Action type="submit" disabled={$inviting}>
 									{$inviting ? 'Sending…' : 'Send invite'}
-								</Button>
-							</Dialog.Footer>
+								</Modal.Action>
+							</Modal.Footer>
 						</form>
-					</Dialog.Content>
-				</Dialog.Root>
+					</Modal.Content>
+				</Modal.Root>
 			</PageHeader.Actions>
 		{/if}
 	</PageHeader.Root>
@@ -444,7 +451,7 @@
 </div>
 
 <!-- Manage roles — the row menu's first action, and where every role change happens. -->
-<Dialog.Root
+<Modal.Root
 	open={managing !== null}
 	onOpenChange={(open) => {
 		if (!open) {
@@ -453,92 +460,103 @@
 		}
 	}}
 >
-	<Dialog.Content class="sm:max-w-md">
+	<Modal.Content>
 		{#if managing}
 			{@const options = roleOptions(managing)}
-			<Dialog.Header>
-				<Dialog.Title>Roles for {Staff.memberName(managing)}</Dialog.Title>
-				<Dialog.Description>
-					Roles decide which features this person can open, and at what level. Their org role ({managing.role})
-					is separate and set on the membership itself.
-				</Dialog.Description>
-			</Dialog.Header>
+			<Modal.Card>
+				<Modal.Header>
+					<Modal.Title><ShieldIcon /> Roles for {Staff.memberName(managing)}</Modal.Title>
+					<Modal.Description>
+						Roles decide which features this person can open, and at what level. Their org role ({managing.role})
+						is separate and set on the membership itself.
+					</Modal.Description>
+				</Modal.Header>
+				<Modal.Body>
+					<FormAlert message={$assignMessage} class="mb-0" />
+					<FormAlert message={$unassignMessage} class="mb-0" />
 
-			<FormAlert message={$assignMessage} />
-			<FormAlert message={$unassignMessage} />
-
-			<div class="flex flex-wrap items-center gap-1.5">
-				{#each managing.roles as role (role.id)}
-					<!-- The form wraps the badge: a <form> is not phrasing content, so it
-					     cannot live inside the badge's own <span>. -->
-					<form method="POST" action="?/unassignRole" use:unassignEnhance>
-						<input type="hidden" name="user_id" value={managing.userId} />
-						<input type="hidden" name="role_id" value={role.id} />
-						<TagBadge tone="indigo" class="gap-1 pr-1">
-							{role.name}
-							<Button
-								type="submit"
-								variant="ghost"
-								size="icon"
-								class="size-4 rounded-sm hover:bg-transparent hover:opacity-70"
-								disabled={$unassigning}
-								aria-label="Remove the {role.name} role from {Staff.memberName(managing)}"
+					<div class="flex flex-wrap items-center gap-1.5">
+						{#each managing.roles as role (role.id)}
+							<!-- The form wraps the badge: a <form> is not phrasing content, so it
+							     cannot live inside the badge's own <span>. -->
+							<form method="POST" action="?/unassignRole" use:unassignEnhance>
+								<input type="hidden" name="user_id" value={managing.userId} />
+								<input type="hidden" name="role_id" value={role.id} />
+								<TagBadge tone="indigo" class="gap-1 pr-1">
+									{role.name}
+									<Button
+										type="submit"
+										variant="ghost"
+										size="icon"
+										class="size-4 rounded-sm hover:bg-transparent hover:opacity-70"
+										disabled={$unassigning}
+										aria-label="Remove the {role.name} role from {Staff.memberName(managing)}"
+									>
+										<XIcon class="size-3" />
+									</Button>
+								</TagBadge>
+							</form>
+						{:else}
+							<span class="text-muted-foreground text-sm"
+								>No roles yet — this person can sign in, but every gated page is closed to them.</span
 							>
-								<XIcon class="size-3" />
-							</Button>
-						</TagBadge>
-					</form>
-				{:else}
-					<span class="text-muted-foreground text-sm"
-						>No roles yet — this person can sign in, but every gated page is closed to them.</span
-					>
-				{/each}
-			</div>
+						{/each}
+					</div>
 
-			<form method="POST" action="?/assignRole" class="flex items-center gap-2" use:assignEnhance>
-				<input type="hidden" name="user_id" value={managing.userId} />
-				<Combobox
-					name="role_id"
-					class="flex-1"
-					{options}
-					value={roleChoice}
-					onchange={(value) => (roleChoice = value)}
-					placeholder="Add a role…"
-					emptyText="No roles left to add"
-					disabled={options.length === 0}
-					ariaLabel="Add a role for {Staff.memberName(managing)}"
-				/>
-				<Button type="submit" variant="outline" disabled={$assigning || !roleChoice}>Assign</Button>
-			</form>
+					<form
+						method="POST"
+						action="?/assignRole"
+						class="flex items-center gap-2"
+						use:assignEnhance
+					>
+						<input type="hidden" name="user_id" value={managing.userId} />
+						<Combobox
+							name="role_id"
+							class="flex-1"
+							{options}
+							value={roleChoice}
+							onchange={(value) => (roleChoice = value)}
+							placeholder="Add a role…"
+							emptyText="No roles left to add"
+							disabled={options.length === 0}
+							ariaLabel="Add a role for {Staff.memberName(managing)}"
+						/>
+						<Button type="submit" variant="outline" disabled={$assigning || !roleChoice}
+							>Assign</Button
+						>
+					</form>
+				</Modal.Body>
+			</Modal.Card>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
 <!-- Remove from the organization — the one destructive act the roster offers. -->
-<Dialog.Root
+<Modal.Root
 	open={removing !== null}
 	onOpenChange={(open) => {
 		if (!open) removingId = null;
 	}}
 >
-	<Dialog.Content class="sm:max-w-md">
+	<Modal.Content>
 		{#if removing}
-			<Dialog.Header>
-				<Dialog.Title>Remove {Staff.memberName(removing)}?</Dialog.Title>
-				<Dialog.Description>
-					They lose access to {activeOrg.name} immediately, along with every role they hold here. Nothing
-					they created is deleted, and they can be invited back.
-				</Dialog.Description>
-			</Dialog.Header>
-
-			<FormAlert message={$removeMessage} />
-
+			<!-- The form wraps the card and the footer so the hold button can submit it. -->
 			<form method="POST" action="?/removeMember" bind:this={removeForm} use:removeEnhance>
 				<input type="hidden" name="user_id" value={removing.userId} />
-				<Dialog.Footer>
-					<Button type="button" variant="outline" onclick={() => (removingId = null)}>
-						Cancel
-					</Button>
+				<Modal.Card>
+					<Modal.Header>
+						<Modal.Title><UserMinusIcon /> Remove {Staff.memberName(removing)}?</Modal.Title>
+						<Modal.Description>
+							They lose access to {activeOrg.name} immediately, along with every role they hold here.
+							Nothing they created is deleted, and they can be invited back.
+						</Modal.Description>
+					</Modal.Header>
+					<Modal.Body>
+						<FormAlert message={$removeMessage} class="mb-0" />
+					</Modal.Body>
+				</Modal.Card>
+				<Modal.Footer>
+					<Modal.Cancel>Cancel</Modal.Cancel>
 					<HoldToConfirm
 						class="h-9 px-4"
 						confirmLabel="Removed"
@@ -546,8 +564,8 @@
 					>
 						Hold to remove
 					</HoldToConfirm>
-				</Dialog.Footer>
+				</Modal.Footer>
 			</form>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
