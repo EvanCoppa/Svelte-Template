@@ -208,6 +208,35 @@ committed. Add a row to the `seed_users` list to add a user; add your own tables
 sample rows underneath, following the same `on conflict do nothing` shape so the
 file stays re-runnable.
 
+### Seeding a hosted database
+
+`seed.sql` never runs against a hosted project, so an account there starts with
+only the personal org `handle_new_user` made it — one entry in the team switcher,
+and none of the industry-shaped differences in the product visible.
+`scripts/seed-user-orgs.mjs` fills that one gap: it gives a user organizations in
+the industries and tiers listed at the top of the file, and nothing else.
+
+```bash
+npm run db:seed-orgs -- --email you@example.com            # print the plan
+npm run db:seed-orgs -- --email you@example.com --apply    # create them
+```
+
+It follows `PUBLIC_SUPABASE_URL` like `db:types` does, so with `.env.local` in
+place it targets the local stack — try it there first. Nothing is written without
+`--apply`, and re-running creates only what is missing, so the safe move on any
+doubt is to run it again and read the plan.
+
+Writing needs the service-role key: `industry_id` and `tier_id` are revoked from
+`authenticated`, so no browser session can set them. `npm run db:env` writes the
+local key; pass a hosted one for the length of one command rather than saving it
+to a file (the real environment beats `.env` and `.env.local`):
+
+```bash
+PUBLIC_SUPABASE_URL=https://<ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<secret key> \
+npm run db:seed-orgs -- --email you@example.com --apply
+```
+
 ## Database types (generated)
 
 The Supabase client is typed end to end: `locals.supabase`, the layout-load client, and
@@ -413,5 +442,6 @@ npm run db:start       # boot the local Supabase stack (Docker)
 npm run db:reset       # re-apply every migration, then supabase/seed.sql
 npm run db:env         # write .env.local pointing at the local stack
 npm run db:types       # regenerate src/lib/database.types.ts (local or hosted)
+npm run db:seed-orgs   # give one user organizations to switch between (any database)
 npm run format         # prettier (svelte + tailwind class sorting)
 ```
