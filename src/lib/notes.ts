@@ -96,8 +96,12 @@ export type NoteAccess = {
  * What the `(app)` layout ships to the dock, and a record page to its card:
  * the open notes, newest first, plus that access. Null when the notes feature
  * is not this org's — the dock then renders nothing at all.
+ *
+ * `docked` is the reader's own `notes.dock` preference. It hides the rail, not
+ * the feature: the dock component stays mounted so ⌥⌘L still opens every note
+ * (docs/user-preferences.md).
  */
-export type NoteDeck = NoteAccess & { open: Note[] };
+export type NoteDeck = NoteAccess & { open: Note[]; docked: boolean };
 
 /**
  * May this session edit this note? The grant AND the authorship rule the

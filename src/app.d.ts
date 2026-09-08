@@ -5,6 +5,7 @@ import type { Vocabulary } from '$lib/features/vocabulary';
 import type { PageMeta } from '$lib/features/types';
 import type { NavItem } from '$lib/navigation';
 import type { NoteDeck } from '$lib/notes';
+import type { Preferences } from '$lib/preferences';
 import type { OrgMembership } from '$lib/org';
 import type { OrgContext } from '$lib/server/org-context';
 
@@ -54,6 +55,12 @@ declare global {
 			 * no notes feature; absent outside the shell.
 			 */
 			noteDock?: NoteDeck | null;
+			/**
+			 * The signed-in user's account preferences, from the (app) layout:
+			 * every key resolved, fallbacks folded in — see
+			 * docs/user-preferences.md.
+			 */
+			preferences?: Preferences;
 			/** Every page this session may see, with its title, from the (app) layout. */
 			pages?: PageMeta[];
 			/**

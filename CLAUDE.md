@@ -506,6 +506,44 @@ version; read them before the website. The full account is `docs/assistant.md`.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
   the real agent with `MockLanguageModelV4` from `ai/test`.
 
+## User settings — three axes, three homes
+
+Switches accumulate, and which of three places one belongs in is not a style
+question: it decides whether it follows you to another laptop and whether the screen
+flickers on load. The full account is `docs/user-preferences.md`; the rules:
+
+- **The organization decides what exists.** Features on and off, tier, industry,
+  roles — the registry, edited at `/settings/features` by an owner or admin. Not a
+  preference; never duplicate one as a preference.
+- **The account decides how you work.** `user_preferences`, one row per key, private
+  to its owner (no policy grants anyone else's, not even an org owner's), loaded once
+  in the `(app)` layout and shipped as `page.data.preferences`. Written by the form
+  action on `/settings/preferences`.
+- **The device decides how it looks here.** `localStorage` (`$lib/theme.svelte` is
+  the pattern) or a **cookie** when the server must know before it renders (the
+  sidebar's collapsed state). Never anything you would mind losing: a private window
+  and cleared site data both read as "no value", and the answer is always the
+  documented default.
+- **Choosing between them**: would it apply to a colleague who never touched it? →
+  organization. Would you want it different on your laptop and your desktop? →
+  device. Does the browser have to answer before the server can render? → device, in
+  a cookie. Otherwise → account. "It must not flash" is _not_ a reason to reach for a
+  cookie: account preferences are loaded server-side too.
+- **Adding an account preference is one entry in `PREFERENCES`**
+  (`src/lib/preferences.ts`): a zod schema, a fallback, a label and a description —
+  plus the `feature` it belongs to, which is what keeps a switch for a feature the
+  org turned off from being offered at all. No migration (the table is key/value) and
+  no backfill (a key with no row _is_ the fallback), and the settings page renders
+  the registry rather than a hand-kept list.
+- A preference is **drawn by the `kind` its entry declares**, never by inspecting the
+  stored value — the rule a record's fields follow. Its value is parsed against its
+  own schema on the way in and on the way out, so a key whose type changed reads as
+  the fallback instead of poisoning every page.
+- The notes rail (`notes.dock`) is the worked example, and it hides **chrome, not the
+  feature**: the dock component stays mounted with the preference off so `⌥⌘L` still
+  opens every note. A preference that quietly takes a shortcut away is how people
+  stop trusting preferences.
+
 ## Navigation
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries

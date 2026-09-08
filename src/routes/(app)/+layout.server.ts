@@ -9,6 +9,7 @@ import { QUERY } from '$lib/queries';
 import { DOCK_NOTE_LIMIT, listNotes } from '$lib/server/crm/notes';
 import { listTiersWithFeatures, loadPageRegistry, loadVocabulary } from '$lib/server/features';
 import { noteAccess } from '$lib/server/notes';
+import { loadPreferences } from '$lib/server/preferences';
 import { hasGrant } from '$lib/server/roles';
 import type { LayoutServerLoad } from './$types';
 
@@ -29,6 +30,9 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// The dock hangs off the shell, not off a page, so its notes are loaded
 	// once here and refreshed by the one key every note surface invalidates.
 	depends(QUERY.notes);
+	// The reader's own switches, one of which decides whether the rail above
+	// is drawn at all (docs/user-preferences.md).
+	depends(QUERY.preferences);
 
 	const { organizations, activeOrg, features, access } = locals.org;
 	const canRead = (featureId: string) => hasGrant(access, featureId);
@@ -38,19 +42,29 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// unreadable feature ships nothing rather than an empty rail.
 	const notesShown = featureGateFor('/notes', features, canRead) === null;
 
-	// Reference data, read once per session (this load reruns only on the
-	// keys above), so the upgrade prompt opens anywhere without a round trip
-	// and the shell can title a page it navigates to without one either. The
-	// notes are not reference data: QUERY.notes above re-runs all of this
-	// whenever one is written, which is the price of one query key.
-	const [tiers, pages, vocabulary, openNotes] = await Promise.all([
+	// Reference data, read once per session (this load reruns only on the keys
+	// above), so the upgrade prompt opens anywhere without a round trip and the
+	// shell can title a page it navigates to without one either. The last two
+	// are not reference data: QUERY.notes and QUERY.preferences re-run all of
+	// this when one changes, which is the price of one query key each.
+	//
+	// The notes go out with the rest rather than waiting on the preference that
+	// decides whether to draw them: one round trip for everyone, and the only
+	// waste is a capped, indexed query for a reader who has notes and hides the
+	// rail. Serialising it would slow the common case to spare the rare one.
+	const [tiers, pages, vocabulary, preferences, openNotes] = await Promise.all([
 		listTiersWithFeatures(locals.supabase),
 		loadPageRegistry(locals.supabase),
 		loadVocabulary(locals.supabase, activeOrg.industryId),
+		loadPreferences(locals.supabase, locals.user.id),
 		notesShown
 			? listNotes(locals.supabase, activeOrg.id, { archived: false, limit: DOCK_NOTE_LIMIT })
 			: []
 	]);
+
+	// Hiding the rail hides the rail: the dock still mounts, so ⌥⌘L still
+	// works, and it simply has nothing to draw.
+	const docked = notesShown && preferences['notes.dock'];
 
 	return {
 		organizations,
@@ -70,7 +84,12 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		vocabulary,
 		// The rail the note dock draws down the edge of every screen, and what
 		// this session may do to it. Null keeps the dock off the page entirely.
-		noteDock: notesShown ? { open: openNotes, ...noteAccess(locals.org, locals.user.id) } : null,
+		noteDock: notesShown
+			? { open: docked ? openNotes : [], docked, ...noteAccess(locals.org, locals.user.id) }
+			: null,
+		// Every account preference, resolved: any page reads them from
+		// `page.data.preferences` without a round trip of its own.
+		preferences,
 		// What each plan above the org's own would unlock — the upgrade prompt's
 		// pitch, keyed like the nav on tier and mode (grants play no part).
 		plans: upgradePlans(tiers, features, activeOrg.tierId),

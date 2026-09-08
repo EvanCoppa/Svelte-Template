@@ -13,6 +13,7 @@ import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import PackageIcon from '@lucide/svelte/icons/package';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import ShieldIcon from '@lucide/svelte/icons/shield';
+import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
 import TicketIcon from '@lucide/svelte/icons/ticket';
@@ -40,6 +41,7 @@ export const ICONS = {
 	package: PackageIcon,
 	'receipt-text': ReceiptTextIcon,
 	shield: ShieldIcon,
+	'sliders-horizontal': SlidersHorizontalIcon,
 	sparkles: SparklesIcon,
 	'sticky-note': StickyNoteIcon,
 	ticket: TicketIcon,

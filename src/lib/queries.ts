@@ -15,6 +15,8 @@ export const QUERY = {
 	staff: 'app:staff',
 	/** The resolved feature map — the org's own opt-outs change it. */
 	features: 'app:features',
+	/** The signed-in user's account preferences (docs/user-preferences.md). */
+	preferences: 'app:preferences',
 	companies: 'app:companies',
 	contacts: 'app:contacts',
 	products: 'app:products',

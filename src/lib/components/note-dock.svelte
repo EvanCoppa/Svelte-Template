@@ -34,6 +34,10 @@
 	// Null when this org has no notes feature, or this user cannot read it:
 	// the layout ships nothing and the dock is not on the page at all.
 	let deck = $derived(page.data.noteDock ?? null);
+	// The reader's own `notes.dock` preference. False draws no rail while the
+	// component stays mounted, so the shortcut below still opens every note —
+	// the preference hides chrome, not the feature (docs/user-preferences.md).
+	let docked = $derived(deck?.docked ?? false);
 	let notes = $derived(deck?.open ?? []);
 
 	let fanned = $state(false);
@@ -89,7 +93,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if deck}
+{#if deck && docked}
 	<aside
 		aria-label="Notes"
 		class="fixed top-1/2 right-0 z-30 hidden -translate-y-1/2 md:block"

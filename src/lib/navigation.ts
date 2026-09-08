@@ -183,6 +183,12 @@ export const settingsNav: SettingsNavGroup[] = [
 				href: '/settings/security',
 				icon: 'shield',
 				aliases: ['password', 'sign in']
+			},
+			{
+				label: 'Preferences',
+				href: '/settings/preferences',
+				icon: 'sliders-horizontal',
+				aliases: ['theme', 'dark mode', 'notes rail', 'dock']
 			}
 		]
 	},

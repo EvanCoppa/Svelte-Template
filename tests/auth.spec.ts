@@ -633,6 +633,72 @@ test.describe('the notes page', () => {
 	});
 });
 
+test.describe('preferences', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	// An account preference outlives the test that set it — it is a row, not a
+	// fixture — so this puts the seeded user back the way the specs above
+	// expect to find them, whether or not the test got that far itself.
+	test.afterEach(async ({ page }) => {
+		await setRail(page, true);
+	});
+
+	/** Flip the notes rail and wait for the save to land. */
+	async function setRail(page: Page, on: boolean) {
+		await page.goto('/settings/preferences');
+		const rail = page.getByRole('switch', { name: 'Notes rail' });
+		await expect(async () => {
+			if ((await rail.getAttribute('aria-checked')) !== String(on)) await rail.click();
+			await expect(rail).toHaveAttribute('aria-checked', String(on), { timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		await page.getByRole('button', { name: 'Save preferences' }).click();
+		await expect(page.getByText('Preferences saved')).toBeVisible();
+	}
+
+	test('separates what stays on this device from what follows the account', async ({ page }) => {
+		await page.goto('/settings/preferences');
+
+		await expect(page).toHaveTitle('Preferences');
+		// The distinction is the point of the page, so it is on the page. Read
+		// off the card titles: the descriptions below them say the same words.
+		const titles = page.locator('[data-slot="card-title"]');
+		await expect(titles.filter({ hasText: 'On this device' })).toBeVisible();
+		await expect(titles.filter({ hasText: 'Your account' })).toBeVisible();
+		// Theme is the device one; the notes rail is the account one.
+		await expect(page.getByRole('switch', { name: 'Dark theme' })).toBeVisible();
+		await expect(page.getByRole('switch', { name: 'Notes rail' })).toBeVisible();
+	});
+
+	test('hides the notes rail without taking notes away', async ({ page }) => {
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+
+		await setRail(page, false);
+		await page.goto('/');
+		await expect(dock).toHaveCount(0);
+
+		// The preference hides chrome, not the feature: the page, the sidebar
+		// entry and the shortcut all still work. (Sidebar entries are buttons,
+		// not anchors — see the shell spec above.)
+		await expect(page.getByRole('button', { name: 'Notes' }).first()).toBeVisible();
+		// A shortcut is a handler like any other: it does nothing until the
+		// window listener is attached, so it is retried the way a click is.
+		await expect(async () => {
+			await page.keyboard.press('Meta+Alt+KeyL');
+			await expect(page).toHaveURL('/notes', { timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		await expect(page.getByText('Renewal call prep')).toBeVisible();
+
+		// Put it back, and prove the rail returns — a preference that cannot be
+		// undone is a trap.
+		await setRail(page, true);
+		await page.goto('/');
+		await expect(dock).toHaveCount(1);
+	});
+});
+
 test.describe('signing out', () => {
 	test('ends the session and re-arms the guard', async ({ page }) => {
 		await signIn(page);

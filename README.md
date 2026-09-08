@@ -384,6 +384,10 @@ out with their labels when you point at it, opening in place and saving itself 2
 after you stop typing. `⌥⌘L` opens `/notes`, which is all of them at once with a search
 box over titles and bodies and an archive shelf beside them.
 
+The rail is a per-user switch at `/settings/preferences` — turning it off hides the
+rail for you alone, and leaves the page, the sidebar entry and `⌥⌘L` working; an owner
+turning the notes feature off at `/settings/features` takes all of it from everyone.
+
 Underneath is a **general `notes` table**, not a sticky-note table: a note may point at
 any record through the same polymorphic link the rest of the schema uses, so a company's
 page shows the notes written about it and deleting that company detaches them rather
@@ -408,6 +412,9 @@ architecture, the tool contract and how to add a tool are in `docs/assistant.md`
 - [`docs/data-invalidation.md`](docs/data-invalidation.md) — the query-key convention:
   naming load dependencies with `depends('app:thing')` and refreshing them with
   targeted `invalidate()` instead of `invalidateAll()`.
+- [`docs/user-preferences.md`](docs/user-preferences.md) — the three axes a setting can
+  belong to (the organization's, your account's, this device's), which one to reach
+  for, and how account preferences are a registry rather than a column per switch.
 - [`docs/notes.md`](docs/notes.md) — the general notes table and the dock built on it:
   the document/timeline split, the one endpoint-instead-of-action in the app, and the
   autosave contract every note surface shares.
