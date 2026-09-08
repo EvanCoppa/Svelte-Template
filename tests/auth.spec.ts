@@ -513,6 +513,192 @@ test.describe('the workspace switcher', () => {
 	});
 });
 
+test.describe('the note dock', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	/**
+	 * The rail fans out on hover, which only answers once Svelte has hydrated —
+	 * so the hover is retried like every other pre-hydration interaction here.
+	 * The mouse leaves first on each attempt: hovering an element the pointer
+	 * is already sitting on dispatches no fresh `pointerenter`, so a retry
+	 * without this only ever repeats the miss.
+	 */
+	async function fan(page: Page) {
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+		await expect(async () => {
+			await page.mouse.move(0, 0);
+			await dock.hover();
+			await expect(dock.getByRole('button', { name: 'New note' })).toBeVisible({ timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		return dock;
+	}
+
+	test('docks one dash per open note to the edge of every screen', async ({ page }) => {
+		// seed.sql gives Acme three open notes and one archived: the rail draws
+		// the open ones and the archive stays off it. Counted as "at least",
+		// not exactly — the spec below writes a note, and a test that only
+		// passes when it runs first is a test that will fail one day.
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+		const dashes = dock.locator('[data-slot="note-dash"]');
+		await expect(dock.getByRole('button', { name: /^\d+ notes?$/ })).toBeVisible();
+		expect(await dashes.count()).toBeGreaterThanOrEqual(3);
+
+		// It is the shell's, not the dashboard's: it follows you to another page.
+		await page.goto('/companies');
+		await expect(dock.getByRole('button', { name: /^\d+ notes?$/ })).toBeVisible();
+		expect(await dashes.count()).toBeGreaterThanOrEqual(3);
+	});
+
+	test('fans out with a label per note, and opens one in place', async ({ page }) => {
+		const dock = await fan(page);
+
+		await expect(dock.getByRole('button', { name: 'Renewal call prep' })).toBeVisible();
+		// An untitled note is named by its first line.
+		await expect(
+			dock.getByRole('button', { name: 'Procurement freeze lifts on the 14th.' })
+		).toBeVisible();
+
+		await dock.getByRole('button', { name: 'Renewal call prep' }).click();
+		// Somebody else wrote this one, so it opens as text: the policy would
+		// refuse the save, and the editor is not offered where it cannot land.
+		await expect(dock.getByText(/Ask about the second site/)).toBeVisible();
+		await expect(dock.getByLabel('Note', { exact: true })).toHaveCount(0);
+	});
+
+	test('writes a note from any screen and keeps it', async ({ page }) => {
+		const words = `note from the dock ${Date.now()}`;
+		const dock = await fan(page);
+
+		await dock.getByRole('button', { name: 'New note' }).click();
+		// A new note is created blank and typed into — its own author, so this
+		// one is editable.
+		const body = dock.getByLabel('Note', { exact: true });
+		await expect(body).toBeVisible();
+		await body.fill(words);
+
+		// Leaving the editor flushes the autosave; the rail re-reads itself from
+		// the same query key, so the label appearing IS the save having landed.
+		await dock.getByRole('button', { name: 'All notes' }).click();
+		await expect(dock.getByRole('button', { name: words })).toBeVisible();
+
+		// It came from the server, not from client memory.
+		await page.reload();
+		await (await fan(page)).getByRole('button', { name: words }).isVisible();
+		await page.goto('/notes');
+		await expect(page.getByText(words)).toBeVisible();
+	});
+});
+
+test.describe('the notes page', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+		await page.goto('/notes');
+	});
+
+	test('opens every note in one window, archive behind its own shelf', async ({ page }) => {
+		// Titled from the `pages` row like every other feature page.
+		await expect(page).toHaveTitle('Notes');
+		await expect(page.getByText('Renewal call prep')).toBeVisible();
+		await expect(page.getByText('Old standup order')).toHaveCount(0);
+
+		await clickWhenLive(page.getByRole('tab', { name: 'Archived' }), () =>
+			expect(page.getByText('Old standup order')).toBeVisible()
+		);
+		await expect(page.getByText('Renewal call prep')).toHaveCount(0);
+	});
+
+	test('searches titles and bodies as you type', async ({ page }) => {
+		const search = page.getByLabel('Search notes');
+		// Filtering happens in the browser, so it only answers once hydrated.
+		await expect(async () => {
+			await search.fill('procurement');
+			await expect(page.getByText('Renewal call prep')).toHaveCount(0);
+		}).toPass({ timeout: 20_000 });
+
+		// Matched on its body: that note has no title at all.
+		await expect(page.getByText(/Procurement freeze lifts/)).toBeVisible();
+	});
+
+	test('shows a record the notes written about it', async ({ page }) => {
+		// The general table's whole point: the same note the dock carries is
+		// the one this company shows, through the shared entity link.
+		await page.goto('/companies/20000000-0000-0000-0000-000000000001');
+
+		const notes = page.locator('[data-slot="card"]', { has: page.getByText('Renewal call prep') });
+		await expect(notes.getByText(/Ask about the second site/)).toBeVisible();
+	});
+});
+
+test.describe('preferences', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	// An account preference outlives the test that set it — it is a row, not a
+	// fixture — so this puts the seeded user back the way the specs above
+	// expect to find them, whether or not the test got that far itself.
+	test.afterEach(async ({ page }) => {
+		await setRail(page, true);
+	});
+
+	/** Flip the notes rail and wait for the save to land. */
+	async function setRail(page: Page, on: boolean) {
+		await page.goto('/settings/preferences');
+		const rail = page.getByRole('switch', { name: 'Notes rail' });
+		await expect(async () => {
+			if ((await rail.getAttribute('aria-checked')) !== String(on)) await rail.click();
+			await expect(rail).toHaveAttribute('aria-checked', String(on), { timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		await page.getByRole('button', { name: 'Save preferences' }).click();
+		await expect(page.getByText('Preferences saved')).toBeVisible();
+	}
+
+	test('separates what stays on this device from what follows the account', async ({ page }) => {
+		await page.goto('/settings/preferences');
+
+		await expect(page).toHaveTitle('Preferences');
+		// The distinction is the point of the page, so it is on the page. Read
+		// off the card titles: the descriptions below them say the same words.
+		const titles = page.locator('[data-slot="card-title"]');
+		await expect(titles.filter({ hasText: 'On this device' })).toBeVisible();
+		await expect(titles.filter({ hasText: 'Your account' })).toBeVisible();
+		// Theme is the device one; the notes rail is the account one.
+		await expect(page.getByRole('switch', { name: 'Dark theme' })).toBeVisible();
+		await expect(page.getByRole('switch', { name: 'Notes rail' })).toBeVisible();
+	});
+
+	test('hides the notes rail without taking notes away', async ({ page }) => {
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+
+		await setRail(page, false);
+		await page.goto('/');
+		await expect(dock).toHaveCount(0);
+
+		// The preference hides chrome, not the feature: the page, the sidebar
+		// entry and the shortcut all still work. (Sidebar entries are buttons,
+		// not anchors — see the shell spec above.)
+		await expect(page.getByRole('button', { name: 'Notes' }).first()).toBeVisible();
+		// A shortcut is a handler like any other: it does nothing until the
+		// window listener is attached, so it is retried the way a click is.
+		await expect(async () => {
+			await page.keyboard.press('Meta+Alt+KeyL');
+			await expect(page).toHaveURL('/notes', { timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		await expect(page.getByText('Renewal call prep')).toBeVisible();
+
+		// Put it back, and prove the rail returns — a preference that cannot be
+		// undone is a trap.
+		await setRail(page, true);
+		await page.goto('/');
+		await expect(dock).toHaveCount(1);
+	});
+});
+
 test.describe('signing out', () => {
 	test('ends the session and re-arms the guard', async ({ page }) => {
 		await signIn(page);

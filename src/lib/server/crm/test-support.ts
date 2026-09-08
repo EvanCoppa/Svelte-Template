@@ -19,6 +19,7 @@ const METHODS = [
 	'gte',
 	'in',
 	'is',
+	'not',
 	'order',
 	'limit',
 	'single',

@@ -377,6 +377,24 @@ is set, hard-refuses on `VERCEL_ENV=production`, `/logout` still signs out (an o
 cookie stops instant re-login; clear it by visiting any page with `?autologin=1`), and
 the `/auth` emailed-link flows keep their signed-out behavior.
 
+## Notes
+
+Every screen carries a note dock on its right edge: one colored dash per note, fanned
+out with their labels when you point at it, opening in place and saving itself 250 ms
+after you stop typing. `⌥⌘L` opens `/notes`, which is all of them at once with a search
+box over titles and bodies and an archive shelf beside them.
+
+The rail is a per-user switch at `/settings/preferences` — turning it off hides the
+rail for you alone, and leaves the page, the sidebar entry and `⌥⌘L` working; an owner
+turning the notes feature off at `/settings/features` takes all of it from everyone.
+
+Underneath is a **general `notes` table**, not a sticky-note table: a note may point at
+any record through the same polymorphic link the rest of the schema uses, so a company's
+page shows the notes written about it and deleting that company detaches them rather
+than shredding them. The table, why it is not `activities`, and why writing a note is
+this app's one API endpoint instead of a form action are in
+[`docs/notes.md`](docs/notes.md).
+
 ## AI assistant
 
 `/assistant` is a chat over the organization's data, built on the Vercel AI SDK. Set
@@ -394,6 +412,12 @@ architecture, the tool contract and how to add a tool are in `docs/assistant.md`
 - [`docs/data-invalidation.md`](docs/data-invalidation.md) — the query-key convention:
   naming load dependencies with `depends('app:thing')` and refreshing them with
   targeted `invalidate()` instead of `invalidateAll()`.
+- [`docs/user-preferences.md`](docs/user-preferences.md) — the three axes a setting can
+  belong to (the organization's, your account's, this device's), which one to reach
+  for, and how account preferences are a registry rather than a column per switch.
+- [`docs/notes.md`](docs/notes.md) — the general notes table and the dock built on it:
+  the document/timeline split, the one endpoint-instead-of-action in the app, and the
+  autosave contract every note surface shares.
 
 ## Deploying to Vercel
 

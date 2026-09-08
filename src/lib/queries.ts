@@ -15,6 +15,8 @@ export const QUERY = {
 	staff: 'app:staff',
 	/** The resolved feature map — the org's own opt-outs change it. */
 	features: 'app:features',
+	/** The signed-in user's account preferences (docs/user-preferences.md). */
+	preferences: 'app:preferences',
 	companies: 'app:companies',
 	contacts: 'app:contacts',
 	products: 'app:products',
@@ -22,6 +24,8 @@ export const QUERY = {
 	proposals: 'app:proposals',
 	billables: 'app:billables',
 	quickPlans: 'app:quick-plans',
+	/** Every note the session can see: the dock's rail and the /notes page share it. */
+	notes: 'app:notes',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

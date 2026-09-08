@@ -316,6 +316,29 @@ insert into public.activities (id, org_id, entity_type, entity_id, type, directi
 		now() - interval '5 days', null, '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
+-- Sticky notes, the other half of "somebody wrote something down": documents
+-- that stay open, not moments that happened (the notes migration explains the
+-- split). One attached to a company, one to a deal, one loose, and one
+-- archived — the four states the dock and /notes have to render.
+insert into public.notes (id, org_id, entity_type, entity_id, title, body, color, archived_at, author_id) values
+	('d0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000001', 'Renewal call prep',
+		E'Ask about the second site.\nLucius wants the mid tier — hold the 12% discount back until he pushes.',
+		'warning', null, '00000000-0000-0000-0000-000000000001'),
+	('d0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'deal', '40000000-0000-0000-0000-000000000001', null,
+		E'Procurement freeze lifts on the 14th. Nothing signs before then.',
+		'info', null, '00000000-0000-0000-0000-000000000003'),
+	('d0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, null, 'Scratch',
+		E'wifi guest password: gotham-2026\nprinter is on the third floor',
+		'cyan', null, '00000000-0000-0000-0000-000000000001'),
+	('d0000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		null, null, 'Old standup order',
+		E'Dev, then E2E, then Evan. Superseded by the rota.',
+		'neutral', now() - interval '3 days', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
 insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
 	('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
