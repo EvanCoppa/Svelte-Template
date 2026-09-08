@@ -231,6 +231,7 @@ don't add hand-written compounds to either shelf.
 - Follow the `svelte-code-writer` skill's tooling for every `.svelte` /
   `.svelte.ts` file you touch, and check live Svelte docs (`/llms.txt` routes) for
   any runes/snippet API you're unsure of.
-- `npm run check`, `npm run lint`, and `npm run knip` all stay at zero — knip will
-  flag unused `index.ts` aliases if you export parts nothing uses yet; export only
-  what exists.
+- Export only what exists — knip flags unused `index.ts` aliases if you export parts
+  nothing uses yet. CI runs `npm run check`, `npm run lint:oxlint` and `npm run knip`;
+  don't run them here (see "Verification" in CLAUDE.md). The zero-findings standard is
+  unchanged.

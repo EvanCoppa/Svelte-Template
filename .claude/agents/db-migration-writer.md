@@ -56,5 +56,8 @@ applied one.
    `database.types.ts`.
 3. Confirm no untyped `.from()` slips in: row types come from the `Tables<'name'>`
    aliases; every client stays `SupabaseClient<Database>`.
-4. Run `npm run check` and `npm test` to catch type fallout, and report the migration
-   file, the tables/policies it creates, and the type-regeneration status.
+4. Don't run `npm run check` or `npm test` for type fallout — CI's `svelte-check`, `tests`
+   and `database` jobs cover it (see "Verification" in CLAUDE.md). `npm run db:reset` and
+   `npm run db:types` against the local stack are still yours: they author the change
+   rather than check it. Report the migration file, the tables/policies it creates, and
+   the type-regeneration status.

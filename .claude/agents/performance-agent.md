@@ -56,4 +56,5 @@ only when the task asks for them, and then one at a time, re-measuring each.
 
 Baseline number → bottleneck at `file:line` with the mechanism → fix (applied with
 after-number, or proposed with expected impact) → what you deliberately didn't optimize.
-`npm run check` / `lint` / `test` stay green on anything you changed.
+The standard `npm run check` / `lint` / `test` enforce still holds on anything you
+changed — CI runs them, you don't (see "Verification" in CLAUDE.md).

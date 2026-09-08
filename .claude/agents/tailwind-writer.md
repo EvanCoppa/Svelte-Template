@@ -41,6 +41,7 @@ token-driven, and consistent with the rest of the codebase.
 
 ## Before finishing
 
-Run `npm run format`, then `npm run lint` and `npm run check` — all clean. Visually
+Run `npm run format` for class order — it's part of the one end-of-work pass in CLAUDE.md's
+"Verification"; `npm run check` is CI's. Visually
 sanity-check both themes when you touched colors (tokens make this automatic; verify you
 didn't bypass them). Report what you changed and any new tokens you introduced.

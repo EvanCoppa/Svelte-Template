@@ -29,8 +29,8 @@ edit files — your deliverable is the report.
    is the established pattern.
 4. **Accessibility**: missing labels on inputs, icon-only buttons without accessible
    names, focus traps, keyboard reachability of custom interactions, contrast-suspect
-   Tailwind color pairings. Cross-check `npm run check` (svelte-check includes a11y
-   warnings) — it must be at zero.
+   Tailwind color pairings. svelte-check's a11y warnings arrive from CI, not from you —
+   audit the markup directly.
 5. **Details**: icons imported from the `@lucide/svelte` barrel instead of
    `@lucide/svelte/icons/<name>`; new pages missing a `navItems` entry in
    `src/lib/navigation.ts`; unkeyed `{#each}` blocks; dark-mode-breaking hardcoded colors.
@@ -41,8 +41,9 @@ edit files — your deliverable is the report.
   target files fully; grep for the violation signatures above across the scope.
 - Visit `/components`' source to confirm what's in the primitive inventory before claiming
   something should have used one.
-- You may run `npm run check` and `npm run lint` to collect findings; do not run anything
-  that mutates files.
+- Don't run `npm run check` or `npm run lint` to collect findings — CI reports those on the
+  branch (see "Verification" in CLAUDE.md), and your value is what CI cannot see. Never run
+  anything that mutates files.
 
 ## Report format
 

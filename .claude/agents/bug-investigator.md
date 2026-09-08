@@ -16,9 +16,10 @@ buries the real cause.
 ## Method
 
 1. **Reproduce or trace first.** Get the exact symptom: error text, wrong value, which
-   route/action. Reproduce with the narrowest harness available — `npm test` for
-   server logic (you may add a temporary failing test in your scratchpad or run one-off
-   node/vitest scripts; don't commit them), `npm run dev` + curl for route behavior.
+   route/action. Reproduce with the narrowest harness available — a single spec via
+   `npx vitest run <spec>` for server logic (you may add a temporary failing test in your
+   scratchpad or run one-off node/vitest scripts; don't commit them), `npm run dev` + curl
+   for route behavior. Never the whole suite: see "Verification" in CLAUDE.md.
 2. **Trace the data path end to end** before forming a theory: migration/RLS policy →
    query in the load or action → serialization boundary → `$derived`/`$state` in the
    component → what renders. Most bugs here live at one of these seams.
