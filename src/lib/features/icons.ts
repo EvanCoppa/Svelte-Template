@@ -3,14 +3,16 @@ import BlocksIcon from '@lucide/svelte/icons/blocks';
 import BookOpenIcon from '@lucide/svelte/icons/book-open';
 import Building2Icon from '@lucide/svelte/icons/building-2';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
+import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import PackageIcon from '@lucide/svelte/icons/package';
-import SettingsIcon from '@lucide/svelte/icons/settings';
+import ShieldIcon from '@lucide/svelte/icons/shield';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import TicketIcon from '@lucide/svelte/icons/ticket';
+import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import UsersIcon from '@lucide/svelte/icons/users';
 
 /**
@@ -24,14 +26,16 @@ export const ICONS = {
 	blocks: BlocksIcon,
 	'book-open': BookOpenIcon,
 	'building-2': Building2Icon,
+	'circle-user': CircleUserIcon,
 	contact: ContactIcon,
 	handshake: HandshakeIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
 	package: PackageIcon,
-	settings: SettingsIcon,
+	shield: ShieldIcon,
 	sparkles: SparklesIcon,
 	ticket: TicketIcon,
+	'toggle-right': ToggleRightIcon,
 	users: UsersIcon
 } satisfies Record<string, NavIcon>;
 

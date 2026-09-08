@@ -16,6 +16,11 @@ import type { FeatureMap } from '$lib/features/types';
  * icon barrel never lands in the bundle. Categories render as labeled
  * sidebar sections in the order declared in NAV_CATEGORIES; empty categories
  * are omitted.
+ *
+ * Settings is deliberately NOT one of them. It is a shell of its own,
+ * entered from the user menu in the sidebar footer, and once you are inside
+ * it the sidebar becomes `settingsNav` below — so the app nav lists the
+ * places you work, never the place you configure them.
  */
 
 export type NavCategoryKey = 'platform' | 'library';
@@ -56,14 +61,6 @@ export const staticNavItems: NavItem[] = [
 		icon: 'layout-dashboard',
 		sortOrder: 0,
 		aliases: ['home', 'overview']
-	},
-	{
-		label: 'Settings',
-		href: '/settings',
-		category: 'platform',
-		icon: 'settings',
-		sortOrder: 900,
-		aliases: ['account', 'password', 'profile', 'features', 'plan']
 	}
 ];
 
@@ -111,7 +108,71 @@ export function groupNav(items: NavItem[]): NavGroup[] {
 }
 
 /** Exact match for the root page, prefix match for everything else. */
-export function isNavItemActive(item: NavItem, pathname: string): boolean {
+export function isNavItemActive(item: { href: string }, pathname: string): boolean {
 	if (item.href === '/') return pathname === '/';
 	return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+/**
+ * The settings shell's own nav — the second half of this file.
+ *
+ * Settings is entered from the user menu, and while you are under
+ * `/settings` the sidebar swaps to these sections
+ * (`$lib/components/settings-sidebar.svelte`). It is a hand-kept list, not a
+ * registry read: these pages exist for every org regardless of industry,
+ * tier or role, which is exactly why they are exempt from the feature gate
+ * (see FEATURE_GATE_EXEMPT_PREFIXES in `$lib/features/gate`).
+ *
+ * Adding a settings page = the route under `(app)/settings/`, one entry
+ * here, and its `pages` row by migration for the title. Groups render in
+ * declared order.
+ */
+export interface SettingsNavItem {
+	label: string;
+	href: string;
+	/** A lucide slug; `iconFor()` in `$lib/features/icons` turns it into a component. */
+	icon: string;
+	/** Extra search keywords for the ⌘K palette. */
+	aliases?: string[];
+}
+
+export interface SettingsNavGroup {
+	label: string;
+	items: SettingsNavItem[];
+}
+
+export const settingsNav: SettingsNavGroup[] = [
+	{
+		label: 'Account',
+		items: [
+			{
+				label: 'Profile',
+				href: '/settings/profile',
+				icon: 'circle-user',
+				aliases: ['display name', 'email', 'account']
+			},
+			{
+				label: 'Security',
+				href: '/settings/security',
+				icon: 'shield',
+				aliases: ['password', 'sign in']
+			}
+		]
+	},
+	{
+		label: 'Organization',
+		items: [
+			{
+				label: 'Features',
+				href: '/settings/features',
+				icon: 'toggle-right',
+				aliases: ['plan', 'modules', 'upgrade']
+			}
+		]
+	}
+];
+
+/** Every settings entry, flattened — what the ⌘K palette lists. */
+export function settingsNavItems(): SettingsNavItem[] {
+	return settingsNav.flatMap((group) => group.items);
 }
