@@ -1,4 +1,10 @@
-import { renderComponent, type ColumnHelper, type RowData } from '@tanstack/svelte-table';
+import {
+	renderComponent,
+	type CellContext,
+	type ColumnDefTemplate,
+	type ColumnHelper,
+	type RowData
+} from '@tanstack/svelte-table';
 import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 import type { DataTableFeatures } from './features.js';
 
@@ -32,6 +38,27 @@ export function selectColumn<TData extends RowData>(
 				onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
 				'aria-label': 'Select row'
 			}),
+		enableSorting: false,
+		enableHiding: false
+	});
+}
+
+/**
+ * The row-actions column: no header label — the "…" trigger every row renders
+ * is self-explanatory — and pinned narrow at the end of the row, the same
+ * shape on every table that has one. Pass the page's own row-actions cell
+ * (typically a `renderComponent` of a `RowActions`-style dropdown); this
+ * helper only fixes the column's id and chrome, since what a row can do is
+ * different per table.
+ */
+export function actionsColumn<TData extends RowData>(
+	columnHelper: ColumnHelper<DataTableFeatures, TData>,
+	cell: ColumnDefTemplate<CellContext<DataTableFeatures, TData, unknown>>
+) {
+	return columnHelper.display({
+		id: 'actions',
+		header: () => '',
+		cell,
 		enableSorting: false,
 		enableHiding: false
 	});

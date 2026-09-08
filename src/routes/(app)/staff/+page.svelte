@@ -128,18 +128,15 @@
 					renderComponent(DataTable.ColumnHeader, { column, title: 'Joined' }),
 				cell: ({ getValue }) => formatDate(getValue())
 			}),
-			columnHelper.display({
-				id: 'actions',
-				header: () => 'Actions',
-				cell: ({ row }) =>
-					renderComponent(Staff.RowActions, {
-						name: Staff.memberName(row.original),
-						canAssignRoles: data.canAssignRoles,
-						canRemove: canRemoveMember(row.original),
-						onManage: () => (managingId = row.original.userId),
-						onRemove: () => (removingId = row.original.userId)
-					})
-			})
+			DataTable.actionsColumn(columnHelper, ({ row }) =>
+				renderComponent(Staff.RowActions, {
+					name: Staff.memberName(row.original),
+					canAssignRoles: data.canAssignRoles,
+					canRemove: canRemoveMember(row.original),
+					onManage: () => (managingId = row.original.userId),
+					onRemove: () => (removingId = row.original.userId)
+				})
+			)
 		]);
 		if (data.canAssignRoles || data.canRemove) return defs;
 		return defs.filter((def) => def.id !== 'actions');
