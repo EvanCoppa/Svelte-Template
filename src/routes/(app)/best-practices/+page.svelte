@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 
@@ -64,27 +65,9 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Best practices</h1>
-		<p class="text-muted-foreground">
-			The conventions this template is built around. The long-form versions live in
-			<code>docs/sveltekit-best-practices.md</code> and <code>docs/data-invalidation.md</code>; when
-			in doubt, the
-			<a
-				class="underline underline-offset-4"
-				href="https://svelte.dev/docs/kit"
-				target="_blank"
-				rel="noreferrer">SvelteKit docs</a
-			>
-			and
-			<a
-				class="underline underline-offset-4"
-				href="https://supabase.com/docs/guides/auth/server-side"
-				target="_blank"
-				rel="noreferrer">Supabase SSR guide</a
-			> win.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Best practices</PageHeader.Title>
+	</PageHeader.Root>
 
 	{#each sections as section (section.title)}
 		<Card.Root>

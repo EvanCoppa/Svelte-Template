@@ -71,6 +71,7 @@
 	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
+	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
@@ -1135,17 +1136,9 @@
 </script>
 
 <div class="mx-auto max-w-5xl space-y-6">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Components</h1>
-		<p class="text-muted-foreground">
-			Every component this template ships: the shadcn-svelte primitives in
-			<code>src/lib/components/ui/</code> and the motion-aware controls ported from Solid Core's
-			<code>interior</code> collection in <code>src/lib/components/enhanced/</code>. Both are plain
-			Svelte files in your repo — edit them, don't fight them. Where a job has two takes, they sit
-			side by side so you can compare. Reach for <code>ui/</code> first; drop into
-			<code>enhanced/</code> only when it has no answer for the job.
-		</p>
-	</div>
+	<PageHeader.Root>
+		<PageHeader.Title>Components</PageHeader.Title>
+	</PageHeader.Root>
 
 	<div class="grid gap-6 lg:grid-cols-2">
 		<div class="lg:col-span-2">
