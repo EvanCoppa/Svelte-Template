@@ -92,6 +92,29 @@ describe('the trail', () => {
 		expect(breadcrumbs.crumbsIn(scope).map((c) => c.path)).toEqual(['/companies', '/deals']);
 	});
 
+	it('counts a door that redirects into a section as the one jump it was', () => {
+		const scope = 'door:acme';
+		breadcrumbs.visit(scope, crumb('/companies'));
+
+		// The user menu points at /settings, which redirects to its first
+		// section: still the jump that was declared, so the trail starts over
+		// there rather than hanging Profile off Companies.
+		breadcrumbs.startAt('/settings');
+		breadcrumbs.visit(scope, crumb('/settings/profile'));
+		expect(breadcrumbs.crumbsIn(scope).map((c) => c.path)).toEqual(['/settings/profile']);
+	});
+
+	it('never counts the whole app as a jump to the dashboard', () => {
+		const scope = 'root:acme';
+		breadcrumbs.visit(scope, crumb('/companies'));
+
+		// '/' is matched exactly, or every page would look like the page the
+		// dashboard entry jumped to.
+		breadcrumbs.startAt('/');
+		breadcrumbs.visit(scope, crumb('/companies/42'));
+		expect(breadcrumbs.crumbsIn(scope).map((c) => c.path)).toEqual(['/companies', '/companies/42']);
+	});
+
 	it('rewinds to the crumb a back navigation lands on', () => {
 		const scope = 'back:acme';
 		breadcrumbs.visit(scope, crumb('/companies'));

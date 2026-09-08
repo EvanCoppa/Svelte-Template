@@ -80,35 +80,3 @@
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
-
-<style>
-	:global(.scrollable-sidebar) {
-		overflow-y: auto;
-		scrollbar-width: none; /* Firefox */
-		-ms-overflow-style: none; /* IE and Edge */
-		-webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
-		mask-image: linear-gradient(to bottom, black calc(100% - 4rem), transparent 100%);
-	}
-
-	:global(.scrollable-sidebar::-webkit-scrollbar) {
-		display: none; /* Chrome, Safari, Opera */
-	}
-
-	:global(.nav-hover-effect) {
-		transition: all 0.3s ease;
-	}
-
-	:global(.nav-hover-effect:hover) {
-		transform: translateX(4px);
-	}
-
-	:global(.nav-active) {
-		background-color: white;
-		border-radius: 0.5rem;
-	}
-
-	/* A white active pill would flare on the dark sidebar — use its accent. */
-	:global(html.dark .nav-active) {
-		background-color: var(--sidebar-accent);
-	}
-</style>

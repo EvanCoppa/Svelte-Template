@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureMap, FeatureMode } from './features/types';
-import { buildNav, groupNav, isNavItemActive, staticNavItems } from './navigation';
+import { isIconName } from './features/icons';
+import {
+	buildNav,
+	groupNav,
+	isNavItemActive,
+	settingsNav,
+	settingsNavItems,
+	staticNavItems
+} from './navigation';
 
 function map(
 	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
@@ -66,16 +74,9 @@ describe('buildNav', () => {
 			]),
 			readAll
 		);
-		expect(nav.map((i) => i.label)).toEqual([
-			'Dashboard',
-			'Early',
-			'Alpha',
-			'Zeta',
-			'Settings',
-			'Docs'
-		]);
+		expect(nav.map((i) => i.label)).toEqual(['Dashboard', 'Early', 'Alpha', 'Zeta', 'Docs']);
 		expect(groupNav(nav).map((g) => [g.key, g.items.length])).toEqual([
-			['platform', 5],
+			['platform', 4],
 			['library', 1]
 		]);
 	});
@@ -105,5 +106,27 @@ describe('isNavItemActive', () => {
 		expect(isNavItemActive(staff, '/staff')).toBe(true);
 		expect(isNavItemActive(staff, '/staff/123')).toBe(true);
 		expect(isNavItemActive(staff, '/staffing')).toBe(false);
+	});
+});
+
+describe('settingsNav', () => {
+	it('stays out of the app nav — settings is entered from the user menu', () => {
+		const nav = buildNav(map([['companies', 'enabled']]), readAll);
+		expect(nav.some((item) => item.href.startsWith('/settings'))).toBe(false);
+	});
+
+	it('lists every section under /settings with an icon the app ships', () => {
+		const items = settingsNavItems();
+		expect(items.length).toBe(settingsNav.reduce((n, g) => n + g.items.length, 0));
+		for (const item of items) {
+			expect(item.href.startsWith('/settings/')).toBe(true);
+			expect(isIconName(item.icon)).toBe(true);
+		}
+	});
+
+	it('marks the section you are on, and only that one', () => {
+		const [profile, security] = settingsNav[0].items;
+		expect(isNavItemActive(profile, '/settings/profile')).toBe(true);
+		expect(isNavItemActive(security, '/settings/profile')).toBe(false);
 	});
 });

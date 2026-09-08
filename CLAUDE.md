@@ -352,7 +352,7 @@ fields (passwords) before returning a form from an action — superforms echoes
 `form.data` back to the browser. The full convention, including multiple forms per
 page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
-/settings are the reference implementations.
+/settings/profile are the reference implementations.
 
 ## Data loading & invalidation
 
@@ -420,7 +420,7 @@ version; read them before the website. The full account is `docs/assistant.md`.
 
 `src/lib/navigation.ts` drives both the sidebar and the ⌘K palette, and the entries
 come from the feature registry: `buildNav()` (called in the `(app)` layout load) merges
-`staticNavItems` (Dashboard, Settings — the pages every org has) with every feature
+`staticNavItems` (Dashboard — the pages every org has) with every feature
 that is `enabled` or `locked_visible` for the active org and readable by the user.
 Adding a page = create the route under `(app)` + register the feature and its `pages`
 row by migration; nothing in `navigation.ts` changes, and the page's `<title>` comes
@@ -430,24 +430,37 @@ navigating. Icons are named by lucide slug (`features.icon`) and resolved
 only through the one-per-file map in `src/lib/features/icons.ts` — add a slug there
 when a feature needs it; never the barrel import.
 
+**Settings is its own shell, not a nav entry.** It is reached from the user menu in the
+sidebar footer (`nav-user.svelte`), and while the pathname is under `/settings` the
+`(app)` layout swaps `AppSidebar` for `SettingsSidebar`, whose sections are the
+hand-kept `settingsNav` list at the bottom of `navigation.ts` — a list, not a registry
+read, because these pages exist for every org and are exempt from the feature gate.
+`/settings` itself only redirects to the first section. Adding a settings page = the
+route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
+the settings sidebar and the palette's Settings group both render from that one list.
+Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
 The header carries a **breadcrumb trail**: how deep this tab has gone since it last
-jumped from the shell, newest last, capped at `MAX_CRUMBS` (3). It is a **depth trail,
-not a hierarchy** — these pages are siblings under one shell and the same screen is
-reached from a dozen places, so a tree read off the URL would be fiction (a contact
+jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
+trail, not a hierarchy** — these pages are siblings under one shell and the same screen
+is reached from a dozen places, so a tree read off the URL would be fiction (a contact
 opened from `/treatments` shows _Treatments › Contact_, not _Contacts › Contact_). The
 depth is the walk actually taken: **a click in a shell surface starts the trail over at
-depth 1** (the sidebar, the ⌘K palette and the user menu each call
-`breadcrumbs.startAt(href)` immediately before their `goto(href)` — a surface that
-navigates without pairing the two would look like a step deeper), a link inside a page
-pushes onto it, and landing on a page the trail already holds truncates back to it, so
-the trail only grows by going deeper. Browser back rewinds it — to the crumb it lands on,
-or to that page alone when it lands outside the trail. All of that behaviour is in
-`src/lib/breadcrumbs.svelte.ts`; `src/lib/components/breadcrumbs.svelte` records one
-visit in `afterNavigate` and renders the trail with `ui/breadcrumb`. Crumbs are named by
-the same `titleFor()` that titles the document, so a page never has two names, and the
-trail lives in `sessionStorage` keyed by user + org (this tab's own; no cookie on every
-request, and switching org or user starts a fresh one). Never add a second breadcrumb
-surface, a per-page crumb prop, or a hierarchy-from-the-URL variant.
+depth 1** — the app sidebar, the settings sidebar, the ⌘K palette and the user menu each
+call `breadcrumbs.startAt(href)` immediately before navigating, so a new surface that
+navigates must pair the two or its jumps read as steps deeper — while a link inside a
+page pushes onto the trail, and landing on a page the trail already holds truncates back
+to it, so the trail only grows by going deeper. A jump is matched to the page that
+arrives with `isPathUnder()`, the same rule that marks the sidebar active, so a door like
+`/settings` redirecting into its first section is still that jump. Browser back rewinds
+the trail — to the crumb it lands on, or to that page alone when it lands outside. All of
+that behaviour is in `src/lib/breadcrumbs.svelte.ts`;
+`src/lib/components/breadcrumbs.svelte` records one visit in `afterNavigate` and renders
+the trail with `ui/breadcrumb`. Crumbs are named by the same `titleFor()` that titles the
+document, so a page never has two names, and the trail lives in `sessionStorage` keyed by
+user + org (this tab's own; no cookie on every request, and switching org or user starts a
+fresh one). Never add a second breadcrumb surface, a per-page crumb prop, or a
+hierarchy-from-the-URL variant.
 
 ## Svelte reference docs
 

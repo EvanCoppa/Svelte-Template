@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { z } from 'zod';
+import { isPathUnder } from '$lib/navigation';
 
 /**
  * The breadcrumb trail: how far this tab has gone since it last jumped from
@@ -85,10 +86,11 @@ function createBreadcrumbTrail() {
 		 * sidebar, the ⌘K palette, the user menu — rather than a step deeper
 		 * into the page someone is on. Arriving at `href` restarts the trail
 		 * there: reaching a page that way is a depth of one, however deep the
-		 * trail had gone. Call it immediately before `goto()`; the page that
-		 * arrives has to be exactly `href`, so a jump that redirects somewhere
-		 * else is recorded as an ordinary step instead of the wrong page's
-		 * root.
+		 * trail had gone. Call it immediately before navigating; the page that
+		 * arrives has to sit at `href` or inside it — a door like `/settings`
+		 * redirecting into its first section is still this jump, while a jump
+		 * that ends up somewhere else entirely is recorded as an ordinary step
+		 * rather than the wrong page's root.
 		 */
 		startAt(href: string): void {
 			jumpingTo = href;
@@ -113,7 +115,7 @@ function createBreadcrumbTrail() {
 			// A declared jump is spent by the next navigation recorded, whether
 			// or not that is the one declared, so a jump that never arrived can
 			// never be mistaken for a later step.
-			const jumped = jumpingTo === crumb.path;
+			const jumped = jumpingTo !== null && isPathUnder(jumpingTo, crumb.path);
 			jumpingTo = null;
 			const known = crumbs.some((c) => c.path === crumb.path);
 			crumbs = jumped || (rewound && !known) ? [crumb] : appendCrumb(crumbs, crumb);

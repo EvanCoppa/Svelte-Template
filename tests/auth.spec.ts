@@ -76,9 +76,9 @@ test.describe('signing in', () => {
 	});
 
 	test('returns to the page that triggered the login', async ({ page }) => {
-		await signIn(page, { next: '/settings' });
+		await signIn(page, { next: '/settings/profile' });
 
-		await expect(page).toHaveURL('/settings');
+		await expect(page).toHaveURL('/settings/profile');
 	});
 
 	test('refuses to follow ?next= off-site', async ({ page }) => {
@@ -113,9 +113,7 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/');
 	});
 
-	test('restarts the trail at a page the sidebar jumps to, then follows it deeper', async ({
-		page
-	}) => {
+	test('restarts the trail where the shell jumps, and follows a link deeper', async ({ page }) => {
 		// `Breadcrumb.Page` is a span carrying role="link" too, so the crumbs
 		// are told apart by slot: a link is a page walked through, the page
 		// slot is where the reader is now.
@@ -123,26 +121,42 @@ test.describe('the app shell', () => {
 		const walked = trail.locator('[data-slot="breadcrumb-link"]');
 		const here = trail.locator('[data-slot="breadcrumb-page"]');
 
-		// Two pages deep before the jump...
-		await page.goto('/companies');
-		await expect(walked).toHaveText(['Dashboard']);
-
-		// ...and the sidebar lands at a depth of one whatever was on screen
-		// before: nothing was walked to get here, so there is no way back to
-		// offer.
-		await clickWhenLive(page.getByRole('button', { name: 'Settings' }).first(), () =>
-			expect(page).toHaveURL('/settings')
-		);
-		await expect(here).toHaveText('Settings');
+		// Signed in on the dashboard: one page, nothing walked to reach it.
+		await expect(here).toHaveText('Dashboard');
 		await expect(walked).toHaveCount(0);
 
 		// A link inside the page is a step deeper, which is the depth the
 		// trail exists to show.
-		await clickWhenLive(page.getByRole('link', { name: 'Manage features' }), () =>
-			expect(page).toHaveURL('/settings/features')
+		await clickWhenLive(page.getByRole('link', { name: 'Browse components' }), () =>
+			expect(page).toHaveURL('/components')
 		);
-		await expect(walked).toHaveText(['Settings']);
-		await expect(here).toHaveText('Features');
+		await expect(walked).toHaveText(['Dashboard']);
+		await expect(here).toHaveText('Components');
+
+		// The sidebar jumps: nothing was walked to get here whatever was on
+		// screen before, so there is no way back to offer.
+		await clickWhenLive(page.getByRole('button', { name: 'Companies' }).first(), () =>
+			expect(page).toHaveURL('/companies')
+		);
+		await expect(here).toHaveText('Companies');
+		await expect(walked).toHaveCount(0);
+	});
+
+	test('starts a fresh trail from the settings sidebar too', async ({ page }) => {
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		const walked = trail.locator('[data-slot="breadcrumb-link"]');
+
+		// A full load into the settings shell, two crumbs deep...
+		await page.goto('/settings');
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(walked).toHaveText(['Dashboard']);
+
+		// ...and its sections are a nav like any other: siblings, not steps.
+		await clickWhenLive(page.getByRole('button', { name: 'Security' }), () =>
+			expect(page).toHaveURL('/settings/security')
+		);
+		await expect(trail.locator('[data-slot="breadcrumb-page"]')).toHaveText('Security');
+		await expect(walked).toHaveCount(0);
 	});
 
 	test('renders every navigation entry the session may see', async ({ page }) => {
@@ -259,12 +273,26 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('cell', { name: 'Bruce Wayne' })).toBeVisible();
 	});
 
-	test('shows the signed-in user their profile on /settings', async ({ page }) => {
+	test('opens settings on its first section, in its own sidebar', async ({ page }) => {
+		// /settings is the door: it redirects to the first entry in
+		// `settingsNav`, and the shell swaps the app nav for the settings one.
 		await page.goto('/settings');
 
+		await expect(page).toHaveURL('/settings/profile');
+		await expect(page).toHaveTitle('Profile');
+		await expect(page.getByRole('button', { name: 'Back to app' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Security' })).toBeVisible();
 		// Loaded through RLS, so this row can only be the caller's own. Matches
 		// the page body and the sidebar user menu, hence first().
 		await expect(page.getByText(TEST_USER.email).first()).toBeVisible();
+	});
+
+	test('keeps Settings out of the app sidebar', async ({ page }) => {
+		await page.goto('/');
+
+		// It is reached from the user menu in the sidebar footer instead — the
+		// nav lists the places you work, not the place you configure them.
+		await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
 	});
 });
 

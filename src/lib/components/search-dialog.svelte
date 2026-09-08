@@ -5,13 +5,17 @@
 	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { iconFor, type NavIcon } from '$lib/features/icons';
-	import { groupNav, type NavItem } from '$lib/navigation';
+	import { groupNav, settingsNavItems, type NavItem, type SettingsNavItem } from '$lib/navigation';
 	import { showUpgrade } from '$lib/upgrade.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	// Derived, not const: the entries change with the active org.
 	let groups = $derived(groupNav(page.data.nav ?? []));
+	// Settings has left the sidebar, so the palette is how you reach a section
+	// of it without going through the user menu first. Same list the settings
+	// sidebar renders — never gated, so it needs no filtering.
+	const settings = settingsNavItems();
 
 	function handleSelect(item: NavItem) {
 		open = false;
@@ -24,6 +28,13 @@
 		// same way the sidebar does — see `$lib/breadcrumbs.svelte`.
 		breadcrumbs.startAt(item.href);
 		goto(item.href);
+	}
+
+	// A settings entry navigates through its own anchor, so declaring the jump
+	// is all this has to do.
+	function handleSettingsSelect(item: SettingsNavItem) {
+		open = false;
+		breadcrumbs.startAt(item.href);
 	}
 </script>
 
@@ -48,13 +59,22 @@
 				{/each}
 			</Command.Group>
 		{/each}
+		<Command.Group heading="Settings">
+			{#each settings as item (item.href)}
+				{@const Icon = iconFor(item.icon)}
+				{@const value = ['Settings', item.label, ...(item.aliases ?? [])].join(' ')}
+				<Command.LinkItem href={item.href} {value} onSelect={() => handleSettingsSelect(item)}>
+					{@render entry(item, Icon)}
+				</Command.LinkItem>
+			{/each}
+		</Command.Group>
 	</Command.List>
 </Command.Dialog>
 
-{#snippet entry(item: NavItem, Icon: NavIcon)}
+{#snippet entry(item: NavItem | SettingsNavItem, Icon: NavIcon)}
 	<Icon class="mr-2 size-4 shrink-0 opacity-60" />
 	{item.label}
-	{#if item.locked}
+	{#if 'locked' in item && item.locked}
 		<LockIcon class="text-muted-foreground ml-auto size-3.5" aria-label="Upgrade required" />
 	{/if}
 {/snippet}
