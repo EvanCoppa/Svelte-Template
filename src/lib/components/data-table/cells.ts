@@ -1,6 +1,7 @@
 import { createRawSnippet } from 'svelte';
 import { renderComponent } from '@tanstack/svelte-table';
 import { StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
+import LinkCell from './data-table-link-cell.svelte';
 
 /**
  * Cell renderers shared by list pages, so an enum value looks the same in
@@ -15,4 +16,12 @@ export function statusCell(value: string, tone: BadgeTone) {
 		tone,
 		children: createRawSnippet(() => ({ render: () => `<span>${label}</span>` }))
 	});
+}
+
+/**
+ * The row's primary column as a link to the record it is about — every list
+ * page's way into the record page (`recordHref()` in `$lib/crm/records`).
+ */
+export function linkCell(label: string, href: string) {
+	return renderComponent(LinkCell, { label, href });
 }

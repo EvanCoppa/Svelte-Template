@@ -355,6 +355,111 @@ test.describe('the staff page', () => {
 	});
 });
 
+test.describe('the record page', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	// seed.sql's Acme fixtures: the company, the person at it, and the
+	// person who belongs to no company at all.
+	const WAYNE = '20000000-0000-0000-0000-000000000001';
+	const LUCIUS = '30000000-0000-0000-0000-000000000001';
+	const BRUCE = '30000000-0000-0000-0000-000000000003';
+
+	test('opens a record from its list and names the page after it', async ({ page }) => {
+		await page.goto('/contacts');
+
+		// The name cell is a plain anchor, so it works before hydration too.
+		await page.getByRole('link', { name: 'Lucius Fox' }).click();
+
+		await expect(page).toHaveURL(`/contacts/${LUCIUS}`);
+		// The record's name is the title (the record-title exception to the
+		// `pages` registry) and the heading; the kind is the eyebrow above it.
+		await expect(page).toHaveTitle('Lucius Fox');
+		await expect(page.getByRole('heading', { name: 'Lucius Fox' })).toBeVisible();
+		await expect(page.getByText('Contact', { exact: true })).toBeVisible();
+		// A link inside a page is a step deeper, named the same way as the title.
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.locator('[data-slot="breadcrumb-page"]')).toHaveText('Lucius Fox');
+		await expect(trail.getByRole('link', { name: 'Contacts' })).toBeVisible();
+	});
+
+	test('shows the fields, the tags and the timeline the CRM attaches to any record', async ({
+		page
+	}) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		await expect(page).toHaveTitle('Wayne Enterprises');
+		// Lifecycle as pills beside the name, the rest as labelled fields.
+		await expect(page.getByText('Customer', { exact: true })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'hello@wayne.example.com' })).toHaveAttribute(
+			'href',
+			'mailto:hello@wayne.example.com'
+		);
+		// The shared entity link: a tag, a billing address and a logged note.
+		await expect(page.getByText('VIP', { exact: true })).toBeVisible();
+		await expect(page.getByText('1007 Mountain Drive').first()).toBeVisible();
+		await expect(page.getByText(/Prefers email over phone/)).toBeVisible();
+	});
+
+	test('lists related records only for the kinds the reader may open', async ({ page }) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		// seed.sql: Support reads contacts and tickets, so the person at Wayne
+		// and the ticket about it are listed and link onward…
+		await expect(page.getByRole('link', { name: 'Lucius Fox' })).toHaveAttribute(
+			'href',
+			`/contacts/${LUCIUS}`
+		);
+		await expect(page.getByRole('link', { name: 'Cannot export invoices' })).toBeVisible();
+		// …while the deal against Wayne is behind a feature Support holds no
+		// grant on, so it is neither shown nor linked — the same answer /deals
+		// gives this user.
+		await expect(page.getByText('Annual support contract')).toHaveCount(0);
+	});
+
+	test('names a company on a person, and links it because the reader may open companies', async ({
+		page
+	}) => {
+		await page.goto(`/contacts/${LUCIUS}`);
+
+		await expect(page.getByRole('link', { name: 'Wayne Enterprises' })).toHaveAttribute(
+			'href',
+			`/companies/${WAYNE}`
+		);
+	});
+
+	test('fills in the custom fields the org declared for the kind', async ({ page }) => {
+		// seed.sql: Bruce is the standalone person with a preferred channel.
+		await page.goto(`/contacts/${BRUCE}`);
+
+		await expect(page).toHaveTitle('Bruce Wayne');
+		await expect(page.getByText('Preferred channel')).toBeVisible();
+		await expect(page.getByText('email', { exact: true })).toBeVisible();
+	});
+
+	test('answers 404 for a record that does not exist, and for an id that is not one', async ({
+		page
+	}) => {
+		// RLS makes "missing" and "not yours" the same absence, so both are a
+		// 404 — never a 403 that confirms the id is real.
+		const missing = await page.goto('/contacts/00000000-0000-0000-0000-000000000000');
+		expect(missing?.status()).toBe(404);
+
+		// `[id=guid]` refuses a malformed id before any load runs.
+		const malformed = await page.goto('/contacts/not-a-record');
+		expect(malformed?.status()).toBe(404);
+	});
+
+	test('stays behind the feature gate of the kind it shows', async ({ page }) => {
+		// Deals is enabled for Acme but Support holds no grant on it, so a deal
+		// record is refused exactly like the deals list is.
+		const response = await page.goto('/deals/40000000-0000-0000-0000-000000000001');
+		expect(response?.status()).toBe(403);
+	});
+});
+
 test.describe('the workspace switcher', () => {
 	test.beforeEach(async ({ page }) => {
 		await signIn(page);

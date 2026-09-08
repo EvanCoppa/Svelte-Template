@@ -170,6 +170,27 @@ application data is scoped to an organization, never to a bare user. The
   depends on a record is the one exception: that page's load returns `title` and
   page data wins. Public screens (`/login`, `/reset-password`, `/invite`) keep
   static titles — they render before a session exists.
+- **Every record has a page, and the generic one is the default**
+  (`src/routes/(app)/[kind=record]/[id=guid]/` + `src/lib/crm/records.ts` +
+  `src/lib/server/crm/records.ts`). A row on any list page links to
+  `recordHref(kind, id)` — `/contacts/<id>`, `/products/<id>` — and one route
+  renders it for every kind: the `[kind=record]` matcher accepts exactly the list
+  routes in `RECORD_KIND_META`, and because a record sits under its kind's list
+  route, the hook's feature gate covers it with no extra wiring. The server module
+  reads the kind's row through its own data module and describes it as one
+  `RecordDetail` — a name, lifecycle pills, and fields typed by how they render
+  (`money`, `datetime`, `record`, `person`…), never by a runtime check — while the
+  shared entity link supplies what every kind has: activities, tags, addresses,
+  custom fields and the records that point at it. A field or a related group
+  that names another kind links only when `passesFeatureGate()` says the reader
+  may open it; otherwise it is plain text or not fetched at all. The page has no
+  `pages` row (its title is the record's name) and no nav entry. **A kind that
+  needs its own screen adds `(app)/<kind>/[id]/`** — a static segment outranks the
+  matcher, so the specific page wins and the generic one stays the default for
+  the rest; compose it from the same `RecordDetail` and the `detail/` parts rather
+  than a second renderer. A new list page joins by adding its kind to
+  `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
+  primary column.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`

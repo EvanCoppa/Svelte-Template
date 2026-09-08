@@ -3,23 +3,11 @@
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import type { BadgeTone } from '$lib/components/ui/badge/index.js';
+	import { recordHref } from '$lib/crm/records';
+	import { TICKET_PRIORITY_TONE, TICKET_STATUS_TONE } from '$lib/crm/tones';
 	import type { TicketWithParties } from '$lib/server/crm/tickets';
 
 	let { data } = $props();
-
-	const statusTone = {
-		open: 'info',
-		pending: 'warning',
-		resolved: 'success',
-		closed: 'neutral'
-	} satisfies Record<TicketWithParties['status'], BadgeTone>;
-	const priorityTone = {
-		low: 'neutral',
-		normal: 'info',
-		high: 'orange',
-		urgent: 'error'
-	} satisfies Record<TicketWithParties['priority'], BadgeTone>;
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, TicketWithParties>();
 	const columns = columnHelper.columns([
@@ -28,7 +16,9 @@
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: '#' })
 		}),
 		columnHelper.accessor('subject', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Subject' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Subject' }),
+			cell: ({ getValue, row }) =>
+				DataTable.linkCell(getValue(), recordHref('ticket', row.original.id))
 		}),
 		columnHelper.accessor((row) => row.companies?.name ?? row.contacts?.name ?? '—', {
 			id: 'party',
@@ -36,12 +26,12 @@
 		}),
 		columnHelper.accessor('status', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), statusTone[getValue()])
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), TICKET_STATUS_TONE[getValue()])
 		}),
 		columnHelper.accessor('priority', {
 			header: ({ column }) =>
 				renderComponent(DataTable.ColumnHeader, { column, title: 'Priority' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), priorityTone[getValue()])
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), TICKET_PRIORITY_TONE[getValue()])
 		})
 	]);
 
