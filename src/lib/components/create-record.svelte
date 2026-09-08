@@ -117,7 +117,7 @@
 				<Modal.Header>
 					<Modal.Title><PlusIcon /> New {terms.noun}</Modal.Title>
 				</Modal.Header>
-				<Modal.Body class="grid gap-5 py-1 sm:grid-cols-2">
+				<Modal.Body class="grid gap-5 pt-1 sm:grid-cols-2">
 					<FormAlert message={$message} class="mb-0 sm:col-span-2" />
 
 					{#each definition.fields as field (field.name)}
