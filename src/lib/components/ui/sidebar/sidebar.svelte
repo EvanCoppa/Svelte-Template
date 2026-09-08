@@ -44,6 +44,71 @@
 		};
 	});
 
+	// Resolves once every animation running on the elements has finished — at
+	// once when nothing is, as under reduced motion. Returns a cancel for when
+	// the wait has gone stale.
+	function whenSettled(elements: (HTMLElement | null)[], then: () => void) {
+		let current = true;
+		const animations = elements.flatMap((el) => el?.getAnimations() ?? []);
+		Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+			if (current) then();
+		});
+		return () => {
+			current = false;
+		};
+	}
+
+	// Docking: opening out of a peek, in two beats. The context raises
+	// `sidebar.docking` at the open. First the content moves aside — the gap's
+	// width transition — while the panel keeps its floating look on top of it;
+	// `pushed` marks that beat done, and the look then eases out to the edges,
+	// which is the second. The dock ends when that has settled. Closing again
+	// mid-dock ends it too — during the first beat the panel is still afloat,
+	// so it leaves the way a peek does.
+	let gapRef = $state<HTMLDivElement | null>(null);
+	let innerRef = $state<HTMLDivElement | null>(null);
+	let pushed = $state(false);
+	let leaving = $state(false);
+	$effect(() => {
+		if (!sidebar.docking) return;
+		if (sidebar.state !== 'expanded') {
+			sidebar.docking = false;
+			leaving = !pushed;
+			pushed = false;
+			return;
+		}
+		return whenSettled(pushed ? [containerRef, innerRef] : [gapRef], () => {
+			if (pushed) sidebar.docking = false;
+			pushed = !pushed;
+		});
+	});
+
+	// Leaving: a peek that ends slides the panel away. It keeps its floating
+	// look, and its place above the header, until it is off-screen — otherwise
+	// it would square off and slip under the header on the way out. Raised
+	// before the DOM updates, so the look never drops for a frame in between;
+	// a cursor back at the edge in time simply peeks it out again.
+	let wasPeeked = false;
+	$effect.pre(() => {
+		const peeked = effectivePeek;
+		if (wasPeeked && !peeked && sidebar.state === 'collapsed') leaving = true;
+		wasPeeked = peeked;
+	});
+	$effect(() => {
+		if (!leaving) return;
+		if (effectivePeek || sidebar.state !== 'collapsed') {
+			leaving = false;
+			return;
+		}
+		return whenSettled([containerRef], () => (leaving = false));
+	});
+
+	// The chrome the panel wears while it sits over the content rather than
+	// beside it: padding, rounded edge, shadow. Peeked, docking until the
+	// content has moved, or leaving. (Not `variant="floating"`, which is the
+	// permanent version of the same look.)
+	const floating = $derived(effectivePeek || (sidebar.docking && !pushed) || leaving);
+
 	$effect(() => {
 		if (!canPeek) {
 			hoverPeek = false;
@@ -118,6 +183,8 @@
 		class="text-sidebar-foreground group peer hidden md:block"
 		data-state={sidebar.state}
 		data-peek={effectivePeek}
+		data-floating={floating}
+		data-docking={sidebar.docking}
 		data-collapsible={sidebar.state === 'collapsed' ? collapsible : ''}
 		data-variant={variant}
 		data-side={side}
@@ -125,9 +192,10 @@
 	>
 		<!-- This is what handles the sidebar gap on desktop -->
 		<div
+			bind:this={gapRef}
 			data-slot="sidebar-gap"
 			class={cn(
-				'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
+				'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-out',
 				'group-data-[collapsible=offcanvas]:w-0',
 				'group-data-[side=right]:rotate-180',
 				variant === 'floating' || variant === 'inset'
@@ -140,7 +208,12 @@
 			data-slot="sidebar-container"
 			class={cn(
 				'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-out md:flex',
-				'group-data-[peek=true]:z-[55] group-data-[peek=true]:p-2',
+				// Over the content, the panel also sits above the header — for the
+				// whole of a dock, so the header never paints over it mid-settle.
+				'group-data-[docking=true]:z-[55] group-data-[floating=true]:z-[55] group-data-[floating=true]:p-2',
+				// The dock's second beat: the padding eases out to the edges. Only
+				// once expanded — a peek that slides away is gone too soon to fade.
+				'group-data-[state=expanded]:transition-[left,right,width,padding]',
 				side === 'left'
 					? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:left-0!'
 					: 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:right-0!',
@@ -153,9 +226,20 @@
 			{...restProps}
 		>
 			<div
+				bind:this={innerRef}
 				data-sidebar="sidebar"
 				data-slot="sidebar-inner"
-				class="bg-sidebar group-data-[variant=floating]:border-sidebar-border group-data-[peek=true]:border-sidebar-border flex h-full w-full flex-col group-data-[peek=true]:overflow-hidden group-data-[peek=true]:rounded-xl group-data-[peek=true]:border group-data-[peek=true]:shadow-2xl group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+				class={cn(
+					'bg-sidebar flex h-full w-full flex-col',
+					// The floating edge is a ring, not a border: a border is whole
+					// pixels wide, so it can only vanish, while a ring is part of the
+					// shadow and fades with it.
+					'group-data-[floating=true]:ring-sidebar-border group-data-[floating=true]:overflow-hidden group-data-[floating=true]:rounded-xl group-data-[floating=true]:shadow-2xl group-data-[floating=true]:ring-1',
+					// Docking, second beat, with the container's padding above:
+					// the corners, the edge and the shadow ease away together.
+					'group-data-[state=expanded]:transition-[border-radius,box-shadow] group-data-[state=expanded]:duration-200 group-data-[state=expanded]:ease-out',
+					'group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm'
+				)}
 			>
 				{@render children?.()}
 			</div>
