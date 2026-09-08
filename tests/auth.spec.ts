@@ -513,6 +513,113 @@ test.describe('the workspace switcher', () => {
 	});
 });
 
+test.describe('the note dock', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	/** The rail fans out on hover, which only answers once Svelte has hydrated. */
+	async function fan(page: Page) {
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+		await expect(async () => {
+			await dock.hover();
+			await expect(dock.getByRole('button', { name: 'New note' })).toBeVisible({ timeout: 2000 });
+		}).toPass({ timeout: 20_000 });
+		return dock;
+	}
+
+	test('docks one dash per open note to the edge of every screen', async ({ page }) => {
+		// seed.sql gives Acme three open notes and one archived; the rail draws
+		// the open ones and the archive stays off it.
+		const dock = page.getByRole('complementary', { name: 'Notes' });
+		await expect(dock.getByRole('button', { name: '3 notes' })).toBeVisible();
+
+		// It is the shell's, not the dashboard's: it follows you to another page.
+		await page.goto('/companies');
+		await expect(dock.getByRole('button', { name: '3 notes' })).toBeVisible();
+	});
+
+	test('fans out with a label per note, and opens one in place', async ({ page }) => {
+		const dock = await fan(page);
+
+		await expect(dock.getByRole('button', { name: 'Renewal call prep' })).toBeVisible();
+		// An untitled note is named by its first line.
+		await expect(
+			dock.getByRole('button', { name: 'Procurement freeze lifts on the 14th.' })
+		).toBeVisible();
+
+		await dock.getByRole('button', { name: 'Renewal call prep' }).click();
+		// Somebody else wrote this one, so it opens as text: the policy would
+		// refuse the save, and the editor is not offered where it cannot land.
+		await expect(dock.getByText(/Ask about the second site/)).toBeVisible();
+		await expect(dock.getByLabel('Note', { exact: true })).toHaveCount(0);
+	});
+
+	test('writes a note from any screen and keeps it', async ({ page }) => {
+		const words = `note from the dock ${Date.now()}`;
+		const dock = await fan(page);
+
+		await dock.getByRole('button', { name: 'New note' }).click();
+		// A new note is created blank and typed into — its own author, so this
+		// one is editable.
+		const body = dock.getByLabel('Note', { exact: true });
+		await expect(body).toBeVisible();
+		await body.fill(words);
+
+		// Leaving the editor flushes the autosave; the rail re-reads itself from
+		// the same query key, so the label appearing IS the save having landed.
+		await dock.getByRole('button', { name: 'All notes' }).click();
+		await expect(dock.getByRole('button', { name: words })).toBeVisible();
+
+		// It came from the server, not from client memory.
+		await page.reload();
+		await (await fan(page)).getByRole('button', { name: words }).isVisible();
+		await page.goto('/notes');
+		await expect(page.getByText(words)).toBeVisible();
+	});
+});
+
+test.describe('the notes page', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+		await page.goto('/notes');
+	});
+
+	test('opens every note in one window, archive behind its own shelf', async ({ page }) => {
+		// Titled from the `pages` row like every other feature page.
+		await expect(page).toHaveTitle('Notes');
+		await expect(page.getByText('Renewal call prep')).toBeVisible();
+		await expect(page.getByText('Old standup order')).toHaveCount(0);
+
+		await page.getByRole('tab', { name: 'Archived' }).click();
+		await expect(page.getByText('Old standup order')).toBeVisible();
+		await expect(page.getByText('Renewal call prep')).toHaveCount(0);
+	});
+
+	test('searches titles and bodies as you type', async ({ page }) => {
+		const search = page.getByLabel('Search notes');
+		// Filtering happens in the browser, so it only answers once hydrated.
+		await expect(async () => {
+			await search.fill('procurement');
+			await expect(page.getByText('Renewal call prep')).toHaveCount(0);
+		}).toPass({ timeout: 20_000 });
+
+		// Matched on its body: that note has no title at all.
+		await expect(page.getByText(/Procurement freeze lifts/)).toBeVisible();
+	});
+
+	test('shows a record the notes written about it', async ({ page }) => {
+		// The general table's whole point: the same note the dock carries is
+		// the one this company shows, through the shared entity link.
+		await page.goto('/companies/20000000-0000-0000-0000-000000000001');
+
+		const notes = page.locator('[data-slot="card"]', { has: page.getByText('Renewal call prep') });
+		await expect(notes.getByText(/Ask about the second site/)).toBeVisible();
+	});
+});
+
 test.describe('signing out', () => {
 	test('ends the session and re-arms the guard', async ({ page }) => {
 		await signIn(page);

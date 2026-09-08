@@ -3,6 +3,7 @@ import type { Database } from '$lib/database.types';
 import type { TermsMap } from '$lib/features/terms';
 import type { PageMeta } from '$lib/features/types';
 import type { NavItem } from '$lib/navigation';
+import type { NoteDeck } from '$lib/notes';
 import type { OrgMembership } from '$lib/org';
 import type { OrgContext } from '$lib/server/org-context';
 
@@ -46,6 +47,12 @@ declare global {
 			activeOrg?: OrgMembership;
 			/** The sidebar/palette entries this session may see, from the (app) layout. */
 			nav?: NavItem[];
+			/**
+			 * The open notes and what may be done to them, from the (app) layout —
+			 * what the note dock draws on every screen. Null when this session has
+			 * no notes feature; absent outside the shell.
+			 */
+			noteDock?: NoteDeck | null;
 			/** Every page this session may see, with its title, from the (app) layout. */
 			pages?: PageMeta[];
 			/**

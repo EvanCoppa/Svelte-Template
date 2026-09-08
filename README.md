@@ -377,6 +377,20 @@ is set, hard-refuses on `VERCEL_ENV=production`, `/logout` still signs out (an o
 cookie stops instant re-login; clear it by visiting any page with `?autologin=1`), and
 the `/auth` emailed-link flows keep their signed-out behavior.
 
+## Notes
+
+Every screen carries a note dock on its right edge: one colored dash per note, fanned
+out with their labels when you point at it, opening in place and saving itself 250 ms
+after you stop typing. `⌥⌘L` opens `/notes`, which is all of them at once with a search
+box over titles and bodies and an archive shelf beside them.
+
+Underneath is a **general `notes` table**, not a sticky-note table: a note may point at
+any record through the same polymorphic link the rest of the schema uses, so a company's
+page shows the notes written about it and deleting that company detaches them rather
+than shredding them. The table, why it is not `activities`, and why writing a note is
+this app's one API endpoint instead of a form action are in
+[`docs/notes.md`](docs/notes.md).
+
 ## AI assistant
 
 `/assistant` is a chat over the organization's data, built on the Vercel AI SDK. Set
@@ -394,6 +408,9 @@ architecture, the tool contract and how to add a tool are in `docs/assistant.md`
 - [`docs/data-invalidation.md`](docs/data-invalidation.md) — the query-key convention:
   naming load dependencies with `depends('app:thing')` and refreshing them with
   targeted `invalidate()` instead of `invalidateAll()`.
+- [`docs/notes.md`](docs/notes.md) — the general notes table and the dock built on it:
+  the document/timeline split, the one endpoint-instead-of-action in the app, and the
+  autosave contract every note surface shares.
 
 ## Deploying to Vercel
 

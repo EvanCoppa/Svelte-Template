@@ -20,6 +20,8 @@ export const QUERY = {
 	products: 'app:products',
 	deals: 'app:deals',
 	proposals: 'app:proposals',
+	/** Every note the session can see: the dock's rail and the /notes page share it. */
+	notes: 'app:notes',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

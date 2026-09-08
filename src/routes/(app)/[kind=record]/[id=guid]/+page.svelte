@@ -1,13 +1,18 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import * as Detail from '$lib/components/detail/index.js';
+	import * as Note from '$lib/components/note/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
 	import { StatusBadge, TagBadge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { recordListHref, recordTerms } from '$lib/crm/records';
+	import { canArchiveNote, canEditNote } from '$lib/notes';
+	import { noteCommands } from '$lib/notes-api';
 	import { iconFor } from '$lib/features/icons';
 	import { iconForPath } from '$lib/navigation';
 	import { capitalize } from '$lib/utils.js';
@@ -23,6 +28,19 @@
 	/** Who logged an activity, or null when nobody can be named. */
 	function author(userId: string | null): string | null {
 		return userId === null ? null : (data.people.get(userId) ?? null);
+	}
+
+	/** The note the button just made, so the caret lands in it. */
+	let addedNoteId = $state<string | null>(null);
+
+	// A note written here is about this record: same table, same endpoint, same
+	// editor as the dock — it is simply born attached.
+	async function addNote() {
+		const note = await noteCommands.create({
+			entityType: data.record.kind,
+			entityId: data.record.id
+		});
+		if (note) addedNoteId = note.id;
 	}
 </script>
 
@@ -146,6 +164,60 @@
 		</div>
 
 		<aside class="space-y-6">
+			{#if data.notes}
+				{@const notes = data.notes}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>Notes</Card.Title>
+						<Card.Description>
+							Written down about this {terms.noun}. They sit on the dock with every other note.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-3">
+						{#each notes.open as note (note.id)}
+							<Note.Card color={note.color} class="h-40">
+								<Note.Editor
+									{note}
+									editable={canEditNote(note, notes)}
+									autofocus={note.id === addedNoteId}
+									bodyClass="flex-1 field-sizing-fixed"
+									onsave={(patch) => noteCommands.save(note.id, patch)}
+								/>
+								{#if canArchiveNote(note, notes)}
+									<Note.Actions>
+										<Note.Palette
+											value={note.color}
+											onpick={(color) => noteCommands.save(note.id, { color })}
+										/>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-7"
+											title="Archive"
+											onclick={() => noteCommands.archive(note.id, true)}
+										>
+											<ArchiveIcon class="size-4" />
+											<span class="sr-only">Archive note</span>
+										</Button>
+									</Note.Actions>
+								{/if}
+							</Note.Card>
+						{/each}
+
+						{#if notes.canManage}
+							<Button variant="outline" class="w-full" onclick={addNote}>
+								<PlusIcon />
+								New note
+							</Button>
+						{:else if notes.open.length === 0}
+							<p class="text-muted-foreground text-sm">
+								Nothing written down about this {terms.noun}.
+							</p>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
 			<Card.Root>
 				<Card.Header>
 					<Card.Title>Activity</Card.Title>

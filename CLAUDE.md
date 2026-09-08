@@ -373,7 +373,9 @@ Default to **form actions** (`+page.server.ts` + `use:enhance`) for all mutation
 bodies born in JS memory (canvas/blob), cross-page mutations, multi-verb REST paths, or
 binary/streaming responses. If a mutation is triggered from the page it lives on and the
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
-input echoed back; `redirect(303, ...)` on success.
+input echoed back; `redirect(303, ...)` on success. Notes are the worked example of the
+exception and the only one in the app — `/api/notes` is cross-page (the dock floats over
+every screen) and multi-verb, and a note has no form to post; see "Notes" below.
 
 ## Forms
 

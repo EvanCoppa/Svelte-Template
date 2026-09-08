@@ -21,6 +21,7 @@ export const FEATURE_IDS = [
 	'products',
 	'deals',
 	'proposals',
+	'notes',
 	'tasks',
 	'tickets',
 	'staff',
