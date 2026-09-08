@@ -19,6 +19,8 @@ This page is the contract for keeping it that way. The `proposals` migration
 | `proposals`                    | a decision offered to one CRM record: title, status, shared terms     | members (delete: owner/admin)      |
 | `proposal_options`             | one column of the grid — a priced, timed, financeable choice          | members (delete: owner/admin)      |
 | `proposal_line_items`          | an itemised line inside an option; `total` is generated               | members (delete: owner/admin)      |
+| `billables`                    | the fee schedule: one chargeable line, priced per unit, with its code | members (delete: owner/admin)      |
+| `quick_plans` + `_billables`   | a named bundle of billables that fills an option in one click         | members (delete: owner/admin)      |
 | `custom_field_definitions`     | an org-declared, typed attribute its options carry (a comparison row) | owner/admin                        |
 | `proposal_custom_field_values` | an option's value for one definition, in the column matching its type | members (delete: owner/admin)      |
 | `proposal_events`              | one thing that happened: sent, viewed, option selected, accepted, …   | members as themselves; append-only |
@@ -223,9 +225,48 @@ icons. A template never meets a string it has to guess at.
 is `src/routes/(app)/proposals/`, built exactly like `/deals` on
 `src/lib/server/crm/proposals.ts`; `proposal` is a record kind, so a row opens on the
 generic record page (status, the record it hangs off, its options' count and
-recommended total, validity, fee and tax), a company, contact or deal page lists the
-proposals hanging off it, and the generic "Add …" form creates an unattached draft
-(title, valid until). It ships in every industry and every plan.
+recommended total, validity, fee and tax), and a company, contact or deal page lists
+the proposals hanging off it. It ships in every industry and every plan.
+
+**Creating one is a page, not the generic modal.** A proposal is the person it is for,
+the two people on it and one to five priced options each made of lines — more than one
+row of strings — so the "Add …" button on the list links to the builder at
+`/proposals/new` (`src/routes/(app)/proposals/new/`, its own `pages` row by the
+`proposal_builder_page` migration), the one kind whose creation is a screen. The builder
+is Yes Smile's treatment plan form, class for class, on this model and the template's
+primitives (`$lib/components/proposal-builder`; the form is
+`$lib/schemas/proposal-builder`):
+
+| the source form                      | here                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| the patient                          | the contact the proposal is for (`entity_type` contact), named by the industry's word |
+| the doctor                           | `responsible_id` — a member; "Provider", "Project manager", as the industry says it   |
+| the presenter                        | `presenter_id` — a member, the signed-in one by default                               |
+| a plan (1–5, "No. Plans")            | a `proposal_options` row, in position order                                           |
+| case fee, courtesy %, show financing | `fee_override`, `discount_pct`, `financing_available`                                 |
+| a procedure ("Items", "Add by code") | a `proposal_line_items` row citing the schedule (`billable_id`)                       |
+| teeth / quadrants / arches           | the line's `detail` (the units as picked or typed) and `quantity` (their count)       |
+| quick select                         | `quick_plans`: the bundle's billables replace the option's, products stay             |
+| a product with a quantity            | a `proposal_line_items` row citing the catalog (`product_id`)                         |
+| notes                                | a note activity logged against the new proposal                                       |
+| the two save buttons                 | `redirect_to`: the new record's page, or back to the list                             |
+
+The whole document posts as one JSON form (`dataType: 'json'`, superforms); the action
+names the proposal after the contact, writes changed contact details back when the
+writer may edit contacts, hands the rest to `createProposalWithOptions()` — one batched
+insert per table, a billable line's quantity being `billableQuantity()` of its units
+(`src/lib/crm/billables.ts`: "12, 13" is two, "1-3" is three, N/A is one) — and lands
+where the button said. Every line keeps the price it was picked at; nothing is re-read
+from the schedule or the catalog on save. Totals on screen are `estimateOptionTotal()`
+(`src/lib/crm/proposals.ts`), the stored formula replayed as a preview. The look is
+Yes Smile's on purpose — literal greys and blues with their dark pairs, quoted once in
+the builder's `classes.ts` — the one screen that does not paint from the theme's tokens.
+
+What the source form had and the model does not: before/after photos (no storage),
+insurance coverage and the cash-offer toggle (no column), tooth surfaces (dental-only;
+`unit_choices` generalises quadrants and arches instead), and the patient's DOB, address
+and insurance fields. A title, validity, default fee and tax rate are not asked for
+either: the title is the contact's name, the rest stay null until the edit form exists.
 
 It is also the reason names live in the registry (docs/features.md, "Names by
 industry"): the nouns differ per vertical while the shape does not, so the feature's
@@ -235,8 +276,9 @@ dentistry). Nothing in the page names it.
 
 ## Deliberately not here (yet)
 
-- **Editing options and line items, and attaching a draft to its record.** The list
-  and the record page read them; the forms that write them are still to build.
+- **Editing a proposal after creation.** The builder writes options and lines once;
+  the list and the record page read them, and the form that edits them in place is
+  still to build.
 - **The deck editor and the presenter.** `slide_decks` stores a deck and
   `proposals.deck_id` points at one; authoring slides, expanding them per option and
   resolving variables at present time are all still to build.

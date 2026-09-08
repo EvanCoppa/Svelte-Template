@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createProposal,
+	createProposalWithOptions,
 	deleteProposal,
 	getProposal,
 	listProposals,
 	proposalParentKind,
 	updateProposal
 } from './proposals';
-import { ORG_ID, supabaseMock } from './test-support';
+import { ORG_ID, supabaseMock, supabaseMockSequence } from './test-support';
 
 const PROPOSAL_ID = 'a1000000-0000-0000-0000-000000000001';
 const DEAL_ID = '40000000-0000-0000-0000-000000000001';
@@ -66,6 +67,80 @@ describe('proposals data access', () => {
 			org_id: ORG_ID
 		});
 		expect(builder.single).toHaveBeenCalled();
+	});
+
+	it('creates a proposal with its options and lines, batched per table, ordered by position', async () => {
+		const { supabase, from, builder } = supabaseMockSequence([
+			{ data: { id: PROPOSAL_ID } },
+			// Rows come back in the database's order, not necessarily ours.
+			{
+				data: [
+					{ id: 'opt-b', sort_order: 1 },
+					{ id: 'opt-a', sort_order: 0 }
+				]
+			},
+			{ data: null }
+		]);
+
+		const proposal = await createProposalWithOptions(
+			supabase,
+			ORG_ID,
+			{ title: 'Crown and whitening' },
+			[
+				{
+					option: { label: 'Porcelain crown', is_recommended: true },
+					line_items: [
+						{ product_id: 'prod', label: 'Crown', quantity: 1, unit_cost: 1450 },
+						{ product_id: null, label: 'Whitening', quantity: 2, unit_cost: 120.5 }
+					]
+				},
+				{
+					option: { label: 'Composite' },
+					line_items: [{ product_id: null, label: 'Filling', quantity: 1, unit_cost: 300 }]
+				}
+			]
+		);
+
+		expect(proposal).toEqual({ id: PROPOSAL_ID });
+		expect(from).toHaveBeenNthCalledWith(1, 'proposals');
+		expect(from).toHaveBeenNthCalledWith(2, 'proposal_options');
+		expect(from).toHaveBeenNthCalledWith(3, 'proposal_line_items');
+		expect(from).toHaveBeenCalledTimes(3);
+		expect(builder.insert).toHaveBeenNthCalledWith(2, [
+			{
+				label: 'Porcelain crown',
+				is_recommended: true,
+				org_id: ORG_ID,
+				proposal_id: PROPOSAL_ID,
+				sort_order: 0
+			},
+			{ label: 'Composite', org_id: ORG_ID, proposal_id: PROPOSAL_ID, sort_order: 1 }
+		]);
+		expect(builder.select).toHaveBeenCalledWith('id, sort_order');
+		// Lines find their option by the sort order we assigned, not by row order.
+		expect(builder.insert).toHaveBeenNthCalledWith(3, [
+			expect.objectContaining({ label: 'Crown', proposal_option_id: 'opt-a', sort_order: 0 }),
+			expect.objectContaining({ label: 'Whitening', proposal_option_id: 'opt-a', sort_order: 1 }),
+			expect.objectContaining({ label: 'Filling', proposal_option_id: 'opt-b', sort_order: 0 })
+		]);
+	});
+
+	it('skips the line insert when no option has lines, and names an option that did not come back', async () => {
+		const bare = supabaseMockSequence([
+			{ data: { id: PROPOSAL_ID } },
+			{ data: [{ id: 'opt-a', sort_order: 0 }] }
+		]);
+		await createProposalWithOptions(bare.supabase, ORG_ID, { title: 'Draft' }, [
+			{ option: { label: 'Only' }, line_items: [] }
+		]);
+		expect(bare.from).not.toHaveBeenCalledWith('proposal_line_items');
+
+		const short = supabaseMockSequence([{ data: { id: PROPOSAL_ID } }, { data: [] }]);
+		await expect(
+			createProposalWithOptions(short.supabase, ORG_ID, { title: 'Draft' }, [
+				{ option: { label: 'Only' }, line_items: [] }
+			])
+		).rejects.toThrow('Option 1 was not created.');
 	});
 
 	it('updates scoped to org and id', async () => {

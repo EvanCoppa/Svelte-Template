@@ -206,6 +206,68 @@ export type Database = {
           },
         ]
       }
+      billables: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          name: string
+          org_id: string
+          sort_order: number
+          unit: string | null
+          unit_choices: string[] | null
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name: string
+          org_id: string
+          sort_order?: number
+          unit?: string | null
+          unit_choices?: string[] | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name?: string
+          org_id?: string
+          sort_order?: number
+          unit?: string | null
+          unit_choices?: string[] | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billables_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string
@@ -710,6 +772,42 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_terms: {
+        Row: {
+          created_at: string
+          industry_id: string
+          label: string
+          term_id: string
+        }
+        Insert: {
+          created_at?: string
+          industry_id: string
+          label: string
+          term_id: string
+        }
+        Update: {
+          created_at?: string
+          industry_id?: string
+          label?: string
+          term_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_terms_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "industry_terms_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
             referencedColumns: ["id"]
           },
         ]
@@ -1327,7 +1425,9 @@ export type Database = {
       }
       proposal_line_items: {
         Row: {
+          billable_id: string | null
           created_at: string
+          detail: string | null
           id: string
           label: string
           org_id: string
@@ -1340,7 +1440,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billable_id?: string | null
           created_at?: string
+          detail?: string | null
           id?: string
           label: string
           org_id: string
@@ -1353,7 +1455,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billable_id?: string | null
           created_at?: string
+          detail?: string | null
           id?: string
           label?: string
           org_id?: string
@@ -1366,6 +1470,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "proposal_line_items_billable_id_org_id_fkey"
+            columns: ["billable_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "billables"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "proposal_line_items_org_id_fkey"
             columns: ["org_id"]
@@ -1490,6 +1601,8 @@ export type Database = {
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
           id: string
           org_id: string
+          presenter_id: string | null
+          responsible_id: string | null
           selected_option_id: string | null
           status: Database["public"]["Enums"]["proposal_status"]
           tax_rate: number | null
@@ -1507,6 +1620,8 @@ export type Database = {
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
           org_id: string
+          presenter_id?: string | null
+          responsible_id?: string | null
           selected_option_id?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
           tax_rate?: number | null
@@ -1524,6 +1639,8 @@ export type Database = {
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
           org_id?: string
+          presenter_id?: string | null
+          responsible_id?: string | null
           selected_option_id?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
           tax_rate?: number | null
@@ -1547,11 +1664,109 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proposals_org_id_presenter_id_fkey"
+            columns: ["org_id", "presenter_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
+            foreignKeyName: "proposals_org_id_responsible_id_fkey"
+            columns: ["org_id", "responsible_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
             foreignKeyName: "proposals_selected_option_id_id_fkey"
             columns: ["selected_option_id", "id"]
             isOneToOne: false
             referencedRelation: "proposal_options"
             referencedColumns: ["id", "proposal_id"]
+          },
+        ]
+      }
+      quick_plan_billables: {
+        Row: {
+          billable_id: string
+          created_at: string
+          org_id: string
+          quick_plan_id: string
+          sort_order: number
+        }
+        Insert: {
+          billable_id: string
+          created_at?: string
+          org_id: string
+          quick_plan_id: string
+          sort_order?: number
+        }
+        Update: {
+          billable_id?: string
+          created_at?: string
+          org_id?: string
+          quick_plan_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_plan_billables_billable_id_org_id_fkey"
+            columns: ["billable_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "billables"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "quick_plan_billables_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_plan_billables_quick_plan_id_org_id_fkey"
+            columns: ["quick_plan_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "quick_plans"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      quick_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          org_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          org_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          org_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1916,6 +2131,27 @@ export type Database = {
           },
         ]
       }
+      terms: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       ticket_comments: {
         Row: {
           author_id: string | null
@@ -2039,6 +2275,7 @@ export type Database = {
         | "indigo"
       company_relationship: "customer" | "supplier" | "partner" | "other"
       crm_entity_type:
+        | "billable"
         | "company"
         | "contact"
         | "deal"
@@ -2220,6 +2457,7 @@ export const Constants = {
       ],
       company_relationship: ["customer", "supplier", "partner", "other"],
       crm_entity_type: [
+        "billable",
         "company",
         "contact",
         "deal",

@@ -659,6 +659,109 @@ insert into public.execution_records (id, org_id, proposal_id, proposal_option_i
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
+-- The two people every proposal names, from each org's own roster: Evan
+-- presents Acme's (an admin there, dev owns) with dev responsible; Bright
+-- Smile's and Ridgeline's are Evan's own, with dev the provider / project
+-- manager. Nullable columns, so the update is what makes the fixtures whole.
+update public.proposals p
+set presenter_id = v.presenter_id, responsible_id = v.responsible_id
+from (values
+	('a1000000-0000-0000-0000-000000000001'::uuid, '00000000-0000-0000-0000-000000000003'::uuid,
+		'00000000-0000-0000-0000-000000000001'::uuid),
+	('a1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003',
+		'00000000-0000-0000-0000-000000000001'),
+	('a1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003',
+		'00000000-0000-0000-0000-000000000001'),
+	('a1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000003',
+		'00000000-0000-0000-0000-000000000001')
+) as v (id, presenter_id, responsible_id)
+where p.id = v.id;
+
+-- Patients at Bright Smile, so the builder has someone to be for.
+insert into public.contacts (id, org_id, company_id, name, email, phone, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000011',
+		null, 'Dana Reyes', 'dana@example.com', '+1 555 010 0110', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000011',
+		null, 'Sam Ortiz', null, '+1 555 010 0111', null, false,
+		'active', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- The fee schedule (the billables migration): a dental practice's procedures
+-- with their CDT codes, counted in teeth, quadrants or arches — and a
+-- roofer's services, counted in squares. Featured ones are the builder's
+-- checkboxes; the rest are found by search. Ids use the c1… range, bundles
+-- c2….
+insert into public.billables (id, org_id, code, name, unit_price, unit, unit_choices, is_featured, created_by) values
+	-- Bright Smile Dental
+	('c1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000011',
+		'D0120', 'Periodic exam', 65.00, 'visit', null, false, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000011',
+		'D2740', 'Porcelain crown', 1450.00, 'tooth', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000011',
+		'D4341', 'Scaling and root planing', 275.00, 'quadrant', '{UR,UL,BR,BL}', true,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000011',
+		'D7140', 'Extraction', 250.00, 'tooth', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000011',
+		'D9972', 'In-office whitening', 450.00, 'arch', '{Upper,Lower}', false,
+		'00000000-0000-0000-0000-000000000003'),
+	-- Ridgeline Roofing
+	('c1000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000005',
+		'RF-TEAROFF', 'Tear-off', 85.00, 'square', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000005',
+		'RF-ARCH', 'Architectural shingle install', 425.00, 'square', null, true,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000005',
+		'RF-UNDER', 'Ice and water underlayment', 95.00, 'square', null, false,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0000-000000000014', '10000000-0000-0000-0000-000000000005',
+		'RF-SLOPE', 'Slope repair', 600.00, 'slope', '{Front,Back,Left,Right}', false,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.quick_plans (id, org_id, name, sort_order, created_by) values
+	('c2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000011',
+		'Crown and whitening', 10, '00000000-0000-0000-0000-000000000003'),
+	('c2000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000011',
+		'Hygiene visit', 20, '00000000-0000-0000-0000-000000000003'),
+	('c2000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000005',
+		'Full replacement', 10, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.quick_plan_billables (quick_plan_id, billable_id, org_id, sort_order) values
+	('c2000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000002',
+		'10000000-0000-0000-0000-000000000011', 0),
+	('c2000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000005',
+		'10000000-0000-0000-0000-000000000011', 1),
+	('c2000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001',
+		'10000000-0000-0000-0000-000000000011', 0),
+	('c2000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000003',
+		'10000000-0000-0000-0000-000000000011', 1),
+	('c2000000-0000-0000-0000-000000000011', 'c1000000-0000-0000-0000-000000000011',
+		'10000000-0000-0000-0000-000000000005', 0),
+	('c2000000-0000-0000-0000-000000000011', 'c1000000-0000-0000-0000-000000000013',
+		'10000000-0000-0000-0000-000000000005', 1),
+	('c2000000-0000-0000-0000-000000000011', 'c1000000-0000-0000-0000-000000000012',
+		'10000000-0000-0000-0000-000000000005', 2)
+on conflict (quick_plan_id, billable_id) do nothing;
+
+-- Bright Smile's draft is for Dana, and its option is built from the
+-- schedule: two crowns (teeth 12 and 13) and an upper-arch whitening — the
+-- fixture for `billable_id`, `detail` and a unit count.
+update public.proposals
+set entity_type = 'contact', entity_id = '30000000-0000-0000-0000-000000000011'
+where id = 'a1000000-0000-0000-0000-000000000003';
+
+insert into public.proposal_line_items (id, org_id, proposal_option_id, billable_id, label, quantity, unit_cost, detail, sort_order) values
+	('a5000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000011',
+		'a2000000-0000-0000-0000-000000000006', 'c1000000-0000-0000-0000-000000000002',
+		'Porcelain crown', 2, 1450.00, '12, 13', 0),
+	('a5000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000011',
+		'a2000000-0000-0000-0000-000000000006', 'c1000000-0000-0000-0000-000000000005',
+		'In-office whitening', 1, 450.00, 'Upper', 1)
+on conflict (id) do nothing;
+
 -- The platform operator (see the system_admins migration). Evan is the
 -- developer's own account, so `npm run dev` lands in the operator view:
 -- every org above in the switcher and owner-level access in each, whatever

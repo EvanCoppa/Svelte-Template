@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Billable } from './billables';
 import type { CompanyWithContacts } from './companies';
 import type { ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
@@ -6,6 +7,7 @@ import type { DealWithParties } from './deals';
 import type { ProductWithCategory } from './products';
 import type { ProposalWithOptions } from './proposals';
 import {
+	describeBillable,
 	describeCompany,
 	describeContact,
 	describeCustomField,
@@ -32,6 +34,8 @@ const STAMPS = {
 
 const openAll = () => true;
 const openNone = () => false;
+/** A dental practice's words for the two people on a proposal. */
+const VOCABULARY = { proposal_presenter: 'Presenter', proposal_responsible: 'Provider' };
 
 const wayne: CompanyWithContacts = {
 	id: COMPANY_ID,
@@ -111,6 +115,8 @@ const options: ProposalWithOptions = {
 	valid_until: '2026-10-01T09:00:00Z',
 	selected_option_id: null,
 	deck_id: null,
+	presenter_id: USER_ID,
+	responsible_id: null,
 	proposal_options: [
 		{
 			id: 'o2',
@@ -305,7 +311,7 @@ describe('describing a record', () => {
 
 	it('describes a proposal by its status, steering to the recommended option and its total', () => {
 		const parent = { kind: 'deal' as const, id: contract.id, name: contract.title };
-		const detail = describeProposal(options, parent, openAll);
+		const detail = describeProposal(options, parent, openAll, VOCABULARY);
 
 		expect(detail.name).toBe('Annual support contract — options');
 		expect(detail.pills).toEqual([{ label: 'Sent', tone: 'info' }]);
@@ -314,6 +320,9 @@ describe('describing a record', () => {
 			value: 'Annual support contract',
 			href: `/deals/${contract.id}`
 		});
+		// The two people, labelled as the industry labels them.
+		expect(field(detail, 'Presenter')).toEqual({ type: 'person', userId: USER_ID });
+		expect(field(detail, 'Provider')).toEqual({ type: 'empty' });
 		expect(field(detail, 'Options')).toEqual({ type: 'number', value: 2 });
 		expect(field(detail, 'Recommended option')).toEqual({ type: 'text', value: 'Standard' });
 		expect(field(detail, 'Recommended total')).toEqual({
@@ -335,7 +344,7 @@ describe('describing a record', () => {
 
 	it('links the record a proposal hangs off only when the reader may open it, and copes without one', () => {
 		const parent = { kind: 'deal' as const, id: contract.id, name: contract.title };
-		expect(field(describeProposal(options, parent, openNone), 'For')).toEqual({
+		expect(field(describeProposal(options, parent, openNone, VOCABULARY), 'For')).toEqual({
 			type: 'record',
 			value: 'Annual support contract',
 			href: null
@@ -362,7 +371,8 @@ describe('describing a record', () => {
 				]
 			},
 			null,
-			openAll
+			openAll,
+			VOCABULARY
 		);
 		expect(draft.pills).toEqual([{ label: 'Draft', tone: 'neutral' }]);
 		expect(field(draft, 'For')).toEqual({ type: 'empty' });
@@ -373,7 +383,8 @@ describe('describing a record', () => {
 		const accepted = describeProposal(
 			{ ...options, status: 'accepted', selected_option_id: 'o1' },
 			parent,
-			openAll
+			openAll,
+			VOCABULARY
 		);
 		expect(field(accepted, 'Selected option')).toEqual({ type: 'text', value: 'Basic' });
 	});
@@ -442,11 +453,53 @@ describe('describing a record', () => {
 	});
 });
 
+describe('describeBillable', () => {
+	const crown: Billable = {
+		id: 'c1000000-0000-0000-0000-000000000001',
+		org_id: ORG_ID,
+		code: 'D2740',
+		name: 'Porcelain crown',
+		description: 'Full-coverage porcelain restoration.',
+		unit_price: 1450,
+		currency: 'USD',
+		unit: 'tooth',
+		unit_choices: null,
+		is_featured: true,
+		is_active: true,
+		sort_order: 0,
+		...STAMPS
+	};
+
+	it('shows the code, the price per unit and how its units are picked', () => {
+		const detail = describeBillable(crown);
+		expect(detail.kind).toBe('billable');
+		expect(detail.name).toBe('Porcelain crown');
+		expect(detail.pills).toEqual([{ label: 'Featured', tone: 'info' }]);
+		expect(field(detail, 'Code')).toEqual({ type: 'text', value: 'D2740' });
+		expect(field(detail, 'Unit price')).toEqual({
+			type: 'money',
+			value: 1450,
+			currency: 'USD',
+			unit: 'tooth'
+		});
+		expect(field(detail, 'Unit choices')).toEqual({ type: 'empty' });
+
+		const quadrants = describeBillable({
+			...crown,
+			is_featured: false,
+			is_active: false,
+			unit_choices: ['UR', 'UL', 'BR', 'BL']
+		});
+		expect(quadrants.pills).toEqual([{ label: 'Inactive', tone: 'neutral' }]);
+		expect(field(quadrants, 'Unit choices')).toEqual({ type: 'text', value: 'UR, UL, BR, BL' });
+	});
+});
+
 describe('getRecord', () => {
 	it('reads the table the kind lives in, scoped to the org and the id', async () => {
 		const { supabase, from, builder } = supabaseMock({ data: fixings });
 
-		const detail = await getRecord(supabase, ORG_ID, 'product', fixings.id, openAll);
+		const detail = await getRecord(supabase, ORG_ID, 'product', fixings.id, openAll, VOCABULARY);
 		expect(from).toHaveBeenCalledWith('products');
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', fixings.id);
@@ -455,6 +508,7 @@ describe('getRecord', () => {
 
 	it('dispatches every kind to its own table', async () => {
 		const tables = {
+			billable: 'billables',
 			company: 'companies',
 			contact: 'contacts',
 			product: 'products',
@@ -468,7 +522,7 @@ describe('getRecord', () => {
 			// SAFETY: the keys of `tables` are exactly the RecordKind union; Object.entries
 			// widens them to string, and this puts the kind back.
 			await expect(
-				getRecord(supabase, ORG_ID, kind as keyof typeof tables, 'x', openAll)
+				getRecord(supabase, ORG_ID, kind as keyof typeof tables, 'x', openAll, VOCABULARY)
 			).resolves.toBeNull();
 			expect(from).toHaveBeenCalledWith(table);
 		}
@@ -477,7 +531,7 @@ describe('getRecord', () => {
 	it("reads the record a proposal hangs off through that kind's own table", async () => {
 		const { supabase, from } = supabaseMockSequence([{ data: options }, { data: contract }]);
 
-		const detail = await getRecord(supabase, ORG_ID, 'proposal', PROPOSAL_ID, openAll);
+		const detail = await getRecord(supabase, ORG_ID, 'proposal', PROPOSAL_ID, openAll, VOCABULARY);
 		expect(from).toHaveBeenNthCalledWith(1, 'proposals');
 		expect(from).toHaveBeenNthCalledWith(2, 'deals');
 		expect(detail && field(detail, 'For')).toEqual({
@@ -490,7 +544,14 @@ describe('getRecord', () => {
 		const draft = supabaseMockSequence([
 			{ data: { ...options, entity_type: null, entity_id: null } }
 		]);
-		const described = await getRecord(draft.supabase, ORG_ID, 'proposal', PROPOSAL_ID, openAll);
+		const described = await getRecord(
+			draft.supabase,
+			ORG_ID,
+			'proposal',
+			PROPOSAL_ID,
+			openAll,
+			VOCABULARY
+		);
 		expect(draft.from).toHaveBeenCalledTimes(1);
 		expect(described && field(described, 'For')).toEqual({ type: 'empty' });
 	});
@@ -498,7 +559,9 @@ describe('getRecord', () => {
 	it('throws the PostgREST message when the read fails', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'boom' } });
 
-		await expect(getRecord(supabase, ORG_ID, 'deal', 'x', openAll)).rejects.toThrow('boom');
+		await expect(getRecord(supabase, ORG_ID, 'deal', 'x', openAll, VOCABULARY)).rejects.toThrow(
+			'boom'
+		);
 	});
 });
 

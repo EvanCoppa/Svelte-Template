@@ -152,23 +152,32 @@ describe('createRecord', () => {
 		);
 	});
 
-	it('writes a proposal unattached, with its validity as an instant', async () => {
-		const dated = supabaseMock({ data: { id: 'proposal' } });
-		await submit(dated.supabase, OWNER, 'proposal', {
-			title: 'Crown and whitening',
-			valid_until: '2026-10-01T09:00'
+	it('writes a billable, splitting its unit choices and reading the featured pick as a boolean', async () => {
+		const chips = supabaseMock({ data: { id: 'billable' } });
+		await submit(chips.supabase, OWNER, 'billable', {
+			name: 'Scaling and root planing',
+			code: 'D4341',
+			unit_price: '275',
+			unit: 'quadrant',
+			unit_choices: 'UR, UL,, BR , BL',
+			is_featured: 'true'
 		});
-		expect(dated.from).toHaveBeenCalledWith('proposals');
-		expect(dated.builder.insert).toHaveBeenCalledWith({
-			title: 'Crown and whitening',
-			valid_until: '2026-10-01T09:00:00.000Z',
+		expect(chips.from).toHaveBeenCalledWith('billables');
+		expect(chips.builder.insert).toHaveBeenCalledWith({
+			name: 'Scaling and root planing',
+			code: 'D4341',
+			unit_price: 275,
+			unit: 'quadrant',
+			unit_choices: ['UR', 'UL', 'BR', 'BL'],
+			is_featured: true,
+			description: null,
 			org_id: ORG_ID
 		});
 
-		const open = supabaseMock({ data: { id: 'proposal' } });
-		await submit(open.supabase, OWNER, 'proposal', { title: 'Crown and whitening' });
-		expect(open.builder.insert).toHaveBeenCalledWith(
-			expect.objectContaining({ valid_until: null })
+		const typed = supabaseMock({ data: { id: 'billable' } });
+		await submit(typed.supabase, OWNER, 'billable', { name: 'Porcelain crown' });
+		expect(typed.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ unit_choices: null, is_featured: false, unit_price: undefined })
 		);
 	});
 

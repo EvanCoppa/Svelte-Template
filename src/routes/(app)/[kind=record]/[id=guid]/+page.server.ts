@@ -13,6 +13,7 @@ import { listAddresses } from '$lib/server/crm/addresses';
 import { listCustomFields } from '$lib/server/crm/custom-fields';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
 import { listTagsFor } from '$lib/server/crm/tags';
+import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
 import { hasGrant } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
@@ -54,8 +55,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// so the same six reads serve every kind; only a party has addresses.
 	const entity = { entityType: kind, entityId: id };
 	const isParty = kind === 'company' || kind === 'contact';
+	// The words the record's labels use — who presents a proposal, who is
+	// responsible for it — as the org's industry says them.
+	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
 	const [record, activities, tags, addresses, customFields, related] = await Promise.all([
-		getRecord(supabase, activeOrgId, kind, id, canOpen),
+		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
 		listTagsFor(supabase, activeOrgId, entity),
 		isParty ? listAddresses(supabase, activeOrgId, entity) : [],

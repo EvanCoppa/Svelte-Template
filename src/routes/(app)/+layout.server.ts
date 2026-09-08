@@ -5,7 +5,7 @@ import { upgradePlans } from '$lib/features/plans';
 import { visibleTerms } from '$lib/features/terms';
 import { buildNav } from '$lib/navigation';
 import { QUERY } from '$lib/queries';
-import { listTiersWithFeatures, loadPageRegistry } from '$lib/server/features';
+import { listTiersWithFeatures, loadPageRegistry, loadVocabulary } from '$lib/server/features';
 import { hasGrant } from '$lib/server/roles';
 import type { LayoutServerLoad } from './$types';
 
@@ -30,9 +30,10 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// Reference data, read once per session (this load reruns only on the
 	// keys above), so the upgrade prompt opens anywhere without a round trip
 	// and the shell can title a page it navigates to without one either.
-	const [tiers, pages] = await Promise.all([
+	const [tiers, pages, vocabulary] = await Promise.all([
 		listTiersWithFeatures(locals.supabase),
-		loadPageRegistry(locals.supabase)
+		loadPageRegistry(locals.supabase),
+		loadVocabulary(locals.supabase, activeOrg.industryId)
 	]);
 
 	return {
@@ -48,6 +49,9 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		// the "Add …" button, the row count and the record page read these.
 		// Filtered exactly like the nav, so grants never reach the browser.
 		terms: visibleTerms(features, canRead),
+		// The words that belong to no feature — who presents a proposal, who is
+		// responsible for it — as the org's industry says them.
+		vocabulary,
 		// What each plan above the org's own would unlock — the upgrade prompt's
 		// pitch, keyed like the nav on tier and mode (grants play no part).
 		plans: upgradePlans(tiers, features, activeOrg.tierId),
