@@ -44,8 +44,7 @@
 		get data() {
 			return data.contacts;
 		},
-		columns,
-		initialState: { pagination: { pageIndex: 0, pageSize: 10 } }
+		columns
 	});
 </script>
 

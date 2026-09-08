@@ -309,7 +309,6 @@
 			return payments;
 		},
 		columns: paymentColumns,
-		initialState: { pagination: { pageIndex: 0, pageSize: 5 } },
 		state: {
 			get rowSelection() {
 				return paymentSelection();
@@ -3162,11 +3161,16 @@
 				<code>createTable</code> against the shared <code>DataTable.features</code> preset; the
 				parts render it. The toolbar row here is page markup — search inputs and
 				<code>ViewOptions</code> compose per page — and the checkbox column is
-				<code>DataTable.selectColumn(columnHelper)</code>, first in every list.
+				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
+				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
+				with no viewport to fill (this one, inside a card) is given a
+				<code>pageSize</code>.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<DataTable.Root table={paymentsTable}>
+			<!-- A card is not a viewport, so this one is told its size; a list page
+			     leaves `pageSize` off and the table fits the screen instead. -->
+			<DataTable.Root table={paymentsTable} pageSize={5}>
 				<div class="flex items-center gap-2">
 					<Input
 						placeholder="Filter emails…"
@@ -3177,7 +3181,7 @@
 					<DataTable.ViewOptions class="ms-auto" />
 				</div>
 				<DataTable.Content />
-				<DataTable.Pagination noun="payment" pageSizeOptions={[5, 10, 20, 30, 50]} />
+				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>

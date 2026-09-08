@@ -61,7 +61,9 @@
 					{/each}
 				</Table.Row>
 			{:else}
-				<Table.Row>
+				<!-- `data-empty` keeps this taller placeholder out of the row-height probe
+				     that fits the page size to the viewport (see `page-size.ts`). -->
+				<Table.Row data-empty="true">
 					<Table.Cell
 						colspan={dataTable.table.getVisibleLeafColumns().length}
 						class="h-24 text-center"
