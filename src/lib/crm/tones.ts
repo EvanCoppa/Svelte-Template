@@ -38,6 +38,16 @@ export const STAGE_OUTCOME_TONE = {
 	lost: 'error'
 } satisfies Record<Enums<'stage_outcome'>, BadgeTone>;
 
+/** A proposal's lifecycle: out for decision is the active state, accepted the good end. */
+export const PROPOSAL_STATUS_TONE = {
+	draft: 'neutral',
+	sent: 'info',
+	viewed: 'violet',
+	accepted: 'success',
+	declined: 'error',
+	expired: 'warning'
+} satisfies Record<Enums<'proposal_status'>, BadgeTone>;
+
 export const TICKET_STATUS_TONE = {
 	open: 'info',
 	pending: 'warning',

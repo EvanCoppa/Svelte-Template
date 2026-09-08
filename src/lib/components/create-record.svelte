@@ -4,6 +4,7 @@
 	import { superForm, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { invalidate } from '$app/navigation';
+	import { page } from '$app/state';
 	import * as Modal from '$lib/components/modal/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -11,6 +12,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { recordTerms } from '$lib/crm/records';
 	import {
 		RECORD_FORMS,
 		RECORD_SCHEMAS,
@@ -18,7 +20,7 @@
 		type RecordFormValues,
 		type RecordType
 	} from '$lib/schemas/records';
-	import { cn } from '$lib/utils.js';
+	import { capitalize, cn } from '$lib/utils.js';
 
 	/**
 	 * The one "Add …" button, and the one form behind it.
@@ -27,6 +29,8 @@
 	 * load built (`loadCreateRecord()` in `$lib/server/records.ts`); the fields,
 	 * the labels and the validation all come from the registry entry for that
 	 * kind, so every object type gets the same form without a page writing one.
+	 * What the record is CALLED comes from the terms the layout shipped — the
+	 * feature's word as the org's industry says it, "Add quote" in a roofer.
 	 * The post is an ordinary form action on the page it was opened from —
 	 * `?/create`, which delegates straight back to `createRecord()`.
 	 *
@@ -45,6 +49,7 @@
 	} = $props();
 
 	const definition = RECORD_FORMS[type];
+	const terms = $derived(recordTerms(page.data.terms, type));
 
 	let open = $state(false);
 
@@ -67,7 +72,7 @@
 		onUpdated({ form: result }) {
 			if (!result.valid) return;
 			open = false;
-			toast.success(`${definition.noun[0].toUpperCase()}${definition.noun.slice(1)} created`);
+			toast.success(`${capitalize(terms.noun)} created`);
 			invalidate(definition.query);
 		}
 	});
@@ -99,7 +104,7 @@
 		{#snippet child({ props })}
 			<Button {...props}>
 				<PlusIcon />
-				Add {definition.noun}
+				Add {terms.noun}
 			</Button>
 		{/snippet}
 	</Modal.Trigger>
@@ -110,7 +115,7 @@
 		<form method="POST" {action} use:enhance>
 			<Modal.Card>
 				<Modal.Header>
-					<Modal.Title><PlusIcon /> {definition.title}</Modal.Title>
+					<Modal.Title><PlusIcon /> New {terms.noun}</Modal.Title>
 				</Modal.Header>
 				<Modal.Body class="grid gap-4 sm:grid-cols-2">
 					<FormAlert message={$message} class="mb-0 sm:col-span-2" />
@@ -163,7 +168,7 @@
 			<Modal.Footer>
 				<Modal.Cancel>Cancel</Modal.Cancel>
 				<Modal.Action type="submit" disabled={$submitting}>
-					{$submitting ? 'Creating…' : `Create ${definition.noun}`}
+					{$submitting ? 'Creating…' : `Create ${terms.noun}`}
 				</Modal.Action>
 			</Modal.Footer>
 		</form>

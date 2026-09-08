@@ -10,25 +10,31 @@ const registry = [
 	{
 		id: 'companies',
 		name: 'Clients',
+		noun: 'client',
 		description: null,
 		route: '/companies',
 		icon: 'users',
 		category: 'platform',
 		sort_order: 10,
 		created_at: '',
-		industry_features: [{ industry_id: 'general' }, { industry_id: 'construction' }],
+		industry_features: [
+			{ industry_id: 'general', name: null, noun: null },
+			// What a roofer calls the same list.
+			{ industry_id: 'construction', name: 'Customers', noun: 'customer' }
+		],
 		tier_features: [{ tier_id: 'free' }, { tier_id: 'pro' }]
 	},
 	{
 		id: 'deals',
 		name: 'Deals',
+		noun: 'deal',
 		description: null,
 		route: '/deals',
 		icon: 'handshake',
 		category: 'platform',
 		sort_order: 20,
 		created_at: '',
-		industry_features: [{ industry_id: 'general' }],
+		industry_features: [{ industry_id: 'general', name: null, noun: null }],
 		tier_features: [{ tier_id: 'pro' }]
 	}
 ];
@@ -168,6 +174,20 @@ describe('loadOrgContext', () => {
 		// Outside construction and the free tier, yet enabled by the pilot override.
 		expect(ctx.features.deals.mode).toBe('enabled');
 		expect(ctx.features.companies.mode).toBe('enabled');
+	});
+
+	it("words each feature the way the active org's industry does", async () => {
+		const h = harness({
+			organizations: [orgRow('member', acme), orgRow('owner', globex)],
+			cookieOrgId: GLOBEX_ID
+		});
+
+		const ctx = await loadOrgContext(h.event);
+		expect(ctx.features.companies.feature).toMatchObject({ name: 'Customers', noun: 'customer' });
+
+		const back = harness({ organizations: [orgRow('member', acme)], cookieOrgId: ORG_ID });
+		const acmeCtx = await loadOrgContext(back.event);
+		expect(acmeCtx.features.companies.feature).toMatchObject({ name: 'Clients', noun: 'client' });
 	});
 
 	it('makes a system admin the owner of every org RLS shows them', async () => {

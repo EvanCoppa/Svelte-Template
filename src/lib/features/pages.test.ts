@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { matchPage, visiblePages } from './pages';
-import type { Feature, FeatureMap, FeatureMode, PageMeta } from './types';
+import type { Feature, FeatureMap, FeatureMode, PageMeta, PageRow } from './types';
 
-function page(id: string, path: string, featureId: string | null = null): PageMeta {
-	return { id, feature_id: featureId, path, title: id };
+function page(
+	id: string,
+	path: string,
+	featureId: string | null = null,
+	title: string | null = id
+): PageRow {
+	return { id, feature_id: featureId, path, title };
 }
 
-function feature(id: string): Feature {
+function feature(id: string, name = id): Feature {
 	return {
 		id,
-		name: id,
+		name,
+		noun: null,
 		description: null,
 		route: `/${id}`,
 		icon: null,
@@ -19,8 +25,10 @@ function feature(id: string): Feature {
 	};
 }
 
-function features(entries: [id: string, mode: FeatureMode][]): FeatureMap {
-	return Object.fromEntries(entries.map(([id, mode]) => [id, { feature: feature(id), mode }]));
+function features(entries: [id: string, mode: FeatureMode, name?: string][]): FeatureMap {
+	return Object.fromEntries(
+		entries.map(([id, mode, name]) => [id, { feature: feature(id, name), mode }])
+	);
 }
 
 const registry: PageMeta[] = [
@@ -32,7 +40,7 @@ const registry: PageMeta[] = [
 	page('deals', '/deals', 'deals'),
 	page('tasks', '/tasks', 'tasks'),
 	page('tickets', '/tickets', 'tickets')
-];
+].map((row) => ({ ...row, title: row.title ?? row.id }));
 
 describe('matchPage', () => {
 	it('matches a path exactly', () => {
@@ -87,5 +95,29 @@ describe('visiblePages', () => {
 		const ids = visiblePages(registry, map, (id) => id !== 'companies').map((p) => p.id);
 		expect(ids).not.toContain('companies');
 		expect(ids).toContain('deals');
+	});
+
+	it('titles a page with no title of its own after its feature, as the industry names it', () => {
+		const quotes = features([['proposals', 'enabled', 'Quotes']]);
+		const [shown] = visiblePages(
+			[page('proposals', '/proposals', 'proposals', null)],
+			quotes,
+			() => true
+		);
+		expect(shown.title).toBe('Quotes');
+	});
+
+	it("keeps a page's own title over its feature's name", () => {
+		const quotes = features([['proposals', 'enabled', 'Quotes']]);
+		const [shown] = visiblePages(
+			[page('proposal-decks', '/proposals/decks', 'proposals', 'Decks')],
+			quotes,
+			() => true
+		);
+		expect(shown.title).toBe('Decks');
+	});
+
+	it('drops a shell row with no title, which the check constraint already forbids', () => {
+		expect(visiblePages([page('blank', '/blank', null, null)], map, () => true)).toEqual([]);
 	});
 });

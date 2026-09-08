@@ -5,6 +5,7 @@ import Building2Icon from '@lucide/svelte/icons/building-2';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
+import FileTextIcon from '@lucide/svelte/icons/file-text';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
@@ -28,6 +29,7 @@ export const ICONS = {
 	'building-2': Building2Icon,
 	'circle-user': CircleUserIcon,
 	contact: ContactIcon,
+	'file-text': FileTextIcon,
 	handshake: HandshakeIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,

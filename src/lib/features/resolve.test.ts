@@ -1,21 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { resolveFeatures, type OrgFeatureState } from './resolve';
+import { isVisible, resolveFeatures, type OrgFeatureState } from './resolve';
 import type { FeatureRegistryRow } from './types';
+
+type IndustryRow = FeatureRegistryRow['industry_features'][number];
+
+/** An industry that includes the feature, calling it by its own words or not. */
+function industry(industry_id: string, words: { name?: string; noun?: string } = {}): IndustryRow {
+	return { industry_id, name: words.name ?? null, noun: words.noun ?? null };
+}
 
 function row(
 	id: string,
-	{ industries = ['general'], tiers = ['free'] }: { industries?: string[]; tiers?: string[] } = {}
+	{
+		industries = [industry('general')],
+		tiers = ['free'],
+		noun = null
+	}: { industries?: IndustryRow[]; tiers?: string[]; noun?: string | null } = {}
 ): FeatureRegistryRow {
 	return {
 		id,
 		name: id,
+		noun,
 		description: null,
 		route: `/${id}`,
 		icon: null,
 		category: 'platform',
 		sort_order: 0,
 		created_at: '2026-01-01T00:00:00Z',
-		industry_features: industries.map((industry_id) => ({ industry_id })),
+		industry_features: industries,
 		tier_features: tiers.map((tier_id) => ({ tier_id }))
 	};
 }
@@ -39,7 +51,7 @@ describe('resolveFeatures', () => {
 	});
 
 	it('hides a feature outside the industry, whatever the tier says', () => {
-		const registry = [row('deals', { industries: ['construction'], tiers: ['free'] })];
+		const registry = [row('deals', { industries: [industry('construction')], tiers: ['free'] })];
 		expect(resolveFeatures(registry, org()).deals.mode).toBe('hidden');
 	});
 
@@ -56,7 +68,7 @@ describe('resolveFeatures', () => {
 	});
 
 	it('lets an enabled override win over industry and tier', () => {
-		const registry = [row('deals', { industries: ['construction'], tiers: ['pro'] })];
+		const registry = [row('deals', { industries: [industry('construction')], tiers: ['pro'] })];
 		const features = resolveFeatures(
 			registry,
 			org({ overrides: [{ feature_id: 'deals', mode: 'enabled' }] })
@@ -99,5 +111,60 @@ describe('resolveFeatures', () => {
 
 	it('resolves an empty registry to an empty map', () => {
 		expect(resolveFeatures([], org())).toEqual({});
+	});
+});
+
+describe('resolveFeatures — what the industry calls a feature', () => {
+	const proposals = row('proposals', {
+		noun: 'proposal',
+		industries: [
+			industry('general'),
+			industry('dentistry', { name: 'Treatment plans', noun: 'treatment plan' }),
+			industry('roofing', { name: 'Quotes' })
+		]
+	});
+
+	it("takes the active industry's own name and noun", () => {
+		const { feature } = resolveFeatures([proposals], org({ industryId: 'dentistry' })).proposals;
+		expect(feature.name).toBe('Treatment plans');
+		expect(feature.noun).toBe('treatment plan');
+	});
+
+	it("inherits the feature's words where the industry row leaves them null", () => {
+		const general = resolveFeatures([proposals], org()).proposals.feature;
+		expect(general).toMatchObject({ name: 'proposals', noun: 'proposal' });
+		// A name without a noun: the noun still inherits.
+		const roofing = resolveFeatures([proposals], org({ industryId: 'roofing' })).proposals.feature;
+		expect(roofing).toMatchObject({ name: 'Quotes', noun: 'proposal' });
+	});
+
+	it("never borrows another industry's words, even when an override enables the feature", () => {
+		const outside = org({
+			industryId: 'beverage',
+			overrides: [{ feature_id: 'proposals', mode: 'enabled' }]
+		});
+		const { feature, mode } = resolveFeatures([proposals], outside).proposals;
+		expect(mode).toBe('enabled');
+		expect(feature).toMatchObject({ name: 'proposals', noun: 'proposal' });
+	});
+});
+
+describe('isVisible', () => {
+	const readAll = () => true;
+	const resolved = (mode: 'enabled' | 'locked_visible' | 'disabled' | 'hidden') => ({
+		feature: resolveFeatures([row('deals')], org()).deals.feature,
+		mode
+	});
+
+	it('shows enabled and locked features, and hides disabled and hidden ones', () => {
+		expect(isVisible(resolved('enabled'), readAll)).toBe(true);
+		expect(isVisible(resolved('locked_visible'), readAll)).toBe(true);
+		expect(isVisible(resolved('disabled'), readAll)).toBe(false);
+		expect(isVisible(resolved('hidden'), readAll)).toBe(false);
+	});
+
+	it('hides a feature the caller cannot read, locked ones included', () => {
+		expect(isVisible(resolved('enabled'), () => false)).toBe(false);
+		expect(isVisible(resolved('locked_visible'), (id) => id !== 'deals')).toBe(false);
 	});
 });

@@ -19,6 +19,7 @@ export const QUERY = {
 	contacts: 'app:contacts',
 	products: 'app:products',
 	deals: 'app:deals',
+	proposals: 'app:proposals',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

@@ -148,8 +148,8 @@ application data is scoped to an organization, never to a bare user. The
   (which verticals include it at all), `tier_features` (which plans unlock it),
   `organization_feature_overrides` (per-org escape hatch, operator/SQL only) —
   plus `organization_disabled_features`, the org's own opt-outs (owner/admin via
-  RLS). The pure resolver (`resolve.ts`, mirrored by `private.feature_mode()`)
-  folds them into one mode per feature per session: `enabled`, `locked_visible`
+  RLS). The pure resolver (`resolve.ts`, mirrored for modes by
+  `private.feature_mode()`) folds them into one mode per feature per session: `enabled`, `locked_visible`
   (industry has it, plan doesn't — the tier axis, shown with an upgrade prompt),
   `disabled` (the org switched it off), `hidden` (not in the industry — does not
   exist). **`hooks.server.ts` enforces the mode** next to the auth check via
@@ -159,9 +159,23 @@ application data is scoped to an organization, never to a bare user. The
   migration inserting its rows (the migration's closing comment is the
   checklist) + its id in `FEATURE_IDS`; the sidebar and ⌘K palette render from
   the registry, and `/settings` (with `/api/` and `/logout`) is exempt from the gate.
+- **A feature's row is where a thing is named, and the industry axis can rename
+  it** (`feature_names_by_industry` migration + `src/lib/features/terms.ts`). A
+  proposal is a "quote" to a roofer and a "treatment plan" to a dentist, so
+  `features.name` / `features.noun` (the list, and one lower-case row of it) are
+  the default words and `industry_features.name` / `noun` an industry's own
+  (null inherits). The resolver applies the active industry's row, so the nav,
+  the palette, the upgrade prompt and feature settings follow with no change;
+  the `(app)` layout ships `terms` for the surfaces that name one record, and
+  `recordTerms(page.data.terms, kind)` (`src/lib/crm/records.ts`) is the one
+  accessor — "Add quote", "3 quotes", "Quote not found". **A kind's words are
+  never a constant in `src/`**, and `private.feature_mode()` mirrors modes only:
+  no policy needs a name.
 - **A feature is made of pages, and a page has a title** (`pages` migration +
   `src/lib/features/pages.ts`). One row per screen — `path`, `title`, and the
   `feature_id` it belongs to (null for the shell pages, dashboard and settings).
+  A feature's own list page leaves `title` null: it is named after the feature,
+  as the org's industry says it, and `visiblePages()` fills it in.
   The `(app)` layout ships the pages the session may see (`visiblePages()`,
   filtered by the same predicate as the nav) and renders **the one `<title>` for
   the whole group** from `matchPage(page.url.pathname, …)`, re-resolved on every
@@ -190,7 +204,8 @@ application data is scoped to an organization, never to a bare user. The
   the rest; compose it from the same `RecordDetail` and the `detail/` parts rather
   than a second renderer. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
-  primary column.
+  primary column. What a kind is called — the eyebrow, "All quotes", the related
+  cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -378,8 +393,9 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 ### Creating a record is one form, not one per page
 
 Adding a row of any kind goes through the **generic record form**: the registry in
-`src/lib/schemas/records.ts` (what each kind of object is called, the feature that
-owns it, the query key its list depends on, its fields and its zod schema), the
+`src/lib/schemas/records.ts` (the feature that owns each kind of object — whose terms
+name it: "Add quote", "Quote created" — the query key its list depends on, its fields
+and its zod schema), the
 `CreateRecord` component behind every list page's "Add …" button, and
 `src/lib/server/records.ts`, which validates the post, checks `manage` on the feature
 and hands the values to the matching `$lib/server/crm/*` module. A list page's server
@@ -571,10 +587,12 @@ before you build.
 Every `(app)` screen opens with `PageHeader` (`src/lib/components/page-header/`): the
 title on the start side, whatever the page lets you do on the end side, one line.
 **There is no subtitle.** A page is named once — by its `pages` row, which also titles
-the document and names the breadcrumb — and a paragraph under the heading explaining
-what "Companies" means is the third copy of that name, so it was removed everywhere
-and no new one goes in. Explanation belongs where the thing is: a `Card.Description`,
-an empty state, an `Alert`.
+the document and names the breadcrumb — so `<PageHeader.Title />` with no children
+renders that name (the same `titleFor()`), and a list page never spells its own; give
+it children only for a heading that is deliberately not the page's name ("Welcome
+back"). A paragraph under the heading explaining what "Companies" means is the third
+copy of that name, so it was removed everywhere and no new one goes in. Explanation
+belongs where the thing is: a `Card.Description`, an empty state, an `Alert`.
 
 `PageHeader.Actions` is where a page's own buttons live, and on a list page the first
 of them is the "Add …" button — `<CreateRecord type="company" form={data.createForm} />`,

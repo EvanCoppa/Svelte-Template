@@ -486,8 +486,8 @@ insert into public.organization_invites (id, org_id, email, token, invited_by) v
 		'00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
--- Proposal fixtures, all inside Acme. Ids use the a0…/a1…/… ranges per
--- table family. Two proposals: one out for decision (sent, three options,
+-- Proposal fixtures, inside Acme except the two drafts at the end of this
+-- block. Ids use the a0…/a1…/… ranges per table family. Two proposals: one out for decision (sent, three options,
 -- line items, custom values, a deck, a timeline) and one already accepted
 -- with its execution record, so every table has a row after a reset.
 -- computed_total is left out on purpose — the trigger owns it.
@@ -614,6 +614,24 @@ insert into public.custom_field_values (id, org_id, entity_type, entity_id, fiel
 		'proposal_option', 'a2000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000003', 'business hours', null, null),
 	('a4000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001',
 		'proposal_option', 'a2000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', '24/7', null, null)
+on conflict (id) do nothing;
+
+-- One draft in a dental practice and one in a roofer, unattached, so the
+-- industry's own words are visible straight after a reset: Bright Smile
+-- presents "Treatment plans", Ridgeline sends "Quotes" (the proposals
+-- feature migration). Evan owns both orgs.
+insert into public.proposals (id, org_id, title, status, created_by) values
+	('a1000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000011',
+		'Crown and whitening', 'draft', '00000000-0000-0000-0000-000000000003'),
+	('a1000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000005',
+		'Re-roof, 32 squares', 'draft', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.proposal_options (id, org_id, proposal_id, label, sort_order, is_recommended, base_price) values
+	('a2000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000011',
+		'a1000000-0000-0000-0000-000000000003', 'Porcelain crown', 0, true, 1450.00),
+	('a2000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000005',
+		'a1000000-0000-0000-0000-000000000004', 'Architectural shingle', 0, true, 18400.00)
 on conflict (id) do nothing;
 
 -- The accepted one: selection and status land together (the check

@@ -26,7 +26,15 @@ import { QUERY } from '$lib/queries';
  */
 
 /** Kinds of record the generic form can create. */
-export const RECORD_TYPES = ['company', 'contact', 'deal', 'product', 'task', 'ticket'] as const;
+export const RECORD_TYPES = [
+	'company',
+	'contact',
+	'deal',
+	'proposal',
+	'product',
+	'task',
+	'ticket'
+] as const;
 
 export type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -52,11 +60,11 @@ export type RecordField = {
 };
 
 export type RecordForm = {
-	/** Lower-case singular, for "Add company" and "Company created". */
-	noun: string;
-	/** The modal's heading. */
-	title: string;
-	/** The feature that owns the record: `manage` on it is what creating needs. */
+	/**
+	 * The feature that owns the record: `manage` on it is what creating needs,
+	 * and its terms are what the button, the modal and the toast call the
+	 * record ("Add quote") — see `recordTerms()` in `$lib/crm/records`.
+	 */
 	feature: FeatureId;
 	/** The list this creates a row in, so the page refreshes and nothing else does. */
 	query: string;
@@ -153,6 +161,11 @@ export const dealRecordSchema = z.object({
 	expected_close_date: optionalDate
 });
 
+export const proposalRecordSchema = z.object({
+	title: requiredText('Title'),
+	valid_until: optionalInstant
+});
+
 export const productRecordSchema = z.object({
 	name: requiredText('Name'),
 	kind: z.enum(['good', 'service']).default('good'),
@@ -187,6 +200,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	company: companyRecordSchema,
 	contact: contactRecordSchema,
 	deal: dealRecordSchema,
+	proposal: proposalRecordSchema,
 	product: productRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
@@ -203,8 +217,6 @@ type RecordFormRegistry = { [K in RecordType]: RecordForm };
 
 export const RECORD_FORMS: RecordFormRegistry = {
 	company: {
-		noun: 'company',
-		title: 'New company',
 		feature: 'companies',
 		query: QUERY.companies,
 		fields: [
@@ -227,8 +239,6 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		]
 	},
 	contact: {
-		noun: 'contact',
-		title: 'New contact',
 		feature: 'contacts',
 		query: QUERY.contacts,
 		fields: [
@@ -240,8 +250,6 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		]
 	},
 	deal: {
-		noun: 'deal',
-		title: 'New deal',
 		feature: 'deals',
 		query: QUERY.deals,
 		fields: [
@@ -250,9 +258,15 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]
 	},
+	proposal: {
+		feature: 'proposals',
+		query: QUERY.proposals,
+		fields: [
+			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual support — options' },
+			{ name: 'valid_until', label: 'Valid until', type: 'datetime' }
+		]
+	},
 	product: {
-		noun: 'product',
-		title: 'New product',
 		feature: 'products',
 		query: QUERY.products,
 		fields: [
@@ -274,8 +288,6 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		]
 	},
 	task: {
-		noun: 'task',
-		title: 'New task',
 		feature: 'tasks',
 		query: QUERY.tasks,
 		fields: [
@@ -285,8 +297,6 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		]
 	},
 	ticket: {
-		noun: 'ticket',
-		title: 'New ticket',
 		feature: 'tickets',
 		query: QUERY.tickets,
 		fields: [

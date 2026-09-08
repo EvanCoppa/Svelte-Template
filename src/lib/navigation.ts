@@ -1,3 +1,4 @@
+import { isVisible } from '$lib/features/resolve';
 import type { FeatureMap } from '$lib/features/types';
 
 /**
@@ -66,16 +67,15 @@ export const staticNavItems: NavItem[] = [
 
 /**
  * The entries one session may see: the static pages plus every feature that
- * is enabled or locked for the org AND readable by the user. Sorted by
- * category order, then sortOrder, then label — the one place filtering
- * happens, so components never check modes or grants themselves.
+ * is enabled or locked for the org AND readable by the user (`isVisible()`,
+ * the predicate the page titles and the terms share). Sorted by category
+ * order, then sortOrder, then label — the one place filtering happens, so
+ * components never check modes or grants themselves. The label is the
+ * feature's name as the org's industry words it.
  */
 export function buildNav(features: FeatureMap, canRead: (featureId: string) => boolean): NavItem[] {
 	const featureItems: NavItem[] = Object.values(features)
-		.filter(
-			({ mode, feature }) =>
-				(mode === 'enabled' || mode === 'locked_visible') && canRead(feature.id)
-		)
+		.filter((resolved) => isVisible(resolved, canRead))
 		.map(({ mode, feature }) => ({
 			label: feature.name,
 			href: feature.route,

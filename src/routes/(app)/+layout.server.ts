@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants.js';
 import { visiblePages } from '$lib/features/pages';
 import { upgradePlans } from '$lib/features/plans';
+import { visibleTerms } from '$lib/features/terms';
 import { buildNav } from '$lib/navigation';
 import { QUERY } from '$lib/queries';
 import { listTiersWithFeatures, loadPageRegistry } from '$lib/server/features';
@@ -43,6 +44,10 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		// Every page's title, filtered exactly like the nav. The layout matches
 		// the current pathname against these — see the pages migration.
 		pages: visiblePages(pages, features, canRead),
+		// What each visible feature is called, as the org's industry words it —
+		// the "Add …" button, the row count and the record page read these.
+		// Filtered exactly like the nav, so grants never reach the browser.
+		terms: visibleTerms(features, canRead),
 		// What each plan above the org's own would unlock — the upgrade prompt's
 		// pitch, keyed like the nav on tier and mode (grants play no part).
 		plans: upgradePlans(tiers, features, activeOrg.tierId),

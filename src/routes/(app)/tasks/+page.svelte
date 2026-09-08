@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import { recordHref } from '$lib/crm/records';
+	import { recordHref, recordTerms } from '$lib/crm/records';
 	import { TASK_STATE_TONE, taskState } from '$lib/crm/tones';
 	import type { Task } from '$lib/server/crm/tasks';
+	import { capitalize } from '$lib/utils.js';
 
 	let { data } = $props();
+
+	const terms = $derived(recordTerms(page.data.terms, 'task'));
 
 	const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
 
@@ -15,7 +19,8 @@
 	const columns = columnHelper.columns([
 		DataTable.selectColumn(columnHelper),
 		columnHelper.accessor('title', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Task' }),
+			header: ({ column }) =>
+				renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) }),
 			cell: ({ getValue, row }) =>
 				DataTable.linkCell(getValue(), recordHref('task', row.original.id))
 		}),
@@ -44,7 +49,7 @@
 
 <div class="space-y-6">
 	<PageHeader.Root>
-		<PageHeader.Title>Tasks</PageHeader.Title>
+		<PageHeader.Title />
 		{#if data.canCreate}
 			<PageHeader.Actions>
 				<CreateRecord type="task" form={data.createForm} />
@@ -54,6 +59,6 @@
 
 	<DataTable.Root {table}>
 		<DataTable.Content />
-		<DataTable.Pagination noun="task" />
+		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>

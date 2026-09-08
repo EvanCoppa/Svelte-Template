@@ -276,7 +276,7 @@
 
 <div class="space-y-6">
 	<PageHeader.Root>
-		<PageHeader.Title>Staff</PageHeader.Title>
+		<PageHeader.Title />
 
 		{#if data.canManage}
 			<PageHeader.Actions>

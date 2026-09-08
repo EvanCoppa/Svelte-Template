@@ -3,7 +3,16 @@ import { match } from './record';
 
 describe('the [kind=record] matcher', () => {
 	it('accepts the list routes that serve records', () => {
-		for (const segment of ['companies', 'contacts', 'products', 'deals', 'tasks', 'tickets']) {
+		const segments = [
+			'companies',
+			'contacts',
+			'products',
+			'deals',
+			'proposals',
+			'tasks',
+			'tickets'
+		];
+		for (const segment of segments) {
 			expect(match(segment)).toBe(true);
 		}
 	});

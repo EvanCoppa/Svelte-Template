@@ -7,6 +7,7 @@ import { ORG_ID, supabaseMock } from '$lib/server/crm/test-support';
 const feature = (id: string, category = 'platform', sort = 0) => ({
 	id,
 	name: id,
+	noun: null,
 	description: null,
 	route: `/${id}`,
 	icon: null,

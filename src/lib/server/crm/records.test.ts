@@ -4,19 +4,21 @@ import type { ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import type { DealWithParties } from './deals';
 import type { ProductWithCategory } from './products';
+import type { ProposalWithOptions } from './proposals';
 import {
 	describeCompany,
 	describeContact,
 	describeCustomField,
 	describeDeal,
 	describeProduct,
+	describeProposal,
 	describeTask,
 	describeTicket,
 	getRecord,
 	listRelatedRecords
 } from './records';
 import type { TaskWithParties } from './tasks';
-import { ORG_ID, supabaseMock, supabaseTablesMock } from './test-support';
+import { ORG_ID, supabaseMock, supabaseMockSequence, supabaseTablesMock } from './test-support';
 import type { TicketThread } from './tickets';
 
 const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
@@ -91,6 +93,42 @@ const contract: DealWithParties = {
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
 	contacts: { id: CONTACT_ID, name: 'Lucius Fox' },
 	pipeline_stages: { id: 's1', name: 'Proposal', outcome: 'open', sort_order: 3 },
+	...STAMPS
+};
+
+const PROPOSAL_ID = 'a1000000-0000-0000-0000-000000000001';
+
+const options: ProposalWithOptions = {
+	id: PROPOSAL_ID,
+	org_id: ORG_ID,
+	entity_type: 'deal',
+	entity_id: contract.id,
+	title: 'Annual support contract — options',
+	base_config: {},
+	status: 'sent',
+	default_fee: 250,
+	tax_rate: 8.25,
+	valid_until: '2026-10-01T09:00:00Z',
+	selected_option_id: null,
+	deck_id: null,
+	proposal_options: [
+		{
+			id: 'o2',
+			label: 'Standard',
+			sort_order: 1,
+			is_recommended: true,
+			computed_total: 25000,
+			currency: 'USD'
+		},
+		{
+			id: 'o1',
+			label: 'Basic',
+			sort_order: 0,
+			is_recommended: false,
+			computed_total: 12000,
+			currency: 'USD'
+		}
+	],
 	...STAMPS
 };
 
@@ -265,6 +303,81 @@ describe('describing a record', () => {
 		expect(field(detail, 'Assigned to')).toEqual({ type: 'person', userId: USER_ID });
 	});
 
+	it('describes a proposal by its status, steering to the recommended option and its total', () => {
+		const parent = { kind: 'deal' as const, id: contract.id, name: contract.title };
+		const detail = describeProposal(options, parent, openAll);
+
+		expect(detail.name).toBe('Annual support contract — options');
+		expect(detail.pills).toEqual([{ label: 'Sent', tone: 'info' }]);
+		expect(field(detail, 'For')).toEqual({
+			type: 'record',
+			value: 'Annual support contract',
+			href: `/deals/${contract.id}`
+		});
+		expect(field(detail, 'Options')).toEqual({ type: 'number', value: 2 });
+		expect(field(detail, 'Recommended option')).toEqual({ type: 'text', value: 'Standard' });
+		expect(field(detail, 'Recommended total')).toEqual({
+			type: 'money',
+			value: 25000,
+			currency: 'USD',
+			unit: null
+		});
+		expect(field(detail, 'Selected option')).toEqual({ type: 'empty' });
+		expect(field(detail, 'Valid until')).toEqual({ type: 'datetime', value: options.valid_until });
+		expect(field(detail, 'Default fee')).toEqual({
+			type: 'money',
+			value: 250,
+			currency: 'USD',
+			unit: null
+		});
+		expect(field(detail, 'Tax rate')).toEqual({ type: 'text', value: '8.25%' });
+	});
+
+	it('links the record a proposal hangs off only when the reader may open it, and copes without one', () => {
+		const parent = { kind: 'deal' as const, id: contract.id, name: contract.title };
+		expect(field(describeProposal(options, parent, openNone), 'For')).toEqual({
+			type: 'record',
+			value: 'Annual support contract',
+			href: null
+		});
+
+		// An unattached draft: nothing recommended, nothing priced, no parent.
+		const draft = describeProposal(
+			{
+				...options,
+				entity_type: null,
+				entity_id: null,
+				status: 'draft',
+				tax_rate: null,
+				default_fee: null,
+				proposal_options: [
+					{
+						id: 'o1',
+						label: 'Basic',
+						sort_order: 0,
+						is_recommended: false,
+						computed_total: null,
+						currency: 'USD'
+					}
+				]
+			},
+			null,
+			openAll
+		);
+		expect(draft.pills).toEqual([{ label: 'Draft', tone: 'neutral' }]);
+		expect(field(draft, 'For')).toEqual({ type: 'empty' });
+		expect(field(draft, 'Recommended option')).toEqual({ type: 'empty' });
+		expect(field(draft, 'Recommended total')).toEqual({ type: 'empty' });
+		expect(field(draft, 'Tax rate')).toEqual({ type: 'empty' });
+
+		const accepted = describeProposal(
+			{ ...options, status: 'accepted', selected_option_id: 'o1' },
+			parent,
+			openAll
+		);
+		expect(field(accepted, 'Selected option')).toEqual({ type: 'text', value: 'Basic' });
+	});
+
 	it('describes a task as open or done from completed_at', () => {
 		const open = describeTask(renewal, openAll);
 		expect(open.pills).toEqual([{ label: 'Open', tone: 'info' }]);
@@ -346,6 +459,7 @@ describe('getRecord', () => {
 			contact: 'contacts',
 			product: 'products',
 			deal: 'deals',
+			proposal: 'proposals',
 			task: 'tasks',
 			ticket: 'support_tickets'
 		} as const;
@@ -360,6 +474,27 @@ describe('getRecord', () => {
 		}
 	});
 
+	it("reads the record a proposal hangs off through that kind's own table", async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: options }, { data: contract }]);
+
+		const detail = await getRecord(supabase, ORG_ID, 'proposal', PROPOSAL_ID, openAll);
+		expect(from).toHaveBeenNthCalledWith(1, 'proposals');
+		expect(from).toHaveBeenNthCalledWith(2, 'deals');
+		expect(detail && field(detail, 'For')).toEqual({
+			type: 'record',
+			value: 'Annual support contract',
+			href: `/deals/${contract.id}`
+		});
+
+		// Unattached: one read, no parent to look for.
+		const draft = supabaseMockSequence([
+			{ data: { ...options, entity_type: null, entity_id: null } }
+		]);
+		const described = await getRecord(draft.supabase, ORG_ID, 'proposal', PROPOSAL_ID, openAll);
+		expect(draft.from).toHaveBeenCalledTimes(1);
+		expect(described && field(described, 'For')).toEqual({ type: 'empty' });
+	});
+
 	it('throws the PostgREST message when the read fails', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'boom' } });
 
@@ -368,21 +503,32 @@ describe('getRecord', () => {
 });
 
 describe('listRelatedRecords', () => {
-	it('lists the people, deals, tasks and tickets that name a company, in nav order', async () => {
+	it('lists the people, deals, proposals, tasks and tickets that name a company, in nav order', async () => {
 		const { supabase, from, builders } = supabaseTablesMock({
 			contacts: { data: [lucius] },
 			deals: { data: [contract] },
+			proposals: { data: [{ ...options, entity_type: 'company', entity_id: COMPANY_ID }] },
 			tasks: { data: [renewal] },
 			support_tickets: { data: [exportBug] }
 		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);
 
-		expect(groups.map((g) => g.kind)).toEqual(['contact', 'deal', 'task', 'ticket']);
+		expect(groups.map((g) => g.kind)).toEqual(['contact', 'deal', 'proposal', 'task', 'ticket']);
 		for (const table of ['contacts', 'deals', 'tasks', 'support_tickets']) {
 			expect(from).toHaveBeenCalledWith(table);
 			expect(builders[table].eq).toHaveBeenCalledWith('company_id', COMPANY_ID);
 		}
+		// A proposal names its parent through the shared entity link.
+		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_type', 'company');
+		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_id', COMPANY_ID);
+		expect(groups[2].records[0]).toEqual({
+			id: PROPOSAL_ID,
+			name: 'Annual support contract — options',
+			href: `/proposals/${PROPOSAL_ID}`,
+			pill: { label: 'Sent', tone: 'info' },
+			meta: '$25,000.00'
+		});
 		expect(groups[0].records[0]).toEqual({
 			id: CONTACT_ID,
 			name: 'Lucius Fox',
@@ -395,11 +541,11 @@ describe('listRelatedRecords', () => {
 			pill: { label: 'Proposal', tone: 'info' },
 			meta: '$24,000.00'
 		});
-		expect(groups[2].records[0]).toMatchObject({
+		expect(groups[3].records[0]).toMatchObject({
 			pill: { label: 'Open', tone: 'info' },
 			meta: 'Due Sep 15, 2026'
 		});
-		expect(groups[3].records[0]).toMatchObject({
+		expect(groups[4].records[0]).toMatchObject({
 			href: `/tickets/${exportBug.id}`,
 			pill: { label: 'Open', tone: 'info' },
 			meta: '#1 · high priority'
@@ -418,11 +564,42 @@ describe('listRelatedRecords', () => {
 		// A contact's page never lists contacts, so that kind is not even asked about.
 		expect(canOpen).not.toHaveBeenCalledWith('contact');
 		expect(from).not.toHaveBeenCalledWith('contacts');
+		expect(from).not.toHaveBeenCalledWith('proposals');
 		expect(from).not.toHaveBeenCalledWith('support_tickets');
 		expect(from).toHaveBeenCalledWith('deals');
 		// Fetched, empty, omitted.
 		expect(from).toHaveBeenCalledWith('tasks');
 		expect(groups.map((g) => g.kind)).toEqual(['deal']);
+	});
+
+	it('lists the proposals hanging off a deal, and nothing else, counting unpriced options', async () => {
+		const unpriced = {
+			...options,
+			status: 'draft' as const,
+			proposal_options: [
+				{
+					id: 'o1',
+					label: 'Basic',
+					sort_order: 0,
+					is_recommended: false,
+					computed_total: 12000,
+					currency: 'USD'
+				}
+			]
+		};
+		const { supabase, from, builders } = supabaseTablesMock({ proposals: { data: [unpriced] } });
+
+		const groups = await listRelatedRecords(supabase, ORG_ID, 'deal', contract.id, openAll);
+
+		expect(groups.map((g) => g.kind)).toEqual(['proposal']);
+		expect(from).toHaveBeenCalledTimes(1);
+		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_type', 'deal');
+		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_id', contract.id);
+		// Nothing recommended: the meta says how many there are to choose from.
+		expect(groups[0].records[0]).toMatchObject({
+			pill: { label: 'Draft', tone: 'neutral' },
+			meta: '1 option'
+		});
 	});
 
 	it('has nothing to list for a kind nothing points at', async () => {

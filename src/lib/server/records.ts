@@ -9,6 +9,7 @@ import {
 	contactRecordSchema,
 	dealRecordSchema,
 	productRecordSchema,
+	proposalRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -19,6 +20,7 @@ import {
 import { createCompany } from './crm/companies';
 import { createContact } from './crm/contacts';
 import { createDeal } from './crm/deals';
+import { createProposal } from './crm/proposals';
 import { createProduct } from './crm/products';
 import { createTask } from './crm/tasks';
 import { createTicket } from './crm/tickets';
@@ -38,7 +40,7 @@ import { can, requirePermission } from './roles';
  */
 
 /**
- * One id for all six create forms. Superforms derives an id from the schema's
+ * One id for every create form. Superforms derives an id from the schema's
  * shape, and the generic form's schema is only known at runtime — naming it
  * keeps the posted form routing to itself, including on the no-JS path.
  */
@@ -137,6 +139,16 @@ async function insertRecord(
 				title: data.title,
 				amount: amount(data.amount),
 				expected_close_date: text(data.expected_close_date)
+			});
+			return;
+		}
+		case 'proposal': {
+			const data = proposalRecordSchema.parse(values);
+			// Unattached: the parent record is picked on the record page, not at
+			// creation — an unattached draft is a legitimate row.
+			await createProposal(supabase, orgId, {
+				title: data.title,
+				valid_until: instant(data.valid_until)
 			});
 			return;
 		}

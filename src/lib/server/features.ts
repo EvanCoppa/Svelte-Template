@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
-import type { FeatureRegistryRow, PageMeta } from '$lib/features/types';
+import type { FeatureRegistryRow, PageRow } from '$lib/features/types';
 import { ensure, unwrap } from './crm/unwrap';
 
 /**
@@ -19,7 +19,8 @@ export type TierWithFeatures = Tables<'tiers'> & { tier_features: { feature_id: 
 
 /**
  * Every feature with its industry and tier maps, in one round trip — the
- * input `resolveFeatures()` folds per org. Ordered for the nav.
+ * input `resolveFeatures()` folds per org. Each industry row carries the
+ * industry's own words for the feature, if any. Ordered for the nav.
  */
 export async function loadFeatureRegistry(
 	supabase: SupabaseClient<Database>
@@ -27,7 +28,7 @@ export async function loadFeatureRegistry(
 	return unwrap(
 		await supabase
 			.from('features')
-			.select('*, industry_features(industry_id), tier_features(tier_id)')
+			.select('*, industry_features(industry_id, name, noun), tier_features(tier_id)')
 			.order('sort_order')
 	);
 }
@@ -35,9 +36,9 @@ export async function loadFeatureRegistry(
 /**
  * Every registered page with its title, ordered by path — what the `(app)`
  * layout titles the shell from. `visiblePages()` filters it for the session
- * before it reaches the browser.
+ * and fills in the titles that follow a feature before it reaches the browser.
  */
-export async function loadPageRegistry(supabase: SupabaseClient<Database>): Promise<PageMeta[]> {
+export async function loadPageRegistry(supabase: SupabaseClient<Database>): Promise<PageRow[]> {
 	return unwrap(await supabase.from('pages').select('id, feature_id, path, title').order('path'));
 }
 

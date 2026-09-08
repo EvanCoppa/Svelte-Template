@@ -1,4 +1,5 @@
-import type { FeatureMap, PageMeta } from './types';
+import { isVisible } from './resolve';
+import type { FeatureMap, PageMeta, PageRow } from './types';
 
 /**
  * Page titles — the registry's other half.
@@ -18,21 +19,28 @@ import type { FeatureMap, PageMeta } from './types';
  * feature) plus the pages of every feature the sidebar would show — enabled
  * or locked, and readable. Same predicate as `buildNav()`, so a title never
  * names a page the nav hides.
+ *
+ * A page with no title of its own is named after its feature, as the org's
+ * industry words it — the way a feature's own list page follows an
+ * industry's rename with one row (the feature_names_by_industry migration).
  */
 export function visiblePages(
-	pages: readonly PageMeta[],
+	pages: readonly PageRow[],
 	features: FeatureMap,
 	canRead: (featureId: string) => boolean
 ): PageMeta[] {
-	return pages.filter((page) => {
-		if (!page.feature_id) return true;
+	const shown: PageMeta[] = [];
+	for (const page of pages) {
+		if (page.feature_id === null) {
+			// The check constraint guarantees a title here; a row without one is not a page.
+			if (page.title !== null) shown.push({ ...page, title: page.title });
+			continue;
+		}
 		const resolved = features[page.feature_id];
-		if (!resolved) return false;
-		return (
-			(resolved.mode === 'enabled' || resolved.mode === 'locked_visible') &&
-			canRead(page.feature_id)
-		);
-	});
+		if (!resolved || !isVisible(resolved, canRead)) continue;
+		shown.push({ ...page, title: page.title ?? resolved.feature.name });
+	}
+	return shown;
 }
 
 /**
@@ -55,8 +63,9 @@ export function matchPage(pathname: string, pages: readonly PageMeta[]): PageMet
 /**
  * What the page currently rendering is called: the record-specific title its
  * own load returned, else the registry's. The one answer to "what is this
- * page's name" — the `(app)` layout titles the document with it and the
- * breadcrumb trail records it, so the two can never disagree.
+ * page's name" — the `(app)` layout titles the document with it, the
+ * breadcrumb trail records it and `PageHeader.Title` heads the page with it,
+ * so the three can never disagree.
  */
 export function titleFor(data: App.PageData, pathname: string): string | undefined {
 	return data.title ?? matchPage(pathname, data.pages ?? [])?.title;
