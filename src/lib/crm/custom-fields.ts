@@ -43,9 +43,11 @@ export function customFieldInputKind(valueType: CustomFieldValueType): CustomFie
  * strings, but the type system cannot know that, and a cast would be exactly
  * the silencing CLAUDE.md forbids.
  */
+const choiceList = z.array(z.string());
+
 export function allowedValues(value: Json | null): string[] | null {
-	if (!Array.isArray(value)) return null;
-	return value.every((entry) => typeof entry === 'string') ? (value as string[]) : null;
+	const parsed = choiceList.safeParse(value);
+	return parsed.success ? parsed.data : null;
 }
 
 /**

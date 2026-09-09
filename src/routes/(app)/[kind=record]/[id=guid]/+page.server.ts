@@ -1,8 +1,12 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { message, setError, superValidate } from 'sveltekit-superforms/server';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { customFieldValueSchema } from '$lib/crm/custom-fields';
 import {
 	recordKindForSegment,
 	recordListHref,
 	recordTerms,
+	RECORD_KIND_META,
 	type RecordKind
 } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
@@ -10,16 +14,23 @@ import { visibleTerms } from '$lib/features/terms';
 import { QUERY } from '$lib/queries';
 import { listActivities } from '$lib/server/crm/activities';
 import { listAddresses } from '$lib/server/crm/addresses';
-import { listCustomFields } from '$lib/server/crm/custom-fields';
+import {
+	clearCustomFieldValue,
+	customFieldColumns,
+	customFieldEntries,
+	listCustomFields,
+	setCustomFieldValue
+} from '$lib/server/crm/custom-fields';
 import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
 import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
-import { hasGrant } from '$lib/server/roles';
+import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
-import type { PageServerLoad } from './$types';
+import { customFieldValueFormSchema } from './schema';
+import type { Actions, PageServerLoad } from './$types';
 
 /**
  * The generic record page — the default page for one record of any kind.
@@ -99,7 +110,14 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		activities,
 		tags,
 		addresses,
+		// Two shapes of the same fields: one for showing (a FieldValue the page
+		// never inspects) and one for editing (the string the form posts).
 		customFields: customFields.map(describeCustomField),
+		customFieldEntries: customFieldEntries(customFields),
+		customFieldForm: await superValidate(zod4(customFieldValueFormSchema)),
+		// Editing a record's cell is editing the record — the permission the
+		// generic create form asks for on the same feature.
+		canEditFields: can(access, RECORD_KIND_META[kind].feature, 'manage'),
 		related,
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
@@ -109,4 +127,59 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// `titleFor()` in $lib/features/pages.
 		title: record.name
 	};
+};
+
+export const actions: Actions = {
+	/**
+	 * One custom field of this record. The value arrives as a string and is
+	 * checked against the definition's own type here, where the definition is
+	 * known — the boundary `$lib/server/records.ts` has for a created record.
+	 *
+	 * A form action rather than an endpoint: the form is on the page it posts
+	 * from and its data comes from form inputs, which is the rule with no
+	 * exception (see "Server actions vs API endpoints").
+	 */
+	saveCustomField: async ({ request, locals, params }) => {
+		const { supabase, org, activeOrgId } = locals;
+		if (!org || !activeOrgId) throw redirect(303, '/login');
+
+		const kind = recordKindForSegment(params.kind);
+		requirePermission(org.access, RECORD_KIND_META[kind].feature, 'manage');
+
+		const form = await superValidate(request, zod4(customFieldValueFormSchema));
+		if (!form.valid) return fail(400, { form });
+
+		const entity = { entityType: kind, entityId: params.id };
+		const fields = await listCustomFields(supabase, activeOrgId, entity);
+		const definition = fields.find(
+			(field) => field.definition.id === form.data.field_definition_id
+		)?.definition;
+		// Not this kind's field, not this org's, or removed since the page loaded.
+		if (!definition) return message(form, 'That field no longer exists.', { status: 400 });
+
+		try {
+			if (form.data.value === '') {
+				await clearCustomFieldValue(supabase, activeOrgId, entity, definition.id);
+			} else {
+				const parsed = customFieldValueSchema(definition).safeParse(form.data.value);
+				if (!parsed.success) {
+					return setError(form, 'value', parsed.error.issues[0].message);
+				}
+				await setCustomFieldValue(
+					supabase,
+					activeOrgId,
+					entity,
+					definition.id,
+					customFieldColumns(definition.value_type, parsed.data)
+				);
+			}
+		} catch (cause) {
+			// Carries the value trigger's own words — a choice outside the list
+			// says so rather than becoming a 500.
+			return message(form, cause instanceof Error ? cause.message : 'Could not save the field.', {
+				status: 400
+			});
+		}
+		return { form };
+	}
 };

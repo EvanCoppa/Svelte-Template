@@ -111,6 +111,23 @@ describe('createRecord', () => {
 		});
 	});
 
+	it('writes a contact’s date of birth as given, and a blank one as null', async () => {
+		const dated = supabaseMock({ data: { id: 'contact' } });
+		await submit(dated.supabase, OWNER, 'contact', {
+			name: 'Bruce Wayne',
+			dob: '1972-02-19'
+		});
+		expect(dated.from).toHaveBeenCalledWith('contacts');
+		expect(dated.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ dob: '1972-02-19' })
+		);
+
+		// A business contact has none, and the same form serves both.
+		const undated = supabaseMock({ data: { id: 'contact' } });
+		await submit(undated.supabase, OWNER, 'contact', { name: 'Lucius Fox' });
+		expect(undated.builder.insert).toHaveBeenCalledWith(expect.objectContaining({ dob: null }));
+	});
+
 	it('writes a deal as a number, leaving an unpriced one to the column default', async () => {
 		const board = { id: 'pipeline-1', pipeline_stages: [{ id: 'stage-1' }] };
 		const priced = supabaseMockSequence([{ data: board }, { data: { id: 'deal' } }]);

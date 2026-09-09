@@ -1,16 +1,31 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
+	import { superForm } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import TablePropertiesIcon from '@lucide/svelte/icons/table-properties';
 	import * as Detail from '$lib/components/detail/index.js';
+	import * as Modal from '$lib/components/modal/index.js';
 	import * as Note from '$lib/components/note/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
+	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { StatusBadge, TagBadge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { Combobox } from '$lib/components/ui/combobox/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { customFieldInputKind } from '$lib/crm/custom-fields';
 	import { recordListHref, recordTerms } from '$lib/crm/records';
+	import { QUERY } from '$lib/queries';
+	import type { CustomFieldEntry } from '$lib/server/crm/custom-fields';
+	import { customFieldValueFormSchema } from './schema';
 	import { canArchiveNote, canEditNote } from '$lib/notes';
 	import { noteCommands } from '$lib/notes-api';
 	import { iconFor } from '$lib/features/icons';
@@ -29,6 +44,52 @@
 	function author(userId: string | null): string | null {
 		return userId === null ? null : (data.people.get(userId) ?? null);
 	}
+
+	// --- Editing one custom field -------------------------------------------
+	//
+	// One field at a time, addressed by id: the modal is retargeted rather than
+	// rebuilt, so the form's schema stays flat and the value posts as a string
+	// like every other field in the app.
+
+	let editingFieldId = $state<string | null>(null);
+	const editingField = $derived(
+		data.customFieldEntries.find((entry) => entry.id === editingFieldId) ?? null
+	);
+
+	const {
+		form: fieldData,
+		errors: fieldErrors,
+		message: fieldMessage,
+		constraints: fieldConstraints,
+		submitting: savingField,
+		enhance: fieldEnhance
+	} = superForm(data.customFieldForm, {
+		validators: zod4Client(customFieldValueFormSchema),
+		invalidateAll: false,
+		resetForm: false,
+		onUpdated({ form }) {
+			if (!form.valid) return;
+			editingFieldId = null;
+			toast.success('Custom field saved');
+			invalidate(QUERY.record(data.record.kind, data.record.id));
+		}
+	});
+
+	function startEditingField(entry: CustomFieldEntry) {
+		$fieldData = { field_definition_id: entry.id, value: entry.value };
+		editingFieldId = entry.id;
+	}
+
+	/** A select's choices as the Combobox takes them. */
+	const choiceOptions = $derived(
+		(editingField?.choices ?? []).map((choice) => ({ value: choice, label: choice }))
+	);
+
+	/** Yes / no / not filled in — three states, so a picker rather than a switch. */
+	const BOOLEAN_OPTIONS = [
+		{ value: 'true', label: 'Yes' },
+		{ value: 'false', label: 'No' }
+	];
 
 	/** The note the button just made, so the caret lands in it. */
 	let addedNoteId = $state<string | null>(null);
@@ -100,7 +161,22 @@
 					<Card.Content>
 						<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2">
 							{#each data.customFields as field (field.key)}
-								<Detail.Field label={field.label} value={field.value} />
+								{@const entry = data.customFieldEntries.find((row) => row.key === field.key)}
+								<Detail.Field label={field.label} value={field.value}>
+									{#snippet action()}
+										{#if data.canEditFields && entry}
+											<Button
+												variant="ghost"
+												size="icon"
+												class="size-6"
+												onclick={() => startEditingField(entry)}
+											>
+												<PencilIcon class="size-3" />
+												<span class="sr-only">Edit {field.label}</span>
+											</Button>
+										{/if}
+									{/snippet}
+								</Detail.Field>
 							{/each}
 						</dl>
 					</Card.Content>
@@ -279,3 +355,87 @@
 		</aside>
 	</div>
 </div>
+
+<!-- Editing one custom field. The input is drawn by the definition's type — the
+	record page never inspects a value to decide how to show or edit it. -->
+<Modal.Root
+	open={editingFieldId !== null}
+	onOpenChange={(open) => {
+		if (!open) editingFieldId = null;
+	}}
+>
+	<Modal.Content>
+		{#if editingField}
+			<form method="POST" action="?/saveCustomField" use:fieldEnhance>
+				<input type="hidden" name="field_definition_id" value={$fieldData.field_definition_id} />
+				<Modal.Card>
+					<Modal.Header>
+						<Modal.Title><TablePropertiesIcon /> {editingField.label}</Modal.Title>
+						<Modal.Description>Leave it empty to clear the field.</Modal.Description>
+					</Modal.Header>
+					<Modal.Body>
+						<FormAlert message={$fieldMessage} class="mb-0" />
+						<div class="grid gap-2">
+							<Label for="custom-field-value">{editingField.label}</Label>
+							{#if customFieldInputKind(editingField.valueType) === 'select'}
+								<Combobox
+									id="custom-field-value"
+									name="value"
+									options={choiceOptions}
+									clearable
+									bind:value={$fieldData.value}
+									placeholder="Not set"
+									invalid={Boolean($fieldErrors.value)}
+								/>
+							{:else if customFieldInputKind(editingField.valueType) === 'boolean'}
+								<Combobox
+									id="custom-field-value"
+									name="value"
+									options={BOOLEAN_OPTIONS}
+									clearable
+									bind:value={$fieldData.value}
+									placeholder="Not set"
+									invalid={Boolean($fieldErrors.value)}
+								/>
+							{:else if customFieldInputKind(editingField.valueType) === 'date'}
+								<Input
+									id="custom-field-value"
+									name="value"
+									type="date"
+									aria-invalid={$fieldErrors.value ? 'true' : undefined}
+									bind:value={$fieldData.value}
+								/>
+							{:else if customFieldInputKind(editingField.valueType) === 'number'}
+								<Input
+									id="custom-field-value"
+									name="value"
+									type="number"
+									step="0.01"
+									aria-invalid={$fieldErrors.value ? 'true' : undefined}
+									bind:value={$fieldData.value}
+								/>
+							{:else}
+								<Input
+									id="custom-field-value"
+									name="value"
+									aria-invalid={$fieldErrors.value ? 'true' : undefined}
+									bind:value={$fieldData.value}
+									{...$fieldConstraints.value}
+								/>
+							{/if}
+							{#if $fieldErrors.value}
+								<p class="text-destructive text-sm">{$fieldErrors.value}</p>
+							{/if}
+						</div>
+					</Modal.Body>
+				</Modal.Card>
+				<Modal.Footer>
+					<Modal.Cancel>Cancel</Modal.Cancel>
+					<Modal.Action type="submit" disabled={$savingField}>
+						{$savingField ? 'Saving…' : 'Save'}
+					</Modal.Action>
+				</Modal.Footer>
+			</form>
+		{/if}
+	</Modal.Content>
+</Modal.Root>

@@ -68,6 +68,16 @@ export function recordHref(kind: RecordKind, id: string): string {
 	return `${recordListHref(kind)}/${id}`;
 }
 
+/**
+ * Whether a `crm_entity_type` is one of the kinds with a list page. Narrows a
+ * value read from a row — a custom field definition's `entity_type`, say — so
+ * it can be named with `recordTerms()` without a cast; `proposal_option` is
+ * the one that answers false.
+ */
+export function isRecordKind(value: string): value is RecordKind {
+	return RECORD_KINDS.some((kind) => kind === value);
+}
+
 /** Whether a path segment is a kind's list route — the matcher's question. */
 export function isRecordSegment(segment: string): segment is RecordSegment {
 	return RECORD_KINDS.some((kind) => RECORD_KIND_META[kind].segment === segment);
