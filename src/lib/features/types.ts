@@ -23,6 +23,7 @@ export const FEATURE_IDS = [
 	'proposals',
 	'billables',
 	'quick-plans',
+	'notes',
 	'tasks',
 	'tickets',
 	'staff',

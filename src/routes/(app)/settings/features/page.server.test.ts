@@ -4,7 +4,7 @@ import { actions, load } from './+page.server';
 import type { OrgContext } from '$lib/server/org-context';
 import { ORG_ID, supabaseMock } from '$lib/server/crm/test-support';
 
-const feature = (id: string, category = 'platform', sort = 0) => ({
+const feature = (id: string, category = 'crm', sort = 0) => ({
 	id,
 	name: id,
 	noun: null,
@@ -28,9 +28,9 @@ function context(role: 'owner' | 'member'): OrgContext {
 			industryId: 'general'
 		},
 		features: {
-			companies: { feature: feature('companies', 'platform', 10), mode: 'enabled' },
-			tasks: { feature: feature('tasks', 'platform', 30), mode: 'disabled' },
-			tickets: { feature: feature('tickets', 'platform', 40), mode: 'enabled' },
+			companies: { feature: feature('companies', 'crm', 10), mode: 'enabled' },
+			tasks: { feature: feature('tasks', 'crm', 30), mode: 'disabled' },
+			tickets: { feature: feature('tickets', 'crm', 40), mode: 'enabled' },
 			'best-practices': {
 				feature: feature('best-practices', 'library', 20),
 				mode: 'locked_visible'

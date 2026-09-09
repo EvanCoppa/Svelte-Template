@@ -11,7 +11,9 @@ import { QUERY } from '$lib/queries';
 import { listActivities } from '$lib/server/crm/activities';
 import { listAddresses } from '$lib/server/crm/addresses';
 import { listCustomFields } from '$lib/server/crm/custom-fields';
+import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
+import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
@@ -36,12 +38,15 @@ import type { PageServerLoad } from './$types';
  * so the specific page takes over and this one stays the default for the rest.
  */
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	const { supabase, org, activeOrgId } = locals;
-	if (!org || !activeOrgId) throw redirect(303, '/login');
+	const { supabase, org, activeOrgId, user } = locals;
+	if (!org || !activeOrgId || !user) throw redirect(303, '/login');
 
 	const kind = recordKindForSegment(params.kind);
 	const { id } = params;
 	depends(QUERY.record(kind, id));
+	// A note written here is written through the same endpoint as one written
+	// from the dock, so this page refreshes on the same key they all share.
+	depends(QUERY.notes);
 
 	// Whether the reader may open a record of another kind: the same decision
 	// the hook makes for that kind's routes, so a link here is never a link to
@@ -51,20 +56,24 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	const canOpen = (other: RecordKind) =>
 		passesFeatureGate(recordListHref(other), features, canRead);
 
-	// Everything the CRM attaches to a record hangs off the shared entity link,
-	// so the same six reads serve every kind; only a party has addresses.
+	// Everything that attaches to a record hangs off the shared entity link, so
+	// the same handful of reads serve every kind; only a party has addresses.
 	const entity = { entityType: kind, entityId: id };
 	const isParty = kind === 'company' || kind === 'contact';
+	// Notes are the general table, not a CRM one: a record shows the ones
+	// pointed at it, and only when this session has the feature at all.
+	const notesShown = passesFeatureGate('/notes', features, canRead);
 	// The words the record's labels use — who presents a proposal, who is
 	// responsible for it — as the org's industry says them.
 	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
-	const [record, activities, tags, addresses, customFields, related] = await Promise.all([
+	const [record, activities, tags, addresses, customFields, related, notes] = await Promise.all([
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
 		listTagsFor(supabase, activeOrgId, entity),
 		isParty ? listAddresses(supabase, activeOrgId, entity) : [],
 		listCustomFields(supabase, activeOrgId, entity),
-		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen)
+		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
+		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : []
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
@@ -92,6 +101,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		addresses,
 		customFields: customFields.map(describeCustomField),
 		related,
+		// The same shape the shell ships to the dock, so a note behaves the
+		// same here as it does there.
+		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,
 		people,
 		// The record's name titles the page and names its crumb — see
 		// `titleFor()` in $lib/features/pages.

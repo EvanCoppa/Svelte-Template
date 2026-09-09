@@ -685,7 +685,7 @@ export type Database = {
       }
       features: {
         Row: {
-          category: string
+          category: string | null
           created_at: string
           description: string | null
           icon: string | null
@@ -696,7 +696,7 @@ export type Database = {
           sort_order: number
         }
         Insert: {
-          category?: string
+          category?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -707,7 +707,7 @@ export type Database = {
           sort_order?: number
         }
         Update: {
-          category?: string
+          category?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -851,6 +851,56 @@ export type Database = {
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          archived_at: string | null
+          author_id: string | null
+          body: string
+          color: Database["public"]["Enums"]["badge_tone"]
+          created_at: string
+          entity_id: string | null
+          entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
+          id: string
+          org_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          author_id?: string | null
+          body?: string
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          id?: string
+          org_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          author_id?: string | null
+          body?: string
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          id?: string
+          org_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2235,6 +2285,27 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          key: string
+          updated_at: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          user_id: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          user_id?: string
+          value?: Json
         }
         Relationships: []
       }

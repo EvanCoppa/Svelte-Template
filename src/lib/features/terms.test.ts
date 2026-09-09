@@ -17,7 +17,7 @@ function map(
 					description: null,
 					route: `/${id}`,
 					icon: null,
-					category: 'platform',
+					category: 'crm',
 					sort_order: 0,
 					created_at: ''
 				}

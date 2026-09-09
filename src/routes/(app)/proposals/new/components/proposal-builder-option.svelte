@@ -32,8 +32,7 @@
 		noun,
 		billables,
 		quickPlans,
-		products,
-		estimate
+		products
 	}: {
 		index: number;
 		option: ProposalBuilderOption;
@@ -44,8 +43,6 @@
 		billables: readonly BuilderBillable[];
 		quickPlans: readonly BuilderQuickPlan[];
 		products: readonly BuilderProduct[];
-		/** What the option comes to as typed — a preview; the database stores the figure. */
-		estimate: number;
 	} = $props();
 
 	type OptionErrors = {
@@ -262,9 +259,6 @@
 				bind:checked={() => option.is_recommended, (on) => set('is_recommended', on)}
 			/>
 		</label>
-		<span class="dark:text-muted-foreground text-sm text-gray-500">
-			Estimated {usd.format(estimate)}
-		</span>
 	</div>
 
 	{#if quickPlans.length > 0}
