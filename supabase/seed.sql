@@ -511,18 +511,18 @@ insert into public.custom_field_values (id, org_id, entity_type, entity_id, fiel
 		'a3000000-0000-0000-0000-000000000004', 'email')
 on conflict (id) do nothing;
 
--- A deck is a reusable template, so this one carries slides and no proposal
--- data: a title slide with a runtime-bound heading, then the two slides the
--- presenter expands and fills from whichever proposal is being shown.
-insert into public.slide_decks (id, org_id, name, deck_json, created_by, updated_by) values
+-- Acme's one deck — how its proposals are presented. It carries slides and
+-- no proposal data: a cover whose heading is bound to the proposal at present
+-- time, then the slides the presenter fills from whichever proposal is shown.
+-- Every other org has no row and presents through the built-in default deck.
+insert into public.slide_decks (id, org_id, deck_json, created_by, updated_by) values
 	('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'Standard proposal deck',
 		'{
 			"version": 1,
 			"slides": [
 				{
 					"id": "s1",
-					"templateId": "title",
+					"templateId": "cover",
 					"content": {
 						"text": { "heading": "A proposal for you", "subheading": "Acme Inc" },
 						"images": {},
@@ -532,18 +532,27 @@ insert into public.slide_decks (id, org_id, name, deck_json, created_by, updated
 				},
 				{
 					"id": "s2",
-					"templateId": "comparison-table",
+					"templateId": "option",
 					"content": {
-						"text": { "heading": "Compare Your Options" },
+						"text": { "eyebrow": "Your options" },
 						"images": {},
 						"colors": { "accentColor": "#2563eb" }
 					}
 				},
 				{
 					"id": "s3",
-					"templateId": "investment-summary",
+					"templateId": "comparison",
 					"content": {
-						"text": { "heading": "Your Investment" },
+						"text": { "heading": "Compare your options" },
+						"images": {},
+						"colors": { "accentColor": "#2563eb" }
+					}
+				},
+				{
+					"id": "s4",
+					"templateId": "thank-you",
+					"content": {
+						"text": { "heading": "Thank you" },
 						"images": {},
 						"colors": { "accentColor": "#2563eb" }
 					}
@@ -555,16 +564,16 @@ on conflict (id) do nothing;
 
 -- Proposal 1 hangs off the Wayne deal; proposal 2 off the Wayne company.
 insert into public.proposals (id, org_id, entity_type, entity_id, title, base_config, status,
-		default_fee, tax_rate, valid_until, deck_id, created_by) values
+		default_fee, tax_rate, valid_until, created_by) values
 	('a1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'deal', '40000000-0000-0000-0000-000000000001', 'Annual support contract — options',
 		'{"seats": 120, "regions": ["us-east", "eu-west"]}', 'sent',
 		250.00, 8.25, now() + interval '30 days',
-		'a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+		'00000000-0000-0000-0000-000000000001'),
 	('a1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
 		'company', '20000000-0000-0000-0000-000000000001', 'Website redesign',
 		'{}', 'draft',
-		null, null, null, null, '00000000-0000-0000-0000-000000000003')
+		null, null, null, '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
 insert into public.proposal_options (id, org_id, proposal_id, label, sort_order, is_recommended,

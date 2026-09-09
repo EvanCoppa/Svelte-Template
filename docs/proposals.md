@@ -14,18 +14,18 @@ This page is the contract for keeping it that way. The `proposals` migration
 
 ## The tables
 
-| table                          | one row means                                                         | written by                         |
-| ------------------------------ | --------------------------------------------------------------------- | ---------------------------------- |
-| `proposals`                    | a decision offered to one CRM record: title, status, shared terms     | members (delete: owner/admin)      |
-| `proposal_options`             | one column of the grid — a priced, timed, financeable choice          | members (delete: owner/admin)      |
-| `proposal_line_items`          | an itemised line inside an option; `total` is generated               | members (delete: owner/admin)      |
-| `billables`                    | the fee schedule: one chargeable line, priced per unit, with its code | members (delete: owner/admin)      |
-| `quick_plans` + `_billables`   | a named bundle of billables that fills an option in one click         | members (delete: owner/admin)      |
-| `custom_field_definitions`     | an org-declared, typed attribute its options carry (a comparison row) | owner/admin                        |
-| `proposal_custom_field_values` | an option's value for one definition, in the column matching its type | members (delete: owner/admin)      |
-| `proposal_events`              | one thing that happened: sent, viewed, option selected, accepted, …   | members as themselves; append-only |
-| `execution_records`            | the vertical-specific follow-through on the accepted option           | members (delete: owner/admin)      |
-| `slide_decks`                  | a reusable presentation template: which slides, in what order         | members (delete: owner/admin)      |
+| table                          | one row means                                                          | written by                         |
+| ------------------------------ | ---------------------------------------------------------------------- | ---------------------------------- |
+| `proposals`                    | a decision offered to one CRM record: title, status, shared terms      | members (delete: owner/admin)      |
+| `proposal_options`             | one column of the grid — a priced, timed, financeable choice           | members (delete: owner/admin)      |
+| `proposal_line_items`          | an itemised line inside an option; `total` is generated                | members (delete: owner/admin)      |
+| `billables`                    | the fee schedule: one chargeable line, priced per unit, with its code  | members (delete: owner/admin)      |
+| `quick_plans` + `_billables`   | a named bundle of billables that fills an option in one click          | members (delete: owner/admin)      |
+| `custom_field_definitions`     | an org-declared, typed attribute its options carry (a comparison row)  | owner/admin                        |
+| `proposal_custom_field_values` | an option's value for one definition, in the column matching its type  | members (delete: owner/admin)      |
+| `proposal_events`              | one thing that happened: sent, viewed, option selected, accepted, …    | members as themselves; append-only |
+| `execution_records`            | the vertical-specific follow-through on the accepted option            | members (delete: owner/admin)      |
+| `slide_decks`                  | the org's one slideshow: which slides, in what order, with what design | members (delete: owner/admin)      |
 
 Everything upstream of the decision is shared. **Only `execution_records` is allowed to
 differ per vertical**: its `execution_type` is a fixed set we own, but its `status` is
@@ -151,14 +151,16 @@ oneself, with no update or delete policy at all (the client-facing view logs thr
 service-role client with a null `actor`). Column grants keep `org_id`, authorship, a child's
 parent link and every computed column out of the browser's reach.
 
-## Decks are templates, not documents
+## One deck per org, and every proposal is presented through it
 
-A deck holds **no proposal data**. It says which slides appear, in what order, on
-which template, with what design and static copy — and the proposal's own figures are
-injected when it is presented. That is why one deck presents every proposal an org
-sends, and why `proposals.deck_id` is a plain nullable pointer (null = the org's
-default) rather than a join table: a proposal is presented _through_ a deck, it does
-not _own_ one.
+An org has **one** slideshow (`slide_decks`, `unique (org_id)` since the `org_slides`
+migration): how its presentation is put together — which slides, in what order, on which
+template, with what design and static copy. It holds **no proposal data**; the proposal's
+own figures are injected when it is presented. Nothing points at a deck and no screen
+lists or names decks: a proposal is presented _through_ the org's deck, full stop. An org
+that has not saved one yet presents through the built-in default deck
+(`src/lib/slides/default-deck.ts`), and its first save creates the row — a load never
+writes.
 
 The whole slide list lives in one `deck_json` column:
 
@@ -168,9 +170,9 @@ The whole slide list lives in one `deck_json` column:
 	"slides": [
 		{
 			"id": "s1",
-			"templateId": "comparison-table",
+			"templateId": "cover",
 			"content": {
-				"text": { "heading": "Compare Your Options" },
+				"text": { "heading": "A proposal for you" },
 				"images": {},
 				"colors": { "accentColor": "#2563eb" },
 				"styles": {},
@@ -182,42 +184,61 @@ The whole slide list lives in one `deck_json` column:
 ```
 
 This is not a hole in rule 1. A deck is always read, written and versioned as a
-unit — the editor loads it whole and saves it whole, and nothing queries across
+unit — the builder loads it whole and saves it whole, and nothing queries across
 slides — so a row per slide would buy ordering and referential machinery for a
 document never accessed a row at a time. The rule's own test still decides it: no two
 industries will ever query on the innards of a slide.
 
-Two things bridge a template and a filled-in presentation, and both belong to the
-presenter, not the schema:
-
-- **Expansion** — one authored slide becomes many. An option-shaped slide (a pricing
-  or comparison slide) is repeated once per `proposal_options` row, in `sort_order`,
-  so the author places it once and never edits it again when an option is added.
-- **Variables** — `content.variables[key].sourceField` is a dot path resolved against
-  the live proposal at present time (`client.name`, `option.computed_total`), with the
-  authored text as the fallback when the path is missing, so a deck renders even with
-  no proposal attached.
-
 The database guarantees only the envelope (an object carrying a numeric `version` and
 an array of `slides`); `slideDeckSchema` in `src/lib/schemas/decks.ts` guarantees the
 slide shapes on save — the freeform-content tier of the three-tier rule above. It
-deliberately does **not** check `templateId` against a registry: an unknown template is
-the renderer's problem, not a reason to refuse a save and lose the author's work.
+deliberately does **not** check `templateId` against the registry: an unknown template is
+skipped by the renderer, not a reason to refuse a save and lose the author's work.
 
-## From options to slides
+## From proposal to slides
 
-The grid is `proposal_options` ordered by `sort_order`: one column per option
-(`is_recommended` marks the highlighted one), rows for the built-in attributes
-(`computed_total`, duration, financing) followed by one row per custom field definition,
-values from `proposal_custom_field_values`. No industry branch is needed to draw it.
+Everything under `src/lib/slides/` sees exactly two things — a deck and a `Presentation`
+— and never a table or a session. `src/lib/server/crm/slides.ts` is the one file that
+reads the database for it: `getDeck()` / `saveDeck()` for the org's row, and
+`loadPresentation()`, which reads one proposal through the existing modules (its options
+with their lines, the record it hangs off, the two people's names, each option's custom
+field rows) and names it in the industry's words. The two pages call those and nothing
+else.
 
-Where a template takes its content as a delimited string — the comparison table's
-`Feature | Basic | Standard* | Premium` lines and the investment summary's
-`label|amount` lines — the form action validates the string with the Zod parsers and keeps
-the **parsed shape**: rows have exactly the header's cell count, a numeric row holds only
-numbers (dashes and blanks read as "not offered"), the recommended column is a single
-`*`-suffixed header cell, and yes/no cells come from the known sets the slide draws as
-icons. A template never meets a string it has to guess at.
+- **The registry** (`registry.ts`) is one entry per template: the component that draws
+  it and the slots the builder edits — every text slot with its label and default, every
+  image slot, every colour, the typography controls — so the editor renders any template
+  from the list and no template has a screen of its own. Every template takes the same
+  props: `text`, `images`, `colors`, `styleVars`, `presentation`, `option`.
+- **Expansion** (`expandDeck()` in `present.ts`) — a template marked `perOption` (the
+  option slide) is repeated once per `proposal_options` row, in `sort_order`, so the
+  author places it once and never edits it again when an option is added. The comparison
+  slide draws every option side by side from the same rows: total, duration, financing,
+  then one row per custom field definition.
+- **Variables** (`slideProps()`) — `content.variables[key].sourceField` is one of the
+  paths in `bindings.ts` (`client.name`, `presenter.name`, `proposal.title`, …), resolved
+  against the presentation; the authored text, then the template default, stand in when
+  the path resolves to nothing, so a deck renders even with no client named.
+- **The canvas** is a fixed 1400×850 that `frame.svelte` scales to whatever width it is
+  given — the list thumbnail, the picker card, the builder canvas and the presenter's
+  stage are all the same frame — and colours are literals the author chose, written into
+  inline styles, so a slide prints as authored and never follows the app theme.
+
+**Two pages, both under `/proposals`** so the feature gate covers them with no wiring:
+
+- `/proposals/slides` — the builder (`src/routes/(app)/proposals/slides/`, its `pages`
+  row by the `org_slides` migration, `manage` to open). Yes Smile's three panes: slides
+  and templates on the left, the deck at reading size in the middle, the selected slide's
+  controls on the right, rendered from the registry over a sample presentation. The deck
+  is the form — one JSON document posted whole (`dataType: 'json'`, like the proposal
+  builder) and validated by `slideBuilderSchema` before `saveDeck()` upserts it. Images go
+  through `POST /api/slides/images` into the public `slides` bucket under the org's
+  folder (the body is a file, CLAUDE.md's endpoint exception) and the deck stores the URL.
+- `/proposals/<id>/present` — the slideshow (`src/routes/(present)/…`, a bare route group
+  with no sidebar; it titles itself from its load, the record-title exception). Load is
+  `getDeck()` + `loadPresentation()`; the page expands and renders. Reached from the
+  Present button on a proposal's record page; the Slides button on the list opens the
+  builder.
 
 ## The page, and what it is called
 
@@ -279,9 +300,8 @@ dentistry). Nothing in the page names it.
 - **Editing a proposal after creation.** The builder writes options and lines once;
   the list and the record page read them, and the form that edits them in place is
   still to build.
-- **The deck editor and the presenter.** `slide_decks` stores a deck and
-  `proposals.deck_id` points at one; authoring slides, expanding them per option and
-  resolving variables at present time are all still to build.
+- **Sharing a slideshow with the client.** The presenter is a signed-in screen; a
+  client-facing link (and the `proposal_events` it would log) is still to build.
 - **Auto-logging status changes as events.** The form action that flips `status` writes
   the matching `proposal_events` row; a trigger could take that over if it drifts.
 - **Vertical-specific handling of `execution_records`** beyond the table.

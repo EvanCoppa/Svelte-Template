@@ -345,6 +345,21 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
   a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+- **An org has one slideshow, and every proposal is presented through it**
+  (`org_slides` migration + `src/lib/slides/` + `src/lib/server/crm/slides.ts` —
+  docs/proposals.md, "One deck per org"). `slide_decks` is one jsonb row per org (the
+  built-in default deck stands in until the first save); it holds slides, never
+  proposal data. Everything under `src/lib/slides/` sees only a deck and a
+  `Presentation` — `loadPresentation()` is the one place a proposal is read and named
+  for the slides — and every template is one entry in `registry.ts` (component, text
+  slots, image slots, colours) taking the same props, so the builder's editor renders
+  any template from the list and none has a screen of its own. Two pages, both under
+  `/proposals` so the gate already covers them: `/proposals/slides` (the builder, a
+  superforms JSON form on `slideBuilderSchema`, `manage` to open, colocated components)
+  and `/proposals/[id]/present` (the slideshow, in the bare `(present)` route group).
+  A per-option slide repeats once per option at present time; a text slot bound to a
+  path in `bindings.ts` fills from the proposal. Slide images upload through
+  `POST /api/slides/images` into the public `slides` bucket, under the org's folder.
 
 ## Database
 

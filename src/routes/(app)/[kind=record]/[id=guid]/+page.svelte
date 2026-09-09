@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import * as Detail from '$lib/components/detail/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
 	import { StatusBadge, TagBadge } from '$lib/components/ui/badge/index.js';
@@ -48,12 +49,21 @@
 			{/if}
 		</div>
 
-		<!-- The breadcrumb trail is the way back on a wide screen; this is the
-		     way back everywhere else. -->
-		<Button href={recordListHref(data.record.kind)} variant="outline">
-			<ArrowLeftIcon />
-			All {terms.plural}
-		</Button>
+		<div class="flex flex-wrap items-center gap-2">
+			<!-- The breadcrumb trail is the way back on a wide screen; this is the
+			     way back everywhere else. -->
+			<Button href={recordListHref(data.record.kind)} variant="outline">
+				<ArrowLeftIcon />
+				All {terms.plural}
+			</Button>
+			{#if data.record.kind === 'proposal'}
+				<!-- The slideshow: this {terms.noun} through the org's deck, full screen. -->
+				<Button href="/proposals/{data.record.id}/present">
+					<PresentationIcon />
+					Present
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">

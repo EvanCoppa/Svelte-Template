@@ -2,6 +2,7 @@
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -83,6 +84,11 @@
 		<PageHeader.Title />
 		{#if data.canCreate}
 			<PageHeader.Actions>
+				<!-- The org's one deck — how every {terms.noun} is presented. -->
+				<Button href="/proposals/slides" variant="outline">
+					<PresentationIcon />
+					Slides
+				</Button>
 				<!-- The builder page, not the generic modal: see +page.server.ts. -->
 				<Button href="/proposals/new">
 					<PlusIcon />

@@ -22,6 +22,8 @@ export const QUERY = {
 	proposals: 'app:proposals',
 	billables: 'app:billables',
 	quickPlans: 'app:quick-plans',
+	/** The org's one slide deck — the builder saves it, the presenter reads it. */
+	slides: 'app:slides',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */
