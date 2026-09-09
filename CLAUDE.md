@@ -345,6 +345,23 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
   a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+- **The calendar is a third kind of "something written down against time"**
+  (`calendar` migration + `src/lib/server/crm/calendar.ts` + `src/lib/calendar.ts` +
+  `src/lib/components/calendar/` + `src/routes/(app)/calendar/`; docs/calendar.md).
+  An activity is a moment that happened, a note a document that stays open, an
+  **event a block of time that is planned** — and a task is _due_, not booked, so
+  `calendar_events` is its own table with a start AND an end. Both are instants and
+  **`ends_at` is exclusive** (an all-day event runs midnight to midnight; `all_day`
+  says how to draw it, not how to store it), so overlap is one comparison and a resize
+  is one column. The optional entity link says who it is for; `assigned_to` is a
+  membership like `deals.assigned_to`. Every Date in `$lib/calendar.ts` is local and
+  the server never draws the grid: `fetchWindow()` pads in UTC, the page draws its own
+  zone's grid after hydration, and forms carry instants behind wall-clock inputs.
+  Booking, editing and deleting are superforms actions; **a drag posts the `move`
+  action from the page's script** (`fetch('?/move')` + `deserialize`, the two changed
+  columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
+  the road for a JS-born mutation that belongs to the page it lives on. The feature
+  is named by the industry ("Schedule" / "appointment" in a practice).
 
 ## Database
 
@@ -400,7 +417,11 @@ binary/streaming responses. If a mutation is triggered from the page it lives on
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
 input echoed back; `redirect(303, ...)` on success. Notes are the worked example of the
 exception and the only one in the app — `/api/notes` is cross-page (the dock floats over
-every screen) and multi-verb, and a note has no form to post; see "Notes" below.
+every screen) and multi-verb, and a note has no form to post; see "Notes" below. A
+mutation born in a **gesture on the page it lives on** (the calendar's drag-to-move, the
+staff page's hold-to-remove) is still a form action: a hidden `<form>` with hidden inputs
+bound to a `superForm` store, filled from script and submitted with `requestSubmit()` —
+never a `fetch` of your own (docs/calendar.md, "The writes").
 
 ## Forms
 
@@ -442,7 +463,9 @@ modal, action or field-rendering loop. A screen whose creation is genuinely spec
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
-plans page, whose one field is a multi-select) keeps its own form and says why.
+plans page, whose one field is a multi-select; the calendar, whose booking form is
+two instants behind wall-clock inputs, an all-day switch that changes what they mean,
+a colour and a record — docs/calendar.md) keeps its own form and says why.
 
 ## Data loading & invalidation
 

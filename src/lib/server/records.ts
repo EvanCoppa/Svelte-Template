@@ -216,8 +216,9 @@ function amount(value: string): number | undefined {
  * The instant a wall-clock pick names. The browser posts an ISO string with
  * its own offset; without JavaScript the naive `2026-09-10T17:00` arrives
  * instead and is read as UTC, which is the one thing the server can know.
+ * Exported for the calendar's own forms, which post the same two shapes.
  */
-function instant(value: string): string | null {
+export function instant(value: string): string | null {
 	if (value === '') return null;
 	const at = new Date(value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`);
 	return Number.isNaN(at.getTime()) ? null : at.toISOString();

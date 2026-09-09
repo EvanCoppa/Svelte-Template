@@ -268,6 +268,75 @@ export type Database = {
           },
         ]
       }
+      calendar_events: {
+        Row: {
+          all_day: boolean
+          assigned_to: string | null
+          color: Database["public"]["Enums"]["badge_tone"]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_at: string
+          entity_id: string | null
+          entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
+          id: string
+          location: string | null
+          org_id: string
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          all_day?: boolean
+          assigned_to?: string | null
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at: string
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          id?: string
+          location?: string | null
+          org_id: string
+          starts_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          all_day?: boolean
+          assigned_to?: string | null
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          id?: string
+          location?: string | null
+          org_id?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_org_id_assigned_to_fkey"
+            columns: ["org_id", "assigned_to"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+          {
+            foreignKeyName: "calendar_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string

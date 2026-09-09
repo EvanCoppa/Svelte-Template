@@ -2,6 +2,7 @@ import type { Component } from 'svelte';
 import BlocksIcon from '@lucide/svelte/icons/blocks';
 import BookOpenIcon from '@lucide/svelte/icons/book-open';
 import Building2Icon from '@lucide/svelte/icons/building-2';
+import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
@@ -31,6 +32,7 @@ export const ICONS = {
 	blocks: BlocksIcon,
 	'book-open': BookOpenIcon,
 	'building-2': Building2Icon,
+	'calendar-days': CalendarDaysIcon,
 	'circle-user': CircleUserIcon,
 	contact: ContactIcon,
 	'file-text': FileTextIcon,

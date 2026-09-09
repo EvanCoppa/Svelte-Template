@@ -814,3 +814,72 @@ insert into public.assistant_messages (conversation_id, id, role, position, part
 		'[{"type": "step-start"}, {"type": "text", "text": "One company is still a lead: **Stark Industries**. Wayne Enterprises is already active."}]'::jsonb,
 		'{"createdAt": 1757155203000, "model": "claude-opus-5"}'::jsonb)
 on conflict (conversation_id, id) do nothing;
+
+-- The calendar: a week of appointments, visits and demos around today, so a
+-- reset always lands on a populated schedule (the calendar migration explains
+-- why an event is neither an activity nor a task). Offsets are from the Monday
+-- of the current week in the fixtures' wall-clock zone below — one line to
+-- move them into yours. Ends are exclusive, and the all-day offsite runs from
+-- midnight to midnight, the way the app writes one.
+insert into public.calendar_events (id, org_id, entity_type, entity_id, title, description, location,
+	starts_at, ends_at, all_day, color, assigned_to, created_by)
+select
+	e.id, e.org_id, e.entity_type, e.entity_id, e.title, e.description, e.location,
+	week.monday + e.starts, week.monday + e.ends, e.all_day, e.color, e.assigned_to, e.created_by
+from (
+	select date_trunc('week', now() at time zone 'America/New_York') at time zone 'America/New_York' as monday
+) as week
+cross join (values
+	('e1000000-0000-0000-0000-000000000001'::uuid, '10000000-0000-0000-0000-000000000001'::uuid,
+		null::public.crm_entity_type, null::uuid, 'Team stand-up', 'Yesterday, today, blockers.', 'Huddle room',
+		interval '9 hours', interval '9 hours 30 minutes', false, 'indigo'::public.badge_tone,
+		'00000000-0000-0000-0000-000000000001'::uuid, '00000000-0000-0000-0000-000000000001'::uuid),
+	('e1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000001', 'Renewal review with Lucius',
+		'Walk through the three options; he leans mid tier.', 'Video call',
+		interval '1 day 10 hours', interval '1 day 11 hours', false, 'info',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+	('e1000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000001', 'Wayne Enterprises site visit',
+		'Second site walkthrough with facilities.', '1007 Mountain Drive, Gotham',
+		interval '1 day 14 hours', interval '1 day 15 hours 30 minutes', false, 'violet',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003'),
+	('e1000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000002', 'Stark Industries intro call',
+		'Pepper is bringing procurement.', 'Video call',
+		interval '2 days 11 hours', interval '2 days 12 hours', false, 'cyan',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001'),
+	('e1000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		null, null, 'Q4 planning offsite', 'Pricing review, then the roadmap.', 'The Lakehouse',
+		interval '3 days', interval '4 days', true, 'warning',
+		null, '00000000-0000-0000-0000-000000000003'),
+	('e1000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'deal', '40000000-0000-0000-0000-000000000001', 'Deal desk: Wayne renewal',
+		'Sign-off on the discount ceiling before the proposal goes out.', null,
+		interval '3 days 9 hours 30 minutes', interval '3 days 10 hours', false, 'success',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+	('e1000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
+		'deal', '40000000-0000-0000-0000-000000000001', 'Proposal walkthrough',
+		'Present the options deck; leave the investment summary behind.', 'Wayne Tower, floor 40',
+		interval '4 days 15 hours', interval '4 days 16 hours', false, 'rose',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003'),
+	('e1000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001',
+		null, null, 'Team stand-up', 'Yesterday, today, blockers.', 'Huddle room',
+		interval '7 days 9 hours', interval '7 days 9 hours 30 minutes', false, 'indigo',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+	-- Two appointments overlap on Tuesday morning, so the week view has a
+	-- side-by-side layout to draw after a reset.
+	('e1000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000002', 'Coffee with Pepper',
+		null, 'Blue Bottle, 5th Ave',
+		interval '1 day 10 hours 30 minutes', interval '1 day 11 hours 30 minutes', false, 'orange',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003'),
+	-- A practice's "Schedule": the same table, named by the industry.
+	('e1000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000011',
+		'contact', '30000000-0000-0000-0000-000000000011', 'Dana Reyes — crown prep',
+		'Teeth 12 and 13; review the treatment plan first.', 'Operatory 2',
+		interval '1 day 9 hours', interval '1 day 10 hours 30 minutes', false, 'info',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
+) as e (id, org_id, entity_type, entity_id, title, description, location,
+	starts, ends, all_day, color, assigned_to, created_by)
+on conflict (id) do nothing;

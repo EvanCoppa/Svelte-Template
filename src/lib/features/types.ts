@@ -16,6 +16,7 @@ import type { Enums, Tables } from '$lib/database.types';
  * denying every member.
  */
 export const FEATURE_IDS = [
+	'calendar',
 	'companies',
 	'contacts',
 	'products',

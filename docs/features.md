@@ -115,12 +115,13 @@ server, `visibleTerms(features, canRead)` gives the same map.
 `<PageHeader.Title />` with no children heads the page with the same `titleFor()` the
 shell and the breadcrumb use, so a list page never spells its own name.
 
-Three features are named per industry today: **proposals** ("Quotes" for roofing and
+Four features are named per industry today: **proposals** ("Quotes" for roofing and
 medical-supplies, "Treatment plans" for cosmetic and dentistry), **contacts** ("Patients"
 in dentistry, "Clients" in cosmetic, "Homeowners" in roofing — the `industry_vocabulary`
-migration) and the two the proposal builder draws from, **billables** ("Procedures",
+migration), the two the proposal builder draws from, **billables** ("Procedures",
 "Services", "Billable items", "Line items") and **quick-plans** ("Bundles", "Packages",
-"Treatment packages", "Order templates", "Standing orders").
+"Treatment packages", "Order templates", "Standing orders") — and the **calendar**, a
+"Schedule" of "appointments" in cosmetic and dentistry (the `calendar` migration).
 
 ### Words that are not a feature's name
 
@@ -280,6 +281,12 @@ No nav edit, no `<title>`, no per-page check. Writes inside the page still open 
   per square and one package. Bright Smile's draft option is built from the schedule —
   two crowns on teeth 12 and 13 — so `detail` and a unit count are on screen after a
   reset.
+- **A week on the calendar**: Acme's schedule around today — a stand-up, a renewal
+  review overlapping a coffee (so the week view has a side-by-side layout to draw), a
+  site visit for a company, a demo, an all-day offsite, a deal desk — and one
+  appointment in Bright Smile Dental's "Schedule" for Dana Reyes. Offsets from the
+  Monday of the current week, in the zone the seed names, so a reset always lands on
+  a populated week (docs/calendar.md).
 - **`evancoppa@gmail.com` is the system admin**: every org above is in their switcher and
   they are owner-level in each, whatever their membership row says. Sign in as
   `dev@example.com` for the member view.
