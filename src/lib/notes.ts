@@ -49,6 +49,19 @@ export function noteLabel(note: Pick<Note, 'title' | 'body'>): string {
 }
 
 /**
+ * What a note says below its name — the lines a peek at it shows before it
+ * is opened. A titled note's body is all of it; an untitled note is named by
+ * its first line, so the excerpt starts after that line rather than repeating
+ * it. Empty when there is nothing more to show.
+ */
+export function noteExcerpt(note: Pick<Note, 'title' | 'body'>): string {
+	const body = note.body.trim();
+	if (note.title?.trim()) return body;
+	const lines = body.split('\n');
+	return lines.slice(1).join('\n').trim();
+}
+
+/**
  * Does a note match what was typed? Every whitespace-separated term has to
  * appear somewhere in the title or the body, case-insensitively — so "wayne
  * renewal" finds the note that mentions both, in either order. An empty query

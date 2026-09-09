@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
@@ -11,19 +12,30 @@
 	import * as Note from '$lib/components/note/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Kbd } from '$lib/components/ui/kbd/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { motionTransition, springs } from '$lib/motion';
-	import { canArchiveNote, canEditNote, canRemoveNote, noteDash, noteLabel } from '$lib/notes';
+	import {
+		canArchiveNote,
+		canEditNote,
+		canRemoveNote,
+		noteDash,
+		noteExcerpt,
+		noteLabel,
+		noteSurface
+	} from '$lib/notes';
 	import { noteCommands } from '$lib/notes-api';
 	import { cn } from '$lib/utils.js';
 
 	/**
 	 * The note dock: every note in the org, docked to the edge of the screen.
 	 *
-	 * Three states, the way a stack of stickies on the edge of a desk has
-	 * three: at rest it is one colored dash per note, a few pixels wide;
-	 * pointing at it fans the notes out with their labels; picking one opens it
-	 * full size, editing in place and saving itself. `⌥⌘L` leaves all of that
-	 * for `/notes`, which is the same notes with room to search them.
+	 * Four states, the way a stack of stickies on the edge of a desk has
+	 * four: at rest it is one colored dash per note, a few pixels wide;
+	 * pointing at it fans the notes out as tabs sticking out of the edge, each
+	 * one its own paper with its label written up the spine; pointing at a tab
+	 * pulls it out far enough to read the start of it; and picking one opens
+	 * it full size, editing in place and saving itself. `⌥⌘L` leaves all of
+	 * that for `/notes`, which is the same notes with room to search them.
 	 *
 	 * Mounted once by the `(app)` layout, like the ⌘K palette and the upgrade
 	 * prompt, and fed by the layout's load — so it is on every screen without
@@ -41,6 +53,8 @@
 	let notes = $derived(deck?.open ?? []);
 
 	let fanned = $state(false);
+	// The tab the pointer (or focus) is on: it slides out to show a preview.
+	let previewId = $state<string | null>(null);
 	let openedId = $state<string | null>(null);
 	// Deriving the open note from the list rather than holding a copy is what
 	// makes archiving or deleting it fall back to the fan with no extra wiring.
@@ -53,8 +67,14 @@
 		openedId = note.id;
 	}
 
+	function open(id: string) {
+		previewId = null;
+		openedId = id;
+	}
+
 	function collapse() {
 		openedId = null;
+		previewId = null;
 		fanned = false;
 	}
 
@@ -87,6 +107,7 @@
 
 	/** Leaving with a note open would close it mid-sentence; only the fan follows the pointer. */
 	function handlePointerLeave() {
+		previewId = null;
 		if (!openedId) fanned = false;
 	}
 </script>
@@ -124,7 +145,11 @@
 					transition: springs.snap,
 					reduced: { keyframes: { opacity: [0, 1] } }
 				}}
-				class="border-border/60 bg-background/95 w-80 rounded-l-xl border border-r-0 p-2 shadow-lg backdrop-blur"
+				class={cn(
+					'w-80',
+					opened &&
+						'border-border/60 bg-background/95 rounded-l-xl border border-r-0 p-2 shadow-lg backdrop-blur'
+				)}
 			>
 				{#if opened}
 					{@const note = opened}
@@ -186,52 +211,102 @@
 						</Note.Card>
 					{/key}
 				{:else}
-					<div class="flex items-center justify-between px-1 pb-1">
-						<span class="text-muted-foreground text-xs font-medium">Notes</span>
-						<div class="flex items-center gap-1">
-							{#if deck.canManage}
-								<Button variant="ghost" size="icon" class="size-7" onclick={addNote}>
-									<PlusIcon class="size-4" />
-									<span class="sr-only">New note</span>
-								</Button>
-							{/if}
-							<Button variant="ghost" size="icon" class="size-7" onclick={collapse}>
-								<XIcon class="size-4" />
-								<span class="sr-only">Close notes</span>
-							</Button>
-						</div>
-					</div>
+					<!-- The notes as tabs: each one its own paper, sticking out of the
+					     edge with its label written up the spine. The one under the
+					     pointer slides out to show how it starts; a click pulls it
+					     out the rest of the way. -->
+					<ul
+						class="flex max-h-[70vh] flex-col items-end gap-1.5 overflow-x-hidden overflow-y-auto py-1"
+					>
+						{#each notes as note (note.id)}
+							{@const previewing = previewId === note.id}
+							{@const excerpt = noteExcerpt(note)}
+							<li class="relative shrink-0">
+								<button
+									type="button"
+									data-slot="note-tab"
+									data-state={previewing ? 'open' : 'closed'}
+									aria-label={noteLabel(note)}
+									onpointerenter={() => (previewId = note.id)}
+									onfocus={() => (previewId = note.id)}
+									onclick={() => open(note.id)}
+									class={cn(
+										'focus-visible:ring-ring flex min-h-24 items-stretch overflow-hidden rounded-l-xl border border-r-0 text-left shadow-sm transition-[width] duration-300 ease-out outline-none focus-visible:ring-2 motion-reduce:transition-none',
+										previewing ? 'w-80' : 'w-11',
+										noteSurface(note.color)
+									)}
+								>
+									<!-- The spine: the label written up it, and the dashed fold
+									     where the paper disappears into the edge. The tab is as
+									     tall as its label, so a long name makes a longer tab. -->
+									<span
+										class="flex w-10 shrink-0 items-center justify-center border-r border-dashed border-current/25 py-3"
+									>
+										<span
+											class="max-h-28 rotate-180 truncate text-[10px] font-semibold tracking-[0.18em] uppercase [writing-mode:vertical-rl]"
+										>
+											{noteLabel(note)}
+										</span>
+									</span>
+									<!-- Out of the flow while folded, so the tab's height is
+									     the spine's; in the flow once pulled out, so the paper
+									     grows to fit what it says. -->
+									<span
+										aria-hidden="true"
+										class={cn(
+											'flex w-70 shrink-0 flex-col gap-1 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none',
+											previewing ? 'opacity-100 delay-100' : 'invisible absolute opacity-0'
+										)}
+									>
+										<span class="truncate text-sm font-semibold">{noteLabel(note)}</span>
+										{#if excerpt}
+											<span class="line-clamp-5 text-sm leading-relaxed whitespace-pre-line"
+												>{excerpt}</span
+											>
+										{:else}
+											<span class="text-sm opacity-55">Nothing more yet.</span>
+										{/if}
+									</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
 
 					{#if notes.length === 0}
-						<p class="text-muted-foreground px-2 py-6 text-center text-sm">
+						<p class="text-muted-foreground px-2 py-4 text-center text-sm">
 							Nothing written down yet.
 						</p>
-					{:else}
-						<ul class="max-h-[60vh] space-y-0.5 overflow-y-auto">
-							{#each notes as note (note.id)}
-								<li>
-									<button
-										type="button"
-										onclick={() => (openedId = note.id)}
-										class="hover:bg-accent focus-visible:ring-ring flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2"
-									>
-										<span class={cn('h-4 w-1.5 shrink-0 rounded-full', noteDash(note.color))}
-										></span>
-										<span class="truncate">{noteLabel(note)}</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
 					{/if}
 
-					<a
-						href="/notes"
-						onclick={openAll}
-						class="text-muted-foreground hover:text-foreground mt-1 flex items-center justify-between rounded-md px-2 py-1.5 text-xs"
-					>
-						Open every note
-						<Kbd>⌥⌘L</Kbd>
-					</a>
+					<div class="flex items-center justify-end gap-1.5 pt-1.5 pr-1">
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										href="/notes"
+										onclick={openAll}
+										variant="outline"
+										size="icon"
+										class="size-8 rounded-full"
+									>
+										<ArrowUpRightIcon class="size-4" />
+										<span class="sr-only">Open every note</span>
+									</Button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content side="left" class="flex items-center gap-2">
+								Open every note
+								<Kbd>⌥⌘L</Kbd>
+							</Tooltip.Content>
+						</Tooltip.Root>
+						{#if deck.canManage}
+							<Button variant="outline" size="icon" class="size-8 rounded-full" onclick={addNote}>
+								<PlusIcon class="size-4" />
+								<span class="sr-only">New note</span>
+							</Button>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		{/if}
