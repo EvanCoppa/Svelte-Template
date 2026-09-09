@@ -9,9 +9,14 @@
 export const builderLabel =
 	'text-gray-700 dark:text-foreground font-semibold text-base leading-normal';
 
-/** An input, a textarea or a picker trigger. */
+/**
+ * An input, a textarea or a picker trigger. It sets no display utility on
+ * purpose: `Input`, `Textarea` and the `Combobox` trigger are all `flex`, and
+ * a `block` here won that merge and stacked the combobox's chevron onto its
+ * own line. Width comes from `w-full`.
+ */
 export const builderInput =
-	'mt-1 block w-full h-auto border border-gray-300 dark:border-input rounded-md bg-white dark:bg-card px-3 py-2 text-base md:text-base focus:outline-none focus-visible:border-blue-500/70 focus-visible:ring-blue-500/65 focus-visible:ring-[1.5px]';
+	'mt-1 w-full h-auto border border-gray-300 dark:border-input rounded-md bg-white dark:bg-card px-3 py-2 text-base md:text-base focus:outline-none focus-visible:border-blue-500/70 focus-visible:ring-blue-500/65 focus-visible:ring-[1.5px]';
 
 /** Added to `builderInput` while the field carries an error. */
 export const builderInputInvalid = 'border-red-500 ring-1 ring-red-500';
