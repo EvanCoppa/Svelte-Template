@@ -18,6 +18,7 @@ import {
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
 import { featureGateFor } from '$lib/features/gate';
+import { mapConfig, mapOrigins } from '$lib/map';
 import { readActiveOrg } from '$lib/server/active-org';
 import { loadOrgContext } from '$lib/server/org-context';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
@@ -61,9 +62,16 @@ const PUBLIC_PATHS = ['/login', '/auth'];
  */
 const RECOVERY_ALLOWED_PATHS = ['/reset-password', '/auth/confirm', '/logout'];
 
-/** Outermost handle so every rendered response carries the header set. */
+/**
+ * Outermost handle so every rendered response carries the header set. The
+ * CSP's origins are derived, never listed: Supabase's from its URL, the
+ * map's from the style URL (`$lib/map`).
+ */
 const securityHeaders: Handle = async ({ event, resolve }) => {
-	return applySecurityHeaders(await resolve(event), PUBLIC_SUPABASE_URL, { dev });
+	return applySecurityHeaders(await resolve(event), PUBLIC_SUPABASE_URL, {
+		dev,
+		mapOrigins: mapOrigins(mapConfig())
+	});
 };
 
 const supabase: Handle = async ({ event, resolve }) => {
