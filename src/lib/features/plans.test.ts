@@ -11,7 +11,7 @@ function feature(id: string, name: string, mode: FeatureMode, sort_order = 0) {
 			description: `${name} description`,
 			route: `/${id}`,
 			icon: null,
-			category: 'platform',
+			category: 'crm',
 			sort_order,
 			created_at: ''
 		},

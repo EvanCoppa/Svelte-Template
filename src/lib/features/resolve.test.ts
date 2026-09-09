@@ -24,7 +24,7 @@ function row(
 		description: null,
 		route: `/${id}`,
 		icon: null,
-		category: 'platform',
+		category: 'crm',
 		sort_order: 0,
 		created_at: '2026-01-01T00:00:00Z',
 		industry_features: industries,

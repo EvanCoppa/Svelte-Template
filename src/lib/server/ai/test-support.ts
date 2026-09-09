@@ -34,7 +34,7 @@ function featureRow(id: string): Feature {
 		description: null,
 		route: `/${id}`,
 		icon: null,
-		category: 'platform',
+		category: 'crm',
 		sort_order: 0,
 		created_at: '2026-01-01T00:00:00Z'
 	};

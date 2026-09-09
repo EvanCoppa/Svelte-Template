@@ -11,7 +11,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { iconFor } from '$lib/features/icons';
-	import { NAV_CATEGORIES } from '$lib/navigation';
+	import { NAV_CATEGORIES, navCategoryOf } from '$lib/navigation';
 	import { showUpgrade } from '$lib/upgrade.svelte';
 	import { featuresSchema } from './schema';
 
@@ -30,7 +30,7 @@
 	let groups = $derived(
 		NAV_CATEGORIES.map((category) => ({
 			...category,
-			rows: data.rows.filter((row) => row.category === category.key)
+			rows: data.rows.filter((row) => navCategoryOf(row.category) === category.key)
 		})).filter((group) => group.rows.length > 0)
 	);
 
