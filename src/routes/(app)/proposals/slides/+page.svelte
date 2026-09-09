@@ -10,11 +10,11 @@
 	import { slideBuilderSchema } from '$lib/schemas/decks';
 	import { type SlideTemplate, templateFor } from '$lib/slides/registry';
 	import type { SlideContent, SlideInstance } from '$lib/slides/types';
-	import Editor from './editor.svelte';
-	import Preview from './preview.svelte';
-	import SlideList from './slide-list.svelte';
-	import TemplatePicker from './template-picker.svelte';
-	import TemplatePreviewModal from './template-preview-modal.svelte';
+	import Editor from './components/editor.svelte';
+	import Preview from './components/preview.svelte';
+	import SlideList from './components/slide-list.svelte';
+	import TemplatePicker from './components/template-picker.svelte';
+	import TemplatePreviewModal from './components/template-preview-modal.svelte';
 
 	/**
 	 * The slide builder — Yes Smile's three panes on the org's one deck:

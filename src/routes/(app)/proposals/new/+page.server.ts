@@ -32,7 +32,7 @@ import type { Actions, PageServerLoad } from './$types';
  * it is the person it is for, the two people on it, and one to five priced
  * options each made of billables and products, which is more than a modal of
  * string fields can hold. The form is `$lib/schemas/proposal-builder`; the
- * parts are `$lib/components/proposal-builder`.
+ * parts are in `./components/`.
  *
  * Gated by the hook on the `proposals` feature + read grant like the list;
  * opening the builder is the act of creating, so it also needs `manage`, the

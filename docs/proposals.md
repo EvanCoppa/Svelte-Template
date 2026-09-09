@@ -255,7 +255,7 @@ row of strings — so the "Add …" button on the list links to the builder at
 `/proposals/new` (`src/routes/(app)/proposals/new/`, its own `pages` row by the
 `proposal_builder_page` migration), the one kind whose creation is a screen. The builder
 is Yes Smile's treatment plan form, class for class, on this model and the template's
-primitives (`$lib/components/proposal-builder`; the form is
+primitives (its parts in `src/routes/(app)/proposals/new/components/`; the form is
 `$lib/schemas/proposal-builder`):
 
 | the source form                      | here                                                                                  |

@@ -355,7 +355,7 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   slots, image slots, colours) taking the same props, so the builder's editor renders
   any template from the list and none has a screen of its own. Two pages, both under
   `/proposals` so the gate already covers them: `/proposals/slides` (the builder, a
-  superforms JSON form on `slideBuilderSchema`, `manage` to open, colocated components)
+  superforms JSON form on `slideBuilderSchema`, `manage` to open, its parts in `components/`)
   and `/proposals/[id]/present` (the slideshow, in the bare `(present)` route group).
   A per-option slide repeats once per option at present time; a text slot bound to a
   path in `bindings.ts` fills from the proposal. Slide images upload through
@@ -715,6 +715,20 @@ and the page-owns-data rules — is the `compound-components` skill
 (`.claude/skills/compound-components/SKILL.md`); the `compound-component-builder`
 agent owns this work. App-level compounds live in `src/lib/components/<name>/`;
 context carries coordination state only (open/active/selection), never fetched data.
+
+### Where a component lives
+
+`src/lib/components/` is for components **used by more than one route** — the shell,
+the compounds every list page composes, the `ui/` and `enhanced/` shelves. A
+component one route uses goes in a **`components/` folder inside that route**
+(`src/routes/(app)/proposals/slides/components/editor.svelte`), imported relatively
+(`./components/editor.svelte`), so the route folder is the whole feature and deleting
+it deletes everything it owned. The rule is by use, not by size: the proposal builder's
+option fieldset, the assistant's thread parts and the slide builder's panes all live
+beside their pages, and a part moves up to `src/lib/components/` on the day a second
+route imports it — never pre-emptively. A route-level folder may carry an `index.ts`
+namespace like the app-level compounds do (`import * as Builder from
+'./components/index.js'`).
 
 ## Key patterns
 

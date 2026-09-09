@@ -11,7 +11,7 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import * as QuickPlans from '$lib/components/quick-plans/index.js';
+	import * as QuickPlans from './components/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
