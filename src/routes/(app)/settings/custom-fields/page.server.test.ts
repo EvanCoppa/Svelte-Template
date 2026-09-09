@@ -177,6 +177,29 @@ describe('custom fields settings actions', () => {
 		});
 	});
 
+	it('says a reused key in words, not with the constraint’s name', async () => {
+		const h = harness('owner', {
+			error: {
+				message:
+					'duplicate key value violates unique constraint "custom_field_definitions_org_id_entity_type_key_key"',
+				code: '23505'
+			}
+		});
+
+		const result = await actions.create(
+			h.post({ entity_type: 'contact', key: 'recall_due', label: 'Recall due', value_type: 'date' })
+		);
+
+		expect(result).toMatchObject({
+			status: 400,
+			data: {
+				form: expect.objectContaining({
+					message: 'A field with that key already exists on this kind of record.'
+				})
+			}
+		});
+	});
+
 	it('surfaces a database refusal as a form message rather than throwing', async () => {
 		const h = harness('owner', {
 			error: { message: 'custom field has values; its type cannot change' }

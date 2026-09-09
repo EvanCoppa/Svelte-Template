@@ -169,7 +169,16 @@
 		<PageHeader.Title />
 		{#if data.canManage}
 			<PageHeader.Actions>
-				<Modal.Root bind:open={createOpen}>
+				<Modal.Root
+					open={createOpen}
+					onOpenChange={(open) => {
+						// Adding a field while looking at Patients adds a PATIENT field:
+						// the dialog opens on the kind the table is filtered to, rather
+						// than on whichever kind the enum happens to list first.
+						if (open && isRecordKind(shownKind)) $createData.entity_type = shownKind;
+						createOpen = open;
+					}}
+				>
 					<Modal.Trigger>
 						{#snippet child({ props })}
 							<Button {...props}>
@@ -198,7 +207,6 @@
 											name="entity_type"
 											options={kindOptions}
 											bind:value={$createData.entity_type}
-											placeholder="Pick a kind of record…"
 											invalid={Boolean($createErrors.entity_type)}
 										/>
 										{#if $createErrors.entity_type}

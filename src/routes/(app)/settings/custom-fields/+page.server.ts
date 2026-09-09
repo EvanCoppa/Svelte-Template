@@ -1,4 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
+import { z } from 'zod';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { recordListHref, RECORD_KINDS } from '$lib/crm/records';
@@ -54,6 +55,26 @@ function orgOf(locals: App.Locals) {
 	const { org, activeOrgId } = locals;
 	if (!org || !activeOrgId) throw redirect(303, '/login');
 	return { org, orgId: activeOrgId };
+}
+
+/** Just enough of a PostgrestError to recognise one, parsed rather than asserted. */
+const postgrestError = z.object({ code: z.string() });
+
+/**
+ * Why a write failed, in words a reader can act on.
+ *
+ * The two definition triggers already raise sentences ("custom field X has
+ * values; its type cannot change"), so those pass through. A unique violation
+ * does not — it names a constraint — and reusing a key is the likeliest
+ * mistake on this screen, so it gets the one translation.
+ */
+function reason(cause: unknown, fallback: string): string {
+	if (!(cause instanceof Error)) return fallback;
+	const parsed = postgrestError.safeParse(cause.cause);
+	if (parsed.success && parsed.data.code === '23505') {
+		return 'A field with that key already exists on this kind of record.';
+	}
+	return cause.message;
 }
 
 /** The guard every action opens with — the shape /settings/features uses. */
@@ -116,9 +137,7 @@ export const actions: Actions = {
 					form.data.value_type === 'select' ? choiceList(form.data.allowed_values) : null
 			});
 		} catch (cause) {
-			return message(form, cause instanceof Error ? cause.message : 'Could not add the field.', {
-				status: 400
-			});
+			return message(form, reason(cause, 'Could not add the field.'), { status: 400 });
 		}
 		return { form };
 	},
@@ -152,9 +171,7 @@ export const actions: Actions = {
 		} catch (cause) {
 			// Carries the definition triggers' own words: a choice removed from
 			// under a stored value says so here.
-			return message(form, cause instanceof Error ? cause.message : 'Could not save the field.', {
-				status: 400
-			});
+			return message(form, reason(cause, 'Could not save the field.'), { status: 400 });
 		}
 		return { form };
 	},
@@ -171,9 +188,7 @@ export const actions: Actions = {
 		try {
 			await deleteCustomFieldDefinition(locals.supabase, orgId, form.data.id);
 		} catch (cause) {
-			return message(form, cause instanceof Error ? cause.message : 'Could not remove the field.', {
-				status: 400
-			});
+			return message(form, reason(cause, 'Could not remove the field.'), { status: 400 });
 		}
 		return { form };
 	}
