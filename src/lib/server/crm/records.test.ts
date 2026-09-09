@@ -58,6 +58,7 @@ const lucius: ContactWithCompany = {
 	email: 'lucius@wayne.example.com',
 	phone: null,
 	title: 'CEO',
+	dob: null,
 	is_primary: true,
 	status: 'active',
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
@@ -254,6 +255,12 @@ describe('describing a record', () => {
 			type: 'boolean',
 			value: true
 		});
+		// A calendar day, carried through as one: a business contact has none,
+		// the person who is the customer usually does.
+		expect(field(describeContact(lucius, openAll), 'Date of birth')).toEqual({ type: 'empty' });
+		expect(
+			field(describeContact({ ...lucius, dob: '1972-02-19' }, openAll), 'Date of birth')
+		).toEqual({ type: 'date', value: '1972-02-19' });
 	});
 
 	it('prices a product in its own currency per unit, and only counts stock for goods', () => {
@@ -436,6 +443,7 @@ describe('describing a record', () => {
 			value_text: 'email',
 			value_numeric: 7,
 			value_boolean: false,
+			value_date: '2026-01-15',
 			created_at: STAMPS.created_at,
 			updated_at: STAMPS.updated_at
 		};
@@ -449,6 +457,7 @@ describe('describing a record', () => {
 		});
 		expect(of('numeric', true).value).toEqual({ type: 'number', value: 7 });
 		expect(of('boolean', true).value).toEqual({ type: 'boolean', value: false });
+		expect(of('date', true).value).toEqual({ type: 'date', value: '2026-01-15' });
 		expect(of('text', false).value).toEqual({ type: 'empty' });
 	});
 });

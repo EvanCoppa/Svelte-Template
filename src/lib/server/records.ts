@@ -127,6 +127,7 @@ async function insertRecord(
 				title: text(data.title),
 				email: text(data.email),
 				phone: text(data.phone),
+				dob: text(data.dob),
 				status: data.status
 			});
 			return;

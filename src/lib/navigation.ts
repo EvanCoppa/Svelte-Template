@@ -223,6 +223,12 @@ export const settingsNav: SettingsNavGroup[] = [
 				href: '/settings/features',
 				icon: 'toggle-right',
 				aliases: ['plan', 'modules', 'upgrade']
+			},
+			{
+				label: 'Custom fields',
+				href: '/settings/custom-fields',
+				icon: 'table-properties',
+				aliases: ['fields', 'attributes', 'extra data']
 			}
 		]
 	}

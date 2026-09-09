@@ -20,7 +20,8 @@ export type ContactWithCompany = Contact & {
 	companies: Pick<Tables<'companies'>, 'id' | 'name'> | null;
 };
 
-type ContactColumn = 'company_id' | 'name' | 'email' | 'phone' | 'title' | 'is_primary' | 'status';
+type ContactColumn =
+	'company_id' | 'name' | 'email' | 'phone' | 'title' | 'dob' | 'is_primary' | 'status';
 
 export async function listContacts(
 	supabase: SupabaseClient<Database>,

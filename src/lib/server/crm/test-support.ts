@@ -30,7 +30,8 @@ type BuilderMethod = (typeof METHODS)[number];
 
 export type QueryResult = {
 	data?: unknown;
-	error?: { message: string } | null;
+	/** `code` is PostgREST's SQLSTATE — app code branches on it (a 23505 unique violation, say). */
+	error?: { message: string; code?: string } | null;
 	count?: number | null;
 };
 

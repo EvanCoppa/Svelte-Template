@@ -1,0 +1,17 @@
+-- Custom fields learn a fifth type: a calendar day.
+--
+-- text/numeric/boolean/select covered a proposal option's comparison row, but
+-- an attribute on a PERSON is where dates live — a recall due, a licence
+-- expiry, a last review. A `date`, not a timestamp: these are calendar days,
+-- and shifting one into a viewer's time zone is how a birthday lands on the
+-- wrong day.
+--
+-- This lives in its own migration on purpose: Postgres refuses to reference a
+-- new enum value inside the transaction that added it, and every migration
+-- file runs as one transaction. The file that follows is the first to use it —
+-- `public.check_custom_field_value()` gains a 'date' branch.
+--
+-- Appended rather than ordered: unlike `crm_entity_type` (kept alphabetical to
+-- match the generated types), this enum is already in no particular order and
+-- nothing reads its sort order.
+alter type public.custom_field_value_type add value if not exists 'date';

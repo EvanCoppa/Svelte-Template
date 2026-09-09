@@ -17,6 +17,8 @@ export const QUERY = {
 	features: 'app:features',
 	/** The signed-in user's account preferences (docs/user-preferences.md). */
 	preferences: 'app:preferences',
+	/** The extra attributes the org declares per kind of record — the settings screen owns them. */
+	customFields: 'app:custom-fields',
 	companies: 'app:companies',
 	contacts: 'app:contacts',
 	products: 'app:products',

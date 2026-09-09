@@ -16,6 +16,7 @@ import ShieldIcon from '@lucide/svelte/icons/shield';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
+import TablePropertiesIcon from '@lucide/svelte/icons/table-properties';
 import TicketIcon from '@lucide/svelte/icons/ticket';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import UsersIcon from '@lucide/svelte/icons/users';
@@ -44,6 +45,7 @@ export const ICONS = {
 	'sliders-horizontal': SlidersHorizontalIcon,
 	sparkles: SparklesIcon,
 	'sticky-note': StickyNoteIcon,
+	'table-properties': TablePropertiesIcon,
 	ticket: TicketIcon,
 	'toggle-right': ToggleRightIcon,
 	users: UsersIcon
