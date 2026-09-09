@@ -4,6 +4,7 @@ import {
 	canEditNote,
 	canRemoveNote,
 	noteDash,
+	noteExcerpt,
 	noteLabel,
 	noteMatches,
 	noteSurface,
@@ -55,6 +56,25 @@ describe('noteLabel', () => {
 	it('never comes back empty, so a fresh note is still clickable', () => {
 		expect(noteLabel(note())).toBe('Empty note');
 		expect(noteLabel(note({ title: '   ', body: '  \n ' }))).toBe('Empty note');
+	});
+});
+
+describe('noteExcerpt', () => {
+	it('is the whole body when the note has a title', () => {
+		expect(noteExcerpt(note({ title: 'Renewal call prep', body: 'Ask about the site\n' }))).toBe(
+			'Ask about the site'
+		);
+	});
+
+	it('skips the first line of an untitled note, which is its label', () => {
+		expect(noteExcerpt(note({ body: '\n  wifi: gotham-2026\nprinter: third floor\n' }))).toBe(
+			'printer: third floor'
+		);
+	});
+
+	it('is empty when there is nothing past the label', () => {
+		expect(noteExcerpt(note({ body: 'just one line' }))).toBe('');
+		expect(noteExcerpt(note())).toBe('');
 	});
 });
 

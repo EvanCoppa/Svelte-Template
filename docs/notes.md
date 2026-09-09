@@ -90,28 +90,37 @@ single story instead of "RLS, except on the API".
 
 ## The modules
 
-| File                                  | What it owns                                                                           |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `src/lib/server/crm/notes.ts`         | The table. `listNotes` / `createNote` / `updateNote` / `deleteNote`.                   |
-| `src/lib/server/notes.ts`             | The guard, `noteColumns()`, `noteAccess()`, `noteLinks()`.                             |
-| `src/lib/schemas/notes.ts`            | The bodies `/api/notes` accepts, and the length constraints.                           |
-| `src/lib/notes.ts`                    | What a note IS to the browser: label, search, markdown, colors, who may edit it. Pure. |
-| `src/lib/notes-api.ts`                | `noteCommands` — the four writes, with the refresh and the error toast in them.        |
-| `src/lib/components/note/`            | `Note.Card` / `Editor` / `Palette` / `Actions`, composed by every surface.             |
-| `src/lib/components/note-dock.svelte` | The dock itself, mounted once by the `(app)` layout.                                   |
+| File                                  | What it owns                                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `src/lib/server/crm/notes.ts`         | The table. `listNotes` / `createNote` / `updateNote` / `deleteNote`.                            |
+| `src/lib/server/notes.ts`             | The guard, `noteColumns()`, `noteAccess()`, `noteLinks()`.                                      |
+| `src/lib/schemas/notes.ts`            | The bodies `/api/notes` accepts, and the length constraints.                                    |
+| `src/lib/notes.ts`                    | What a note IS to the browser: label, excerpt, search, markdown, colors, who may edit it. Pure. |
+| `src/lib/notes-api.ts`                | `noteCommands` — the four writes, with the refresh and the error toast in them.                 |
+| `src/lib/components/note/`            | `Note.Card` / `Editor` / `Palette` / `Actions`, composed by every surface.                      |
+| `src/lib/components/note-dock.svelte` | The dock itself, mounted once by the `(app)` layout.                                            |
 
 `$lib/notes.ts` is split from `$lib/notes-api.ts` for one concrete reason: the API half
 imports `$app/navigation`, which cannot be imported in a node test. Keeping the rules
 about what a note is on the pure side is what makes them testable.
 
-## The three states
+## The four states
 
 The dock is the product's signature, so it is built the way the Mac app describes it:
 
 - **At rest** — one colored dash per open note, a few pixels wide, on the right edge.
-- **Fanned** — pointing at it (or focusing it) opens a 20rem panel listing every note by
-  its label: its title, or its first line if it has none.
-- **Open** — picking one replaces the list with the note at full size, editing in place.
+- **Fanned** — pointing at it (or focusing it) turns the notes into tabs sticking out of
+  the edge: each one its own paper in its own color, its label — its title, or its
+  first line if it has none — written up the spine, and a dashed fold where the paper
+  disappears into the edge. A tab is as tall as its label. Under the tabs sit the two
+  round buttons: a new note, and the door to `/notes`.
+- **Previewing** — pointing at a tab slides it out (`w-11` → `w-80`) far enough to read
+  the start of it: the label as a heading and the first lines of the body
+  (`noteExcerpt()`, which skips an untitled note's first line rather than saying it
+  twice). Nothing is opened yet, and the pointer moving to the next tab slides this one
+  back in.
+- **Open** — clicking a tab replaces the fan with the note at full size, editing in
+  place.
 
 `⌥⌘L` leaves all of it for `/notes`, which is the same notes with room to search them.
 Escape steps back one level at a time. The pointer leaving closes the fan, but never
