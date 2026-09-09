@@ -11,7 +11,7 @@ import {
 } from './navigation';
 
 function map(
-	entries: [id: string, mode: FeatureMode, extra?: { category?: string; sort?: number }][]
+	entries: [id: string, mode: FeatureMode, extra?: { category?: string | null; sort?: number }][]
 ): FeatureMap {
 	return Object.fromEntries(
 		entries.map(([id, mode, extra]) => [
@@ -25,7 +25,7 @@ function map(
 					description: null,
 					route: `/${id}`,
 					icon: 'users',
-					category: extra?.category ?? 'platform',
+					category: extra?.category === undefined ? 'crm' : extra.category,
 					sort_order: extra?.sort ?? 0,
 					created_at: ''
 				}
@@ -77,14 +77,37 @@ describe('buildNav', () => {
 		);
 		expect(nav.map((i) => i.label)).toEqual(['Dashboard', 'Early', 'Alpha', 'Zeta', 'Docs']);
 		expect(groupNav(nav).map((g) => [g.key, g.items.length])).toEqual([
-			['platform', 4],
+			['general', 1],
+			['crm', 3],
 			['library', 1]
 		]);
 	});
 
-	it('falls back to the platform section for an unknown category', () => {
-		const nav = buildNav(map([['odd', 'enabled', { category: 'mystery' }]]), readAll);
-		expect(nav.find((i) => i.featureId === 'odd')?.category).toBe('platform');
+	it('renders sections in the declared order and omits the empty ones', () => {
+		const nav = buildNav(
+			map([
+				['docs', 'enabled', { category: 'library' }],
+				['deals', 'enabled', { category: 'crm' }],
+				['odd', 'enabled', { category: null }]
+			]),
+			readAll
+		);
+		expect(groupNav(nav).map((g) => g.label)).toEqual(['General', 'CRM', 'Library', 'Other']);
+	});
+
+	it('files a feature with no category, or one it does not know, under Other', () => {
+		const nav = buildNav(
+			map([
+				['odd', 'enabled', { category: 'mystery' }],
+				['bare', 'enabled', { category: null }]
+			]),
+			readAll
+		);
+		expect(nav.filter((i) => i.featureId).map((i) => i.category)).toEqual(['other', 'other']);
+	});
+
+	it('puts the dashboard in General', () => {
+		expect(staticNavItems.every((item) => item.category === 'general')).toBe(true);
 	});
 
 	it('returns only the static pages for an empty map', () => {

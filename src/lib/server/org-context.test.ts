@@ -14,7 +14,7 @@ const registry = [
 		description: null,
 		route: '/companies',
 		icon: 'users',
-		category: 'platform',
+		category: 'crm',
 		sort_order: 10,
 		created_at: '',
 		industry_features: [
@@ -31,7 +31,7 @@ const registry = [
 		description: null,
 		route: '/deals',
 		icon: 'handshake',
-		category: 'platform',
+		category: 'crm',
 		sort_order: 20,
 		created_at: '',
 		industry_features: [{ industry_id: 'general', name: null, noun: null }],

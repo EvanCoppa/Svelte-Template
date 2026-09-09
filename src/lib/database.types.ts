@@ -685,7 +685,7 @@ export type Database = {
       }
       features: {
         Row: {
-          category: string
+          category: string | null
           created_at: string
           description: string | null
           icon: string | null
@@ -696,7 +696,7 @@ export type Database = {
           sort_order: number
         }
         Insert: {
-          category?: string
+          category?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -707,7 +707,7 @@ export type Database = {
           sort_order?: number
         }
         Update: {
-          category?: string
+          category?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null

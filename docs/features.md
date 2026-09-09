@@ -137,6 +137,25 @@ pickers with them and `describeProposal()` labels the two `person` fields on the
 page with them. Nothing is settable per org: an org that needs its own word asks for a
 migration, exactly like a feature's name.
 
+## Sidebar sections
+
+A feature's `category` is the section of the sidebar it is filed under. The values are
+`general`, `crm`, `tools`, `insights`, `library` and `other` — declared once as
+`NAV_CATEGORIES` in `src/lib/navigation.ts`, in the order the sections render, and
+mirrored by the check constraint on `features.category` (the `feature_categories`
+migration). `groupNav()` buckets the entries and drops the empty sections, so a
+category may ship before the features that will live in it (`insights` does today).
+
+The column is **nullable on purpose**: a feature that says nothing about where it
+belongs is filed under Other rather than under a default the migration had to guess.
+`navCategoryOf()` is the one place that answers it — null and any value the app does
+not know both become `other` — and both the sidebar and `/settings/features` group
+with it, so a feature lands in the same section on both screens.
+
+Adding a section = one entry in `NAV_CATEGORIES` and the same value in the check
+constraint, by migration. Nothing else changes: the sidebar, the ⌘K palette and the
+feature settings page all render the list.
+
 ## Pages and titles
 
 A feature is made of **pages**, and a page has a **title**. `pages` is the registry of
@@ -216,8 +235,8 @@ exists, and `pages` is readable by signed-in users only.
 
 1. Create the route under `src/routes/(app)/<route>/`.
 2. A migration inserts its `features` row (id, name, noun — lower-case singular when
-   the feature is a list of records — description, route, icon slug, category,
-   sort_order), its `industry_features` rows (with the industry's own `name` / `noun`
+   the feature is a list of records — description, route, icon slug, category (the
+   sidebar section — see "Sidebar sections"; null files it under Other), sort_order), its `industry_features` rows (with the industry's own `name` / `noun`
    where it calls the feature something else) and its `tier_features` rows — plus
    `role_permissions` grants if plain members need it.
 3. The same migration inserts a `pages` row per screen the feature is made of

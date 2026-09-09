@@ -14,9 +14,10 @@ import type { FeatureMap } from '$lib/features/types';
  * `staticNavItems` are the pages that are not features: universal parts of
  * the shell every org gets. Icons are named, not imported — every slug
  * resolves through the one-per-file map in `$lib/features/icons`, so the
- * icon barrel never lands in the bundle. Categories render as labeled
- * sidebar sections in the order declared in NAV_CATEGORIES; empty categories
- * are omitted.
+ * icon barrel never lands in the bundle. A feature's `category` is the
+ * sidebar section it is filed under: they render as labeled sections in the
+ * order declared in NAV_CATEGORIES, empty ones are omitted, and a feature
+ * that names no category (or one the app does not know) falls into Other.
  *
  * Settings is deliberately NOT one of them. It is a shell of its own,
  * entered from the user menu in the sidebar footer, and once you are inside
@@ -24,12 +25,38 @@ import type { FeatureMap } from '$lib/features/types';
  * places you work, never the place you configure them.
  */
 
-export type NavCategoryKey = 'platform' | 'library';
+export type NavCategoryKey = 'general' | 'crm' | 'tools' | 'insights' | 'library' | 'other';
 
+/**
+ * The sidebar's sections, in the order they render. Mirrors the values
+ * `features.category` accepts (the feature_categories migration); a feature
+ * whose category is null or unknown is filed under Other by
+ * `navCategoryOf()`, so a section never goes missing because a row said
+ * nothing. Empty sections are dropped by `groupNav()`, which is why a
+ * category may ship before the features that will live in it.
+ */
 export const NAV_CATEGORIES: { key: NavCategoryKey; label: string }[] = [
-	{ key: 'platform', label: 'Platform' },
-	{ key: 'library', label: 'Library' }
+	{ key: 'general', label: 'General' },
+	{ key: 'crm', label: 'CRM' },
+	{ key: 'tools', label: 'Tools' },
+	{ key: 'insights', label: 'Insights' },
+	{ key: 'library', label: 'Library' },
+	{ key: 'other', label: 'Other' }
 ];
+
+/**
+ * The section a registry row belongs to: its own category when it names one
+ * the app knows, Other otherwise. The one place that answers it — the nav
+ * and the feature settings page both group with it, so a row lands in the
+ * same section on both screens.
+ */
+export function navCategoryOf(category: string | null | undefined): NavCategoryKey {
+	return isNavCategory(category) ? category : 'other';
+}
+
+function isNavCategory(value: string | null | undefined): value is NavCategoryKey {
+	return NAV_CATEGORIES.some((c) => c.key === value);
+}
 
 export interface NavItem {
 	label: string;
@@ -58,7 +85,7 @@ export const staticNavItems: NavItem[] = [
 	{
 		label: 'Dashboard',
 		href: '/',
-		category: 'platform',
+		category: 'general',
 		icon: 'layout-dashboard',
 		sortOrder: 0,
 		aliases: ['home', 'overview']
@@ -79,7 +106,7 @@ export function buildNav(features: FeatureMap, canRead: (featureId: string) => b
 		.map(({ mode, feature }) => ({
 			label: feature.name,
 			href: feature.route,
-			category: isCategory(feature.category) ? feature.category : 'platform',
+			category: navCategoryOf(feature.category),
 			icon: feature.icon ?? '',
 			sortOrder: feature.sort_order,
 			featureId: feature.id,
@@ -93,10 +120,6 @@ export function buildNav(features: FeatureMap, canRead: (featureId: string) => b
 			a.sortOrder - b.sortOrder ||
 			a.label.localeCompare(b.label)
 	);
-}
-
-function isCategory(value: string): value is NavCategoryKey {
-	return NAV_CATEGORIES.some((c) => c.key === value);
 }
 
 /** Buckets items into labeled sidebar sections; empty sections are omitted. */
