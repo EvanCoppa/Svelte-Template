@@ -19,11 +19,6 @@ alter table public.features
 	alter column category drop default,
 	alter column category drop not null;
 
-alter table public.features
-	add constraint features_category_check
-		check (category is null or category in
-			('general', 'crm', 'tools', 'insights', 'library', 'other'));
-
 comment on column public.features.category is
 	'Sidebar section; mirrors NavCategoryKey in src/lib/navigation.ts. Null means the app files it under Other.';
 
@@ -43,3 +38,11 @@ update public.features set category = 'tools'
 -- explicit Other bucket rather than silently into a section it was never
 -- filed under.
 update public.features set category = 'other' where category = 'platform';
+
+-- Added only after every existing row has been re-filed above, so the check
+-- never runs against a value this migration is itself in the middle of
+-- retiring ('platform').
+alter table public.features
+	add constraint features_category_check
+		check (category is null or category in
+			('general', 'crm', 'tools', 'insights', 'library', 'other'));
