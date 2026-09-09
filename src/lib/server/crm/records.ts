@@ -259,6 +259,9 @@ export function describeContact(row: ContactWithCompany, canOpen: CanOpen): Reco
 			{ label: 'Title', value: text(row.title) },
 			{ label: 'Email', value: email(row.email) },
 			{ label: 'Phone', value: phone(row.phone) },
+			// A calendar day, so `date` rather than `datetime`: a birthday must
+			// not shift with the reader's time zone.
+			{ label: 'Date of birth', value: date(row.dob) },
 			{ label: 'Primary contact', value: yesNo(row.is_primary) }
 		],
 		createdAt: row.created_at,
@@ -431,6 +434,8 @@ export function describeCustomField({ definition, value }: CustomField): CustomR
 				label,
 				value: value.value_boolean === null ? EMPTY : yesNo(value.value_boolean)
 			};
+		case 'date':
+			return { key, label, value: date(value.value_date) };
 	}
 }
 

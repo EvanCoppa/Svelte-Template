@@ -236,15 +236,17 @@ on conflict (id) do nothing;
 -- Two people at companies and one standing alone. The third is the whole point
 -- of the party model: a customer who is a person, the shape a dental patient or
 -- a homeowner takes, with no company row invented to hold them.
-insert into public.contacts (id, org_id, company_id, name, email, title, is_primary, status, created_by) values
+-- `dob` is set on the standalone person and left null on the two business
+-- contacts: both branches of describeContact() have a fixture that way.
+insert into public.contacts (id, org_id, company_id, name, email, title, dob, is_primary, status, created_by) values
 	('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Lucius Fox', 'lucius@wayne.example.com', 'CEO', true,
+		'20000000-0000-0000-0000-000000000001', 'Lucius Fox', 'lucius@wayne.example.com', 'CEO', null, true,
 		'active', '00000000-0000-0000-0000-000000000001'),
 	('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000002', 'Pepper Potts', 'pepper@stark.example.com', 'COO', true,
+		'20000000-0000-0000-0000-000000000002', 'Pepper Potts', 'pepper@stark.example.com', 'COO', null, true,
 		'active', '00000000-0000-0000-0000-000000000001'),
 	('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
-		null, 'Bruce Wayne', 'client@example.com', null, false,
+		null, 'Bruce Wayne', 'client@example.com', null, '1972-02-19', false,
 		'active', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
@@ -525,13 +527,23 @@ insert into public.custom_field_definitions (id, org_id, entity_type, key, label
 	('a3000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
 		'proposal_option', 'support_tier', 'Support tier', 'select', '["email", "business hours", "24/7"]'),
 	('a3000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
-		'contact', 'preferred_channel', 'Preferred channel', 'select', '["email", "phone", "text"]')
+		'contact', 'preferred_channel', 'Preferred channel', 'select', '["email", "phone", "text"]'),
+	('a3000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'contact', 'last_review', 'Last review', 'date', null)
 on conflict (id) do nothing;
 
 insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_text) values
 	('a4000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001',
 		'contact', '30000000-0000-0000-0000-000000000003',
 		'a3000000-0000-0000-0000-000000000004', 'email')
+on conflict (id) do nothing;
+
+-- The date type, in the column that carries it. Exactly one of the four typed
+-- columns is ever non-null — the check constraint counts them.
+insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_date) values
+	('a4000000-0000-0000-0000-00000000000b', '10000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000003',
+		'a3000000-0000-0000-0000-000000000005', '2026-01-15')
 on conflict (id) do nothing;
 
 -- A deck is a reusable template, so this one carries slides and no proposal

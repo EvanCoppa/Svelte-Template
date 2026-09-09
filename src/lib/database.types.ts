@@ -371,6 +371,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          dob: string | null
           email: string | null
           id: string
           is_primary: boolean
@@ -385,6 +386,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          dob?: string | null
           email?: string | null
           id?: string
           is_primary?: boolean
@@ -399,6 +401,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          dob?: string | null
           email?: string | null
           id?: string
           is_primary?: boolean
@@ -480,6 +483,7 @@ export type Database = {
           org_id: string
           updated_at: string
           value_boolean: boolean | null
+          value_date: string | null
           value_numeric: number | null
           value_text: string | null
         }
@@ -492,6 +496,7 @@ export type Database = {
           org_id: string
           updated_at?: string
           value_boolean?: boolean | null
+          value_date?: string | null
           value_numeric?: number | null
           value_text?: string | null
         }
@@ -504,6 +509,7 @@ export type Database = {
           org_id?: string
           updated_at?: string
           value_boolean?: boolean | null
+          value_date?: string | null
           value_numeric?: number | null
           value_text?: string | null
         }
@@ -2355,7 +2361,12 @@ export type Database = {
         | "proposal_option"
         | "task"
         | "ticket"
-      custom_field_value_type: "text" | "numeric" | "boolean" | "select"
+      custom_field_value_type:
+        | "text"
+        | "numeric"
+        | "boolean"
+        | "select"
+        | "date"
       duration_unit: "visits" | "days" | "weeks" | "months" | "sec"
       execution_type:
         | "appointment_schedule"
@@ -2538,7 +2549,7 @@ export const Constants = {
         "task",
         "ticket",
       ],
-      custom_field_value_type: ["text", "numeric", "boolean", "select"],
+      custom_field_value_type: ["text", "numeric", "boolean", "select", "date"],
       duration_unit: ["visits", "days", "weeks", "months", "sec"],
       execution_type: [
         "appointment_schedule",

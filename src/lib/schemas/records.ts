@@ -157,6 +157,7 @@ export const contactRecordSchema = z.object({
 	title: optionalText,
 	email: optionalEmail,
 	phone: optionalText,
+	dob: optionalDate,
 	status: z.enum(['lead', 'prospect', 'active', 'inactive']).default('lead')
 });
 
@@ -257,6 +258,7 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'title', label: 'Job title', type: 'text', placeholder: 'Head of Operations' },
 			{ name: 'email', label: 'Email', type: 'email', placeholder: 'dana@acme.com' },
 			{ name: 'phone', label: 'Phone', type: 'tel', placeholder: '+1 555 010 0100' },
+			{ name: 'dob', label: 'Date of birth', type: 'date' },
 			{ name: 'status', label: 'Status', type: 'select', options: PARTY_STATUS_OPTIONS }
 		]
 	},
