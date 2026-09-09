@@ -9,17 +9,26 @@
 --
 --   invoices             one bill sent to one customer
 --   invoice_line_items   what is being billed for, priced per line
---   payments             one sum of money that arrived (or went back out)
---   payment_allocations  which invoices that money settled, and by how much
+--   payments             one sum of money that moved, optionally against one
+--                        invoice
 --
 -- Four decisions worth stating:
 --
--- 1. A PAYMENT IS NOT A COLUMN ON AN INVOICE. Customers pay one check against
---    six invoices, and one invoice gets paid across three instalments. That is
---    many-to-many, so it is a join table with an amount on it. An
---    `invoices.payment_id` — or a `payments.invoice_id` — cannot express the
---    normal case, and `amount_paid` without allocations is a number that
---    reconciles to nothing.
+-- 1. A PAYMENT POINTS AT AT MOST ONE INVOICE, AND `invoice_id` IS NULLABLE.
+--    Set, the row settles that invoice and feeds its `amount_paid`. Null, the
+--    row is money that moved without being applied to anything — a deposit
+--    taken before the invoice exists, a customer paying on account, a refund
+--    of an overpayment — and it sits against the company until someone applies
+--    it. That nullable column is the whole reason one table is enough here:
+--    unapplied cash has a home, which is what a NOT NULL `invoice_id` could
+--    not give it.
+--
+--    The tradeoff, stated plainly: one payment cannot span two invoices. A
+--    $400 check clearing three of them is three rows sharing a `reference`,
+--    and the deposit is reconstructed by grouping on that reference rather
+--    than being a row of its own. Splitting `payments` into a payment and its
+--    allocations is the change that buys that back, and it is a change to make
+--    when someone actually needs it — not before.
 --
 -- 2. TAX AND DISCOUNT ARE PER LINE, AND THE HEADER IS THEIR SUM. A distributor
 --    bills taxable and exempt lines on one invoice, so a single header tax
@@ -105,7 +114,8 @@ create table public.invoices (
 	-- number. Not grantable: a document number a client can choose collides.
 	number text not null,
 	status public.invoice_status not null default 'draft',
-	-- Follows the allocations, by trigger. Never written by a client.
+	-- Follows the payments pointing at this invoice, by trigger. Never
+	-- written by a client.
 	payment_status public.payment_state not null default 'unpaid',
 
 	currency text not null default 'USD',
@@ -115,8 +125,8 @@ create table public.invoices (
 	-- The only two money columns a human types on the header.
 	shipping numeric(12, 2) not null default 0,
 	discount numeric(12, 2) not null default 0,
-	-- Follows the allocations, by trigger. Negative is impossible; more than
-	-- `total` is not, and shows as a negative balance.
+	-- Follows the payments pointing at this invoice, by trigger. Negative is
+	-- impossible; more than `total` is not, and shows as a negative balance.
 	amount_paid numeric(12, 2) not null default 0,
 
 	-- Snapshot of the customer's terms when the invoice was issued, the way a
@@ -125,7 +135,7 @@ create table public.invoices (
 	payment_terms_days integer,
 	due_date date,
 	issued_at timestamptz,
-	-- Stamped by the allocation rollup when the balance reaches zero, cleared
+	-- Stamped by the payment rollup when the balance reaches zero, cleared
 	-- if a refund reopens it.
 	paid_at timestamptz,
 	voided_at timestamptz,
@@ -172,7 +182,7 @@ create table public.invoices (
 );
 
 comment on table public.invoices is
-	'One bill sent to one customer. subtotal and tax roll up from the lines, amount_paid from the allocations; total and balance_due are generated. Overdue is derived, never stored.';
+	'One bill sent to one customer. subtotal and tax roll up from the lines, amount_paid from its payments; total and balance_due are generated. Overdue is derived, never stored.';
 comment on column public.invoices.balance_due is
 	'What is still owed. Generated — the aging query is "balance_due > 0 and due_date < current_date", not a join.';
 comment on column public.invoices.payment_terms_days is
@@ -282,6 +292,12 @@ create table public.payments (
 	id uuid not null primary key default gen_random_uuid(),
 	org_id uuid not null references public.organizations (id) on delete cascade,
 	company_id uuid not null,
+	-- The invoice this settles. NULL is a first-class state, not a missing
+	-- value (decision 1): unapplied money on the customer's account. Composite
+	-- so the invoice must be this org's, and SET NULL on delete because
+	-- deleting a bill must never delete the record that money changed hands —
+	-- the payment falls back to unapplied.
+	invoice_id uuid,
 	kind public.payment_kind not null default 'payment',
 	method public.payment_method not null default 'check',
 	-- Always positive; direction lives in `kind`.
@@ -299,27 +315,38 @@ create table public.payments (
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now(),
 
-	-- Sums over payments and allocations stay a plain SUM instead of a CASE
-	-- repeated at every call site.
+	-- Sums over payments stay a plain SUM instead of a CASE repeated at every
+	-- call site.
 	signed_amount numeric(12, 2) generated always as (
 		case kind when 'refund' then -amount else amount end
 	) stored,
 
 	foreign key (company_id, org_id) references public.companies (id, org_id) on delete restrict,
+	foreign key (invoice_id, org_id) references public.invoices (id, org_id)
+		on delete set null (invoice_id),
 	unique (id, org_id),
 	constraint payments_amount_positive check (amount > 0),
 	constraint payments_currency_is_iso4217 check (currency ~ '^[A-Z]{3}$')
 );
 
 comment on table public.payments is
-	'One sum of money that arrived from a customer, or went back to them. Which invoices it settled is payment_allocations — a payment is never tied to one invoice.';
+	'One sum of money that moved. invoice_id set means it settles that invoice; null means unapplied money sitting on the customer''s account.';
+comment on column public.payments.invoice_id is
+	'The invoice this settles, or null for unapplied money on account. Null is a state, not a gap.';
 comment on column public.payments.signed_amount is
 	'amount, negated for a refund. Generated, so direction can never disagree with kind.';
 
 create index payments_org_id_idx on public.payments (org_id);
 create index payments_company_id_idx on public.payments (company_id);
+-- Everything applied to one invoice — what the amount_paid rollup reads.
+create index payments_invoice_id_idx on public.payments (invoice_id);
 -- The payments list, and a customer's payment history.
 create index payments_org_id_received_at_idx on public.payments (org_id, received_at desc);
+-- Unapplied money waiting to be put somewhere, per customer. Partial, because
+-- applied payments are most of the table and never appear in that view.
+create index payments_org_id_company_id_unapplied_idx
+	on public.payments (org_id, company_id)
+	where invoice_id is null;
 
 create unique index payments_org_id_idempotency_key_idx
 	on public.payments (org_id, idempotency_key)
@@ -330,33 +357,7 @@ create trigger payments_set_updated_at
 	for each row execute procedure public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- payment_allocations — which invoices the money settled
--- ---------------------------------------------------------------------------
-
-create table public.payment_allocations (
-	payment_id uuid not null,
-	invoice_id uuid not null,
-	org_id uuid not null references public.organizations (id) on delete cascade,
-	-- Always positive: the direction is the payment's, not the allocation's.
-	amount numeric(12, 2) not null,
-	created_at timestamptz not null default now(),
-	primary key (payment_id, invoice_id),
-	-- Both composite: money can only ever be applied within one org. Deleting
-	-- either end drops the allocation and the rollup below restates the
-	-- invoice, so no orphan can leave an invoice looking paid.
-	foreign key (payment_id, org_id) references public.payments (id, org_id) on delete cascade,
-	foreign key (invoice_id, org_id) references public.invoices (id, org_id) on delete cascade,
-	constraint payment_allocations_amount_positive check (amount > 0)
-);
-
-comment on table public.payment_allocations is
-	'How much of one payment settled one invoice. The many-to-many that lets one check clear six invoices and one invoice take three instalments.';
-
-create index payment_allocations_org_id_idx on public.payment_allocations (org_id);
-create index payment_allocations_invoice_id_idx on public.payment_allocations (invoice_id);
-
--- ---------------------------------------------------------------------------
--- Derived state: the invoice follows its lines and its allocations
+-- Derived state: the invoice follows its lines and its payments
 -- ---------------------------------------------------------------------------
 
 -- The lines half. `subtotal` is the sum of pre-tax net amounts and `tax` the
@@ -392,15 +393,15 @@ create trigger invoice_line_items_refresh_rollups
 	on public.invoice_line_items
 	for each row execute procedure public.refresh_invoice_line_rollups();
 
--- The money half. `amount_paid` is the signed sum of what has been applied, so
--- a refund allocation reduces it and a fully refunded invoice reads 'unpaid'
--- again with no extra state. Clamped at zero: refunding more than was ever
--- paid is a data error, not a negative amount_paid the check constraint would
--- reject halfway through a legitimate write.
+-- The money half. `amount_paid` is the signed sum of the payments pointing at
+-- the invoice, so a refund row reduces it and a fully refunded invoice reads
+-- 'unpaid' again with no extra state. Clamped at zero: refunding more than was
+-- ever paid is a data error, not a negative amount_paid the check constraint
+-- would reject halfway through a legitimate write.
 --
--- Fires from BOTH tables: an allocation changing is the obvious case, but so
--- is a payment flipping from 'payment' to 'refund', which moves every invoice
--- that payment touched without any allocation row changing.
+-- Both the OLD and the NEW invoice are restated, because the common edit is
+-- moving a payment from one invoice to another (or off one onto the account),
+-- and restating only the new side would leave the old one still looking paid.
 create function public.refresh_invoice_payment_state()
 returns trigger
 language plpgsql
@@ -410,13 +411,16 @@ as $$
 declare
 	targets uuid[];
 begin
-	if tg_table_name = 'payment_allocations' then
-		targets := array[case tg_op when 'DELETE' then old.invoice_id else new.invoice_id end];
-	else
-		select coalesce(array_agg(distinct a.invoice_id), '{}')
-		into targets
-		from public.payment_allocations a
-		where a.payment_id = case tg_op when 'DELETE' then old.id else new.id end;
+	targets := array_remove(
+		array[
+			case when tg_op <> 'INSERT' then old.invoice_id end,
+			case when tg_op <> 'DELETE' then new.invoice_id end
+		],
+		null
+	);
+
+	if array_length(targets, 1) is null then
+		return null;
 	end if;
 
 	update public.invoices i
@@ -436,10 +440,9 @@ begin
 		select
 			target.id as invoice_id,
 			greatest(coalesce((
-				select sum(a.amount * sign(p.signed_amount))
-				from public.payment_allocations a
-				join public.payments p on p.id = a.payment_id
-				where a.invoice_id = target.id
+				select sum(p.signed_amount)
+				from public.payments p
+				where p.invoice_id = target.id
 			), 0), 0) as applied
 		from unnest(targets) as target(id)
 	) paid
@@ -449,68 +452,10 @@ begin
 end;
 $$;
 
-create trigger payment_allocations_refresh_invoice
-	after insert or delete or update of amount, invoice_id
-	on public.payment_allocations
+create trigger payments_refresh_invoice
+	after insert or delete or update of invoice_id, kind, amount
+	on public.payments
 	for each row execute procedure public.refresh_invoice_payment_state();
-
-create trigger payments_refresh_invoices
-	after update of kind, amount on public.payments
-	for each row execute procedure public.refresh_invoice_payment_state();
-
--- Money that was never received cannot settle anything. A CHECK cannot see
--- across rows, so the sum is guarded here — without it, allocating $500 of a
--- $100 check marks four invoices paid out of money that does not exist.
-create function public.check_payment_not_over_allocated()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-	target uuid;
-	allocated numeric(12, 2);
-	available numeric(12, 2);
-begin
-	-- Fires from both sides, because there are two ways to break the rule:
-	-- allocating more of a payment, and shrinking the payment under what is
-	-- already allocated.
-	if tg_table_name = 'payment_allocations' then
-		target := case tg_op when 'DELETE' then old.payment_id else new.payment_id end;
-	else
-		target := new.id;
-	end if;
-
-	select coalesce(sum(a.amount), 0) into allocated
-	from public.payment_allocations a
-	where a.payment_id = target;
-
-	select p.amount into available
-	from public.payments p
-	where p.id = target;
-
-	if available is not null and allocated > available then
-		raise exception
-			'payment % has % allocated but is only %', target, allocated, available
-			using errcode = 'check_violation';
-	end if;
-
-	return null;
-end;
-$$;
-
--- AFTER ROW, which in Postgres means "queued to the end of the statement": a
--- multi-row insert is therefore checked once, against the complete set, rather
--- than rejected halfway through a batch that balances by its last row. A
--- statement-level trigger would read better and cannot be used — OLD and NEW
--- are not assigned there, and the sum needs to know which payment moved.
-create trigger payment_allocations_check_total
-	after insert or update or delete on public.payment_allocations
-	for each row execute procedure public.check_payment_not_over_allocated();
-
-create trigger payments_check_allocation_total
-	after update of amount on public.payments
-	for each row execute procedure public.check_payment_not_over_allocated();
 
 -- Issuing closes the lines (decision 3). Stricter than the purchases freeze on
 -- purpose: a purchase order is internal until the goods land, an invoice is a
@@ -595,7 +540,6 @@ create trigger invoices_crm_entity_deleted
 alter table public.invoices enable row level security;
 alter table public.invoice_line_items enable row level security;
 alter table public.payments enable row level security;
-alter table public.payment_allocations enable row level security;
 
 create policy "Members can view invoices"
 	on public.invoices for select to authenticated
@@ -650,23 +594,6 @@ create policy "Owners and admins can delete payments"
 	on public.payments for delete to authenticated
 	using (private.org_role(org_id) in ('owner', 'admin'));
 
-create policy "Members can view payment allocations"
-	on public.payment_allocations for select to authenticated
-	using (private.org_role(org_id) is not null);
-
-create policy "Members can allocate payments"
-	on public.payment_allocations for insert to authenticated
-	with check (private.org_role(org_id) is not null);
-
-create policy "Members can change an allocation"
-	on public.payment_allocations for update to authenticated
-	using (private.org_role(org_id) is not null)
-	with check (private.org_role(org_id) is not null);
-
-create policy "Members can unallocate payments"
-	on public.payment_allocations for delete to authenticated
-	using (private.org_role(org_id) is not null);
-
 -- ---------------------------------------------------------------------------
 -- Column-level grants
 -- ---------------------------------------------------------------------------
@@ -694,17 +621,10 @@ grant insert (org_id, invoice_id, product_id, description, product_sku_snapshot,
 -- `kind` is insert-only: a payment that can be flipped into a refund in place
 -- rewrites history on every invoice it touched. Issue the opposite row instead.
 revoke insert, update on table public.payments from authenticated;
-grant insert (org_id, company_id, kind, method, amount, currency, reference, received_at,
-		idempotency_key, notes, created_by),
-	update (method, amount, currency, reference, received_at, notes)
+grant insert (org_id, company_id, invoice_id, kind, method, amount, currency, reference,
+		received_at, idempotency_key, notes, created_by),
+	update (invoice_id, method, amount, currency, reference, received_at, notes)
 	on table public.payments to authenticated;
-
--- `payment_id` is insert-only for the same reason: moving money between
--- payments is a delete and a new row, so both invoices get restated.
-revoke insert, update on table public.payment_allocations from authenticated;
-grant insert (org_id, payment_id, invoice_id, amount),
-	update (invoice_id, amount)
-	on table public.payment_allocations to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- What this migration deliberately leaves out
