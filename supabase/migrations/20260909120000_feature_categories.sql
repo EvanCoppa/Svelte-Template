@@ -12,6 +12,11 @@
 -- migration here plus an entry there, in the order the sections should render.
 -- Empty sections are omitted, so a category may ship before the features that
 -- will live in it ('insights' does).
+--
+-- Order matters: the old constraint goes first and the new one is added last,
+-- because every existing row still says 'platform' or 'library' until the
+-- re-filing in between has run — a check constraint is validated against the
+-- table the moment it is added.
 
 alter table public.features drop constraint features_category_check;
 
@@ -19,16 +24,10 @@ alter table public.features
 	alter column category drop default,
 	alter column category drop not null;
 
-alter table public.features
-	add constraint features_category_check
-		check (category is null or category in
-			('general', 'crm', 'tools', 'insights', 'library', 'other'));
-
 comment on column public.features.category is
 	'Sidebar section; mirrors NavCategoryKey in src/lib/navigation.ts. Null means the app files it under Other.';
 
--- The registry as it stands, re-filed. Everything not named here keeps
--- whatever it has, and an unknown value would not have passed the old check.
+-- The registry as it stands, re-filed.
 update public.features set category = 'general'
 	where id in ('assistant', 'notes', 'staff');
 
@@ -43,3 +42,8 @@ update public.features set category = 'tools'
 -- explicit Other bucket rather than silently into a section it was never
 -- filed under.
 update public.features set category = 'other' where category = 'platform';
+
+alter table public.features
+	add constraint features_category_check
+		check (category is null or category in
+			('general', 'crm', 'tools', 'insights', 'library', 'other'));
