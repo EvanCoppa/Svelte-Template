@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listTagsFor } from './tags';
+import { listTaggedEntityIds, listTagsFor } from './tags';
 import { ORG_ID, supabaseMock } from './test-support';
 
 const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
@@ -21,6 +21,20 @@ describe('tags data access', () => {
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('entity_type', 'company');
 		expect(builder.eq).toHaveBeenCalledWith('entity_id', COMPANY_ID);
+	});
+
+	it('lists the ids of one kind of record carrying a tag, each once', async () => {
+		const { supabase, builder } = supabaseMock({
+			data: [{ entity_id: COMPANY_ID }, { entity_id: COMPANY_ID }, { entity_id: 'c2' }]
+		});
+
+		await expect(listTaggedEntityIds(supabase, ORG_ID, 'company', 'vip')).resolves.toEqual([
+			COMPANY_ID,
+			'c2'
+		]);
+		expect(builder.select).toHaveBeenCalledWith('entity_id, tags!inner(name)');
+		expect(builder.eq).toHaveBeenCalledWith('entity_type', 'company');
+		expect(builder.ilike).toHaveBeenCalledWith('tags.name', 'vip');
 	});
 
 	it('throws the PostgREST message when a query fails', async () => {

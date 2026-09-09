@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
+import type { CompanyOwnCondition, ViewSort } from '$lib/views/filter';
 import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
@@ -28,13 +29,42 @@ export type CompanyWithContacts = Company & { contacts: Tables<'contacts'>[] };
 
 type CompanyColumn = 'name' | 'email' | 'phone' | 'website' | 'status' | 'relationship';
 
+/**
+ * The org's companies, by name. `relationship` is the one-off filter the
+ * companies page and the assistant's search use; `conditions`, `ids` and
+ * `sort` are how a view's filter compiles (`$lib/views/filter`) — its own
+ * columns applied here, the conditions that need another table first
+ * (a tag) arriving as an id list from `runView()`.
+ */
 export async function listCompanies(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { relationship?: Company['relationship'] } = {}
+	filter: {
+		relationship?: Company['relationship'];
+		ids?: readonly string[];
+		conditions?: readonly CompanyOwnCondition[];
+		sort?: ViewSort;
+	} = {}
 ): Promise<Company[]> {
-	let query = supabase.from('companies').select('*').eq('org_id', orgId).order('name');
+	let query = supabase.from('companies').select('*').eq('org_id', orgId);
 	if (filter.relationship) query = query.eq('relationship', filter.relationship);
+	if (filter.ids) query = query.in('id', [...filter.ids]);
+	for (const condition of filter.conditions ?? []) {
+		switch (condition.op) {
+			case 'in':
+				query = query.in(condition.field, condition.values);
+				break;
+			case 'not_in':
+				query = query.not(condition.field, 'in', `(${condition.values.join(',')})`);
+				break;
+			case 'ilike':
+				query = query.ilike(condition.field, `%${condition.value}%`);
+				break;
+		}
+	}
+	query = filter.sort
+		? query.order(filter.sort.field, { ascending: filter.sort.direction === 'asc' })
+		: query.order('name');
 	return unwrap(await query);
 }
 

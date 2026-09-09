@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	loadFeatureRegistry,
 	loadTermRegistry,
+	loadViewRegistry,
 	loadVocabulary,
 	listTiersWithFeatures,
 	setDisabledFeatures
@@ -26,6 +27,20 @@ describe('loadFeatureRegistry', () => {
 		const { supabase } = supabaseMock({ error: { message: 'permission denied' } });
 
 		await expect(loadFeatureRegistry(supabase)).rejects.toThrow('permission denied');
+	});
+});
+
+describe('loadViewRegistry', () => {
+	it('loads every view definition, by id', async () => {
+		const rows = [{ id: 'suppliers', source: 'company' }];
+		const { supabase, from, builder } = supabaseMock({ data: rows });
+
+		await expect(loadViewRegistry(supabase)).resolves.toBe(rows);
+		expect(from).toHaveBeenCalledWith('views');
+		expect(builder.select).toHaveBeenCalledWith(
+			'id, source, filter, columns, layouts, default_layout'
+		);
+		expect(builder.order).toHaveBeenCalledWith('id');
 	});
 });
 

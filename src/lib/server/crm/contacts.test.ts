@@ -30,6 +30,24 @@ describe('contacts data access', () => {
 		expect(builder.is).toHaveBeenCalledWith('company_id', null);
 	});
 
+	it('compiles a view’s conditions into the query, including whether a company exists', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+		await listContacts(supabase, ORG_ID, {
+			ids: [CONTACT_ID],
+			conditions: [
+				{ field: 'has_company', op: 'eq', value: false },
+				{ field: 'company_id', op: 'in', values: [COMPANY_ID] },
+				{ field: 'title', op: 'ilike', value: 'CEO' }
+			],
+			sort: { field: 'created_at', direction: 'desc' }
+		});
+		expect(builder.in).toHaveBeenCalledWith('id', [CONTACT_ID]);
+		expect(builder.is).toHaveBeenCalledWith('company_id', null);
+		expect(builder.in).toHaveBeenCalledWith('company_id', [COMPANY_ID]);
+		expect(builder.ilike).toHaveBeenCalledWith('title', '%CEO%');
+		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
+	});
+
 	it('creates a contact with no company at all', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: CONTACT_ID } });
 

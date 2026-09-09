@@ -19,6 +19,9 @@ alter table public.features
 	alter column category drop default,
 	alter column category drop not null;
 
+comment on column public.features.category is
+	'Sidebar section; mirrors NavCategoryKey in src/lib/navigation.ts. Null means the app files it under Other.';
+
 -- The registry as it stands, re-filed. Everything not named here keeps
 -- whatever it has, and an unknown value would not have passed the old check.
 update public.features set category = 'general'
@@ -36,14 +39,10 @@ update public.features set category = 'tools'
 -- filed under.
 update public.features set category = 'other' where category = 'platform';
 
--- Added last, once no row holds the retired 'platform' value any more: a
--- CHECK is validated against the whole table the moment it is added, so
--- adding it before the re-filing above fails the replay on an empty
--- database even though it passes against a database already migrated.
+-- Added only after every existing row has been re-filed above, so the check
+-- never runs against a value this migration is itself in the middle of
+-- retiring ('platform').
 alter table public.features
 	add constraint features_category_check
 		check (category is null or category in
 			('general', 'crm', 'tools', 'insights', 'library', 'other'));
-
-comment on column public.features.category is
-	'Sidebar section; mirrors NavCategoryKey in src/lib/navigation.ts. Null means the app files it under Other.';

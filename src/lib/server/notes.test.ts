@@ -1,36 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Note } from './crm/notes';
-import { ORG_ID, supabaseTablesMock } from './crm/test-support';
 import type { OrgRole } from '$lib/org';
 import type { OrgContext } from './org-context';
 import type { PermissionLevel } from './roles';
-import { noteAccess, noteColumns, noteLinks } from './notes';
-
-const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
-
-function note(fields: Partial<Note> = {}): Note {
-	// SAFETY: `noteLinks` reads id, entity_type and entity_id and nothing else.
-	return {
-		id: 'd0000000-0000-0000-0000-000000000001',
-		entity_type: null,
-		entity_id: null,
-		...fields
-	} as Note;
-}
-
-/** Enough of a company row for `getRecord()` to describe one — it pills the lifecycle. */
-const company = {
-	id: COMPANY_ID,
-	name: 'Wayne Enterprises',
-	status: 'active',
-	relationship: 'customer',
-	contacts: []
-};
-
-const openEverything = () => true;
-
-/** The record labels main's vocabulary supplies; `noteLinks` only passes them through. */
-const vocabulary = { proposal_presenter: 'Presenter', proposal_responsible: 'Responsible' };
+import { noteAccess, noteColumns } from './notes';
 
 describe('noteColumns', () => {
 	it('writes only what the browser sent, so one surface never clobbers another', () => {
@@ -47,91 +19,6 @@ describe('noteColumns', () => {
 		const archived = noteColumns({ archived: true });
 		expect(Date.parse(archived.archived_at ?? '')).toBeGreaterThanOrEqual(before);
 		expect(noteColumns({ archived: false })).toEqual({ archived_at: null });
-	});
-});
-
-describe('noteLinks', () => {
-	it('asks nothing when no note is about anything', async () => {
-		const { supabase, from } = supabaseTablesMock({});
-
-		await expect(
-			noteLinks(supabase, ORG_ID, [note(), note()], openEverything, vocabulary)
-		).resolves.toEqual({});
-		expect(from).not.toHaveBeenCalled();
-	});
-
-	it('names the record a note is about, and links to it', async () => {
-		const { supabase } = supabaseTablesMock({
-			companies: { data: company }
-		});
-
-		const attached = note({ entity_type: 'company', entity_id: COMPANY_ID });
-		await expect(
-			noteLinks(supabase, ORG_ID, [attached], openEverything, vocabulary)
-		).resolves.toEqual({
-			[attached.id]: { label: 'Wayne Enterprises', href: `/companies/${COMPANY_ID}` }
-		});
-	});
-
-	it('reads a record once however many notes point at it', async () => {
-		const { supabase, from } = supabaseTablesMock({
-			companies: { data: company }
-		});
-
-		const notes = [
-			note({ id: 'd0000000-0000-0000-0000-00000000000a' }),
-			note({ id: 'd0000000-0000-0000-0000-00000000000b' })
-		].map((row) => ({ ...row, entity_type: 'company' as const, entity_id: COMPANY_ID }));
-
-		const links = await noteLinks(supabase, ORG_ID, notes, openEverything, vocabulary);
-		expect(Object.keys(links)).toHaveLength(2);
-		expect(from).toHaveBeenCalledTimes(1);
-	});
-
-	it('does not even fetch a record the reader may not open', async () => {
-		const { supabase, from } = supabaseTablesMock({
-			companies: { data: company }
-		});
-
-		await expect(
-			noteLinks(
-				supabase,
-				ORG_ID,
-				[note({ entity_type: 'company', entity_id: COMPANY_ID })],
-				() => false,
-				vocabulary
-			)
-		).resolves.toEqual({});
-		expect(from).not.toHaveBeenCalled();
-	});
-
-	it('leaves a note unlinked when the record is gone', async () => {
-		const { supabase } = supabaseTablesMock({ companies: { data: null } });
-
-		await expect(
-			noteLinks(
-				supabase,
-				ORG_ID,
-				[note({ entity_type: 'company', entity_id: COMPANY_ID })],
-				openEverything,
-				vocabulary
-			)
-		).resolves.toEqual({});
-	});
-
-	it('ignores an entity type that has no page of its own', async () => {
-		const { supabase, from } = supabaseTablesMock({});
-
-		await expect(
-			noteLinks(
-				supabase,
-				ORG_ID,
-				[note({ entity_type: 'proposal_option', entity_id: COMPANY_ID })],
-				openEverything,
-				vocabulary
-			)
-		).resolves.toEqual({});
-		expect(from).not.toHaveBeenCalled();
 	});
 });
 

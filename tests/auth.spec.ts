@@ -167,10 +167,13 @@ test.describe('the app shell', () => {
 		// and Deals and Products carry no grant for Support, so none of the
 		// three may appear. Settings is not here either: it is a shell of its
 		// own, entered from the user menu (see $lib/navigation).
+		// Vendors is a view (the views migration): its read grant is derived
+		// from companies', and a CRM org calls the suppliers view "Vendors".
 		for (const label of [
 			'Dashboard',
 			'Companies',
 			'Contacts',
+			'Vendors',
 			'Tickets',
 			'Staff',
 			'Components',
@@ -268,6 +271,31 @@ test.describe('the app shell', () => {
 		await page.goto('/companies');
 		await expect(page).toHaveTitle('Companies');
 		await expect(page.getByRole('cell', { name: 'Wayne Enterprises' })).toBeVisible();
+	});
+
+	test('renders a view as a table of the records its filter picks, and offers the map', async ({
+		page
+	}) => {
+		// The suppliers view: companies whose relationship is supplier, titled
+		// "Vendors" in a CRM org. One page renders every views row.
+		await page.goto('/views/suppliers');
+		await expect(page).toHaveTitle('Vendors');
+		await expect(page.getByRole('cell', { name: 'Gotham Steel Supply' })).toBeVisible();
+		await expect(page.getByRole('cell', { name: 'Wayne Enterprises' })).toHaveCount(0);
+
+		// The map layout: a canvas when a style is configured, otherwise the
+		// empty state that says how to configure one.
+		await clickWhenLive(page.getByRole('tab', { name: 'Map' }), async () => {
+			await expect(
+				page.locator('[data-slot="map-view"], [data-slot="empty"]').first()
+			).toBeVisible();
+		});
+		await expect(page.getByRole('cell', { name: 'Gotham Steel Supply' })).toHaveCount(0);
+	});
+
+	test('404s a view slug no row claims', async ({ page }) => {
+		const response = await page.goto('/views/not-a-view');
+		expect(response?.status()).toBe(404);
 	});
 
 	test('lists a person who belongs to no company at all', async ({ page }) => {

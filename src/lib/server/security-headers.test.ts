@@ -21,6 +21,16 @@ describe('buildContentSecurityPolicy', () => {
 		expect(csp).toContain("base-uri 'self'");
 	});
 
+	it('admits the map origins for fetches and images, and nothing without a map', () => {
+		const csp = buildContentSecurityPolicy(SUPABASE_URL, { mapOrigins: ['https://tiles.test'] });
+		const directive = (name: string) => csp.split('; ').find((part) => part.startsWith(name));
+
+		expect(directive('connect-src')).toContain('https://tiles.test');
+		expect(directive('img-src')).toContain('https://tiles.test');
+		expect(directive('script-src')).not.toContain('https://tiles.test');
+		expect(buildContentSecurityPolicy(SUPABASE_URL)).not.toContain('tiles.test');
+	});
+
 	it('relaxes connect-src for Vite only in dev', () => {
 		expect(buildContentSecurityPolicy(SUPABASE_URL)).not.toContain('ws:');
 		expect(buildContentSecurityPolicy(SUPABASE_URL, { dev: true })).toContain('ws:');

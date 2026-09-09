@@ -195,7 +195,7 @@
 			bind:this={gapRef}
 			data-slot="sidebar-gap"
 			class={cn(
-				'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-out',
+				'relative w-(--sidebar-width) bg-transparent transition-[width] duration-100 ease-out',
 				'group-data-[collapsible=offcanvas]:w-0',
 				'group-data-[side=right]:rotate-180',
 				variant === 'floating' || variant === 'inset'
@@ -207,7 +207,7 @@
 			bind:this={containerRef}
 			data-slot="sidebar-container"
 			class={cn(
-				'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-out md:flex',
+				'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-100 ease-out md:flex',
 				// Over the content, the panel also sits above the header — for the
 				// whole of a dock, so the header never paints over it mid-settle.
 				'group-data-[docking=true]:z-[55] group-data-[floating=true]:z-[55] group-data-[floating=true]:p-2',
@@ -237,7 +237,7 @@
 					'group-data-[floating=true]:ring-sidebar-border group-data-[floating=true]:overflow-hidden group-data-[floating=true]:rounded-xl group-data-[floating=true]:shadow-2xl group-data-[floating=true]:ring-1',
 					// Docking, second beat, with the container's padding above:
 					// the corners, the edge and the shadow ease away together.
-					'group-data-[state=expanded]:transition-[border-radius,box-shadow] group-data-[state=expanded]:duration-200 group-data-[state=expanded]:ease-out',
+					'group-data-[state=expanded]:transition-[border-radius,box-shadow] group-data-[state=expanded]:duration-100 group-data-[state=expanded]:ease-out',
 					'group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm'
 				)}
 			>

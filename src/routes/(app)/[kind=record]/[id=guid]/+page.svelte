@@ -15,6 +15,7 @@
 	import { noteCommands } from '$lib/notes-api';
 	import { iconFor } from '$lib/features/icons';
 	import { iconForPath } from '$lib/navigation';
+	import { QUERY } from '$lib/queries';
 	import { capitalize } from '$lib/utils.js';
 
 	let { data } = $props();
@@ -107,37 +108,15 @@
 				</Card.Root>
 			{/if}
 
-			{#if data.addresses.length > 0}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Addresses</Card.Title>
-					</Card.Header>
-					<Card.Content class="grid gap-3 sm:grid-cols-2">
-						{#each data.addresses as address (address.id)}
-							<address class="border-border space-y-1.5 rounded-lg border p-3 text-sm not-italic">
-								<div class="flex items-center gap-2">
-									<TagBadge tone={address.is_primary ? 'info' : 'neutral'} class="capitalize">
-										{address.kind}
-									</TagBadge>
-									{#if address.label}
-										<span class="text-muted-foreground truncate text-xs">{address.label}</span>
-									{/if}
-								</div>
-								<p>{address.line1}</p>
-								{#if address.line2}
-									<p>{address.line2}</p>
-								{/if}
-								<p>
-									{[address.city, address.region].filter(Boolean).join(', ')}
-									{address.postal_code ?? ''}
-								</p>
-								{#if address.country}
-									<p class="text-muted-foreground">{address.country}</p>
-								{/if}
-							</address>
-						{/each}
-					</Card.Content>
-				</Card.Root>
+			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+				<Detail.Addresses
+					addresses={data.addresses}
+					form={data.addressForm}
+					removeForm={data.removeAddressForm}
+					canManage={data.canManageAddresses}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
 			{/if}
 
 			{#each data.related as group (group.kind)}

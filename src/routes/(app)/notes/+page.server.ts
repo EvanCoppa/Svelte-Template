@@ -2,9 +2,10 @@ import { redirect } from '@sveltejs/kit';
 import { recordListHref, type RecordKind } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
 import { QUERY } from '$lib/queries';
+import { recordLinks } from '$lib/server/crm/links';
 import { listNotes } from '$lib/server/crm/notes';
 import { loadVocabulary } from '$lib/server/features';
-import { noteAccess, noteLinks } from '$lib/server/notes';
+import { noteAccess } from '$lib/server/notes';
 import { hasGrant } from '$lib/server/roles';
 import type { PageServerLoad } from './$types';
 
@@ -35,7 +36,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 
 	return {
 		notes,
-		links: await noteLinks(supabase, activeOrgId, notes, canOpen, vocabulary),
+		links: await recordLinks(supabase, activeOrgId, notes, canOpen, vocabulary),
 		access: noteAccess(org, user.id)
 	};
 };

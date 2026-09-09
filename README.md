@@ -9,6 +9,8 @@ An opinionated, production-shaped starting point for new software projects:
   select, combobox, dialog, dropdown, table, tabs, sidebar, command palette, …)
 - The **app shell**: collapsible sidebar with hover-peek, sticky blurred header,
   ⌘K navigation palette, dark mode — all driven by one config file
+- A **calendar** at `/calendar`: month, week and day views, drag to move, pull to
+  stretch, click or draw to book — every write a form action (`docs/calendar.md`)
 - **Vercel** adapter preconfigured
 - Written-down conventions in [`docs/`](docs/) so every project starts aligned
 
