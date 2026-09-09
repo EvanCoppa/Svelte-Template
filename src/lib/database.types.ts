@@ -2391,6 +2391,44 @@ export type Database = {
         }
         Relationships: []
       }
+      views: {
+        Row: {
+          columns: string[]
+          created_at: string
+          default_layout: string
+          filter: Json
+          id: string
+          layouts: string[]
+          source: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Insert: {
+          columns: string[]
+          created_at?: string
+          default_layout?: string
+          filter?: Json
+          id: string
+          layouts?: string[]
+          source: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Update: {
+          columns?: string[]
+          created_at?: string
+          default_layout?: string
+          filter?: Json
+          id?: string
+          layouts?: string[]
+          source?: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "views_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -32,6 +32,24 @@ describe('companies data access', () => {
 		expect(filtered.builder.eq).toHaveBeenCalledWith('relationship', 'supplier');
 	});
 
+	it('compiles a view’s conditions, id list and sort into the query', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+		await listCompanies(supabase, ORG_ID, {
+			ids: ['a', 'b'],
+			conditions: [
+				{ field: 'status', op: 'in', values: ['active'] },
+				{ field: 'relationship', op: 'not_in', values: ['customer', 'other'] },
+				{ field: 'website', op: 'ilike', value: 'example.com' }
+			],
+			sort: { field: 'status', direction: 'asc' }
+		});
+		expect(builder.in).toHaveBeenCalledWith('id', ['a', 'b']);
+		expect(builder.in).toHaveBeenCalledWith('status', ['active']);
+		expect(builder.not).toHaveBeenCalledWith('relationship', 'in', '(customer,other)');
+		expect(builder.ilike).toHaveBeenCalledWith('website', '%example.com%');
+		expect(builder.order).toHaveBeenCalledWith('status', { ascending: true });
+	});
+
 	it('fetches one company with its people, tolerating absence', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
-import type { CrmEntityRef } from './entity';
+import type { CrmEntityRef, CrmEntityType } from './entity';
 import { unwrap } from './unwrap';
 
 /**
@@ -30,4 +30,26 @@ export async function listTagsFor(
 			.eq('entity_id', entity.entityId)
 	);
 	return rows.map((row) => row.tags).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The ids of every record of one kind carrying a tag of that name — how a
+ * view's `tag has` condition becomes an id list for the kind's list module
+ * (`runView()` in ./views). Case-insensitive, like the tag picker will be.
+ */
+export async function listTaggedEntityIds(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType,
+	tagName: string
+): Promise<string[]> {
+	const rows = unwrap(
+		await supabase
+			.from('taggings')
+			.select('entity_id, tags!inner(name)')
+			.eq('org_id', orgId)
+			.eq('entity_type', entityType)
+			.ilike('tags.name', tagName)
+	);
+	return [...new Set(rows.map((row) => row.entity_id))];
 }

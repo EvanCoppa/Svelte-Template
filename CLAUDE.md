@@ -206,6 +206,24 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+- **A view is a query with a page** (`views` migration + `src/lib/views/` +
+  `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
+  `views` row names a source (`company` | `contact`), a JSON filter validated by
+  `VIEW_FILTER_SCHEMAS`, its columns and its layouts (`table`, `map`), and its id
+  is a `features` row at `/views/<id>` — so the nav, the gate, the title, the
+  industry's name for it and the role grants need nothing new; adding a view for
+  an industry is one migration inserting rows (that file's closing comment is the
+  checklist), never a route. Filters compile through `listCompanies()` /
+  `listContacts()` (`conditions`, `ids`, `sort`), the hops (a tag, a contact's
+  company's relationship) resolving to an id list first — never a second query
+  builder. The page draws `ViewRow`s and `MapPin`s the server described
+  (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
+  generic `CreateRecord` pre-filled from the filter. The map is `MapView`
+  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
+  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
+  record page's address form saves. Per-org saved views are a later phase and
+  reuse the same filter shape.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`

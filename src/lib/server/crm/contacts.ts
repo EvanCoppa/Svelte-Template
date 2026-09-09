@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
+import type { ContactOwnCondition, ViewSort } from '$lib/views/filter';
 import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
@@ -22,18 +23,49 @@ export type ContactWithCompany = Contact & {
 
 type ContactColumn = 'company_id' | 'name' | 'email' | 'phone' | 'title' | 'is_primary' | 'status';
 
+/**
+ * The org's people with the company each belongs to, by name. `companyId`
+ * and `unattachedOnly` are the one-off filters the pages use; `conditions`,
+ * `ids` and `sort` are how a view's filter compiles (`$lib/views/filter`) —
+ * the contact's own columns applied here, a hop through another table (the
+ * company's relationship, a tag) arriving as an id list from `runView()`.
+ */
 export async function listContacts(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { companyId?: string; unattachedOnly?: boolean } = {}
+	filter: {
+		companyId?: string;
+		unattachedOnly?: boolean;
+		ids?: readonly string[];
+		conditions?: readonly ContactOwnCondition[];
+		sort?: ViewSort;
+	} = {}
 ): Promise<ContactWithCompany[]> {
-	let query = supabase
-		.from('contacts')
-		.select('*, companies(id, name)')
-		.eq('org_id', orgId)
-		.order('name');
+	let query = supabase.from('contacts').select('*, companies(id, name)').eq('org_id', orgId);
 	if (filter.companyId) query = query.eq('company_id', filter.companyId);
 	if (filter.unattachedOnly) query = query.is('company_id', null);
+	if (filter.ids) query = query.in('id', [...filter.ids]);
+	for (const condition of filter.conditions ?? []) {
+		switch (condition.op) {
+			case 'in':
+				query = query.in(condition.field, condition.values);
+				break;
+			case 'not_in':
+				query = query.not(condition.field, 'in', `(${condition.values.join(',')})`);
+				break;
+			case 'ilike':
+				query = query.ilike(condition.field, `%${condition.value}%`);
+				break;
+			case 'eq':
+				query = condition.value
+					? query.not('company_id', 'is', null)
+					: query.is('company_id', null);
+				break;
+		}
+	}
+	query = filter.sort
+		? query.order(filter.sort.field, { ascending: filter.sort.direction === 'asc' })
+		: query.order('name');
 	return unwrap(await query);
 }
 
