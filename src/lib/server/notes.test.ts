@@ -20,6 +20,10 @@ describe('noteColumns', () => {
 		expect(Date.parse(archived.archived_at ?? '')).toBeGreaterThanOrEqual(before);
 		expect(noteColumns({ archived: false })).toEqual({ archived_at: null });
 	});
+
+	it('moves a note on the rail by writing its position alone', () => {
+		expect(noteColumns({ position: 1757404800.5 })).toEqual({ position: 1757404800.5 });
+	});
 });
 
 describe('noteAccess', () => {

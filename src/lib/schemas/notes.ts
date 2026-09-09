@@ -60,7 +60,9 @@ export const updateNoteSchema = z.object({
 	body: body.optional(),
 	color: color.optional(),
 	/** Archiving is a boolean up here and a timestamp in the column. */
-	archived: z.boolean().optional()
+	archived: z.boolean().optional(),
+	/** Where the note sits on the rail — `positionBetween()` in `$lib/notes` picks it. */
+	position: z.number().finite().optional()
 });
 
 /** An edit, as `noteColumns()` in `$lib/server/notes` turns it into columns. */
