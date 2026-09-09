@@ -231,16 +231,22 @@
 									onfocus={() => (previewId = note.id)}
 									onclick={() => open(note.id)}
 									class={cn(
-										'focus-visible:ring-ring flex min-h-24 items-stretch overflow-hidden rounded-l-xl border border-r-0 text-left shadow-sm transition-[width] duration-300 ease-out outline-none focus-visible:ring-2 motion-reduce:transition-none',
-										previewing ? 'w-80' : 'w-11',
+										'focus-visible:ring-ring flex items-stretch overflow-hidden rounded-l-xl border border-r-0 text-left shadow-sm transition-[width,min-height] duration-300 ease-out outline-none focus-visible:ring-2 motion-reduce:transition-none',
+										// Pulled out, it is a sticky note — squarer than wide,
+										// and a preview of how it starts, not the whole thing.
+										previewing ? 'min-h-44 w-56' : 'min-h-24 w-11',
 										noteSurface(note.color)
 									)}
 								>
 									<!-- The spine: the label written up it, and the dashed fold
-									     where the paper disappears into the edge. The tab is as
-									     tall as its label, so a long name makes a longer tab. -->
+									     where the paper disappears into the edge. The fold is a
+									     painted gradient, not `border-dashed`: a CSS dash is a few
+									     pixels long with a gap to match and reads as a solid line
+									     from arm's length, and only a gradient can set the dash and
+									     the gap. The tab is as tall as its label, so a long name
+									     makes a longer tab. -->
 									<span
-										class="flex w-10 shrink-0 items-center justify-center border-r border-dashed border-current/25 py-3"
+										class="flex w-10 shrink-0 items-center justify-center bg-[linear-gradient(to_bottom,color-mix(in_oklab,currentColor_25%,transparent)_12px,transparent_12px)] bg-[length:1px_20px] bg-right bg-repeat-y py-3"
 									>
 										<span
 											class="max-h-28 rotate-180 truncate text-[10px] font-semibold tracking-[0.18em] uppercase [writing-mode:vertical-rl]"
@@ -254,7 +260,7 @@
 									<span
 										aria-hidden="true"
 										class={cn(
-											'flex w-70 shrink-0 flex-col gap-1 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none',
+											'flex w-46 shrink-0 flex-col gap-1 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none',
 											previewing ? 'opacity-100 delay-100' : 'invisible absolute opacity-0'
 										)}
 									>
