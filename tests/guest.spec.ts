@@ -33,6 +33,13 @@ test.describe('unauthenticated visitor', () => {
 		await expect(page).toHaveURL('/login?next=%2Fcompanies');
 	});
 
+	test('asks for a login before the calendar can answer', async ({ page }) => {
+		// The calendar reads its view and day off the URL; an anonymous visitor
+		// is bounced with both intact, so login can return to the same week.
+		await page.goto('/calendar?view=week&date=2026-09-09');
+		await expect(page).toHaveURL('/login?next=%2Fcalendar%3Fview%3Dweek%26date%3D2026-09-09');
+	});
+
 	test('asks for a login before the assistant can answer', async ({ page }) => {
 		// The assistant is a feature route like any other, and its stream
 		// endpoint sits under it: neither says anything to an anonymous visitor.

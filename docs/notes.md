@@ -93,7 +93,8 @@ single story instead of "RLS, except on the API".
 | File                                  | What it owns                                                                                    |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `src/lib/server/crm/notes.ts`         | The table. `listNotes` / `createNote` / `updateNote` / `deleteNote`.                            |
-| `src/lib/server/notes.ts`             | The guard, `noteColumns()`, `noteAccess()`, `noteLinks()`.                                      |
+| `src/lib/server/notes.ts`             | The guard, `noteColumns()`, `noteAccess()`.                                                     |
+| `src/lib/server/crm/links.ts`         | `recordLinks()` — names and links the record a note (or a calendar event) is about.             |
 | `src/lib/schemas/notes.ts`            | The bodies `/api/notes` accepts, and the length constraints.                                    |
 | `src/lib/notes.ts`                    | What a note IS to the browser: label, excerpt, search, markdown, colors, who may edit it. Pure. |
 | `src/lib/notes-api.ts`                | `noteCommands` — the four writes, with the refresh and the error toast in them.                 |
