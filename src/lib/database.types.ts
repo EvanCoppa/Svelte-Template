@@ -1913,7 +1913,7 @@ export type Database = {
           {
             foreignKeyName: "slide_decks_org_id_fkey"
             columns: ["org_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
