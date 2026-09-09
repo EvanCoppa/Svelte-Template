@@ -131,11 +131,19 @@
 				const target = document.createElement('div');
 				const content = mount(MapViewPopup, { target, props: pin.data });
 				popup?.remove();
-				popup = new lib.Popup({ closeButton: false, offset: 12 })
+				popup = new lib.Popup({ offset: 12 })
 					.setLngLat([lng, lat])
 					.setDOMContent(target)
 					.addTo(map);
 				popup.on('close', () => unmount(content));
+				// Opened by a click, but still has to work without one: land
+				// focus on the link (or the popup itself, when there is nowhere
+				// to go) so Tab reaches the close button and Escape dismisses it.
+				target.tabIndex = -1;
+				target.addEventListener('keydown', (keyEvent) => {
+					if (keyEvent.key === 'Escape') popup?.remove();
+				});
+				(target.querySelector<HTMLAnchorElement>('a') ?? target).focus();
 			});
 			for (const layer of ['clusters', 'pin']) {
 				map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
@@ -193,4 +201,19 @@
 	class={cn('bg-muted relative min-h-64 w-full overflow-hidden rounded-lg border', className)}
 	{...restProps}
 	{@attach mapAttachment}
-></div>
+>
+	<!-- Pins are a canvas layer — nothing a keyboard or screen reader can
+	     reach. This list is the same data as real, focusable links, so every
+	     pin the map draws is still reachable without a pointer. -->
+	<ul class="sr-only">
+		{#each pins as pin (pin.id)}
+			<li>
+				{#if pin.href}
+					<a href={pin.href}>{pin.label}</a>
+				{:else}
+					{pin.label}
+				{/if}
+			</li>
+		{/each}
+	</ul>
+</div>
