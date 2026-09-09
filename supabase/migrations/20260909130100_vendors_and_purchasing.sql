@@ -59,10 +59,17 @@ create type public.purchase_status as enum (
 	'cancelled'
 );
 
--- Where the money is. Deliberately a second axis: goods arrive and invoices
--- get paid on unrelated clocks, and collapsing them into one status is how
--- you end up unable to answer "what have we received but not paid for".
-create type public.purchase_payment_status as enum ('unpaid', 'partial', 'paid');
+-- How much of a document is settled. Deliberately a second axis from where the
+-- goods are: they arrive and the bill gets paid on unrelated clocks, and
+-- collapsing the two is how you end up unable to answer "what have we received
+-- but not paid for".
+--
+-- Not named for purchases: an invoice, and later an order, ask exactly this
+-- question of exactly these three answers, and one vocabulary beats three
+-- identical ones (CLAUDE.md rule 1). Anything above `total` still reads as
+-- 'paid'; the overage shows as a negative balance rather than a fourth state
+-- nothing would branch on.
+create type public.payment_state as enum ('unpaid', 'partial', 'paid');
 
 -- ---------------------------------------------------------------------------
 -- companies learns the terms you buy on
@@ -241,7 +248,7 @@ create table public.purchases (
 	-- number a client can choose is a document number that collides.
 	number text not null,
 	status public.purchase_status not null default 'draft',
-	payment_status public.purchase_payment_status not null default 'unpaid',
+	payment_status public.payment_state not null default 'unpaid',
 	-- The vendor's own reference — their order number or invoice number, so a
 	-- statement can be reconciled without opening the PO.
 	reference text,
