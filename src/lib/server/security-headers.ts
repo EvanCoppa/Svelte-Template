@@ -9,23 +9,46 @@
  * to the theme snippet.
  */
 
-export function buildContentSecurityPolicy(supabaseUrl: string, { dev = false } = {}): string {
+export interface SecurityHeaderOptions {
+	dev?: boolean;
+	/**
+	 * Where the map's style, tiles, glyphs and sprite come from — derived from
+	 * `PUBLIC_MAP_STYLE_URL` by `mapOrigins()` in `$lib/map`, the way the
+	 * Supabase origin is derived above. MapLibre fetches all four, so they go
+	 * in connect-src as well as img-src; its worker is a blob, already admitted.
+	 */
+	mapOrigins?: readonly string[];
+}
+
+export function buildContentSecurityPolicy(
+	supabaseUrl: string,
+	{ dev = false, mapOrigins = [] }: SecurityHeaderOptions = {}
+): string {
 	const supabase = new URL(supabaseUrl).origin;
 	// Supabase Realtime connects over a websocket on the same host.
 	const supabaseWs = supabase.replace(/^https:/, 'wss:');
 
-	const connectSrc = ["'self'", 'blob:', supabase, supabaseWs];
+	const connectSrc = ["'self'", 'blob:', supabase, supabaseWs, ...mapOrigins];
 	// Vite's dev server and HMR use websockets and dynamic origins.
 	if (dev) connectSrc.push('ws:', 'http:', 'https:');
+	const imgSrc = [
+		"'self'",
+		'data:',
+		'blob:',
+		supabase,
+		// github.com + avatars.githubusercontent.com serve the /components
+		// avatar demo — remove them along with it.
+		'https://github.com',
+		'https://avatars.githubusercontent.com',
+		...mapOrigins
+	];
 
 	return [
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline'",
 		// Svelte transitions and floating-ui positioning write inline styles.
 		"style-src 'self' 'unsafe-inline'",
-		// github.com + avatars.githubusercontent.com serve the /components
-		// avatar demo — remove them along with it.
-		`img-src 'self' data: blob: ${supabase} https://github.com https://avatars.githubusercontent.com`,
+		`img-src ${imgSrc.join(' ')}`,
 		"font-src 'self' data:",
 		`connect-src ${connectSrc.join(' ')}`,
 		`media-src 'self' blob: ${supabase}`,
@@ -40,9 +63,9 @@ export function buildContentSecurityPolicy(supabaseUrl: string, { dev = false } 
 export function applySecurityHeaders(
 	response: Response,
 	supabaseUrl: string,
-	{ dev = false } = {}
+	options: SecurityHeaderOptions = {}
 ): Response {
-	response.headers.set('Content-Security-Policy', buildContentSecurityPolicy(supabaseUrl, { dev }));
+	response.headers.set('Content-Security-Policy', buildContentSecurityPolicy(supabaseUrl, options));
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');

@@ -1,6 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { recordListHref, type RecordKind } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
+import { mapConfig } from '$lib/map';
 import { QUERY } from '$lib/queries';
 import { listAddressesFor } from '$lib/server/crm/addresses';
 import { describeViewRows, pinsFor, resultIds, runView } from '$lib/server/crm/views';
@@ -57,6 +58,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		view,
 		rows: describeViewRows(result, view, canOpen, addresses),
 		pins: pinsFor(result, canOpen, addresses),
+		// Null when there is no map configured; the map layout says so.
+		map: mapConfig(),
 		...(await loadCreateRecord(locals, view.source, { defaults: defaultsFor(view) }))
 	};
 };

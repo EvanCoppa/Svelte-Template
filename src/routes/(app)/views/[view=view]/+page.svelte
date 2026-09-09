@@ -5,8 +5,9 @@
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
-	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as MapView from '$lib/components/map-view/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { featureTerms } from '$lib/features/terms';
 	import { viewColumns } from '$lib/views/table';
@@ -50,18 +51,33 @@
 	</PageHeader.Root>
 
 	{#if layout === 'map'}
-		<Empty.Root class="border">
-			<Empty.Header>
-				<Empty.Title>No addresses to map yet</Empty.Title>
-				<Empty.Description>
-					{#if data.pins.length === 0}
+		{#if data.map === null}
+			<Empty.Root class="border">
+				<Empty.Header>
+					<Empty.Title>The map is not configured</Empty.Title>
+					<Empty.Description>
+						Set PUBLIC_MAP_STYLE_URL to a MapLibre style and the {terms.plural} with an address will be
+						drawn here.
+					</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{:else if data.pins.length === 0}
+			<Empty.Root class="border">
+				<Empty.Header>
+					<Empty.Title>No addresses to map yet</Empty.Title>
+					<Empty.Description>
 						Add an address to a {terms.noun} and it will appear here.
-					{:else}
-						The map is not configured.
-					{/if}
-				</Empty.Description>
-			</Empty.Header>
-		</Empty.Root>
+					</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{:else}
+			<MapView.Root
+				pins={data.pins}
+				styleUrl={data.map.styleUrl}
+				darkStyleUrl={data.map.darkStyleUrl}
+				class="h-[65vh]"
+			/>
+		{/if}
 	{:else}
 		<DataTable.Root {table}>
 			<DataTable.Content emptyMessage={`No ${terms.plural} yet.`} />
