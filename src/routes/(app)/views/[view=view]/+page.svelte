@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { createTable } from '@tanstack/svelte-table';
-	import MapIcon from '@lucide/svelte/icons/map';
-	import TableIcon from '@lucide/svelte/icons/table';
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import { SegmentedControl } from '$lib/components/enhanced/segmented-control/index.js';
 	import * as MapView from '$lib/components/map-view/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
-	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { featureTerms } from '$lib/features/terms';
+	import { capitalize } from '$lib/utils.js';
+	import { VIEW_LAYOUTS, type ViewLayout } from '$lib/views/types';
 	import { viewColumns } from '$lib/views/table';
 
 	let { data } = $props();
@@ -29,7 +29,14 @@
 		columns
 	});
 
-	let layout = $state(data.view.defaultLayout);
+	let layout: ViewLayout = $state(data.view.defaultLayout);
+
+	const layoutOptions = $derived(
+		VIEW_LAYOUTS.filter((l) => data.view.layouts.includes(l)).map((value) => ({
+			value,
+			label: capitalize(value)
+		}))
+	);
 </script>
 
 <div class="space-y-6">
@@ -37,12 +44,14 @@
 		<PageHeader.Title />
 		<PageHeader.Actions>
 			{#if data.view.layouts.length > 1}
-				<Tabs.Root bind:value={layout}>
-					<Tabs.List aria-label="Layout">
-						<Tabs.Trigger value="table"><TableIcon /> Table</Tabs.Trigger>
-						<Tabs.Trigger value="map"><MapIcon /> Map</Tabs.Trigger>
-					</Tabs.List>
-				</Tabs.Root>
+				<SegmentedControl
+					label="Layout"
+					options={layoutOptions}
+					value={layout}
+					onValueChange={(value) => {
+						if (value === 'table' || value === 'map') layout = value;
+					}}
+				/>
 			{/if}
 			{#if data.canCreate}
 				<CreateRecord type={data.view.source} form={data.createForm} />
@@ -75,6 +84,7 @@
 				pins={data.pins}
 				styleUrl={data.map.styleUrl}
 				darkStyleUrl={data.map.darkStyleUrl}
+				aria-label={`${terms.plural} on a map`}
 				class="h-[65vh]"
 			/>
 		{/if}

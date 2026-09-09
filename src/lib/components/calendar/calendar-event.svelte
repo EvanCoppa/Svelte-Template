@@ -1,10 +1,12 @@
 <script lang="ts">
 	import {
 		compactTime,
+		EVENT_COLOR_NAMES,
 		eventAccent,
 		eventStart,
 		eventSurface,
-		formatTimeRange
+		formatTimeRange,
+		formatWhen
 	} from '$lib/calendar';
 	import type { CalendarEvent } from '$lib/server/crm/calendar';
 	import { cn, type WithElementRef } from '$lib/utils.js';
@@ -57,8 +59,15 @@
 		variant === 'block' ? formatTimeRange(event) : compactTime(eventStart(event))
 	);
 	const compact = $derived(height !== undefined && height < 40);
+	// The accessible name says what the visible chip/bar/block cannot: which
+	// day it is on (the grid position carries that visually, nothing else
+	// does) and which colour it is (drawn as a dot/stripe only) — the same
+	// "when" line the details popover shows, and the colour picker's own
+	// names (event-form.svelte).
 	const label = $derived(
-		event.all_day ? event.title : `${event.title}, ${formatTimeRange(event)}`.replace(' – ', ' to ')
+		`${event.title}, ${formatWhen(event)}, ${EVENT_COLOR_NAMES[event.color]}`
+			.replace(' – ', ' to ')
+			.replace(' · ', ', ')
 	);
 </script>
 
