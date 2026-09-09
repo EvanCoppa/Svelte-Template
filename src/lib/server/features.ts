@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
 import type { FeatureRegistryRow, PageRow } from '$lib/features/types';
+import type { ViewRegistryRow } from '$lib/views/resolve';
 import { resolveVocabulary, type TermRegistryRow, type Vocabulary } from '$lib/features/vocabulary';
 import { ensure, unwrap } from './crm/unwrap';
 
@@ -41,6 +42,22 @@ export async function loadFeatureRegistry(
  */
 export async function loadPageRegistry(supabase: SupabaseClient<Database>): Promise<PageRow[]> {
 	return unwrap(await supabase.from('pages').select('id, feature_id, path, title').order('path'));
+}
+
+/**
+ * Every view's definition (the views migration) — what the one view page
+ * resolves its slug against. Reference data; whether a session may see a
+ * view is its feature's mode, already in the org context.
+ */
+export async function loadViewRegistry(
+	supabase: SupabaseClient<Database>
+): Promise<ViewRegistryRow[]> {
+	return unwrap(
+		await supabase
+			.from('views')
+			.select('id, source, filter, columns, layouts, default_layout')
+			.order('id')
+	);
 }
 
 /**

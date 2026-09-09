@@ -1,25 +1,36 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { message, superValidate } from 'sveltekit-superforms/server';
+import { zod4 } from 'sveltekit-superforms/adapters';
 import {
+	RECORD_KIND_META,
 	recordKindForSegment,
 	recordListHref,
 	recordTerms,
-	type RecordKind
+	type RecordKind,
+	type RecordSegment
 } from '$lib/crm/records';
 import { passesFeatureGate } from '$lib/features/gate';
 import { visibleTerms } from '$lib/features/terms';
 import { QUERY } from '$lib/queries';
 import { listActivities } from '$lib/server/crm/activities';
-import { listAddresses } from '$lib/server/crm/addresses';
+import {
+	createAddress,
+	deleteAddress,
+	listAddresses,
+	updateAddress
+} from '$lib/server/crm/addresses';
 import { listCustomFields } from '$lib/server/crm/custom-fields';
 import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
 import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
+import { geocode } from '$lib/server/geocode';
 import { getDisplayNames } from '$lib/server/profiles';
-import { hasGrant } from '$lib/server/roles';
+import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
+import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 
 /**
  * The generic record page — the default page for one record of any kind.
@@ -36,7 +47,19 @@ import type { PageServerLoad } from './$types';
  * When a kind earns a page of its own, it goes at
  * `src/routes/(app)/<kind>/[id]/`; a static segment outranks `[kind=record]`,
  * so the specific page takes over and this one stays the default for the rest.
+ *
+ * The one thing edited here is a party's addresses — the form below, whose
+ * action geocodes what it saves so the record can sit on a view's map.
  */
+
+/** Explicit form ids, shared by the load, the actions and the page's `superForm`s. */
+const FORM_IDS = { address: 'address', removeAddress: 'remove-address' } as const;
+
+/** Whether the kind has addresses at all — the database refuses one on anything else. */
+function isParty(kind: RecordKind): kind is 'company' | 'contact' {
+	return kind === 'company' || kind === 'contact';
+}
+
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	const { supabase, org, activeOrgId, user } = locals;
 	if (!org || !activeOrgId || !user) throw redirect(303, '/login');
@@ -59,7 +82,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// Everything that attaches to a record hangs off the shared entity link, so
 	// the same handful of reads serve every kind; only a party has addresses.
 	const entity = { entityType: kind, entityId: id };
-	const isParty = kind === 'company' || kind === 'contact';
+	const party = isParty(kind);
 	// Notes are the general table, not a CRM one: a record shows the ones
 	// pointed at it, and only when this session has the feature at all.
 	const notesShown = passesFeatureGate('/notes', features, canRead);
@@ -70,7 +93,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
 		listTagsFor(supabase, activeOrgId, entity),
-		isParty ? listAddresses(supabase, activeOrgId, entity) : [],
+		party ? listAddresses(supabase, activeOrgId, entity) : [],
 		listCustomFields(supabase, activeOrgId, entity),
 		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
 		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : []
@@ -94,11 +117,21 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		].filter((userId): userId is string => userId !== null)
 	);
 
+	// The address forms, for a party the reader may manage; the action
+	// refuses everyone else anyway.
+	const [addressForm, removeAddressForm] = await Promise.all([
+		superValidate(zod4(addressSchema), { id: FORM_IDS.address }),
+		superValidate(zod4(removeAddressSchema), { id: FORM_IDS.removeAddress })
+	]);
+
 	return {
 		record,
 		activities,
 		tags,
 		addresses,
+		addressForm,
+		removeAddressForm,
+		canManageAddresses: party && can(access, RECORD_KIND_META[kind].feature, 'manage'),
 		customFields: customFields.map(describeCustomField),
 		related,
 		// The same shape the shell ships to the dock, so a note behaves the
@@ -110,3 +143,78 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		title: record.name
 	};
 };
+
+/** The org and the party this request edits, or the refusal the hook would give. */
+function partyOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
+	const { supabase, org, activeOrgId } = locals;
+	if (!org || !activeOrgId) throw redirect(303, '/login');
+	const kind = recordKindForSegment(params.kind);
+	if (!isParty(kind)) throw error(400, 'Only a company or a contact has addresses.');
+	requirePermission(org.access, RECORD_KIND_META[kind].feature, 'manage');
+	return { supabase, orgId: activeOrgId, entity: { entityType: kind, entityId: params.id } };
+}
+
+export const actions: Actions = {
+	saveAddress: async ({ request, locals, params }) => {
+		const { supabase, orgId, entity } = partyOf(locals, params);
+		const form = await superValidate(request, zod4(addressSchema), { id: FORM_IDS.address });
+		if (!form.valid) return fail(400, { form });
+
+		const { id, ...posted } = form.data;
+		const lines = {
+			line1: posted.line1,
+			line2: text(posted.line2),
+			city: text(posted.city),
+			region: text(posted.region),
+			postal_code: text(posted.postal_code),
+			country: text(posted.country)
+		};
+		// Coordinates are a courtesy the map needs, never a condition of
+		// saving: a geocoder that is off, down or stumped leaves them null and
+		// the address still lands.
+		const geo = await geocode(lines);
+		if (!geo.ok) console.warn(`[geocode] ${geo.error}`);
+		const values = {
+			...lines,
+			kind: posted.kind,
+			label: text(posted.label),
+			is_primary: posted.is_primary,
+			latitude: geo.ok ? geo.latitude : null,
+			longitude: geo.ok ? geo.longitude : null
+		};
+
+		try {
+			if (id === '') await createAddress(supabase, orgId, entity, values);
+			else await updateAddress(supabase, orgId, entity, id, values);
+		} catch (cause) {
+			return message(form, cause instanceof Error ? cause.message : 'Could not save the address.', {
+				status: 400
+			});
+		}
+		return { form };
+	},
+
+	removeAddress: async ({ request, locals, params }) => {
+		const { supabase, orgId } = partyOf(locals, params);
+		const form = await superValidate(request, zod4(removeAddressSchema), {
+			id: FORM_IDS.removeAddress
+		});
+		if (!form.valid) return fail(400, { form });
+
+		try {
+			await deleteAddress(supabase, orgId, form.data.id);
+		} catch (cause) {
+			return message(
+				form,
+				cause instanceof Error ? cause.message : 'Could not remove the address.',
+				{ status: 400 }
+			);
+		}
+		return { form };
+	}
+};
+
+/** Blank is not a value: an untouched field becomes a null column. */
+function text(value: string): string | null {
+	return value === '' ? null : value;
+}

@@ -46,24 +46,32 @@ import { can, requirePermission } from './roles';
  */
 export const CREATE_FORM_ID = 'create-record';
 
-/** An empty create form for `type`, for a list page's load. */
-export function createRecordForm(type: RecordType): Promise<SuperValidated<RecordFormValues>> {
-	return superValidate(zod4(RECORD_SCHEMAS[type]), { id: CREATE_FORM_ID });
+/**
+ * A create form for `type`, for a list page's load — empty, or started from
+ * `defaults` (a view pins the fields its filter fixes, so a record added from
+ * "Vendors" is a supplier). Defaults are not errors, so the form opens clean.
+ */
+export function createRecordForm(
+	type: RecordType,
+	defaults: Partial<RecordFormValues> = {}
+): Promise<SuperValidated<RecordFormValues>> {
+	return superValidate(defaults, zod4(RECORD_SCHEMAS[type]), { id: CREATE_FORM_ID, errors: false });
 }
 
 /**
- * What a list page's load adds for its "Add …" button: the empty form, and
+ * What a list page's load adds for its "Add …" button: the form, and
  * whether this user may use it. A member without `manage` still reads the
  * list; the button simply isn't rendered, and the action refuses anyway.
  */
 export async function loadCreateRecord(
 	locals: App.Locals,
-	type: RecordType
+	type: RecordType,
+	{ defaults = {} }: { defaults?: Partial<RecordFormValues> } = {}
 ): Promise<{ createForm: SuperValidated<RecordFormValues>; canCreate: boolean }> {
 	if (!locals.org) throw redirect(303, '/login');
 
 	return {
-		createForm: await createRecordForm(type),
+		createForm: await createRecordForm(type, defaults),
 		canCreate: can(locals.org.access, RECORD_FORMS[type].feature, 'manage')
 	};
 }
@@ -216,8 +224,9 @@ function amount(value: string): number | undefined {
  * The instant a wall-clock pick names. The browser posts an ISO string with
  * its own offset; without JavaScript the naive `2026-09-10T17:00` arrives
  * instead and is read as UTC, which is the one thing the server can know.
+ * Exported for the calendar's own forms, which post the same two shapes.
  */
-function instant(value: string): string | null {
+export function instant(value: string): string | null {
 	if (value === '') return null;
 	const at = new Date(value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`);
 	return Number.isNaN(at.getTime()) ? null : at.toISOString();

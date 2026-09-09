@@ -69,11 +69,14 @@
 		type WizardStep
 	} from '$lib/components/enhanced/index.js';
 	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
+	import { mapConfig } from '$lib/map';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as MapView from '$lib/components/map-view/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -321,6 +324,15 @@
 	const paymentEmailFilter = $derived(
 		String(paymentsTable.getColumn('email')?.getFilterValue() ?? '')
 	);
+
+	// Map — the page owns the pins and the style; the compound draws them.
+	// The style is env-only (`.env.example`), so the card says so when unset.
+	const map = mapConfig();
+	const demoPins: MapView.MapPin[] = [
+		{ id: 'p1', label: 'Wayne Enterprises', href: null, latitude: 40.5806, longitude: -74.2854 },
+		{ id: 'p2', label: 'Stark Industries', href: null, latitude: 40.7545, longitude: -73.976 },
+		{ id: 'p3', label: 'Gotham Steel Supply', href: null, latitude: 40.7178, longitude: -74.0431 }
+	];
 
 	// Segmented control — a radiogroup, so the value is a plain string.
 	const ranges: SegmentedOption[] = [
@@ -3176,6 +3188,39 @@
 				<DataTable.Content />
 				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Map</Card.Title>
+			<Card.Description>
+				The <code>MapView</code> compound in <code>src/lib/components/map-view/</code>, MapLibre GL
+				drawn from one clustered layer. The page owns the pins (<code>MapPin[]</code> — on a view
+				page, made server-side from the records' addresses) and the style (<code>mapConfig()</code>
+				in <code>$lib/map</code>, from <code>PUBLIC_MAP_STYLE_URL</code>); the root frames them,
+				zooms into a cluster on click and opens <code>MapView.Popup</code> on a pin. Colours are the
+				<code>app.css</code> tokens and the style follows the theme.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			{#if map}
+				<MapView.Root
+					pins={demoPins}
+					styleUrl={map.styleUrl}
+					darkStyleUrl={map.darkStyleUrl}
+					class="h-80"
+				/>
+			{:else}
+				<Empty.Root class="border">
+					<Empty.Header>
+						<Empty.Title>The map is not configured</Empty.Title>
+						<Empty.Description>
+							Set <code>PUBLIC_MAP_STYLE_URL</code> to a MapLibre style URL to draw one here.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 

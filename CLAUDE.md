@@ -206,6 +206,24 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+- **A view is a query with a page** (`views` migration + `src/lib/views/` +
+  `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
+  `views` row names a source (`company` | `contact`), a JSON filter validated by
+  `VIEW_FILTER_SCHEMAS`, its columns and its layouts (`table`, `map`), and its id
+  is a `features` row at `/views/<id>` — so the nav, the gate, the title, the
+  industry's name for it and the role grants need nothing new; adding a view for
+  an industry is one migration inserting rows (that file's closing comment is the
+  checklist), never a route. Filters compile through `listCompanies()` /
+  `listContacts()` (`conditions`, `ids`, `sort`), the hops (a tag, a contact's
+  company's relationship) resolving to an id list first — never a second query
+  builder. The page draws `ViewRow`s and `MapPin`s the server described
+  (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
+  generic `CreateRecord` pre-filled from the filter. The map is `MapView`
+  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
+  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
+  record page's address form saves. Per-org saved views are a later phase and
+  reuse the same filter shape.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -360,6 +378,23 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   A per-option slide repeats once per option at present time; a text slot bound to a
   path in `bindings.ts` fills from the proposal. Slide images upload through
   `POST /api/slides/images` into the public `slides` bucket, under the org's folder.
+- **The calendar is a third kind of "something written down against time"**
+  (`calendar` migration + `src/lib/server/crm/calendar.ts` + `src/lib/calendar.ts` +
+  `src/lib/components/calendar/` + `src/routes/(app)/calendar/`; docs/calendar.md).
+  An activity is a moment that happened, a note a document that stays open, an
+  **event a block of time that is planned** — and a task is _due_, not booked, so
+  `calendar_events` is its own table with a start AND an end. Both are instants and
+  **`ends_at` is exclusive** (an all-day event runs midnight to midnight; `all_day`
+  says how to draw it, not how to store it), so overlap is one comparison and a resize
+  is one column. The optional entity link says who it is for; `assigned_to` is a
+  membership like `deals.assigned_to`. Every Date in `$lib/calendar.ts` is local and
+  the server never draws the grid: `fetchWindow()` pads in UTC, the page draws its own
+  zone's grid after hydration, and forms carry instants behind wall-clock inputs.
+  Booking, editing and deleting are superforms actions; **a drag posts the `move`
+  action from the page's script** (`fetch('?/move')` + `deserialize`, the two changed
+  columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
+  the road for a JS-born mutation that belongs to the page it lives on. The feature
+  is named by the industry ("Schedule" / "appointment" in a practice).
 
 ## Database
 
@@ -415,7 +450,11 @@ binary/streaming responses. If a mutation is triggered from the page it lives on
 data comes from form inputs, it **must** be a form action. `fail(400, {...})` with the
 input echoed back; `redirect(303, ...)` on success. Notes are the worked example of the
 exception and the only one in the app — `/api/notes` is cross-page (the dock floats over
-every screen) and multi-verb, and a note has no form to post; see "Notes" below.
+every screen) and multi-verb, and a note has no form to post; see "Notes" below. A
+mutation born in a **gesture on the page it lives on** (the calendar's drag-to-move, the
+staff page's hold-to-remove) is still a form action: a hidden `<form>` with hidden inputs
+bound to a `superForm` store, filled from script and submitted with `requestSubmit()` —
+never a `fetch` of your own (docs/calendar.md, "The writes").
 
 ## Forms
 
@@ -457,7 +496,9 @@ modal, action or field-rendering loop. A screen whose creation is genuinely spec
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
-plans page, whose one field is a multi-select) keeps its own form and says why.
+plans page, whose one field is a multi-select; the calendar, whose booking form is
+two instants behind wall-clock inputs, an all-day switch that changes what they mean,
+a colour and a record — docs/calendar.md) keeps its own form and says why.
 
 ## Data loading & invalidation
 
