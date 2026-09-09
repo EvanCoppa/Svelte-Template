@@ -258,13 +258,36 @@ on conflict (id) do nothing;
 
 -- Addresses: a billing address on the company and a home address on the person
 -- who has no company, which is exactly the case the old schema could not hold.
-insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, is_primary) values
+-- Coordinates are what a geocoder would have stored (src/lib/server/geocode.ts),
+-- so the view pages' maps have pins with no provider configured.
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
 	('32000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'company', '20000000-0000-0000-0000-000000000001', 'billing',
-		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', true),
+		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', 40.580600, -74.285400, true),
 	('32000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
 		'contact', '30000000-0000-0000-0000-000000000003', 'primary',
-		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', true)
+		'1007 Mountain Drive', 'Gotham', 'NJ', '07001', 'US', 40.580600, -74.285400, true),
+	-- The other two companies, so the Vendors view (Gotham Steel) and the
+	-- companies map both have somewhere to point.
+	('32000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000002', 'primary',
+		'200 Park Avenue', 'New York', 'NY', '10166', 'US', 40.754500, -73.976000, true),
+	('32000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000003', 'shipping',
+		'1 Dock Road', 'Jersey City', 'NJ', '07305', 'US', 40.717800, -74.043100, true)
+on conflict (id) do nothing;
+
+-- A partner and the person at it, so the Partner contacts view lists someone.
+insert into public.companies (id, org_id, name, email, phone, website, status, relationship, created_by) values
+	('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'Oscorp', 'partners@oscorp.example.com', null,
+		'https://oscorp.example.com', 'active', 'partner', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.contacts (id, org_id, company_id, name, email, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000004', 'Norman Osborn', 'norman@oscorp.example.com', 'Chairman', true,
+		'active', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
 -- The stage is a row now, so the fixture looks it up by name in Acme's default
@@ -708,6 +731,35 @@ insert into public.contacts (id, org_id, company_id, name, email, phone, title, 
 	('30000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000011',
 		null, 'Sam Ortiz', null, '+1 555 010 0111', null, false,
 		'active', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Where the patients live, so Bright Smile's Patient map view opens on pins.
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
+	('32000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000011',
+		'contact', '30000000-0000-0000-0000-000000000011', 'primary',
+		'418 Elm Street', 'Boulder', 'CO', '80302', 'US', 40.019000, -105.276500, true),
+	('32000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000011',
+		'contact', '30000000-0000-0000-0000-000000000012', 'primary',
+		'77 Pearl Street', 'Boulder', 'CO', '80302', 'US', 40.017900, -105.281800, true)
+on conflict (id) do nothing;
+
+-- Ridgeline Roofing's suppliers, so a roofer's Suppliers view has a list and a map.
+insert into public.companies (id, org_id, name, email, phone, website, status, relationship, created_by) values
+	('20000000-0000-0000-0000-000000000051', '10000000-0000-0000-0000-000000000005',
+		'Summit Shingle Co', 'sales@summitshingle.example.com', '+1 555 020 0500',
+		null, 'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0000-000000000052', '10000000-0000-0000-0000-000000000005',
+		'Front Range Lumber', 'orders@frlumber.example.com', null,
+		'https://frlumber.example.com', 'active', 'supplier', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
+	('32000000-0000-0000-0000-000000000051', '10000000-0000-0000-0000-000000000005',
+		'company', '20000000-0000-0000-0000-000000000051', 'primary',
+		'5200 Brighton Boulevard', 'Denver', 'CO', '80216', 'US', 39.783700, -104.973400, true),
+	('32000000-0000-0000-0000-000000000052', '10000000-0000-0000-0000-000000000005',
+		'company', '20000000-0000-0000-0000-000000000052', 'primary',
+		'1800 Foothills Parkway', 'Boulder', 'CO', '80301', 'US', 40.019800, -105.216500, true)
 on conflict (id) do nothing;
 
 -- The fee schedule (the billables migration): a dental practice's procedures

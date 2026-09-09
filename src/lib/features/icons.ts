@@ -10,6 +10,8 @@ import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+import MapIcon from '@lucide/svelte/icons/map';
+import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import ShieldIcon from '@lucide/svelte/icons/shield';
@@ -18,6 +20,7 @@ import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
 import TicketIcon from '@lucide/svelte/icons/ticket';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
+import TruckIcon from '@lucide/svelte/icons/truck';
 import UsersIcon from '@lucide/svelte/icons/users';
 
 /**
@@ -38,6 +41,8 @@ export const ICONS = {
 	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
+	map: MapIcon,
+	'map-pin': MapPinIcon,
 	package: PackageIcon,
 	'receipt-text': ReceiptTextIcon,
 	shield: ShieldIcon,
@@ -46,6 +51,7 @@ export const ICONS = {
 	'sticky-note': StickyNoteIcon,
 	ticket: TicketIcon,
 	'toggle-right': ToggleRightIcon,
+	truck: TruckIcon,
 	users: UsersIcon
 } satisfies Record<string, NavIcon>;
 

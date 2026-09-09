@@ -17,6 +17,7 @@ const METHODS = [
 	'delete',
 	'eq',
 	'gte',
+	'ilike',
 	'in',
 	'is',
 	'not',
