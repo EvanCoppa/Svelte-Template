@@ -21,9 +21,12 @@ import { unwrap, unwrapDeleted } from './unwrap';
 export type Note = Tables<'notes'>;
 
 type NoteInsertColumn = 'title' | 'body' | 'color';
-type NoteUpdateColumn = NoteInsertColumn | 'archived_at';
+type NoteUpdateColumn = NoteInsertColumn | 'archived_at' | 'position';
 
-/** What an edit may set. `archived_at` is the column behind the API's `archived`. */
+/**
+ * What an edit may set. `archived_at` is the column behind the API's `archived`;
+ * `position` is where the note sits on the rail (the notes_position migration).
+ */
 export type NoteEdit = Pick<TablesUpdate<'notes'>, NoteUpdateColumn>;
 
 /**
@@ -43,8 +46,11 @@ export async function listNotes(
 		.from('notes')
 		.select('*')
 		.eq('org_id', orgId)
-		// Newest first, and by creation rather than by edit: a note must not
-		// jump up the rail while it is being typed into.
+		// The rail's order: `position` defaults to the moment a note was written,
+		// so an untouched rail is newest first — by creation rather than by
+		// edit, so a note never jumps up the rail while it is being typed into —
+		// and a note somebody dragged sits where they dropped it.
+		.order('position', { ascending: false })
 		.order('created_at', { ascending: false });
 	if (filter.entity) {
 		query = query

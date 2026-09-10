@@ -1175,6 +1175,7 @@ export type Database = {
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
           id: string
           org_id: string
+          position: number
           title: string | null
           updated_at: string
         }
@@ -1188,6 +1189,7 @@ export type Database = {
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
           org_id: string
+          position?: number
           title?: string | null
           updated_at?: string
         }
@@ -1201,6 +1203,7 @@ export type Database = {
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
           org_id?: string
+          position?: number
           title?: string | null
           updated_at?: string
         }
