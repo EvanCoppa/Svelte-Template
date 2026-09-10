@@ -162,10 +162,11 @@ needs**, and the palette filters by the session's `features` + `access` the way
 without a plugin system: a command belongs to a feature, a feature belongs to industries
 and tiers, and the existing resolver already answers "may this person see this".
 
-**The hard rule: `::` opens an existing form. It never writes.** `::task` opens
-`CreateRecord` with `type="task"` and the fields pre-filled from the surrounding text
-and the current record; `::quote` links to the proposal builder at `/proposals/new`;
-`::remind` opens the calendar's booking form. Every one of those already validates,
+**The hard rule: `::` opens an existing form. It never writes.** `::task` reaches
+`CreateRecord` with `type="task"` pre-filled from the surrounding text and the current
+record (by navigation — see Decision 11); `::quote` links to the proposal builder at
+`/proposals/new`; `::remind` opens the calendar's booking form. Every one of those
+already validates,
 already checks `manage` on its feature server-side, and already toasts. A `::` command
 that posts its own mutation would be a second create path for every record kind in the
 app, and the first schema change would leave it behind.
@@ -301,6 +302,50 @@ That is the whole point of routing both through one context shape: there is one 
 that decides what a model is allowed to see, and it is already the place that decides
 what a tool is allowed to touch.
 
+## Decision 10 — the note editor stays a textarea, and results live in a gutter
+
+Doing the scratch-paper features first (Phase 1a) forces one question the original
+ordering let us dodge: `note-editor.svelte` renders a `<Textarea>`, and **you cannot
+render a live math result inline in a textarea.** Three ways out, and the choice matters
+more than it looks:
+
+| approach                        | cost                                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **a results gutter** (chosen)   | per-line alignment against a wrapping textarea is fiddly                                                                                  |
+| write `= $937.50` into the body | poisons `noteLabel()` (a note is named by its first line) and search; machine-edits text under a live caret inside a 250 ms autosave loop |
+| swap to `contenteditable`       | drags the largest open question in this plan — which editor library — into its cheapest phase                                             |
+
+**The body is the source of truth and computed output never enters it.** A gutter is
+derived, so `noteLabel()`, `noteExcerpt()`, `noteMatches()` and `notesToMarkdown()` keep
+working with no changes at all, and a note written on a phone (where the dock is
+`hidden md:block` and `/notes` is the whole feature) degrades to plain text rather than
+to someone else's markup.
+
+Checklists are the easy case in the same model: `- [ ]` is the text convention, and
+clicking the gutter's box rewrites **one character at a known offset**. That is a safe
+edit in a way that rewriting whole result lines is not, and it is the only write to the
+body the compute layer is allowed to make.
+
+## Decision 11 — `::` navigates, because there is exactly one create-form id
+
+`CREATE_FORM_ID` in `src/lib/server/records.ts` is a single fixed string — "one id for
+every create form", so the posted form routes to itself including on the no-JS path. Two
+consequences for `::`:
+
+- The dock cannot mount its own `CreateRecord` beside a list page's without a superforms
+  id collision, because the dock is mounted by the `(app)` layout and floats over every
+  screen.
+- Pre-building forms for all seven record kinds in that layout would mean seven
+  `superValidate` calls on every page load in the app.
+
+So `::task` **navigates**: `/tasks?new=…`, and the list page opens its own form
+pre-filled. `createRecordForm(type, defaults)` already takes defaults and the views
+feature already uses exactly that to pin a supplier on "Add from Vendors", so this is
+existing machinery, not new. The cost is real and should be stated rather than
+discovered: you get moved off the page you were writing on. Keeping the note in place
+would need a per-instance form id — a deliberate change to `CREATE_FORM_ID`'s contract,
+made on purpose with the no-JS path re-checked, not slipped in.
+
 ---
 
 ## Phases
@@ -309,41 +354,55 @@ Each phase is shippable on its own and has an exit criterion. `check`, `lint`,
 `lint:oxlint`, `knip`, `test` and `db:types:check` at zero is assumed throughout and is
 not repeated per phase.
 
-**Phase 0 — the enum, and the naming call.** Two paired migrations adding `note` and
-`document` to `crm_entity_type`, plus the branches in `private.crm_entity_exists()` and
-`public.on_crm_entity_deleted()`. Nothing user-visible. _Exit: `db:reset` clean, types
-regenerated and committed._ Do this first — it is cheap, it unblocks everything, and it
-is the one piece that cannot be hurried later.
+**The order is deliberately Antinote-first**, and the reason is not enthusiasm — it is
+that the whole scratch-paper layer needs **no migration at all**. `notes.body` is already
+`text`, the editor already autosaves, `/api/notes` already takes a body patch, and
+`createRecordForm()` already accepts defaults. The paired enum migrations that everything
+else in this plan waits on are needed only by the reference index, so they move to the
+phase that actually has a document to point at. That keeps the least reversible work
+until last, and puts the part people will judge the product by first.
 
-**Phase 1 — the editor language, in notes only.** `src/lib/editor/` — the command
-registry, `/` and `::` palettes, `@` with `GET /api/records/search`, `compute.ts` for
-`/math`, checklists for `/list`. `::` launches `CreateRecord` and the proposal builder
-pre-filled. No documents yet, no AI. _Exit: from the dock, on a company page, `@`-mention
-a contact and open a pre-filled task form; a `/math` block totals a line._
+**Phase 1a — the scratch pad.** `src/lib/editor/compute.ts` and the `/` palette, in the
+note editor only: `/math` with variables, currency, percentages and reactive recompute;
+`/list` checklists; sums, averages, counts. Pure module, vitest beside it, results
+rendered in a gutter (Decision 10). No `@`, no `::`, no AI, no schema change, no new
+dependency. _Exit: a note totals `price * quantity` as you type, and `noteLabel()`,
+`noteExcerpt()`, search and `notesToMarkdown()` are all provably untouched by it._
 
-**Phase 2 — documents.** The `documents` table, the feature rows (registered exactly as
+**Phase 1b — the language.** `@` with `GET /api/records/search` (gate-filtered), the `::`
+palette over the command registry, and `::task` / `::quote` / `::remind` handing off to
+the forms that already exist. Still no schema change. _Exit: from the dock, on a company
+page, `@`-mention a contact and land on a pre-filled task form._
+
+**Phase 2 — the enum.** Two paired migrations adding `note` and `document` to
+`crm_entity_type`, plus the branches in `private.crm_entity_exists()` and
+`public.on_crm_entity_deleted()`. Nothing user-visible; it exists to unblock Phase 3, and
+it lands here rather than first because nothing before it needs it. _Exit: `db:reset`
+clean, types regenerated and committed._
+
+**Phase 3 — documents.** The `documents` table, the feature rows (registered exactly as
 notes.md describes: `features`, `pages`, `industry_features`, `tier_features`,
 `role_permissions` derived from what each role can already do), `/docs`, `/docs/<id>`,
 the block editor over jsonb, `entity_references` written on save, nesting via `parent_id`.
-The same `src/lib/editor/` from Phase 1, mounted in a second surface — if it needs
-changes to work there, that is the signal Phase 1 over-fitted to notes. _Exit: a document
+The same `src/lib/editor/` from Phases 1a/1b, mounted in a second surface — if it needs
+changes to work there, that is the signal it over-fitted to notes. _Exit: a document
 mentioning a company shows under "Mentioned in" on that company's record page._
 
-**Phase 3 — promotion and embeds.** `::create-page` turns a note into a document, leaving
+**Phase 4 — promotion and embeds.** `::create-page` turns a note into a document, leaving
 the note pointing at it (`entity_references`, `kind = 'mention'` from the note). The
 `/view` block. _Exit: a note becomes a document without retyping; a document embeds the
 `suppliers` view and renders a placeholder for a reader who lacks the feature._
 
-**Phase 4 — local autocomplete.** The header changes (2 and 3 in Decision 8), weight
+**Phase 5 — local autocomplete.** The header changes (2 and 3 in Decision 8), weight
 hosting, the worker, the adapter, the benchmark, the account preference, ghost text with
 Tab / word-by-word Tab / Esc. _Exit: the benchmark table is in the PR, and the kill
 criterion was checked before the merge, not after._
 
-**Phase 5 — dictation.** `microphone=(self)`, mic capture, a local speech model through
+**Phase 6 — dictation.** `microphone=(self)`, mic capture, a local speech model through
 the same worker layer, into the note editor first. _Exit: a ten-second note dictated with
 the network tab empty._
 
-**Phase 6 — cloud commands.** `::summarize`, `::draft`, `::extract` as tools on the
+**Phase 7 — cloud commands.** `::summarize`, `::draft`, `::extract` as tools on the
 existing agent, each with its `ToolAccess` row and a label in `src/lib/ai/labels.ts`.
 Destructive ones go in `TOOL_APPROVAL`. _Exit: no new prompt-assembly code — the diff is
 tool files, two map entries each, and labels._
@@ -373,8 +432,14 @@ tool files, two map entries each, and labels._
    every tier, matching notes — and revisit if a vertical never opens it.
 2. **What does the block editor render with?** No editor library is vendored today, and
    this is the single largest dependency decision in the plan. It should go through
-   `dependency-scout` before Phase 2 starts, with "we write the editor ourselves over
-   `contenteditable`" as a genuine option to price rather than a straw man.
+   `dependency-scout` before Phase 3 starts, with "we write the editor ourselves over
+   `contenteditable`" as a genuine option to price rather than a straw man. Ordering the
+   scratch pad first buys real evidence for that call: by then `src/lib/editor/` exists,
+   and how awkward the gutter turned out to be is a measurement rather than a guess.
 3. **Does a note keep a hard cap of 20 000 characters once `::create-page` exists?** It
    becomes a much easier constraint to defend when there is somewhere to graduate to —
    possibly the prompt to graduate.
+4. **Is being moved off the page an acceptable price for `::`?** Decision 11 takes the
+   cheap path on the grounds that it reuses machinery that already exists. If it grates
+   in Phase 1b, the fix is a per-instance create-form id, and that is worth doing
+   properly rather than working around.
