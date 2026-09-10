@@ -9,16 +9,12 @@
 --                             company you happen to buy from, so the terms you
 --                             buy on are three nullable columns on the row you
 --                             already have.
---   product_suppliers         who sells you a catalog entry, under what part
---                             number, at what cost and lead time. One product,
---                             many vendors — which is the whole reason
---                             `products.unit_cost` cannot be the answer.
+--   company_relationships     every role a company plays for this org, as a
+--                             SET — one company is often both a customer and a
+--                             supplier, which a single enum column cannot say.
 --   purchases                 one order placed with one vendor.
 --   purchase_line_items       what was ordered, and how much of it actually
 --                             showed up.
---   document_numbers          the per-org counter behind "PO-00001". Purchasing
---                             is the first document that needs a human-facing
---                             number; orders, quotes and invoices reuse this.
 --
 -- Three decisions worth stating, because copying them is cheaper than
 -- rediscovering them:
@@ -110,131 +106,102 @@ alter table public.products
 	alter column unit_cost type numeric(14, 4);
 
 comment on column public.products.unit_cost is
-	'Default landed cost of one unit, four decimals. A vendor-specific cost lives on product_suppliers and wins when one exists.';
+	'Default landed cost of one unit, four decimals. A per-vendor cost belongs on a product/vendor table when sourcing needs one.';
 
 -- ---------------------------------------------------------------------------
--- document_numbers — one counter per org per kind of document
+-- company_relationships — every role a company plays for this org
 -- ---------------------------------------------------------------------------
 
--- The template's only prior human-facing number is `support_tickets.number`,
--- a global identity column, and its comment says why that is fine: a ticket
--- number is a handle for conversation, not bookkeeping. A purchase order
--- number is bookkeeping. It goes to a vendor, it comes back on their invoice,
--- and two orgs on the same database must be able to both have PO-00001.
+-- A company is not one thing to you. A distributor buys gloves from a company
+-- that also buys gauze from it; a freight broker is a supplier and a partner.
+-- `companies.relationship` is a single enum column and therefore cannot say
+-- that, so the roles become a SET: one row per role a company plays.
 --
--- Hence a counter per (org, kind) rather than a Postgres sequence: sequences
--- are global objects, cannot be partitioned by a row value, and cannot be
--- reset per tenant. Allocation goes through the SECURITY DEFINER function
--- below, so no client ever writes `next_value`.
-create table public.document_numbers (
+-- Deliberately a mapping table rather than the roles being columns or an
+-- array: a role is a thing you filter and join on ("every supplier"), an array
+-- needs a GIN index and its own operators to do that, and a column per role
+-- grows forever.
+--
+-- The vocabulary stays `public.company_relationship` — the enum this template
+-- already owns (the pipelines rule: sets an org defines are rows, vocabularies
+-- we own are enums). Adding a role a distributor needs — carrier, manufacturer,
+-- broker — is one `alter type ... add value` in its own migration, so none are
+-- invented here on speculation.
+create table public.company_relationships (
+	company_id uuid not null,
+	relationship public.company_relationship not null,
 	org_id uuid not null references public.organizations (id) on delete cascade,
-	-- 'purchase' today; 'order', 'quote', 'invoice', 'rma' as they arrive.
-	-- Free text rather than an enum: a new document kind should not need an
-	-- ALTER TYPE and the two-migration dance that comes with it.
-	doc_type text not null,
-	prefix text not null,
-	next_value bigint not null default 1,
-	primary key (org_id, doc_type),
-	constraint document_numbers_doc_type_not_blank check (length(trim(doc_type)) > 0),
-	constraint document_numbers_prefix_not_blank check (length(trim(prefix)) > 0),
-	constraint document_numbers_next_value_positive check (next_value > 0)
+	created_at timestamptz not null default now(),
+	-- The pair IS the fact, so it is the key: a company cannot hold the same
+	-- role twice, and no surrogate id is needed to say so.
+	primary key (company_id, relationship),
+	foreign key (company_id, org_id) references public.companies (id, org_id) on delete cascade
 );
 
-comment on table public.document_numbers is
-	'One counter per org per kind of document, behind private.next_document_number(). Two orgs can each have a PO-00001.';
+comment on table public.company_relationships is
+	'Every role a company plays for this org — customer, supplier, partner. A set, because one company is often several of them.';
 
--- Allocates and advances in one statement. The upsert takes a row lock on the
--- counter, so two concurrent purchases serialize here and cannot be handed the
--- same number — which a `select max(number) + 1` in app code could not promise.
-create function private.next_document_number(org uuid, doc text, default_prefix text)
-returns text
+create index company_relationships_org_id_idx on public.company_relationships (org_id);
+-- "every supplier", "every customer" — the query this table exists for.
+create index company_relationships_org_id_relationship_idx
+	on public.company_relationships (org_id, relationship);
+
+-- ---------------------------------------------------------------------------
+-- Backfill, and the sync that keeps the two in step until the column goes
+-- ---------------------------------------------------------------------------
+
+-- Expand/contract, deliberately paused at expand. `companies.relationship` is
+-- read in 23 app files — including the `views` filter compiler, which offers
+-- both a `relationship` condition and a `company.relationship` hop — so
+-- dropping it now would be a refactor of a subsystem this change has no other
+-- reason to touch.
+--
+-- Until then the COLUMN is authoritative and this table mirrors it, so there
+-- is exactly one place a role is written and no chance of the two disagreeing.
+-- The contract step is: rework the views filter and `listCompanies` to read
+-- this table, then drop the column, this trigger and this function together.
+insert into public.company_relationships (company_id, relationship, org_id)
+select c.id, c.relationship, c.org_id
+from public.companies c
+on conflict (company_id, relationship) do nothing;
+
+create function public.sync_company_relationship()
+returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-	allocated bigint;
-	chosen_prefix text;
 begin
-	insert into public.document_numbers as d (org_id, doc_type, prefix, next_value)
-	values (org, doc, default_prefix, 1)
-	on conflict (org_id, doc_type) do update set next_value = d.next_value + 1
-	returning d.next_value, d.prefix into allocated, chosen_prefix;
-
-	return chosen_prefix || '-' || lpad(allocated::text, 5, '0');
+	insert into public.company_relationships (company_id, relationship, org_id)
+	values (new.id, new.relationship, new.org_id)
+	on conflict (company_id, relationship) do nothing;
+	return null;
 end;
 $$;
 
-comment on function private.next_document_number(uuid, text, text) is
-	'Allocates the next number for one org and document kind, creating the counter on first use. The upsert serializes concurrent callers.';
+comment on function public.sync_company_relationship() is
+	'Mirrors companies.relationship into company_relationships. Temporary: drop it with the column when the app reads the table instead.';
+
+create trigger companies_sync_relationship
+	after insert or update of relationship on public.companies
+	for each row execute procedure public.sync_company_relationship();
 
 -- ---------------------------------------------------------------------------
--- product_suppliers — who sells you this, and on what terms
+-- Purchase order numbers
 -- ---------------------------------------------------------------------------
 
--- The reason `products.unit_cost` alone cannot work: you buy the same glove
--- from two distributors, under two part numbers, at two prices, with two lead
--- times, and which one you call depends on who has it. That is a row per
--- (product, vendor), not a column.
-create table public.product_suppliers (
-	id uuid not null primary key default gen_random_uuid(),
-	org_id uuid not null references public.organizations (id) on delete cascade,
-	product_id uuid not null,
-	company_id uuid not null,
-	-- The vendor's own part number — what you quote them when ordering, and
-	-- what comes back on their packing slip.
-	vendor_sku text,
-	unit_cost numeric(14, 4),
-	currency text not null default 'USD',
-	lead_time_days integer,
-	min_order_quantity numeric(14, 4),
-	-- Who to buy from by default. At most one per product; the partial unique
-	-- index below is what says so.
-	is_preferred boolean not null default false,
-	is_active boolean not null default true,
-	notes text,
-	created_by uuid references auth.users (id) on delete set null default auth.uid(),
-	created_at timestamptz not null default now(),
-	updated_at timestamptz not null default now(),
-	-- Both composite: a link can only ever join this org's product to this
-	-- org's vendor. Deleting either end deletes the link and nothing else —
-	-- a sourcing option is not a financial record.
-	foreign key (product_id, org_id) references public.products (id, org_id) on delete cascade,
-	foreign key (company_id, org_id) references public.companies (id, org_id) on delete cascade,
-	unique (id, org_id),
-	unique (org_id, product_id, company_id),
-	constraint product_suppliers_unit_cost_nonnegative
-		check (unit_cost is null or unit_cost >= 0),
-	constraint product_suppliers_currency_is_iso4217
-		check (currency ~ '^[A-Z]{3}$'),
-	constraint product_suppliers_lead_time_nonnegative
-		check (lead_time_days is null or lead_time_days >= 0),
-	constraint product_suppliers_min_order_quantity_positive
-		check (min_order_quantity is null or min_order_quantity > 0)
-);
-
-comment on table public.product_suppliers is
-	'One way to source one catalog entry: a vendor, their part number, the cost and lead time. A product may have several; at most one is preferred.';
-comment on column public.product_suppliers.vendor_sku is
-	'The vendor''s part number for this product — what the org quotes when ordering, not the org''s own sku.';
-
-create index product_suppliers_org_id_idx on public.product_suppliers (org_id);
-create index product_suppliers_company_id_idx on public.product_suppliers (company_id);
--- The sourcing panel: every live option for one product, preferred first.
-create index product_suppliers_org_id_product_id_idx
-	on public.product_suppliers (org_id, product_id, is_active);
-
-create unique index product_suppliers_one_preferred_idx
-	on public.product_suppliers (org_id, product_id)
-	where is_preferred;
-
-create unique index product_suppliers_org_id_company_id_vendor_sku_idx
-	on public.product_suppliers (org_id, company_id, lower(vendor_sku))
-	where vendor_sku is not null;
-
-create trigger product_suppliers_set_updated_at
-	before update on public.product_suppliers
-	for each row execute procedure public.set_updated_at();
+-- A sequence, not a per-org counter table. The number is a FACADE: every
+-- foreign key in this schema targets `id`, nothing joins on `number`, and the
+-- label exists so a person can say it on the phone. What it must be is unique,
+-- stable once sent, and sequential enough for an accountant — which a sequence
+-- gives for the price of one line.
+--
+-- The tradeoff, stated: a sequence is a global object, so a second org's first
+-- purchase order continues this org's numbering rather than starting at one.
+-- That matters when two orgs share a database and not before; per-org
+-- numbering is a counter table, and it can replace this without touching a
+-- column, a grant or a trigger signature.
+create sequence public.purchase_number_seq start with 1;
 
 -- ---------------------------------------------------------------------------
 -- purchases — one order placed with one vendor
@@ -328,7 +295,7 @@ set search_path = ''
 as $$
 begin
 	if new.number is null or length(trim(new.number)) = 0 then
-		new.number := private.next_document_number(new.org_id, 'purchase', 'PO');
+		new.number := 'PO-' || lpad(nextval('public.purchase_number_seq')::text, 5, '0');
 	end if;
 	return new;
 end;
@@ -572,33 +539,24 @@ create trigger purchases_crm_entity_deleted
 -- and edit a purchase is the `purchasing` feature's role grant, checked in the
 -- load and the action — not a subquery in a policy.
 
-alter table public.document_numbers enable row level security;
-alter table public.product_suppliers enable row level security;
+alter table public.company_relationships enable row level security;
 alter table public.purchases enable row level security;
 alter table public.purchase_line_items enable row level security;
 
--- Readable so a screen can show "next: PO-00007"; writable by nobody. Every
--- allocation goes through private.next_document_number(), which runs as the
--- owner and so is unaffected by the absence of a write policy.
-create policy "Members can view document numbers"
-	on public.document_numbers for select to authenticated
+-- A role is a fact about a company, so it follows the companies policies: any
+-- member reads and writes them, owner/admin removes one. There is no update
+-- policy because there is nothing to update — the pair IS the row, so changing
+-- a role is a delete and an insert.
+create policy "Members can view company relationships"
+	on public.company_relationships for select to authenticated
 	using (private.org_role(org_id) is not null);
 
-create policy "Members can view product suppliers"
-	on public.product_suppliers for select to authenticated
-	using (private.org_role(org_id) is not null);
-
-create policy "Members can create product suppliers as themselves"
-	on public.product_suppliers for insert to authenticated
-	with check (private.org_role(org_id) is not null and created_by = (select auth.uid()));
-
-create policy "Members can update product suppliers"
-	on public.product_suppliers for update to authenticated
-	using (private.org_role(org_id) is not null)
+create policy "Members can give a company a role"
+	on public.company_relationships for insert to authenticated
 	with check (private.org_role(org_id) is not null);
 
-create policy "Owners and admins can delete product suppliers"
-	on public.product_suppliers for delete to authenticated
+create policy "Owners and admins can remove a company's role"
+	on public.company_relationships for delete to authenticated
 	using (private.org_role(org_id) in ('owner', 'admin'));
 
 create policy "Members can view purchases"
@@ -646,18 +604,11 @@ create policy "Members can remove purchase line items"
 -- need no grant; `subtotal`, `number` and `next_value` are withheld here
 -- because a trigger or a function owns them.
 
--- The counter is service-role and function territory only.
-revoke insert, update on table public.document_numbers from authenticated;
-
--- `product_id` and `company_id` are insert-only: what a sourcing link joins is
--- decided when it is made. Repointing it is a delete and a new row, so the
--- unique index does its job instead of being edited around.
-revoke insert, update on table public.product_suppliers from authenticated;
-grant insert (org_id, product_id, company_id, vendor_sku, unit_cost, currency, lead_time_days,
-		min_order_quantity, is_preferred, is_active, notes, created_by),
-	update (vendor_sku, unit_cost, currency, lead_time_days, min_order_quantity, is_preferred,
-		is_active, notes)
-	on table public.product_suppliers to authenticated;
+-- Nothing on a role row is editable — the pair is the whole fact. The sync
+-- trigger writes as the owner, so it is unaffected by the missing update grant.
+revoke insert, update on table public.company_relationships from authenticated;
+grant insert (org_id, company_id, relationship)
+	on table public.company_relationships to authenticated;
 
 revoke insert, update on table public.purchases from authenticated;
 grant insert (org_id, company_id, status, payment_status, reference, currency, freight,
@@ -685,26 +636,33 @@ grant insert (vendor_account_number, payment_terms_days, distribution_fee_pct),
 -- ---------------------------------------------------------------------------
 -- What this migration deliberately leaves out
 -- ---------------------------------------------------------------------------
--- 1. `company_relationships`. Making `companies.relationship` a SET (so one
---    company can be both a customer and a supplier — the actual defect) is
---    blocked on app work, not schema work: the generic record form posts one
---    string per field (src/lib/schemas/records.ts) and has no multi-value
---    field type, so a company created through CreateRecord could not say it
---    is a vendor. Nothing here references `relationship`, so that change
---    costs this migration nothing when it lands.
--- 2. Receiving into stock. `quantity_received` records what arrived; it moves
+-- 1. Dropping `companies.relationship`. The mapping table above is the shape
+--    the roles want, but the column is read in 23 app files — including the
+--    `views` filter compiler, which offers a `relationship` condition AND a
+--    `company.relationship` hop. Cutting over is a refactor of a subsystem
+--    this change has no other reason to touch, so the column stays
+--    authoritative and the trigger mirrors it. Contract step, as one change:
+--    move the views filter and `listCompanies` onto the table, teach the
+--    generic record form a multi-value field (it posts one string per field
+--    today, so "Add company" can still only set one role), then drop the
+--    column, the trigger and `public.sync_company_relationship()` together.
+-- 2. A product/vendor sourcing table. Which vendor sells you a given product,
+--    under what part number, at what cost and lead time is a fact about the
+--    PAIR, not about the company, so it is a real typed table when sourcing
+--    needs one — not a role here and not jsonb on a mapping row.
+-- 3. Receiving into stock. `quantity_received` records what arrived; it moves
 --    no inventory, because `inventory_ledger` does not exist yet. When it
 --    does, the receipt writes a ledger row with reason 'receipt' valued at
 --    `landed_unit_cost` — which is why that column is generated here.
--- 3. Lot and expiry. A received line of a medical product needs a lot number
+-- 4. Lot and expiry. A received line of a medical product needs a lot number
 --    and an expiration date, and both belong on a `lots` row the receipt
 --    points at — not columns here. Lots land before inventory, because they
 --    change inventory's grain.
--- 4. Soft delete. Purchases are owner/admin-deletable like every other table
+-- 5. Soft delete. Purchases are owner/admin-deletable like every other table
 --    today. Financial-record retention is a convention that has to be decided
 --    once and applied to every document table (and to
 --    public.on_crm_entity_deleted), not invented for this one.
--- 5. The `purchasing` feature rows and the page. A features row renders a
+-- 6. The `purchasing` feature rows and the page. A features row renders a
 --    sidebar entry, so it ships with the route, not ahead of it — the
 --    features migration's closing comment is that checklist.
 --

@@ -192,6 +192,12 @@ create trigger orders_set_updated_at
 	before update on public.orders
 	for each row execute procedure public.set_updated_at();
 
+-- A sequence, not a per-org counter table — the reasoning is on
+-- `purchase_number_seq` in the vendors-and-purchasing migration: the number is
+-- a facade (nothing joins on it; every foreign key targets `id`) that must be
+-- unique, stable once sent, and sequential enough for an accountant.
+create sequence public.order_number_seq start with 1;
+
 create function public.assign_order_number()
 returns trigger
 language plpgsql
@@ -200,7 +206,7 @@ set search_path = ''
 as $$
 begin
 	if new.number is null or length(trim(new.number)) = 0 then
-		new.number := private.next_document_number(new.org_id, 'order', 'ORD');
+		new.number := 'ORD-' || lpad(nextval('public.order_number_seq')::text, 5, '0');
 	end if;
 	return new;
 end;

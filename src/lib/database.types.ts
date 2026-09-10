@@ -396,6 +396,42 @@ export type Database = {
           },
         ]
       }
+      company_relationships: {
+        Row: {
+          company_id: string
+          created_at: string
+          org_id: string
+          relationship: Database["public"]["Enums"]["company_relationship"]
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          org_id: string
+          relationship: Database["public"]["Enums"]["company_relationship"]
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          org_id?: string
+          relationship?: Database["public"]["Enums"]["company_relationship"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_relationships_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "company_relationships_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_profiles: {
         Row: {
           contact_id: string
@@ -697,35 +733,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id", "pipeline_id"]
-          },
-        ]
-      }
-      document_numbers: {
-        Row: {
-          doc_type: string
-          next_value: number
-          org_id: string
-          prefix: string
-        }
-        Insert: {
-          doc_type: string
-          next_value?: number
-          org_id: string
-          prefix: string
-        }
-        Update: {
-          doc_type?: string
-          next_value?: number
-          org_id?: string
-          prefix?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_numbers_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -1888,82 +1895,6 @@ export type Database = {
             columns: ["parent_id", "org_id"]
             isOneToOne: false
             referencedRelation: "product_categories"
-            referencedColumns: ["id", "org_id"]
-          },
-        ]
-      }
-      product_suppliers: {
-        Row: {
-          company_id: string
-          created_at: string
-          created_by: string | null
-          currency: string
-          id: string
-          is_active: boolean
-          is_preferred: boolean
-          lead_time_days: number | null
-          min_order_quantity: number | null
-          notes: string | null
-          org_id: string
-          product_id: string
-          unit_cost: number | null
-          updated_at: string
-          vendor_sku: string | null
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          id?: string
-          is_active?: boolean
-          is_preferred?: boolean
-          lead_time_days?: number | null
-          min_order_quantity?: number | null
-          notes?: string | null
-          org_id: string
-          product_id: string
-          unit_cost?: number | null
-          updated_at?: string
-          vendor_sku?: string | null
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          id?: string
-          is_active?: boolean
-          is_preferred?: boolean
-          lead_time_days?: number | null
-          min_order_quantity?: number | null
-          notes?: string | null
-          org_id?: string
-          product_id?: string
-          unit_cost?: number | null
-          updated_at?: string
-          vendor_sku?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_suppliers_company_id_org_id_fkey"
-            columns: ["company_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id", "org_id"]
-          },
-          {
-            foreignKeyName: "product_suppliers_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_suppliers_product_id_org_id_fkey"
-            columns: ["product_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "products"
             referencedColumns: ["id", "org_id"]
           },
         ]

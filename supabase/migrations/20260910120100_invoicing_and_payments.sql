@@ -3,7 +3,7 @@
 -- The purchasing migration built the payables side — what the org owes a
 -- vendor. This is the mirror: what a customer owes the org, and the money that
 -- arrives against it. It reuses that migration's machinery rather than growing
--- a parallel set (`private.next_document_number()`, `public.payment_state`,
+-- a parallel set (the document-number convention, `public.payment_state`,
 -- the two-axis status split, the derived-state-is-the-database rule), which is
 -- the whole reason those were built generically.
 --
@@ -204,6 +204,12 @@ create trigger invoices_set_updated_at
 	before update on public.invoices
 	for each row execute procedure public.set_updated_at();
 
+-- A sequence, not a per-org counter table — the reasoning is on
+-- `purchase_number_seq` in the vendors-and-purchasing migration: the number is
+-- a facade (nothing joins on it; every foreign key targets `id`) that must be
+-- unique, stable once sent, and sequential enough for an accountant.
+create sequence public.invoice_number_seq start with 1;
+
 create function public.assign_invoice_number()
 returns trigger
 language plpgsql
@@ -212,7 +218,7 @@ set search_path = ''
 as $$
 begin
 	if new.number is null or length(trim(new.number)) = 0 then
-		new.number := private.next_document_number(new.org_id, 'invoice', 'INV');
+		new.number := 'INV-' || lpad(nextval('public.invoice_number_seq')::text, 5, '0');
 	end if;
 	return new;
 end;
