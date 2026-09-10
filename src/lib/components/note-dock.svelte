@@ -97,6 +97,12 @@
 	// Where the notes pulled off the edge are, and the rows to draw there. A
 	// note that has been archived or deleted since is simply no longer in the
 	// layout's list, so it leaves the desk with no wiring of its own.
+	// Restoring the desk is a side effect (it reads sessionStorage and writes
+	// state), so it runs here rather than inside the derived below — mutating
+	// state during a derivation is unsafe and Svelte rejects it.
+	$effect(() => {
+		floatingNotes.enter(scope);
+	});
 	let floating = $derived(floatingNotes.floatingIn(scope));
 	let floatingIds = $derived(new Set(floating.map((placed) => placed.id)));
 	let desk = $derived(

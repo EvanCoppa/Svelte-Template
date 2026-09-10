@@ -91,12 +91,19 @@ function createFloatingNotes() {
 
 	return {
 		/**
+		 * Restore the desk for a scope if it isn't already the one loaded. Has
+		 * to run outside of a derivation (an `$effect`, an event handler) —
+		 * never from `floatingIn`, which reactive reads call during rendering.
+		 */
+		enter,
+
+		/**
 		 * The notes floating for a scope, in the order they were last touched
 		 * (the last one is on top). A scope the desk was not built in gets an
-		 * empty desk rather than another session's.
+		 * empty desk rather than another session's. Pure read — call `enter`
+		 * first to restore the desk for a new scope.
 		 */
 		floatingIn(wanted: string): readonly FloatingNote[] {
-			enter(wanted);
 			return wanted === scope ? desk : [];
 		},
 
