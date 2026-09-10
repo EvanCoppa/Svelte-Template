@@ -155,4 +155,43 @@ export type NotePatch = {
 	body?: string;
 	color?: BadgeTone;
 	archived?: boolean;
+	/** Where it sits on the rail; see `positionBetween()`. */
+	position?: number;
 };
+
+/**
+ * A list with one note moved to a new index, the rest keeping their order —
+ * what the rail shows while a tab is being dragged, before anything is saved.
+ * Unknown ids and out-of-range indexes leave the list as it was.
+ */
+export function moveNote<T extends Pick<Note, 'id'>>(
+	notes: readonly T[],
+	id: string,
+	toIndex: number
+): T[] {
+	const from = notes.findIndex((note) => note.id === id);
+	if (from === -1 || toIndex < 0 || toIndex >= notes.length) return [...notes];
+	const moved = [...notes];
+	const [note] = moved.splice(from, 1);
+	if (note) moved.splice(toIndex, 0, note);
+	return moved;
+}
+
+/**
+ * The `position` a note takes to sit between two neighbours on the rail,
+ * where higher is nearer the top: the midpoint when it has both, a step past
+ * the one it has otherwise. Only the moved note is written, which is what a
+ * double-precision column is for — the neighbours' positions are what they
+ * were, and the gap between them halves each time something lands in it.
+ */
+export function positionBetween(above: number | undefined, below: number | undefined): number {
+	if (above !== undefined && below !== undefined) return (above + below) / 2;
+	if (above !== undefined) return above - 1;
+	if (below !== undefined) return below + 1;
+	return Date.now() / 1000;
+}
+
+/** The position for the note at `index` of an already-reordered rail. */
+export function positionAt(notes: readonly Pick<Note, 'position'>[], index: number): number {
+	return positionBetween(notes[index - 1]?.position, notes[index + 1]?.position);
+}

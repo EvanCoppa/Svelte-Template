@@ -580,7 +580,7 @@ test.describe('the note dock', () => {
 		expect(await dashes.count()).toBeGreaterThanOrEqual(3);
 	});
 
-	test('fans out with a label per note, and opens one in place', async ({ page }) => {
+	test('fans out with a label per note, and grows one in place', async ({ page }) => {
 		const dock = await fan(page);
 
 		await expect(dock.getByRole('button', { name: 'Renewal call prep' })).toBeVisible();
@@ -594,6 +594,48 @@ test.describe('the note dock', () => {
 		// refuse the save, and the editor is not offered where it cannot land.
 		await expect(dock.getByText(/Ask about the second site/)).toBeVisible();
 		await expect(dock.getByLabel('Note', { exact: true })).toHaveCount(0);
+		// It grew where its tab was — there is no window around it, and the
+		// other tabs are still beside it.
+		await expect(
+			dock.getByRole('button', { name: 'Procurement freeze lifts on the 14th.' })
+		).toBeVisible();
+		// The × folds it back to a tab.
+		await dock.getByRole('button', { name: 'Close note' }).click();
+		await expect(dock.getByRole('button', { name: 'Renewal call prep' })).toBeVisible();
+	});
+
+	test('pulls a note off the edge and leaves it floating over every page', async ({ page }) => {
+		const dock = await fan(page);
+		await dock.getByRole('button', { name: 'Renewal call prep' }).click();
+		const paper = dock.locator('[data-slot="note-card"]');
+		await expect(paper).toBeVisible();
+		const box = await paper.boundingBox();
+		if (!box) throw new Error('the grown note has no box');
+
+		// Take it by the rim — the paper's own padding, where no control sits —
+		// and carry it out over the page.
+		await page.mouse.move(box.x + 6, box.y + box.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(box.x - 240, box.y - 120, { steps: 12 });
+		await page.mouse.up();
+
+		const floating = page.locator('[data-slot="floating-note"]');
+		await expect(floating).toHaveCount(1);
+		await expect(floating.getByText(/Ask about the second site/)).toBeVisible();
+		// It left the dock: the rail no longer offers its tab.
+		await expect(dock.getByRole('button', { name: 'Renewal call prep' })).toHaveCount(0);
+
+		// Where it floats is this tab's: it is still there after a full load of
+		// another page.
+		await page.goto('/companies');
+		await expect(floating.getByText(/Ask about the second site/)).toBeVisible();
+
+		// The × puts it back on the dock.
+		await floating.getByRole('button', { name: 'Close note' }).click();
+		await expect(floating).toHaveCount(0);
+		await expect(
+			(await fan(page)).getByRole('button', { name: 'Renewal call prep' })
+		).toBeVisible();
 	});
 
 	test('writes a note from any screen and keeps it', async ({ page }) => {
@@ -609,7 +651,7 @@ test.describe('the note dock', () => {
 
 		// Leaving the editor flushes the autosave; the rail re-reads itself from
 		// the same query key, so the label appearing IS the save having landed.
-		await dock.getByRole('button', { name: 'All notes' }).click();
+		await dock.getByRole('button', { name: 'Close note' }).click();
 		await expect(dock.getByRole('button', { name: words })).toBeVisible();
 
 		// It came from the server, not from client memory.

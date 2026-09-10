@@ -6,15 +6,17 @@ const NOTE_ID = 'd0000000-0000-0000-0000-000000000001';
 const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
 
 describe('notes data access', () => {
-	it('lists the rail newest first, by when a note was written', async () => {
+	it('lists the rail by position, newest first where nobody has moved one', async () => {
 		const rows = [{ id: NOTE_ID, body: 'Ask about the second site' }];
 		const { supabase, from, builder } = supabaseMock({ data: rows });
 
 		await expect(listNotes(supabase, ORG_ID)).resolves.toEqual(rows);
 		expect(from).toHaveBeenCalledWith('notes');
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
-		// Not `updated_at`: a note must not climb the rail while it is typed into.
-		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
+		// Where a note was dropped wins; behind that, creation rather than
+		// `updated_at`, so a note must not climb the rail while it is typed into.
+		expect(builder.order).toHaveBeenNthCalledWith(1, 'position', { ascending: false });
+		expect(builder.order).toHaveBeenNthCalledWith(2, 'created_at', { ascending: false });
 	});
 
 	it('filters to the notes about one record', async () => {

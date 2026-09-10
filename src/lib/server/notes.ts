@@ -73,6 +73,7 @@ export function noteColumns(patch: UpdateNoteBody): NoteEdit {
 	if (patch.archived !== undefined) {
 		columns.archived_at = patch.archived ? new Date().toISOString() : null;
 	}
+	if (patch.position !== undefined) columns.position = patch.position;
 	return columns;
 }
 
