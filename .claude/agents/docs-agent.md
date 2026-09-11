@@ -41,5 +41,6 @@ drift from the code are worse than no docs.
 
 Verify every command you documented actually runs (`npm run <script>` names against
 `package.json`), every file path exists, and every code snippet type-checks conceptually
-against the current source. Run `npm run lint` (prettier checks markdown). Report what
-you added/changed and any code-vs-docs discrepancies you found along the way.
+against the current source. `npm run format` (prettier formats markdown) is the one pass
+to make, at the end — see "Verification" in CLAUDE.md. Report what you added/changed and
+any code-vs-docs discrepancies you found along the way.

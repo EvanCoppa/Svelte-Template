@@ -61,7 +61,8 @@ never add a new hand-validated form. The full house convention is the
 
 ## Before finishing
 
-Run `npm run check`, `npm run lint`, and `npm test` — all clean. If you touched an auth
-route, extend its tests (or delegate to `test-writer`; actions are testable by invoking
-them with a real `FormData` request and asserting on the returned `form.errors`). Report
+Leave `npm run check`, `npm run lint` and `npm test` to CI (see "Verification" in
+CLAUDE.md). If you touched an auth route, extend its tests (or delegate to `test-writer`;
+actions are testable by invoking them with a real `FormData` request and asserting on the
+returned `form.errors`) and run just those specs with `npx vitest run <spec>`. Report
 the schema's rules and the action's failure modes in one short list.

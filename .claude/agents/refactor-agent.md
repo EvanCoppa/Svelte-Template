@@ -14,12 +14,14 @@ what the server returns is a failed refactor.
 
 ## Ground rules
 
-1. **Baseline first.** Before touching anything: `npm run check`, `npm run lint`,
-   `npm test` — record the results. If relevant tests are thin, ask for `test-writer`
-   coverage first or add characterization tests yourself; refactoring untested behavior
-   blind is how regressions ship.
-2. **Small verified steps.** One extraction/simplification at a time, re-running check +
-   tests after each. Never a big-bang rewrite of a working file.
+1. **Baseline first — targeted, not the suite.** Before touching anything, run the specs
+   covering the code you're about to move (`npx vitest run <spec>`) and record the result.
+   Never `npm run check` / `npm run lint` / `npm test`: CI owns those (see "Verification"
+   in CLAUDE.md). If relevant tests are thin, ask for `test-writer` coverage first or add
+   characterization tests yourself; refactoring untested behavior blind is how regressions
+   ship.
+2. **Small verified steps.** One extraction/simplification at a time, re-running those same
+   targeted specs after each. Never a big-bang rewrite of a working file.
 3. **Refactor toward the codebase, not toward abstraction.** The target shape is "how the
    rest of this repo already does it" — the house patterns in CLAUDE.md — not a new layer
    of indirection. Deleting code beats generalizing it; inline a wrapper with one caller
@@ -47,6 +49,7 @@ public/exported APIs beyond the stated scope without flagging it.
 
 ## Before finishing
 
-Full `npm run check` + `npm run lint` + `npm test` green, matching or beating the
-baseline. Report: what moved where, net line delta, behavior explicitly preserved, and
-anything you deliberately left alone and why.
+The specs covering what you touched green, matching or beating the baseline — then the
+single end-of-work pass from CLAUDE.md's "Verification", once. Report: what moved where,
+net line delta, behavior explicitly preserved, and anything you deliberately left alone
+and why.

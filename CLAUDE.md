@@ -49,6 +49,54 @@ npm run db:lint        # schema static analysis — keep at ZERO
 npm run format         # prettier (svelte + tailwind plugins)
 ```
 
+## Verification — CI owns the suite, you run it once at most
+
+**GitHub Actions is the gate.** `.github/workflows/ci.yml` runs on every push and every
+pull request, and it owns these:
+
+- `svelte-check` → `npm run check`
+- `Oxlint` → `npm run lint:oxlint`
+- `Knip` → `npm run knip`
+- `tests` → `npm test`
+- `database` → replays every migration onto a disposable Postgres, then `npm run db:lint`
+  and `npm run db:types:check`
+
+**Never run those here.** A green local pass proves nothing CI won't prove a minute
+later on the branch we actually read, and running them between edits is the single
+biggest waste of a session. `npm run build` is not a check either — Vercel builds the
+deploy; type errors are `npm run check`'s job, which CI owns.
+
+So:
+
+1. **While working, run nothing.** No check after each file, no "let me just verify"
+   test run mid-task, no lint loop between edits. Write the whole change first.
+2. **When the work is genuinely finished** — every file written, nothing left you
+   intend to touch — you get **one** verification pass, covering only what CI does
+   not: `npm run format`, then `npm run lint` (prettier check + eslint, neither of
+   which has a CI job). Add `npm run test:e2e` only when the change touches a flow
+   the specs in `tests/` cover _and_ a Supabase stack is already up — never boot one
+   to run them.
+3. **If that pass is red, fix it and re-run only the command that failed** — not the
+   suite, and not a second full pass.
+4. Commit and push. CI reports; a red job there is the signal to act on, and you fix
+   it from its output rather than by re-running the suite locally first.
+
+Three things this rule does not touch:
+
+- **Reproducing one specific failure.** Chasing a bug or a red CI job, run the single
+  spec that shows it: `npx vitest run src/path/to/file.test.ts`, or
+  `npx playwright test tests/guest.spec.ts -g "…"`. Same for a test you just wrote, or
+  behavior a refactor must preserve: run _that_ spec, not `npm test`. Targeted evidence
+  is fine; a suite run to see whether you broke something is not.
+- **Authoring a migration.** `npm run db:reset` and `npm run db:types` are how a
+  migration gets written and its types regenerated (see "Database") — build steps
+  against the local stack, not checks.
+- **`npm run dev`.** Running the app to see a change work is not verification.
+
+This section outranks any "run `npm run check` / `npm run lint` / `npm test` before
+finishing" line in a subagent definition or a vendored skill: those mean _this_ pass,
+once, at the end — or nothing at all when CI already covers the command.
+
 ## Tech stack
 
 - **SvelteKit 2 + Svelte 5** (runes only), TypeScript strict, Tailwind CSS v4
@@ -90,7 +138,7 @@ Playwright specs live in `tests/` (`*.spec.ts`); vitest owns `src/**` and the tw
 never overlap. Split by what a spec needs:
 
 - **No database** → `tests/guest.spec.ts`. An unauthenticated request never reaches
-  Supabase, so these run on a bare clone and in CI. New assertions about the route
+  Supabase, so these run on a bare clone. New assertions about the route
   guard, `?next=` handling or security headers belong here.
 - **Signed in** → `tests/auth.spec.ts`. Gated on `authStackReachable()` from
   `tests/env.ts`, so it skips with an explanation rather than failing when no stack

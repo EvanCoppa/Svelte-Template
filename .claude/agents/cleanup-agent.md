@@ -25,8 +25,9 @@ Grep is necessary but not sufficient. For each candidate check, beyond direct im
 - **Framework/tooling consumers**: config files, `hooks.server.ts`, migrations (never
   delete an applied migration — it's history, not dead code), generated files
   (`database.types.ts` is regenerated, not pruned by hand).
-- **CSS**: scoped component styles are flagged as unused by `npm run check` — trust that
-  signal. For `src/app.css`, check tokens/keyframes against class usage across `.svelte`
+- **CSS**: unused scoped component styles are flagged by svelte-check, which now runs in CI
+  rather than here — so grep the component's own markup for the selector before cutting it.
+  For `src/app.css`, check tokens/keyframes against class usage across `.svelte`
   files before removing; Tailwind v4 generates from source scanning, so unused utility
   classes cost nothing — dead _custom_ CSS is the target.
 - **Dependencies**: a package with zero imports anywhere (check config files too —
@@ -47,10 +48,12 @@ convergence you may apply; anything that changes behavior gets reported instead.
 
 ## Method
 
-1. Baseline: `npm run check`, `npm run lint`, `npm test` all green before starting.
-2. Delete in small batches by area, re-running check + tests after each batch —
-   svelte-check's unused-CSS and TS's unused-symbol errors are your safety net alongside
-   grep.
+1. Baseline: a clean `git status` and green CI on the branch before starting. Don't run
+   `npm run check` / `npm run lint` / `npm test` yourself — see "Verification" in CLAUDE.md.
+2. Delete in small batches by area. Grep is the safety net you have in-session: every
+   deletion needs a proof of death you can point at, because svelte-check's unused-CSS and
+   TS's unused-symbol errors now arrive from CI after the push rather than between batches.
+   Where a deleted symbol's callers have specs, run those (`npx vitest run <spec>`).
 3. When genuinely unsure whether something is dead (e.g. looks reachable only from a
    flow you can't exercise), leave it and report it — a false delete costs more than a
    leftover file.
