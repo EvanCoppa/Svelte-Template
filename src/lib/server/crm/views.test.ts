@@ -29,6 +29,9 @@ const steel: Company = {
 	email: null,
 	phone: ' +1 555 0180 ',
 	website: null,
+	vendor_account_number: null,
+	payment_terms_days: null,
+	distribution_fee_pct: null,
 	created_by: null,
 	created_at: '2026-01-01T00:00:00Z',
 	updated_at: '2026-01-01T00:00:00Z'

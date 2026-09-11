@@ -1,0 +1,14 @@
+-- Purchases become a kind of CRM record (the vendors-and-purchasing migration
+-- that follows creates the table). The enum value ships alone here because
+-- Postgres refuses to use a value in the transaction that added it, exactly
+-- as the party-model migration explains — the next file adds the tables and
+-- the `private.crm_entity_exists()` branch that makes the value resolvable.
+--
+-- A purchase order earns a place on the shared link rather than growing its
+-- own note/address/tag columns: you call a vendor about a late shipment (an
+-- activity), you ship a drop-ship PO somewhere that is not your warehouse (an
+-- address), and you tag the ones under dispute.
+--
+-- `before 'task'` keeps the enum in alphabetical order (… proposal_option,
+-- purchase, task, ticket), which is the order the generated types list it in.
+alter type public.crm_entity_type add value if not exists 'purchase' before 'task';
