@@ -149,6 +149,19 @@
 				</Card.Root>
 			{/if}
 
+			{#if data.thread}
+				{@const thread = data.thread}
+				<Detail.Thread
+					messages={thread.messages}
+					form={thread.form}
+					removeForm={thread.removeForm}
+					userId={thread.userId}
+					canModerate={thread.canModerate}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
+			{/if}
+
 			{#each data.related as group (group.kind)}
 				{@const related = recordTerms(page.data.terms, group.kind)}
 				<Card.Root>

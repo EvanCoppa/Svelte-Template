@@ -3111,7 +3111,7 @@ export type Database = {
           id: string
           number: number
           org_id: string
-          priority: Database["public"]["Enums"]["ticket_priority"]
+          priority: Database["public"]["Enums"]["priority"]
           status: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at: string
@@ -3126,7 +3126,7 @@ export type Database = {
           id?: string
           number?: never
           org_id: string
-          priority?: Database["public"]["Enums"]["ticket_priority"]
+          priority?: Database["public"]["Enums"]["priority"]
           status?: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at?: string
@@ -3141,7 +3141,7 @@ export type Database = {
           id?: string
           number?: never
           org_id?: string
-          priority?: Database["public"]["Enums"]["ticket_priority"]
+          priority?: Database["public"]["Enums"]["priority"]
           status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
           updated_at?: string
@@ -3275,9 +3275,53 @@ export type Database = {
           },
         ]
       }
+      task_comments: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          org_id: string
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          org_id: string
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_id_org_id_fkey"
+            columns: ["task_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
-          assigned_to: string | null
           company_id: string | null
           completed_at: string | null
           contact_id: string | null
@@ -3287,11 +3331,11 @@ export type Database = {
           due_at: string | null
           id: string
           org_id: string
+          priority: Database["public"]["Enums"]["priority"]
           title: string
           updated_at: string
         }
         Insert: {
-          assigned_to?: string | null
           company_id?: string | null
           completed_at?: string | null
           contact_id?: string | null
@@ -3301,11 +3345,11 @@ export type Database = {
           due_at?: string | null
           id?: string
           org_id: string
+          priority?: Database["public"]["Enums"]["priority"]
           title: string
           updated_at?: string
         }
         Update: {
-          assigned_to?: string | null
           company_id?: string | null
           completed_at?: string | null
           contact_id?: string | null
@@ -3315,6 +3359,7 @@ export type Database = {
           due_at?: string | null
           id?: string
           org_id?: string
+          priority?: Database["public"]["Enums"]["priority"]
           title?: string
           updated_at?: string
         }
@@ -3332,13 +3377,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id", "org_id"]
-          },
-          {
-            foreignKeyName: "tasks_org_id_assigned_to_fkey"
-            columns: ["org_id", "assigned_to"]
-            isOneToOne: false
-            referencedRelation: "organization_members"
-            referencedColumns: ["org_id", "user_id"]
           },
           {
             foreignKeyName: "tasks_org_id_fkey"
@@ -3600,6 +3638,7 @@ export type Database = {
         | "other"
       payment_state: "unpaid" | "partial" | "paid"
       permission_level: "read" | "manage" | "delete"
+      priority: "low" | "normal" | "high" | "urgent"
       product_kind: "good" | "service"
       proposal_event_type:
         | "sent"
@@ -3634,7 +3673,6 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
-      ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -3832,6 +3870,7 @@ export const Constants = {
       ],
       payment_state: ["unpaid", "partial", "paid"],
       permission_level: ["read", "manage", "delete"],
+      priority: ["low", "normal", "high", "urgent"],
       product_kind: ["good", "service"],
       proposal_event_type: [
         "sent",
@@ -3870,7 +3909,6 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
-      ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
   },

@@ -4,15 +4,16 @@ import Field from './detail-field.svelte';
 import Images from './detail-images.svelte';
 import Related from './detail-related.svelte';
 import Relationship from './detail-relationship.svelte';
+import Thread from './detail-thread.svelte';
 import Value from './detail-value.svelte';
 
 /**
  * The parts the generic record page is drawn from — one field, one value, one
- * timeline entry, one related record, one relationship, a party's addresses
- * and an asset's photos, each with the form that edits them. The page owns
- * the data and every name: each part takes exactly what it shows as a prop,
- * so a specific record page built later composes the same parts around its
- * own load.
+ * timeline entry, one related record, one relationship, a party's addresses,
+ * an asset's photos, and the conversation on a record — each with the form
+ * that edits it. The page owns the data and every name: each part takes
+ * exactly what it shows as a prop, so a specific record page built later
+ * composes the same parts around its own load.
  */
 export {
 	Activity,
@@ -21,6 +22,7 @@ export {
 	Images,
 	Related,
 	Relationship,
+	Thread,
 	Value,
 	//
 	Activity as DetailActivity,
@@ -29,5 +31,6 @@ export {
 	Images as DetailImages,
 	Related as DetailRelated,
 	Relationship as DetailRelationship,
+	Thread as DetailThread,
 	Value as DetailValue
 };

@@ -273,3 +273,96 @@ describe('the image actions', () => {
 		expect(missing.bucket.remove).not.toHaveBeenCalled();
 	});
 });
+
+const TASK_ID = '50000000-0000-0000-0000-000000000001';
+const COMMENT_ID = 'f4000000-0000-0000-0000-000000000001';
+
+/** A comment action posted against a task, which is the kind that has a thread. */
+function comment(
+	name: ActionName,
+	supabase: SupabaseClient<Database>,
+	access: UserAccess,
+	fields: [string, string][]
+) {
+	// SAFETY: the actions read `request`, `locals` and `params` only.
+	return actions[name]({
+		request: post(fields),
+		locals: localsFor(supabase, access),
+		params: { kind: 'tasks', id: TASK_ID }
+	} as never);
+}
+
+describe('the comment actions', () => {
+	it('refuses a kind that has no conversation before writing anything', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: {} }]);
+
+		// SAFETY: the action reads `request`, `locals` and `params` only — and
+		// this one refuses on `params.kind` before touching the other two.
+		await expect(
+			actions.saveComment({
+				request: post([['body', 'Hello']]),
+				locals: localsFor(supabase, OWNER),
+				params: { kind: 'products', id: TASK_ID }
+			} as never)
+		).rejects.toMatchObject({ status: 400 });
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('lets a reader post: joining a conversation is not editing the record', async () => {
+		const { supabase, from, builder } = supabaseMockSequence([{ data: { id: COMMENT_ID } }]);
+
+		const result = await comment('saveComment', supabase, READER, [
+			['id', ''],
+			['body', 'On it — I will pull the numbers today.']
+		]);
+		expect(result).toHaveProperty('form.valid', true);
+		expect(from).toHaveBeenCalledWith('task_comments');
+		// No author_id: the column defaults to the caller, and RLS refuses
+		// anything else.
+		expect(builder.insert).toHaveBeenCalledWith({
+			task_id: TASK_ID,
+			body: 'On it — I will pull the numbers today.',
+			org_id: ORG_ID
+		});
+	});
+
+	it('edits the message the post names rather than adding another', async () => {
+		const { supabase, builder } = supabaseMockSequence([{ data: { id: COMMENT_ID } }]);
+
+		const result = await comment('saveComment', supabase, READER, [
+			['id', COMMENT_ID],
+			['body', 'Corrected.']
+		]);
+		expect(result).toHaveProperty('form.valid', true);
+		expect(builder.update).toHaveBeenCalledWith({ body: 'Corrected.' });
+		expect(builder.eq).toHaveBeenCalledWith('id', COMMENT_ID);
+		expect(builder.insert).not.toHaveBeenCalled();
+	});
+
+	it('echoes an empty message back inline instead of posting it', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: {} }]);
+
+		const result = await comment('saveComment', supabase, READER, [
+			['id', ''],
+			['body', '   ']
+		]);
+		expect(result).toMatchObject({ status: 400 });
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('removes a message, and says so when RLS filtered it away', async () => {
+		const removed = supabaseMockSequence([{ data: [{ id: COMMENT_ID }] }]);
+		await expect(
+			comment('removeComment', removed.supabase, READER, [['id', COMMENT_ID]])
+		).resolves.toHaveProperty('form.valid', true);
+		expect(removed.builder.delete).toHaveBeenCalled();
+
+		const missing = supabaseMockSequence([{ data: [] }]);
+		const result = await comment('removeComment', missing.supabase, READER, [['id', COMMENT_ID]]);
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty(
+			'data.form.message',
+			expect.stringContaining('Comment was not deleted')
+		);
+	});
+});

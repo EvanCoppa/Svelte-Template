@@ -28,6 +28,12 @@ import {
 import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
 import { getRelationships } from '$lib/server/crm/relationships';
+import {
+	addTaskComment,
+	deleteTaskComment,
+	listTaskComments,
+	updateTaskComment
+} from '$lib/server/crm/task-comments';
 import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
@@ -38,6 +44,7 @@ import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
 import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
+import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
 
 /**
  * The generic record page — the default page for one record of any kind.
@@ -64,7 +71,9 @@ const FORM_IDS = {
 	address: 'address',
 	removeAddress: 'remove-address',
 	image: 'entity-image',
-	removeImage: 'remove-entity-image'
+	removeImage: 'remove-entity-image',
+	comment: 'comment',
+	removeComment: 'remove-comment'
 } as const;
 
 /** Whether the kind has addresses at all — the database refuses one on anything else. */
@@ -75,6 +84,15 @@ function isParty(kind: RecordKind): kind is 'company' | 'contact' {
 /** Whether the kind has photos at all — the database refuses one on anything else. */
 function isAsset(kind: RecordKind): kind is 'asset' {
 	return kind === 'asset';
+}
+
+/**
+ * Whether the kind has a conversation. Only a task so far; a ticket already
+ * has its own thread table and joins by adding a branch here and in the two
+ * comment actions, not by growing a second thread component.
+ */
+function hasThread(kind: RecordKind): kind is 'task' {
+	return kind === 'task';
 }
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
@@ -102,26 +120,39 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	const entity = { entityType: kind, entityId: id };
 	const party = isParty(kind);
 	const asset = isAsset(kind);
+	const threaded = hasThread(kind);
 	// Notes are the general table, not a CRM one: a record shows the ones
 	// pointed at it, and only when this session has the feature at all.
 	const notesShown = passesFeatureGate('/notes', features, canRead);
 	// The words the record's labels use — who presents a proposal, who is
 	// responsible for it — as the org's industry says them.
 	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
-	const [record, activities, tags, addresses, images, customFields, related, relationships, notes] =
-		await Promise.all([
-			getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
-			listActivities(supabase, activeOrgId, { entity }),
-			listTagsFor(supabase, activeOrgId, entity),
-			party ? listAddresses(supabase, activeOrgId, entity) : [],
-			asset ? listEntityImages(supabase, activeOrgId, entity) : [],
-			listCustomFields(supabase, activeOrgId, entity),
-			listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
-			// The graph: every relationship this record stands in, from either
-			// side, oriented and named by the one module that knows how.
-			getRelationships(supabase, activeOrgId, entity, canOpen, vocabulary),
-			notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : []
-		]);
+	const [
+		record,
+		activities,
+		tags,
+		addresses,
+		images,
+		customFields,
+		related,
+		relationships,
+		notes,
+		messages
+	] = await Promise.all([
+		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
+		listActivities(supabase, activeOrgId, { entity }),
+		listTagsFor(supabase, activeOrgId, entity),
+		party ? listAddresses(supabase, activeOrgId, entity) : [],
+		asset ? listEntityImages(supabase, activeOrgId, entity) : [],
+		listCustomFields(supabase, activeOrgId, entity),
+		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
+		// The graph: every relationship this record stands in, from either
+		// side, oriented and named by the one module that knows how. A task's
+		// assignees are in here, which is why it needs no field of its own.
+		getRelationships(supabase, activeOrgId, entity, canOpen, vocabulary),
+		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : [],
+		threaded ? listTaskComments(supabase, activeOrgId, id) : []
+	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
 	// Named the way the org's industry names the kind: "Quote not found."
@@ -141,13 +172,22 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		].filter((userId): userId is string => userId !== null)
 	);
 
-	// The address and image forms, for a record the reader may manage; the
-	// actions refuse everyone else anyway.
-	const [addressForm, removeAddressForm, imageForm, removeImageForm] = await Promise.all([
+	// The address, image and comment forms, for a record the reader may
+	// manage; the actions refuse everyone else anyway.
+	const [
+		addressForm,
+		removeAddressForm,
+		imageForm,
+		removeImageForm,
+		commentForm,
+		removeCommentForm
+	] = await Promise.all([
 		superValidate(zod4(addressSchema), { id: FORM_IDS.address }),
 		superValidate(zod4(removeAddressSchema), { id: FORM_IDS.removeAddress }),
 		superValidate(zod4(imageUploadSchema), { id: FORM_IDS.image }),
-		superValidate(zod4(removeImageSchema), { id: FORM_IDS.removeImage })
+		superValidate(zod4(removeImageSchema), { id: FORM_IDS.removeImage }),
+		superValidate(zod4(taskCommentSchema), { id: FORM_IDS.comment }),
+		superValidate(zod4(removeTaskCommentSchema), { id: FORM_IDS.removeComment })
 	]);
 
 	return {
@@ -165,6 +205,18 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		customFields: customFields.map(describeCustomField),
 		related,
 		relationships,
+		// The conversation, for the kinds that have one. `userId` and
+		// `canModerate` are what the thread needs to decide which messages
+		// offer edit and remove — the same two answers RLS gives.
+		thread: threaded
+			? {
+					messages,
+					form: commentForm,
+					removeForm: removeCommentForm,
+					userId: user.id,
+					canModerate: org.activeOrg.role === 'owner' || org.activeOrg.role === 'admin'
+				}
+			: null,
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
 		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,
@@ -174,6 +226,20 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		title: record.name
 	};
 };
+
+/**
+ * The org and the task this request comments on. Posting needs no grant
+ * beyond being able to open the record: a conversation is participation, not
+ * editing, and a Viewer who cannot reply is a Viewer nobody talks to. Which
+ * messages may be changed is RLS's answer — author, or owner/admin.
+ */
+function threadOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
+	const { supabase, org, activeOrgId } = locals;
+	if (!org || !activeOrgId) throw redirect(303, '/login');
+	const kind = recordKindForSegment(params.kind);
+	if (!hasThread(kind)) throw error(400, 'This kind of record has no conversation.');
+	return { supabase, orgId: activeOrgId, taskId: params.id };
+}
 
 /** The org and the party this request edits, or the refusal the hook would give. */
 function partyOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
@@ -231,6 +297,42 @@ export const actions: Actions = {
 			return message(form, cause instanceof Error ? cause.message : 'Could not save the address.', {
 				status: 400
 			});
+		}
+		return { form };
+	},
+
+	saveComment: async ({ request, locals, params }) => {
+		const { supabase, orgId, taskId } = threadOf(locals, params);
+		const form = await superValidate(request, zod4(taskCommentSchema), { id: FORM_IDS.comment });
+		if (!form.valid) return fail(400, { form });
+
+		const { id, body } = form.data;
+		try {
+			if (id === '') await addTaskComment(supabase, orgId, { task_id: taskId, body });
+			else await updateTaskComment(supabase, orgId, id, { body });
+		} catch (cause) {
+			return message(form, cause instanceof Error ? cause.message : 'Could not post the message.', {
+				status: 400
+			});
+		}
+		return { form };
+	},
+
+	removeComment: async ({ request, locals, params }) => {
+		const { supabase, orgId } = threadOf(locals, params);
+		const form = await superValidate(request, zod4(removeTaskCommentSchema), {
+			id: FORM_IDS.removeComment
+		});
+		if (!form.valid) return fail(400, { form });
+
+		try {
+			await deleteTaskComment(supabase, orgId, form.data.id);
+		} catch (cause) {
+			return message(
+				form,
+				cause instanceof Error ? cause.message : 'Could not remove the message.',
+				{ status: 400 }
+			);
 		}
 		return { form };
 	},

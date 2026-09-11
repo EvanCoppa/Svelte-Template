@@ -465,6 +465,33 @@ staff page's hold-to-remove) is still a form action: a hidden `<form>` with hidd
 bound to a `superForm` store, filled from script and submitted with `requestSubmit()` —
 never a `fetch` of your own (docs/calendar.md, "The writes").
 
+## Assignment, priority and conversations (docs/tasks.md)
+
+Tasks are the reference for three things a record may need, and each has exactly one
+answer:
+
+- **Assignment is a relationship, not a column** — `tasks.assigned_to` is gone. A task
+  is assigned to as many people as the work needs through `assigned_to` rows in the
+  graph (docs/relationships.md), and unassigning sets `ended_on` rather than deleting,
+  so a handover is history instead of a lost fact. `listTaskAssignees()`,
+  `assignTask()` and `endTaskAssignment()` in `src/lib/server/crm/tasks.ts` are the
+  only place that shape is known; the Relationships card draws the result, so
+  `describeTask()` has **no "Assigned to" field** — never add a second copy of a
+  relationship as a record field. `deals.assigned_to` and `calendar_events.assigned_to`
+  stay columns on purpose: each is genuinely one person.
+- **Priority is one vocabulary** — the `public.priority` enum (renamed from
+  `ticket_priority` when tasks became its second table), its options named once in
+  `PRIORITY_OPTIONS` (`src/lib/schemas/records.ts`) and toned once in `PRIORITY_TONE`
+  (`src/lib/crm/tones.ts`). A third table that needs urgency reuses both; it never
+  declares a second enum with the same values.
+- **A conversation is `Detail.Thread` plus a comments table** — `task_comments` copies
+  `ticket_comments` (authored content, editable by its author or an owner/admin), and
+  the generic record page renders the thread whenever the load supplies `data.thread`.
+  That is a data-presence check, not a kind check: another kind joins by adding a
+  branch to `hasThread()` and the two comment actions, never by forking the record
+  page or writing a second thread component. **Posting requires no grant** beyond
+  being able to open the record — participation is not editing.
+
 ## Forms
 
 Every form is built with **sveltekit-superforms + zod v4** — schema at module top
