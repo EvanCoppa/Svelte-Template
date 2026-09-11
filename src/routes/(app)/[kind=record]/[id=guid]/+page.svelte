@@ -119,6 +119,17 @@
 				/>
 			{/if}
 
+			{#if data.record.kind === 'asset'}
+				<Detail.Images
+					images={data.images}
+					form={data.imageForm}
+					removeForm={data.removeImageForm}
+					canManage={data.canManageImages}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
+			{/if}
+
 			{#if data.relationships.length > 0}
 				<Card.Root>
 					<Card.Header>
