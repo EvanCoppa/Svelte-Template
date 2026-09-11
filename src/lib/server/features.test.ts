@@ -18,7 +18,7 @@ describe('loadFeatureRegistry', () => {
 		expect(from).toHaveBeenCalledWith('features');
 		// Each industry row carries the industry's own words for the feature.
 		expect(builder.select).toHaveBeenCalledWith(
-			'*, industry_features(industry_id, name, noun), tier_features(tier_id)'
+			'*, industry_features(industry_id, name, noun, sort_order), tier_features(tier_id)'
 		);
 		expect(builder.order).toHaveBeenCalledWith('sort_order');
 	});

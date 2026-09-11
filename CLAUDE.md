@@ -171,6 +171,19 @@ application data is scoped to an organization, never to a bare user. The
   accessor — "Add quote", "3 quotes", "Quote not found". **A kind's words are
   never a constant in `src/`**, and `private.feature_mode()` mirrors modes only:
   no policy needs a name.
+- **The sidebar's order is the industry's too** (`nav_sort_order` +
+  `industry_feature_order` migrations; docs/features.md, "Order inside a
+  section"). `features.sort_order` is the default position inside the
+  feature's section and `industry_features.sort_order` the industry's own,
+  null inheriting column by column exactly as `name` / `noun` do on that row —
+  so a practice leads with its Schedule and its Patients, a roofer with Quotes,
+  through the same resolver and with no second nav. Positions are **multiples
+  of 100, restarting at 100 in each category**, so a new feature slots between
+  two others without renumbering them (below 100 is reserved for
+  `staticNavItems`; Dashboard is 0), and the order within a section is the
+  order of the work — never alphabetical, never ship date, with a view directly
+  after the records it filters. Sections themselves are not per-industry, and
+  a vertical that sets an order sets it for every feature in that section.
 - **A feature is made of pages, and a page has a title** (`pages` migration +
   `src/lib/features/pages.ts`). One row per screen — `path`, `title`, and the
   `feature_id` it belongs to (null for the shell pages, dashboard and settings).

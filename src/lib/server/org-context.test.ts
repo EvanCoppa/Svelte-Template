@@ -18,9 +18,14 @@ const registry = [
 		sort_order: 10,
 		created_at: '',
 		industry_features: [
-			{ industry_id: 'general', name: null, noun: null },
-			// What a roofer calls the same list.
-			{ industry_id: 'construction', name: 'Customers', noun: 'customer' }
+			{ industry_id: 'general', name: null, noun: null, sort_order: null },
+			// What a roofer calls the same list, and where a roofer puts it.
+			{
+				industry_id: 'construction',
+				name: 'Customers',
+				noun: 'customer',
+				sort_order: 200
+			}
 		],
 		tier_features: [{ tier_id: 'free' }, { tier_id: 'pro' }]
 	},
@@ -34,7 +39,7 @@ const registry = [
 		category: 'crm',
 		sort_order: 20,
 		created_at: '',
-		industry_features: [{ industry_id: 'general', name: null, noun: null }],
+		industry_features: [{ industry_id: 'general', name: null, noun: null, sort_order: null }],
 		tier_features: [{ tier_id: 'pro' }]
 	}
 ];
