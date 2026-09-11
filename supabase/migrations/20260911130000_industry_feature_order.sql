@@ -47,14 +47,15 @@ comment on column public.industry_features.sort_order is
 update public.industry_features as f
 set sort_order = v.sort_order
 from (values
-	-- Dentistry — the day is the schedule, and the record at the centre of it
-	-- is the patient. Treatment plans follow the patient; the practices that
-	-- refer to you are a supporting record, not the front door. (No deals row:
-	-- the industry does not include that feature.)
-	('dentistry', 'calendar', 100),
-	('dentistry', 'contacts', 200),
-	('dentistry', 'patient-map', 300),
-	('dentistry', 'proposals', 400),
+	-- Dentistry — the treatment plan leads: presenting and getting one accepted
+	-- is the practice's work, and the rest of the day hangs off it. Then the
+	-- schedule, then the patient it is for (the map is a cut of the patients);
+	-- the practices that refer to you are a supporting record, not the front
+	-- door. (No deals row: the industry does not include that feature.)
+	('dentistry', 'proposals', 100),
+	('dentistry', 'calendar', 200),
+	('dentistry', 'contacts', 300),
+	('dentistry', 'patient-map', 400),
 	('dentistry', 'tasks', 500),
 	('dentistry', 'companies', 600),
 	('dentistry', 'tickets', 700),
