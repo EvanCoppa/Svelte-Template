@@ -29,11 +29,14 @@ export type OrgFeatureState = {
  *   4. otherwise                                  -> hidden
  *
  * `private.feature_mode()` in the features migration mirrors the modes
- * exactly — keep the two in sync. Naming is app-side only: the industry's
- * own `name` / `noun` (industry_features) replace the feature's where set,
- * and no policy ever needs a name. The resolver never inspects ids for
- * specific values: it works purely on the rows, so adding a feature needs
- * no change here.
+ * exactly — keep the two in sync. The industry axis is app-side only: the
+ * industry's own `name` / `noun` (the feature_names_by_industry migration)
+ * and its own `sort_order` (the industry_feature_order migration) replace
+ * the feature's where set, so a practice leads with its Schedule and a
+ * roofer with Quotes without a second nav or a check anywhere downstream —
+ * and no policy ever needs a name or an order. The resolver never inspects
+ * ids for specific values: it works purely on the rows, so adding a feature
+ * needs no change here.
  */
 export function resolveFeatures(
 	registry: readonly FeatureRegistryRow[],
@@ -47,7 +50,7 @@ export function resolveFeatures(
 		const industry = row.industry_features.find((i) => i.industry_id === org.industryId);
 		const inTier = row.tier_features.some((t) => t.tier_id === org.tierId);
 		features[row.id] = {
-			feature: wordedBy(stripMaps(row), industry),
+			feature: asIndustry(stripMaps(row), industry),
 			mode: modeFor(overrides.get(row.id), industry !== undefined, inTier, disabled.has(row.id))
 		};
 	}
@@ -88,12 +91,19 @@ function stripMaps(row: FeatureRegistryRow): Feature {
 }
 
 /**
- * The row as the org's industry words it: the industry's own name and noun
- * where its row sets them, the feature's otherwise.
+ * The row as the org's industry has it: the industry's own name, noun and
+ * position where its row sets them, the feature's otherwise. Null inherits
+ * column by column, so an industry can rename a feature without reordering
+ * it, or reorder it without renaming it.
  */
-function wordedBy(
+function asIndustry(
 	feature: Feature,
-	industry: { name: string | null; noun: string | null } | undefined
+	industry: { name: string | null; noun: string | null; sort_order: number | null } | undefined
 ): Feature {
-	return { ...feature, name: industry?.name ?? feature.name, noun: industry?.noun ?? feature.noun };
+	return {
+		...feature,
+		name: industry?.name ?? feature.name,
+		noun: industry?.noun ?? feature.noun,
+		sort_order: industry?.sort_order ?? feature.sort_order
+	};
 }

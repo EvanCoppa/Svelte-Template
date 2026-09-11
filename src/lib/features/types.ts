@@ -59,11 +59,15 @@ export type Feature = Tables<'features'>;
 /**
  * A registry row with its industry and tier maps embedded, as loaded. An
  * industry row may carry the industry's own words for the feature (`name`,
- * `noun`); null inherits the feature's — see the feature_names_by_industry
- * migration.
+ * `noun` — the feature_names_by_industry migration) and its own position in
+ * the sidebar section (`sort_order` — the industry_feature_order migration);
+ * null inherits the feature's, column by column.
  */
 export type FeatureRegistryRow = Feature & {
-	industry_features: Pick<Tables<'industry_features'>, 'industry_id' | 'name' | 'noun'>[];
+	industry_features: Pick<
+		Tables<'industry_features'>,
+		'industry_id' | 'name' | 'noun' | 'sort_order'
+	>[];
 	tier_features: { tier_id: string }[];
 };
 

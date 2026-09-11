@@ -8,7 +8,7 @@ against them add up to: every charge and every payment, per customer and for the
 organization, with the balance that falls out of them.
 
 This page is the contract for keeping it that way. The `invoicing_and_payments` migration
-built the tables; the `ledger` migration (`supabase/migrations/20260911120000_ledger.sql`)
+built the tables; the `ledger` migration (`supabase/migrations/20260911140000_ledger.sql`)
 made the customer a party and registered the two features. The app side is
 `src/lib/server/crm/invoices.ts`, `payments.ts` and `ledger.ts`, the pure fold in
 `src/lib/crm/ledger.ts`, and the forms in `src/lib/schemas/invoices.ts`.

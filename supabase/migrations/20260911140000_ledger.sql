@@ -126,15 +126,17 @@ create trigger invoices_void_detaches_payments
 -- The features
 -- ---------------------------------------------------------------------------
 
--- Filed under CRM, beside the proposals they follow from: an invoice is the
--- bill a quote becomes, and the ledger is where the money it asks for lands.
+-- Filed under CRM, between the proposals they follow from (900) and the tasks
+-- that follow them (1000), on the nav_sort_order convention: an invoice is
+-- the bill a quote becomes, and the ledger is where the money it asks for
+-- lands.
 insert into public.features (id, name, noun, description, route, icon, category, sort_order) values
 	('invoices', 'Invoices', 'invoice',
 		'Bills sent to customers: drafted from lines, issued, paid or voided.',
-		'/invoices', 'receipt', 'crm', 23),
+		'/invoices', 'receipt', 'crm', 950),
 	('ledger', 'Ledger', null,
 		'Every charge and every payment, per customer and for the whole organization — and what is still owed.',
-		'/ledger', 'wallet', 'crm', 24)
+		'/ledger', 'wallet', 'crm', 975)
 on conflict (id) do nothing;
 
 -- No title of their own: named by the feature, as the org's industry says it.
@@ -146,21 +148,26 @@ on conflict (id) do nothing;
 -- Every industry bills someone, so both features go to the whole catalog.
 -- "Invoices" reads the same everywhere; the ledger is named for who is on
 -- it where that matters (null inherits "Ledger"). Listed rather than derived
--- because the rows carry words; an industry added later adds its two rows
--- here with its own.
-insert into public.industry_features (industry_id, feature_id, name, noun) values
-	('crm', 'invoices', null, null),
-	('roofing', 'invoices', null, null),
-	('medical-supplies', 'invoices', null, null),
-	('cosmetic', 'invoices', null, null),
-	('dentistry', 'invoices', null, null),
-	('beverage', 'invoices', null, null),
-	('crm', 'ledger', null, null),
-	('roofing', 'ledger', null, null),
-	('medical-supplies', 'ledger', 'Accounts receivable', null),
-	('cosmetic', 'ledger', 'Client ledger', null),
-	('dentistry', 'ledger', 'Patient ledger', null),
-	('beverage', 'ledger', 'Accounts receivable', null)
+-- because the rows carry words — and a place in the sidebar, since every
+-- vertical but crm orders its CRM section itself (the industry_feature_order
+-- migration) and a pair left to inherit 950/975 would read as a second list
+-- after the ordered one. The bill sits where the money is handled: right
+-- after the quote where the quote is the product, after the patient where
+-- the patient is, after the proposal in a distributor's sequence. An
+-- industry added later adds its two rows here with its own words and place.
+insert into public.industry_features (industry_id, feature_id, name, noun, sort_order) values
+	('crm', 'invoices', null, null, null),
+	('crm', 'ledger', null, null, null),
+	('roofing', 'invoices', null, null, 150),
+	('roofing', 'ledger', null, null, 175),
+	('medical-supplies', 'invoices', null, null, 550),
+	('medical-supplies', 'ledger', 'Accounts receivable', null, 575),
+	('cosmetic', 'invoices', null, null, 350),
+	('cosmetic', 'ledger', 'Client ledger', null, 375),
+	('dentistry', 'invoices', null, null, 450),
+	('dentistry', 'ledger', 'Patient ledger', null, 475),
+	('beverage', 'invoices', null, null, 550),
+	('beverage', 'ledger', 'Accounts receivable', null, 575)
 on conflict (industry_id, feature_id) do nothing;
 
 -- Every plan, like proposals: getting paid is not an upgrade.
