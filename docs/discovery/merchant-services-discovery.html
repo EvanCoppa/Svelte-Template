@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Merchant Services — Discovery Questionnaire</title>
+		<style>
+			@page {
+				size: letter;
+				margin: 18mm 16mm 16mm;
+			}
+
+			:root {
+				--ink: #17181c;
+				--muted: #5c6270;
+				--faint: #8b91a0;
+				--rule: #dfe2e8;
+				--accent: #1f5fd8;
+				--wash: #f4f6fa;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html {
+				-webkit-print-color-adjust: exact;
+				print-color-adjust: exact;
+			}
+
+			body {
+				margin: 0;
+				color: var(--ink);
+				font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+				font-size: 10.5pt;
+				line-height: 1.5;
+			}
+
+			h1,
+			h2,
+			h3 {
+				margin: 0;
+				font-weight: 700;
+				letter-spacing: -0.01em;
+			}
+
+			p {
+				margin: 0 0 8pt;
+			}
+
+			/* ---------------------------------------------------------------- cover */
+
+			.cover {
+				border-top: 4pt solid var(--accent);
+				padding-top: 14pt;
+				margin-bottom: 18pt;
+			}
+
+			.eyebrow {
+				font-size: 8pt;
+				font-weight: 700;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				color: var(--accent);
+				margin-bottom: 8pt;
+			}
+
+			.cover h1 {
+				font-size: 24pt;
+				line-height: 1.15;
+				margin-bottom: 8pt;
+			}
+
+			.cover .lede {
+				font-size: 11.5pt;
+				color: var(--muted);
+				max-width: 46em;
+			}
+
+			.meta {
+				display: flex;
+				gap: 10pt;
+				margin-top: 14pt;
+			}
+
+			.meta div {
+				flex: 1;
+				background: var(--wash);
+				border-radius: 4pt;
+				padding: 9pt 11pt;
+			}
+
+			.meta dt {
+				font-size: 7.5pt;
+				font-weight: 700;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				color: var(--faint);
+				margin-bottom: 3pt;
+			}
+
+			.meta dd {
+				margin: 0;
+				font-size: 9.5pt;
+				line-height: 1.35;
+			}
+
+			.howto {
+				border: 0.75pt solid var(--rule);
+				border-left: 3pt solid var(--accent);
+				border-radius: 3pt;
+				padding: 10pt 12pt;
+				margin: 16pt 0 4pt;
+				font-size: 9.5pt;
+				color: var(--muted);
+			}
+
+			.howto strong {
+				color: var(--ink);
+			}
+
+			.howto ul {
+				margin: 6pt 0 0;
+				padding-left: 14pt;
+			}
+
+			.howto li {
+				margin-bottom: 3pt;
+			}
+
+			/* -------------------------------------------------------------- sections */
+
+			section {
+				margin-top: 20pt;
+				break-inside: auto;
+			}
+
+			.section-head {
+				display: flex;
+				align-items: baseline;
+				gap: 8pt;
+				border-bottom: 1.25pt solid var(--ink);
+				padding-bottom: 5pt;
+				margin-bottom: 4pt;
+				break-after: avoid;
+			}
+
+			.section-head .num {
+				font-size: 9pt;
+				font-weight: 700;
+				color: var(--accent);
+				letter-spacing: 0.08em;
+			}
+
+			.section-head h2 {
+				font-size: 13.5pt;
+			}
+
+			.section-note {
+				font-size: 9pt;
+				color: var(--muted);
+				margin: 6pt 0 10pt;
+				break-after: avoid;
+			}
+
+			/* ------------------------------------------------------------- questions */
+
+			.q {
+				break-inside: avoid;
+				margin-bottom: 13pt;
+				padding-left: 30pt;
+				position: relative;
+			}
+
+			.q .tag {
+				position: absolute;
+				left: 0;
+				top: 1pt;
+				font-size: 8.5pt;
+				font-weight: 700;
+				color: var(--accent);
+				background: var(--wash);
+				border-radius: 3pt;
+				padding: 1.5pt 5pt;
+			}
+
+			.q .ask {
+				font-weight: 600;
+				margin-bottom: 3pt;
+			}
+
+			.q .why {
+				font-size: 9pt;
+				color: var(--muted);
+				margin-bottom: 5pt;
+			}
+
+			.opts {
+				margin: 0 0 5pt;
+				padding: 0;
+				list-style: none;
+				column-gap: 16pt;
+			}
+
+			.opts.two {
+				columns: 2;
+			}
+
+			.opts li {
+				font-size: 9.5pt;
+				margin-bottom: 2.5pt;
+				break-inside: avoid;
+			}
+
+			.box {
+				display: inline-block;
+				width: 8pt;
+				height: 8pt;
+				border: 0.9pt solid var(--faint);
+				border-radius: 1.5pt;
+				margin-right: 5pt;
+				vertical-align: -0.5pt;
+			}
+
+			.lines {
+				border-bottom: 0.75pt solid #c3c8d2;
+				height: 16pt;
+			}
+
+			.lines + .lines {
+				margin-top: 0;
+			}
+
+			.answer-2 .lines:first-child {
+				margin-top: 2pt;
+			}
+
+			/* ------------------------------------------------------------- emphasis */
+
+			.callout {
+				background: var(--wash);
+				border-radius: 4pt;
+				padding: 10pt 12pt;
+				font-size: 9.5pt;
+				margin: 10pt 0 12pt;
+				break-inside: avoid;
+			}
+
+			.callout strong {
+				display: block;
+				margin-bottom: 3pt;
+			}
+
+			table.rank {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 9.5pt;
+				margin: 4pt 0 6pt;
+			}
+
+			table.rank th {
+				text-align: left;
+				font-size: 7.5pt;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--faint);
+				border-bottom: 0.75pt solid var(--rule);
+				padding: 0 6pt 4pt;
+			}
+
+			table.rank th:last-child,
+			table.rank td:last-child {
+				text-align: center;
+				width: 52pt;
+			}
+
+			table.rank td {
+				border-bottom: 0.75pt solid var(--rule);
+				padding: 6pt;
+				vertical-align: top;
+			}
+
+			table.rank td:last-child {
+				border-bottom: 0.75pt solid var(--rule);
+			}
+
+			table.rank .what {
+				font-weight: 600;
+			}
+
+			table.rank .detail {
+				color: var(--muted);
+				font-size: 9pt;
+			}
+
+			.rank-slot {
+				display: inline-block;
+				width: 22pt;
+				height: 13pt;
+				border: 0.9pt solid var(--faint);
+				border-radius: 2pt;
+			}
+
+			footer.end {
+				margin-top: 22pt;
+				border-top: 1.25pt solid var(--ink);
+				padding-top: 10pt;
+				font-size: 9.5pt;
+				color: var(--muted);
+				break-inside: avoid;
+			}
+
+			footer.end strong {
+				color: var(--ink);
+			}
+
+			.pagebreak {
+				break-before: page;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="cover">
+			<div class="eyebrow">Discovery questionnaire</div>
+			<h1>Tell us how you run your shop</h1>
+			<p class="lede">
+				We are building your platform around how your office actually works — your funnel, your
+				words, your residual process — rather than bending your business to fit generic CRM. These
+				questions are how we find out. Your answers decide what we turn on for you on day one, and
+				what we build next.
+			</p>
+			<div class="meta">
+				<div>
+					<dt>Who should fill this in</dt>
+					<dd>
+						Whoever runs the sales floor, plus whoever reconciles residuals. Those are usually two
+						people, and the second half of this matters most.
+					</dd>
+				</div>
+				<div>
+					<dt>How long it takes</dt>
+					<dd>
+						About 25 minutes. Skip anything that does not apply to you — a blank is an answer.
+					</dd>
+				</div>
+				<div>
+					<dt>What happens next</dt>
+					<dd>
+						We turn your answers into a build plan and walk you through it: what ships first, what
+						comes later, and what we would not build at all.
+					</dd>
+				</div>
+			</div>
+			<div class="howto">
+				<strong>Two notes before you start.</strong>
+				<ul>
+					<li>
+						Where we have offered checkboxes, tick as many as are true — and write in the margin
+						when none of them is quite right. The write-ins are the most useful thing in here.
+					</li>
+					<li>
+						Do not tidy up your answers. If the honest answer is "a spreadsheet nobody but Karen
+						understands", that is exactly what we need to see.
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<!-- 1 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">01</span>
+				<h2>Your business</h2>
+			</div>
+			<p class="section-note">The shape of the company, so we size everything else correctly.</p>
+
+			<div class="q">
+				<span class="tag">Q1</span>
+				<div class="ask">
+					How would you describe your business to another person in the industry?
+				</div>
+				<ul class="opts two">
+					<li><span class="box"></span> Registered ISO / MSP</li>
+					<li><span class="box"></span> Agent office under an ISO</li>
+					<li><span class="box"></span> Sub-ISO</li>
+					<li><span class="box"></span> Payment facilitator</li>
+					<li><span class="box"></span> A mix of the above</li>
+					<li><span class="box"></span> Something else (please say)</li>
+				</ul>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q2</span>
+				<div class="ask">Which processors or back-ends do you board merchants to?</div>
+				<div class="why">
+					List all of them, even the one you only use twice a year. Each one is a different report
+					format and a different set of rules on our side.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q3</span>
+				<div class="ask">
+					Roughly how many merchants are on your books today, and how many people sell for you?
+				</div>
+				<div class="why">
+					Ballpark is fine. We are asking because forty reps and four reps are genuinely different
+					products.
+				</div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 2 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">02</span>
+				<h2>Your words</h2>
+			</div>
+			<p class="section-note">
+				The app calls things whatever you call them — the menu, the buttons, the page titles. So we
+				need your vocabulary, not ours.
+			</p>
+
+			<div class="q">
+				<span class="tag">Q4</span>
+				<div class="ask">What do you call the person at the business you are selling to?</div>
+				<ul class="opts two">
+					<li><span class="box"></span> Owner</li>
+					<li><span class="box"></span> Principal</li>
+					<li><span class="box"></span> Merchant</li>
+					<li><span class="box"></span> Contact</li>
+					<li><span class="box"></span> Signer</li>
+					<li><span class="box"></span> Other:</li>
+				</ul>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q5</span>
+				<div class="ask">
+					Walk us through a deal from first contact to the merchant's first batch. What are the
+					stages, and what do you call each one?
+				</div>
+				<div class="why">
+					This becomes the board your reps drag deals across, so please use your own stage names —
+					even if there are nine of them.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q6</span>
+				<div class="ask">Tell us about your reps.</div>
+				<ul class="opts two">
+					<li><span class="box"></span> W-2 employees</li>
+					<li><span class="box"></span> 1099 independent agents</li>
+					<li><span class="box"></span> Both</li>
+					<li><span class="box"></span> We have sub-agents under agents</li>
+					<li><span class="box"></span> Reps would log in themselves</li>
+					<li><span class="box"></span> Only the office logs in</li>
+				</ul>
+				<div class="why">
+					If you have sub-agents: how many levels deep does it go, and does a top-level agent see
+					their sub-agents' merchants?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q7</span>
+				<div class="ask">
+					On a proposal, what do you call the person who presents it, and the person responsible for
+					the account afterwards?
+				</div>
+				<div class="why">
+					For example "Rep" and "Relationship manager", or "Agent" and "Account executive". They may
+					well be the same person — say so if they are.
+				</div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 3 ------------------------------------------------------------------- -->
+		<section class="pagebreak">
+			<div class="section-head">
+				<span class="num">03</span>
+				<h2>Selling</h2>
+			</div>
+			<p class="section-note">What a rep actually carries into a shop, and what comes back out.</p>
+
+			<div class="q">
+				<span class="tag">Q8</span>
+				<div class="ask">
+					What do you call the document you put in front of a merchant to win the deal?
+				</div>
+				<ul class="opts two">
+					<li><span class="box"></span> Proposal</li>
+					<li><span class="box"></span> Savings analysis</li>
+					<li><span class="box"></span> Rate comparison</li>
+					<li><span class="box"></span> Statement analysis</li>
+					<li><span class="box"></span> Quote</li>
+					<li><span class="box"></span> Other:</li>
+				</ul>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q9</span>
+				<div class="ask">
+					When one business has several locations, how do you think about it — one merchant with
+					several accounts, or several merchants?
+				</div>
+				<div class="why">
+					We want to put the volume, the rates and the residual in the right place, and that depends
+					entirely on your answer here.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q10</span>
+				<div class="ask">
+					What do you need to know about a merchant account itself, beyond who the business is?
+				</div>
+				<div class="why">
+					MID, MCC, open date, average ticket, monthly volume, card-present versus e-commerce,
+					current pricing — tick or list whatever you look up most often.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q11</span>
+				<div class="ask">How does hardware work for you?</div>
+				<ul class="opts two">
+					<li><span class="box"></span> We sell terminals outright</li>
+					<li><span class="box"></span> We lease them</li>
+					<li><span class="box"></span> We place them free</li>
+					<li><span class="box"></span> The merchant brings their own</li>
+					<li><span class="box"></span> We hold stock ourselves</li>
+					<li><span class="box"></span> A distributor ships direct</li>
+				</ul>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q12</span>
+				<div class="ask">
+					Do you need to know which specific unit is sitting at which merchant — by serial number?
+				</div>
+				<div class="why">
+					In other words: when a terminal comes back, does anyone care which one it was?
+				</div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q13</span>
+				<div class="ask">
+					Do you ever send a merchant a bill you expect them to pay you directly?
+				</div>
+				<div class="why">
+					Most ISOs never do — the fees come out of the merchant's deposits. But equipment, software
+					or a service plan sometimes gets invoiced. If you never invoice anyone, say so and we will
+					leave that whole area out.
+				</div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 4 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">04</span>
+				<h2>Getting a merchant live</h2>
+			</div>
+			<p class="section-note">Everything between a signature and a first batch.</p>
+
+			<div class="q">
+				<span class="tag">Q14</span>
+				<div class="ask">
+					What paperwork does an application need, and where does it live today while you are
+					collecting it?
+				</div>
+				<div class="why">
+					Signed app, statements, voided check, ID, business licence — and honestly: email inbox, a
+					shared drive, a filing cabinet?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q15</span>
+				<div class="ask">
+					After a merchant is live, what do they call you about, and who picks up the phone?
+				</div>
+				<div class="why">
+					Chargebacks, a deposit that did not land, a dead terminal, a fee they do not recognise —
+					and what you call that queue internally.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q16</span>
+				<div class="ask">
+					Would you ever want merchants themselves to log in — to see statements, open a ticket, or
+					check a deposit?
+				</div>
+				<ul class="opts two">
+					<li><span class="box"></span> Yes, that would be valuable</li>
+					<li><span class="box"></span> Maybe later</li>
+					<li><span class="box"></span> No — we would rather they call us</li>
+				</ul>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q17</span>
+				<div class="ask">Who inside your office should <em>not</em> be able to see something?</div>
+				<div class="why">
+					This is the most important question on the page. For example: should a rep be able to see
+					another rep's merchants? Their residuals? Should a support person see commission splits?
+					Tell us what would cause a problem if the wrong person saw it.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 5 ------------------------------------------------------------------- -->
+		<section class="pagebreak">
+			<div class="section-head">
+				<span class="num">05</span>
+				<h2>Residuals and getting paid</h2>
+			</div>
+			<p class="section-note">
+				This is the part we most want to get right, because it is the part that happens every month
+				forever. Please be as specific as you can stand to be.
+			</p>
+
+			<div class="callout">
+				<strong>If you only answer one section, make it this one.</strong>
+				Everything else in this document is about winning a merchant. This section is about the
+				money that arrives afterwards, which is the actual business — and it is where software
+				usually helps the most.
+			</div>
+
+			<div class="q">
+				<span class="tag">Q18</span>
+				<div class="ask">How do residuals reach you each month, and in what format?</div>
+				<div class="why">
+					A CSV you download from a portal, a spreadsheet emailed to you, a PDF, a report you log in
+					to read on screen? And roughly what day of the month?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q19</span>
+				<div class="ask">
+					How many separate reports do you reconcile each month, and do they agree with each other?
+				</div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q20</span>
+				<div class="ask">How are splits decided, and how often do they change?</div>
+				<div class="why">
+					A flat percentage per rep? Per merchant? Tiered on volume? Does a rep's split change when
+					they hit a number, or when an account is handed over?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q21</span>
+				<div class="ask">
+					Describe what actually happens today, step by step, from the report landing to the reps
+					being paid.
+				</div>
+				<div class="why">
+					Who does it, in what tool, and how many hours does it take? If it is a spreadsheet, we
+					would love a copy with the names blanked out — that one file would tell us more than this
+					whole page.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q22</span>
+				<div class="ask">
+					Do your reps get a statement showing how their number was arrived at? Do they trust it?
+				</div>
+				<div class="why">
+					And how often do they come back and argue with it? We are trying to work out whether a
+					self-serve rep statement is worth building early.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 6 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">06</span>
+				<h2>Statements and pricing</h2>
+			</div>
+			<p class="section-note">How a rate gets proposed in the first place.</p>
+
+			<div class="q">
+				<span class="tag">Q23</span>
+				<div class="ask">
+					When a rep brings back a merchant's current processing statement, what happens to it?
+				</div>
+				<div class="why">
+					Who works out the effective rate, in what tool, and how long does the rep wait before they
+					can go back with a number?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q24</span>
+				<div class="ask">Which pricing models do you offer?</div>
+				<ul class="opts two">
+					<li><span class="box"></span> Interchange plus</li>
+					<li><span class="box"></span> Tiered</li>
+					<li><span class="box"></span> Flat rate</li>
+					<li><span class="box"></span> Cash discount</li>
+					<li><span class="box"></span> Surcharge</li>
+					<li><span class="box"></span> Dual pricing</li>
+				</ul>
+				<div class="why">
+					Do you present more than one side by side, or arrive with a single recommendation?
+				</div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q25</span>
+				<div class="ask">
+					Roughly how many statements does your office analyse in a normal week, and is that number
+					limited by demand or by capacity?
+				</div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 7 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">07</span>
+				<h2>Sensitive data</h2>
+			</div>
+			<p class="section-note">A short section, but we would rather ask than assume.</p>
+
+			<div class="q">
+				<span class="tag">Q26</span>
+				<div class="ask">
+					What sensitive information would you want stored in the system, and what should never
+					touch it?
+				</div>
+				<div class="why">
+					Applications contain Social Security numbers, tax IDs and bank details. Some offices want
+					those held; others deliberately keep them only in the processor's portal. Card numbers we
+					will not store under any circumstances. Tell us where your line is and we will design to
+					it.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 8 ------------------------------------------------------------------- -->
+		<section>
+			<div class="section-head">
+				<span class="num">08</span>
+				<h2>What you look at</h2>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q27</span>
+				<div class="ask">
+					What numbers do you check every week, and what do you check every month?
+				</div>
+				<div class="why">
+					New accounts boarded, volume, attrition, rep performance, residual per account — and which
+					one, if it moved the wrong way, would ruin your week?
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 9 ------------------------------------------------------------------- -->
+		<section class="pagebreak">
+			<div class="section-head">
+				<span class="num">09</span>
+				<h2>Where AI could help</h2>
+			</div>
+			<p class="section-note">
+				We would rather build the two things you would use daily than ten you would not. Please rank
+				only the ones you care about — 1 for the most useful — and leave the rest blank.
+			</p>
+
+			<div class="q">
+				<span class="tag">Q28</span>
+				<div class="ask">Rank what would genuinely save you time.</div>
+				<table class="rank">
+					<thead>
+						<tr>
+							<th>What it would do</th>
+							<th>Rank</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>
+								<div class="what">Read a competitor's statement for you</div>
+								<div class="detail">
+									A rep photographs the merchant's current statement; the volume, transaction count,
+									fees and effective rate come back filled in.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Draft the proposal from that statement</div>
+								<div class="detail">
+									Two or three priced options against their current cost, ready for the rep to
+									adjust and present.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Warn you when a merchant is slipping away</div>
+								<div class="detail">
+									Flags accounts whose volume has dropped sharply, before they close — so someone
+									can call while it still matters.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Check the processor's residual math</div>
+								<div class="detail">
+									Compares what you were paid against what the accounts should have produced, and
+									flags the gaps.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Brief a rep before a visit</div>
+								<div class="detail">
+									One short summary of the merchant: history with you, open issues, what was quoted
+									last time, what to watch for.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Write up a visit from the rep talking</div>
+								<div class="detail">
+									The rep speaks for thirty seconds in the car; the notes, the follow-up tasks and
+									the deal's new stage are recorded for them.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Pre-check an application before underwriting</div>
+								<div class="detail">
+									Flags a business type or a detail likely to be declined, before the paperwork is
+									done.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+						<tr>
+							<td>
+								<div class="what">Answer the questions merchants repeat</div>
+								<div class="detail">
+									Deposit timing, what a fee is, how a chargeback works — drafted for your support
+									person, or answered directly.
+								</div>
+							</td>
+							<td><span class="rank-slot"></span></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q29</span>
+				<div class="ask">What did you picture when you heard we were building AI into this?</div>
+				<div class="why">
+					Genuinely open. If you have seen something elsewhere that impressed you — or something
+					that was sold as AI and turned out to be nothing — we would like to hear about both.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q30</span>
+				<div class="ask">What should a computer never do on its own in your business?</div>
+				<div class="why">
+					Send something to a merchant unreviewed? Change a rate? Move a deal forward? Knowing your
+					limits up front is how we avoid building something you would have to switch off.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<!-- 10 ------------------------------------------------------------------ -->
+		<section>
+			<div class="section-head">
+				<span class="num">10</span>
+				<h2>What you use today</h2>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q31</span>
+				<div class="ask">
+					What software is your office in every day, and which of it would you happily stop paying
+					for?
+				</div>
+				<div class="why">
+					CRM, spreadsheets, e-signature, the processors' portals, accounting, phones, email
+					marketing. Please mark anything we would need to connect to rather than replace.
+				</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+
+			<div class="q">
+				<span class="tag">Q32</span>
+				<div class="ask">
+					If we could fix exactly one thing in the next ninety days, what should it be?
+				</div>
+				<div class="why">One sentence. This is the answer that sets our order of work.</div>
+				<div class="lines"></div>
+				<div class="lines"></div>
+			</div>
+		</section>
+
+		<footer class="end">
+			<strong>Thank you — this is more useful than you think.</strong>
+			Send it back however is easiest: typed, scanned, photographed, or read out to us on a call
+			while someone takes notes. If you can attach one redacted residual spreadsheet and one
+			merchant statement you have analysed recently, those two files will answer half of these
+			questions better than writing ever could.
+		</footer>
+	</body>
+</html>
