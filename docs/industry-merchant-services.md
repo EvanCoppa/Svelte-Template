@@ -288,21 +288,40 @@ the single most likely place for this engagement to disappoint, and it is cheap 
 `docs/discovery/merchant-services-discovery.html` is the same numbering, written for them rather than
 for us. It is the thing to send; the answers turn every ⚠️ above into a row in one migration.
 
-## When the answers come back
+## What has shipped, and what the answers still change
 
-One migration, in this order (the checklists in the `features`, `views`,
-`industry_role_catalog` and `industry_vocabulary` migrations are each authoritative for
-their part):
+The config half is **built**: `supabase/migrations/20260911150000_merchant_services_industry.sql`
+is the industry, its feature map with this vertical's words and order, the three
+views, the six-rung role ladder and the two vocabulary rows — data only, so
+`database.types.ts` is untouched and the only `src/` change is the three view ids in
+`FEATURE_IDS`. `supabase/seed.sql` adds Keystone Payments (pro) and Cobalt Merchant
+Services (free), the boarding board in place of the generic one, and MID / MCC /
+average ticket / current processor as custom fields on a merchant.
 
-1. `industries` row; `industry_features` rows with this vertical's `name` / `noun` /
-   `sort_order` for every feature in the CRM and Tools sections.
-2. Three `views` rows + their `features` and `pages` rows (`merchant-map`, `prospects`,
-   `referral-partners`), and their ids in `FEATURE_IDS`.
-3. Six `roles` + `role_permissions`, the ladder rungs derived from `industry_features`.
-4. Two `industry_terms` rows.
-5. `tier_features` — which plan unlocks what for them.
-6. Seed fixtures: two orgs in the vertical, so every mode is visible locally.
-7. `npm run db:types`, commit `src/lib/database.types.ts`.
+Every ⚠️ above therefore shipped as a **default, not a decision**: "Merchants",
+"Applications", "Rate proposals", "Support cases", "Terminals", "Quick options",
+"Rep" and "Relationship manager" are the words in the database today, and a word is
+a row — Q4, Q5, Q7, Q8, Q12 and Q15 each cost one `update` when the answers come
+back, never a refactor. The same is true of the absences: turning invoices on for
+them (Q13) is one `industry_features` row.
 
-Everything under "What has to be built" is a separate piece of work and should be scoped
-and priced as one — starting with Gap 1, which is a platform decision, not a customer one.
+Two limits the build surfaced, both written into the migration and seed where they
+will be read:
+
+- **A custom field holds one value**, so `mid` on a merchant is honest only while
+  that business has one location. It is a bridge to gap 2, not a substitute.
+- **`billables.unit_price` is a fixed money amount**, so the fee schedule covers the
+  monthly, per-item and incident fees but not the discount rate, which is a
+  percentage of volume. A rate proposal built from it is the fixed half of the quote.
+  Whether that matters on day one is Q24.
+
+And one thing this vertical needs that no industry can have yet: an org onboarded
+tomorrow gets none of those custom fields, because `custom_field_definitions` is
+per-org working data. The fix is small and benefits every vertical — a table of
+per-industry defaults and one trigger, alongside the `create_default_pipeline` one
+that already exists — and it is deliberately not in that migration, which changes no
+behaviour at all.
+
+Everything under "What has to be built" is still ahead, and should be scoped and
+priced as one piece of work — starting with gap 1, which is a platform decision
+rather than a customer one.
