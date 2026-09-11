@@ -22,6 +22,7 @@ import {
 import { listCustomFields } from '$lib/server/crm/custom-fields';
 import { listNotes } from '$lib/server/crm/notes';
 import { describeCustomField, getRecord, listRelatedRecords } from '$lib/server/crm/records';
+import { getRelationships } from '$lib/server/crm/relationships';
 import { noteAccess } from '$lib/server/notes';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
@@ -89,15 +90,19 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// The words the record's labels use — who presents a proposal, who is
 	// responsible for it — as the org's industry says them.
 	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
-	const [record, activities, tags, addresses, customFields, related, notes] = await Promise.all([
-		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
-		listActivities(supabase, activeOrgId, { entity }),
-		listTagsFor(supabase, activeOrgId, entity),
-		party ? listAddresses(supabase, activeOrgId, entity) : [],
-		listCustomFields(supabase, activeOrgId, entity),
-		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
-		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : []
-	]);
+	const [record, activities, tags, addresses, customFields, related, relationships, notes] =
+		await Promise.all([
+			getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
+			listActivities(supabase, activeOrgId, { entity }),
+			listTagsFor(supabase, activeOrgId, entity),
+			party ? listAddresses(supabase, activeOrgId, entity) : [],
+			listCustomFields(supabase, activeOrgId, entity),
+			listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
+			// The graph: every relationship this record stands in, from either
+			// side, oriented and named by the one module that knows how.
+			getRelationships(supabase, activeOrgId, entity, canOpen, vocabulary),
+			notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : []
+		]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
 	// Named the way the org's industry names the kind: "Quote not found."
@@ -134,6 +139,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		canManageAddresses: party && can(access, RECORD_KIND_META[kind].feature, 'manage'),
 		customFields: customFields.map(describeCustomField),
 		related,
+		relationships,
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
 		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,

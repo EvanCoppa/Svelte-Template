@@ -18,9 +18,12 @@ import type { FeatureId } from '$lib/features/types';
  * for the rest.
  *
  * Proposal options are an entity type too, but have no list page: an option
- * is read through its proposal.
+ * is read through its proposal. A member (`'member'`) is an entity type with
+ * no record page either: the staff roster is where a person who works here
+ * is read, so a relationship naming one shows a name and no link.
  */
 export const RECORD_KINDS = [
+	'asset',
 	'billable',
 	'company',
 	'contact',
@@ -45,6 +48,7 @@ export type RecordKindMeta = {
  * the org's industry says them (`recordTerms()` below), never a constant.
  */
 export const RECORD_KIND_META = {
+	asset: { feature: 'assets', segment: 'assets' },
 	billable: { feature: 'billables', segment: 'billables' },
 	company: { feature: 'companies', segment: 'companies' },
 	contact: { feature: 'contacts', segment: 'contacts' },
