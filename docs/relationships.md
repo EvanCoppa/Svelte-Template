@@ -150,11 +150,30 @@ list page `/assets`, and the record page the generic one.
   RLS lets any member write, so the check is the app-level gate exactly as it is for
   addresses.
 
+## The first thing that moved onto the graph
+
+`tasks.assigned_to` was a column, and a column can only ever name one person. The
+task system migration dropped it and made assignment `assigned_to` relationships
+instead — several assignees per task, and a handover kept as an ended row rather
+than overwritten. Two consequences worth copying:
+
+- **The type widened rather than forking.** `assigned_to` shipped scoped to
+  `source_type = 'asset'`; a task is assigned exactly the same way, so the source
+  opened up to any kind instead of a near-duplicate type being added. Its inverse
+  label moved with it ("holds" → "assignee of"), because a label that only reads
+  for one kind is the real argument for a second type, and that one didn't.
+- **The shape is named once, in the feature's own module.** `listTaskAssignees()`,
+  `assignTask()` and `endTaskAssignment()` in `src/lib/server/crm/tasks.ts` are the
+  only place that knows assignment IS a relationship; callers ask a task for its
+  assignees. A kind that wants the same thing adds those three helpers, not a
+  second convention. See docs/tasks.md.
+
 ## Not built yet
 
-- A UI to draw a relationship (a type picker plus a record picker across kinds) and
-  to remove one. The API and the read side are complete; the write side is called
-  from tests only.
+- A general UI to draw a relationship (a type picker plus a record picker across
+  kinds) and to remove one. The read side is complete everywhere, and the write
+  side now has one real caller in the task helpers above; the rest is called from
+  tests only.
 - A settings page for an org's own relationship types (RLS already allows
   owners/admins to insert them).
 - Custom objects (`custom_record`), which this design is shaped to accept.

@@ -39,6 +39,15 @@ import { unwrap, unwrapDeleted } from './unwrap';
  * the same PostgREST error a missing foreign key would raise.
  */
 
+/**
+ * The system types app code names directly, by the fixed ids the
+ * relationships migration ships. Types are addressed by id and never by
+ * key, because an org may define a type reusing a system key.
+ */
+export const RELATIONSHIP_TYPE = {
+	assignedTo: 'f0000000-0000-0000-0000-000000000012'
+} as const;
+
 export type RelationshipType = Tables<'relationship_types'>;
 export type Relationship = Tables<'relationships'>;
 export type RelationshipWithType = Relationship & { relationship_types: RelationshipType };

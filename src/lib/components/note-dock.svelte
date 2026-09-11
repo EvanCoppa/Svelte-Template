@@ -30,7 +30,9 @@
 	import { cn } from '$lib/utils.js';
 
 	/**
-	 * The note dock: every note in the org, docked to the edge of the screen.
+	 * The note dock: the org's shared scratchpad, docked to the edge of the
+	 * screen. Notes attached to a record are private to their author and live
+	 * on that record's card, so the rail never carries one.
 	 *
 	 * Four states, the way a stack of stickies on the edge of a desk has
 	 * four: at rest it is one colored dash per note, a few pixels wide;

@@ -116,4 +116,62 @@ export function supabaseMockSequence(results: QueryResult[]) {
 	return { supabase, from, builder: methods };
 }
 
+export type StorageResult = {
+	upload?: { data?: unknown; error?: { message: string } | null };
+	createSignedUrls?: {
+		data?: { path: string; signedUrl: string }[];
+		error?: { message: string } | null;
+	};
+	remove?: { data?: unknown; error?: { message: string } | null };
+};
+
+/**
+ * Test double for a Storage bucket (`supabase.storage.from(bucket)`), for
+ * modules that upload/sign/remove files alongside a table row
+ * (`entity-images.ts`). Each method is a `vi.fn()` resolving to the
+ * configured result, mirroring the shape `@supabase/storage-js` returns —
+ * assertions read the recorded calls the same way `supabaseMock` does.
+ */
+export function storageMock(result: StorageResult = {}) {
+	const bucket = {
+		upload: vi.fn<
+			(path: string, file: File, options?: { contentType?: string }) => Promise<QueryResult>
+		>(async () => ({ data: null, error: null, ...result.upload })),
+		createSignedUrls: vi.fn<
+			(
+				paths: string[],
+				ttl: number
+			) => Promise<{ data: { path: string; signedUrl: string }[]; error: unknown }>
+		>(async () => ({ data: [], error: null, ...result.createSignedUrls })),
+		remove: vi.fn<(paths: string[]) => Promise<QueryResult>>(async () => ({
+			data: null,
+			error: null,
+			...result.remove
+		}))
+	};
+	const from = vi.fn(() => bucket);
+	const storage = { from };
+	return { storage, from, bucket };
+}
+
+/**
+ * Rebuilds an existing `supabaseMock*` double with a `storageMock()` beside
+ * its `.from`, the way `supabaseMock` itself builds `{ from }` — one `never`
+ * assertion at construction, never a cast onto an already-typed value.
+ */
+export function withStorage<T extends { supabase: SupabaseClient<Database>; from: unknown }>(
+	mock: T,
+	result: StorageResult = {}
+): T & {
+	storage: ReturnType<typeof storageMock>['storage'];
+	storageFrom: ReturnType<typeof storageMock>['from'];
+	bucket: ReturnType<typeof storageMock>['bucket'];
+} {
+	const { storage, from, bucket } = storageMock(result);
+	// SAFETY: crm modules read `supabase.from()` and `supabase.storage.from()`
+	// only; the rest of SupabaseClient is never touched.
+	const supabase: SupabaseClient<Database> = { from: mock.from, storage } as never;
+	return { ...mock, supabase, storage, storageFrom: from, bucket };
+}
+
 export const ORG_ID = '10000000-0000-0000-0000-000000000001';

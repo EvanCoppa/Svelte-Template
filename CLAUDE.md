@@ -423,6 +423,22 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
   the road for a JS-born mutation that belongs to the page it lives on. The feature
   is named by the industry ("Schedule" / "appointment" in a practice).
+- **A task has a column AND a finishing time, and a trigger holds them together**
+  (`task_board` migration + `src/lib/crm/tasks.ts` + `src/routes/(app)/tasks/`).
+  `tasks.status` (`task_status`: todo / in_progress / blocked / done) says WHERE the
+  task sits; `completed_at` says WHEN it was finished. They are not two ways to say
+  the same thing, and `private.tasks_sync_completion()` keeps the one relationship
+  between them — `status = 'done'` exactly when the timestamp is set — so the board
+  writes `status`, the checkbox writes `completed_at`, and neither knows the other
+  column exists. An enum rather than rows, unlike `pipeline_stages`: "not started,
+  underway, stuck, finished" is the same four states in every vertical, and what a
+  task is CALLED is already the industry's through the feature's terms. There is no
+  `cancelled` state on purpose — it would be a second closed state and the timestamp
+  can only be honest about one. **The page is not a table**: a `Kanban` board by
+  status and a `GroupList` by due-date bucket, the choice remembered per device
+  (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
+  and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
+  for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
 
 ## Database
 
@@ -483,6 +499,33 @@ mutation born in a **gesture on the page it lives on** (the calendar's drag-to-m
 staff page's hold-to-remove) is still a form action: a hidden `<form>` with hidden inputs
 bound to a `superForm` store, filled from script and submitted with `requestSubmit()` —
 never a `fetch` of your own (docs/calendar.md, "The writes").
+
+## Assignment, priority and conversations (docs/tasks.md)
+
+Tasks are the reference for three things a record may need, and each has exactly one
+answer:
+
+- **Assignment is a relationship, not a column** — `tasks.assigned_to` is gone. A task
+  is assigned to as many people as the work needs through `assigned_to` rows in the
+  graph (docs/relationships.md), and unassigning sets `ended_on` rather than deleting,
+  so a handover is history instead of a lost fact. `listTaskAssignees()`,
+  `assignTask()` and `endTaskAssignment()` in `src/lib/server/crm/tasks.ts` are the
+  only place that shape is known; the Relationships card draws the result, so
+  `describeTask()` has **no "Assigned to" field** — never add a second copy of a
+  relationship as a record field. `deals.assigned_to` and `calendar_events.assigned_to`
+  stay columns on purpose: each is genuinely one person.
+- **Priority is one vocabulary** — the `public.priority` enum (renamed from
+  `ticket_priority` when tasks became its second table), its options named once in
+  `PRIORITY_OPTIONS` (`src/lib/schemas/records.ts`) and toned once in `PRIORITY_TONE`
+  (`src/lib/crm/tones.ts`). A third table that needs urgency reuses both; it never
+  declares a second enum with the same values.
+- **A conversation is `Detail.Thread` plus a comments table** — `task_comments` copies
+  `ticket_comments` (authored content, editable by its author or an owner/admin), and
+  the generic record page renders the thread whenever the load supplies `data.thread`.
+  That is a data-presence check, not a kind check: another kind joins by adding a
+  branch to `hasThread()` and the two comment actions, never by forking the record
+  page or writing a second thread component. **Posting requires no grant** beyond
+  being able to open the record — participation is not editing.
 
 ## Forms
 
@@ -723,6 +766,19 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   (the sidebar, the palette and the feature gate already do); never navigate somewhere to pitch
   a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
   the reference.
+- **A board is `Kanban`** (`src/lib/components/kanban/`), the app-level compound for "cards in
+  columns you can move one between": `Kanban.Root` owns the drag state, `Kanban.Column` registers
+  its own drop zone, `Kanban.Card` is the draggable shell with a real handle button on it. The page
+  owns the columns, the cards and what a move means — the board hands back a card id and the
+  column it was released over, and nothing else. Moving works from the keyboard as well as under a
+  pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
+  `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
+- **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
+  sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
+  names anything: the page arrives with its rows already in piles, because what a pile means and
+  what it is called are the page's to know (a count reads "3 quotes" through `recordTerms()`,
+  never a hardcoded noun). Not to be confused with `enhanced/accordion`, which is a config-object
+  component for panels of text.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted

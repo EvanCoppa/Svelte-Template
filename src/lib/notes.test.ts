@@ -27,6 +27,7 @@ function note(fields: Partial<Note> = {}): Note {
 		color: 'warning',
 		archived_at: null,
 		author_id: null,
+		entity_type: null,
 		...fields
 	} as Note;
 }
@@ -161,6 +162,19 @@ describe('who may write on a note', () => {
 		expect(canRemoveNote(mine, access())).toBe(true);
 		expect(canRemoveNote(mine, access({ canDelete: false }))).toBe(false);
 		expect(canRemoveNote(theirs, access())).toBe(false);
+	});
+
+	it('refuses an owner or admin someone else’s note about a record — those are private', () => {
+		const theirsOnACompany = note({ author_id: SOMEONE_ELSE, entity_type: 'company' });
+		const manager = access({ viewer: { userId: ME, isOrgManager: true } });
+		expect(canEditNote(theirsOnACompany, manager)).toBe(false);
+		expect(canArchiveNote(theirsOnACompany, manager)).toBe(false);
+		expect(canRemoveNote(theirsOnACompany, manager)).toBe(false);
+	});
+
+	it('still lets the author manage their own note about a record', () => {
+		const mineOnACompany = note({ author_id: ME, entity_type: 'company' });
+		expect(canEditNote(mineOnACompany, access())).toBe(true);
 	});
 });
 

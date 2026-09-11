@@ -2,7 +2,6 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArchiveRestoreIcon from '@lucide/svelte/icons/archive-restore';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import LinkIcon from '@lucide/svelte/icons/link';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
@@ -146,7 +145,6 @@
 {/snippet}
 
 {#snippet card(note: NoteRow)}
-	{@const link = data.links[note.id]}
 	{@const archived = note.archived_at !== null}
 	<!-- The grant says whether this session writes notes at all; RLS narrows
 	     that to the author (or an owner/admin), so the editor is only offered
@@ -160,18 +158,6 @@
 			bodyClass="flex-1 field-sizing-fixed"
 			onsave={(patch) => noteCommands.save(note.id, patch)}
 		/>
-
-		{#if link}
-			<!-- What this note is about. The link is here only when the reader may
-			     open that record — the load did not even fetch the rest. -->
-			<a
-				href={link.href}
-				class="flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-			>
-				<LinkIcon class="size-3 shrink-0" />
-				<span class="truncate">{link.label}</span>
-			</a>
-		{/if}
 
 		{#if mine || canRemoveNote(note, data.access)}
 			<Note.Actions>

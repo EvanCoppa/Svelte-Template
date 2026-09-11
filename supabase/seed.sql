@@ -311,10 +311,88 @@ insert into public.deals (id, org_id, contact_id, title, amount, assigned_to, cr
 		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
-insert into public.tasks (id, org_id, company_id, title, due_at, assigned_to, created_by) values
+-- Tasks across the priority ladder and the board's four columns, with the
+-- due dates spread so the grouped list has a row in every bucket: one
+-- overdue, one due today, two this week, one later, one with no date at all
+-- and one already finished. `status` and `completed_at` are held in step by
+-- trigger (the task board migration), so the done row's two agree rather than
+-- one correcting the other.
+insert into public.tasks (id, org_id, company_id, title, details, due_at, priority, status, completed_at, created_by) values
 	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Send renewal quote', now() + interval '7 days',
-		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003')
+		'20000000-0000-0000-0000-000000000001', 'Send renewal quote',
+		'Pull last year''s numbers before quoting.', now() + interval '7 days',
+		'high', 'todo', null, '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Chase the signed order form',
+		null, now() + interval '2 days',
+		'urgent', 'blocked', null, '00000000-0000-0000-0000-000000000001'),
+	('50000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, 'Write the Q4 renewal playbook',
+		'One page. What we say when they ask for a discount.', now() + interval '21 days',
+		'low', 'in_progress', null, '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Book the kickoff call',
+		null, now() - interval '3 days',
+		'normal', 'done', now() - interval '2 days', '00000000-0000-0000-0000-000000000001'),
+	-- Late, due today, and undated: the three buckets the four above do not reach.
+	('50000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Confirm the site visit window',
+		'Waiting on building access.', now() - interval '2 days',
+		'urgent', 'in_progress', null, '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		null, 'Call the supplier back',
+		null, date_trunc('day', now()) + interval '16 hours',
+		'normal', 'todo', null, '00000000-0000-0000-0000-000000000001'),
+	('50000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
+		null, 'Tidy the proposal templates', null, null,
+		'low', 'todo', null, '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+-- Assignment is a relationship now, so a task can name more than one person:
+-- the renewal quote is dev's and Evan's together, and the playbook was handed
+-- from Evan to dev — the ended row is the history the old column could not
+-- keep. `assigned_to` is the system type (relationships migration). Ids use
+-- the f3… range here and f4… for the thread below; f1… and f2… are taken by
+-- the assets block further down.
+insert into public.relationships
+	(id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, ended_on, created_by) values
+	('f3000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'task', '50000000-0000-0000-0000-000000000001',
+		'member', '00000000-0000-0000-0000-000000000001', current_date - 3, null,
+		'00000000-0000-0000-0000-000000000003'),
+	('f3000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'task', '50000000-0000-0000-0000-000000000001',
+		'member', '00000000-0000-0000-0000-000000000003', current_date - 3, null,
+		'00000000-0000-0000-0000-000000000003'),
+	('f3000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'task', '50000000-0000-0000-0000-000000000002',
+		'member', '00000000-0000-0000-0000-000000000001', current_date - 1, null,
+		'00000000-0000-0000-0000-000000000001'),
+	-- Handed over: Evan held it until yesterday, dev has it now.
+	('f3000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'task', '50000000-0000-0000-0000-000000000003',
+		'member', '00000000-0000-0000-0000-000000000003', current_date - 14, current_date - 1,
+		'00000000-0000-0000-0000-000000000003'),
+	('f3000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'task', '50000000-0000-0000-0000-000000000003',
+		'member', '00000000-0000-0000-0000-000000000001', current_date - 1, null,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- A thread, so the task page has a conversation to render.
+insert into public.task_comments (id, org_id, task_id, author_id, body, created_at) values
+	('f4000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'50000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003',
+		'Last year they pushed back hard on the uplift. Worth leading with the usage numbers.',
+		now() - interval '2 days'),
+	('f4000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'50000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001',
+		'Agreed. I''ll pull the seat count this afternoon and draft something.',
+		now() - interval '2 days' + interval '20 minutes'),
+	('f4000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'50000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003',
+		'Draft looks right to me — send it once legal signs off on the term change.',
+		now() - interval '6 hours')
 on conflict (id) do nothing;
 
 -- The interaction log that replaced `notes`: a note, a call and an email, so a

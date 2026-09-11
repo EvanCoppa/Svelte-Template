@@ -129,6 +129,17 @@
 				/>
 			{/if}
 
+			{#if data.record.kind === 'asset'}
+				<Detail.Images
+					images={data.images}
+					form={data.imageForm}
+					removeForm={data.removeImageForm}
+					canManage={data.canManageImages}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
+			{/if}
+
 			{#if data.relationships.length > 0}
 				<Card.Root>
 					<Card.Header>
@@ -146,6 +157,19 @@
 						</ul>
 					</Card.Content>
 				</Card.Root>
+			{/if}
+
+			{#if data.thread}
+				{@const thread = data.thread}
+				<Detail.Thread
+					messages={thread.messages}
+					form={thread.form}
+					removeForm={thread.removeForm}
+					userId={thread.userId}
+					canModerate={thread.canModerate}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
 			{/if}
 
 			{#each data.related as group (group.kind)}
@@ -178,7 +202,8 @@
 					<Card.Header>
 						<Card.Title>Notes</Card.Title>
 						<Card.Description>
-							Written down about this {terms.noun}. They sit on the dock with every other note.
+							Written down about this {terms.noun}. Only visible to you — they don't show up on the
+							dock or the notes page.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-3">
