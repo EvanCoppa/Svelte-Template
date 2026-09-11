@@ -10,7 +10,7 @@ import {
 	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TASK_STATE_TONE,
-	TICKET_PRIORITY_TONE,
+	PRIORITY_TONE,
 	TICKET_STATUS_TONE,
 	taskState
 } from '$lib/crm/tones';
@@ -393,14 +393,16 @@ export function describeTask(row: TaskWithParties, canOpen: CanOpen): RecordDeta
 		kind: 'task',
 		id: row.id,
 		name: row.title,
-		pills: [pill(state, TASK_STATE_TONE[state])],
+		pills: [pill(state, TASK_STATE_TONE[state]), pill(row.priority, PRIORITY_TONE[row.priority])],
+		// No "Assigned to" field: a task's assignees are relationships, and
+		// the Relationships card draws them with everything else the record
+		// is linked to.
 		fields: [
 			{ label: 'Company', value: record('company', row.companies, canOpen) },
 			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
 			{ label: 'Details', value: text(row.details) },
 			{ label: 'Due', value: datetime(row.due_at) },
-			{ label: 'Completed', value: datetime(row.completed_at) },
-			{ label: 'Assigned to', value: person(row.assigned_to) }
+			{ label: 'Completed', value: datetime(row.completed_at) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -415,7 +417,7 @@ export function describeTicket(row: TicketThread, canOpen: CanOpen): RecordDetai
 		name: row.subject,
 		pills: [
 			pill(row.status, TICKET_STATUS_TONE[row.status]),
-			pill(row.priority, TICKET_PRIORITY_TONE[row.priority])
+			pill(row.priority, PRIORITY_TONE[row.priority])
 		],
 		fields: [
 			{ label: 'Number', value: text(`#${String(row.number)}`) },

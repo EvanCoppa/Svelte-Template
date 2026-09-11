@@ -5,7 +5,7 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { TASK_STATE_TONE, taskState } from '$lib/crm/tones';
+	import { PRIORITY_TONE, TASK_STATE_TONE, taskState } from '$lib/crm/tones';
 	import type { Task } from '$lib/server/crm/tasks';
 	import { capitalize } from '$lib/utils.js';
 
@@ -23,6 +23,11 @@
 				renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) }),
 			cell: ({ getValue, row }) =>
 				DataTable.linkCell(getValue(), recordHref('task', row.original.id))
+		}),
+		columnHelper.accessor('priority', {
+			header: ({ column }) =>
+				renderComponent(DataTable.ColumnHeader, { column, title: 'Priority' }),
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), PRIORITY_TONE[getValue()])
 		}),
 		columnHelper.accessor('due_at', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Due' }),
