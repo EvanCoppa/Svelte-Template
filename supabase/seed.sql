@@ -387,22 +387,6 @@ insert into public.notes (id, org_id, entity_type, entity_id, title, body, color
 		'neutral', now() - interval '3 days', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
--- The shelves the notes page groups by, and which notes sit on them. Two
--- named categories plus the notes that stay unfiled, so the page renders the
--- accordion with a filled group, a second group and the unfiled pile it always
--- opens with.
-insert into public.note_categories (id, org_id, name, color, position) values
-	('e0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'Accounts', 'info', 1),
-	('e0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'Office', 'cyan', 2)
-on conflict (id) do nothing;
-
-update public.notes set category_id = 'e0000000-0000-0000-0000-000000000001'
-where id in ('d0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002');
-update public.notes set category_id = 'e0000000-0000-0000-0000-000000000002'
-where id = 'd0000000-0000-0000-0000-000000000003';
-
 insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
 	('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',

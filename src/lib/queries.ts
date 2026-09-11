@@ -29,8 +29,6 @@ export const QUERY = {
 	assets: 'app:assets',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
-	/** The shelves /notes groups by — adding, renaming or removing one changes them. */
-	noteCategories: 'app:note-categories',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

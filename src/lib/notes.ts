@@ -144,8 +144,6 @@ export type NoteInput = {
 	title?: string | null;
 	body?: string;
 	color?: BadgeTone;
-	/** The shelf it is filed on, or null for unfiled. */
-	categoryId?: string | null;
 	/** The record it is about, as `crm_entity_type` names the kind. */
 	entityType?: string;
 	entityId?: string;
@@ -156,8 +154,6 @@ export type NotePatch = {
 	title?: string | null;
 	body?: string;
 	color?: BadgeTone;
-	/** The shelf it is filed on: null unfiles it, omitted leaves it put. */
-	categoryId?: string | null;
 	archived?: boolean;
 	/** Where it sits on the rail; see `positionBetween()`. */
 	position?: number;

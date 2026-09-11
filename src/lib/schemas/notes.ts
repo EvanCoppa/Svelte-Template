@@ -32,13 +32,6 @@ const body = z.string().max(NOTE_BODY_MAX, 'That note is too long to save.');
 const color = z.enum(BADGE_TONES);
 
 /**
- * The shelf a note is filed on, or null for unfiled. Nullable rather than
- * merely optional: omitting it leaves the note where it is, sending null takes
- * it off its shelf, and the two are different edits.
- */
-const categoryId = z.guid().nullable();
-
-/**
  * What a note may be about. The record kinds with a page — the ones a note
  * can be written from — rather than every `crm_entity_type`; the database
  * trigger checks the row exists in the org either way.
@@ -53,7 +46,6 @@ export const createNoteSchema = z
 		title: title.optional(),
 		body: body.optional(),
 		color: color.optional(),
-		categoryId: categoryId.optional(),
 		entityType: entity.entityType.optional(),
 		entityId: entity.entityId.optional()
 	})
@@ -67,7 +59,6 @@ export const updateNoteSchema = z.object({
 	title: title.optional(),
 	body: body.optional(),
 	color: color.optional(),
-	categoryId: categoryId.optional(),
 	/** Archiving is a boolean up here and a timestamp in the column. */
 	archived: z.boolean().optional(),
 	/** Where the note sits on the rail — `positionBetween()` in `$lib/notes` picks it. */

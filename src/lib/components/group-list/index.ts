@@ -34,8 +34,8 @@ import Root from './group-list.svelte';
  * Structural, with one piece of state: whether a group is open, which is the
  * collapsible's and bindable from the page. Nothing here groups, sorts, counts
  * or names anything — the page arrives with its rows already in piles, because
- * what a pile means (a due-date bucket on /tasks, a category on /notes) and
- * what it is called are the page's to know.
+ * what a pile means (a due-date bucket on /tasks, a stage or an owner
+ * elsewhere) and what it is called are the page's to know.
  */
 export {
 	Root,

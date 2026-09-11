@@ -20,7 +20,7 @@ import { unwrap, unwrapDeleted } from './unwrap';
 
 export type Note = Tables<'notes'>;
 
-type NoteInsertColumn = 'title' | 'body' | 'color' | 'category_id';
+type NoteInsertColumn = 'title' | 'body' | 'color';
 type NoteUpdateColumn = NoteInsertColumn | 'archived_at' | 'position';
 
 /**

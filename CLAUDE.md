@@ -420,15 +420,6 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
   and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
   for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
-- **A note is filed on a shelf the org invented** (`note_categories` migration +
-  `src/lib/server/crm/note-categories.ts`). Rows, not an enum — the opposite call to
-  `task_status` and the same one `pipelines` made: no two orgs group their writing
-  alike. `notes.category_id` is nullable and always will be, so `/notes` opens on the
-  unfiled pile rather than demanding a category first, and deleting a shelf unfiles
-  its notes through `on delete set null` rather than taking them with it. The page
-  groups by category with `GroupList`; a category is edited from the page out of a
-  form, so it is an **ordinary form action**, while filing a note is editing the note
-  and still goes through `/api/notes` — one road per thing, not one per screen.
 
 ## Database
 
@@ -737,11 +728,11 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
   `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
-  sections over rows (`layout="rows"`) or cards (`layout="grid"`), used by `/tasks` and `/notes`.
-  Nothing in it groups, sorts, counts or names anything: the page arrives with its rows already in
-  piles, because what a pile means and what it is called are the page's to know (a count reads
-  "3 quotes" through `recordTerms()`, never a hardcoded noun). Not to be confused with
-  `enhanced/accordion`, which is a config-object component for panels of text.
+  sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
+  names anything: the page arrives with its rows already in piles, because what a pile means and
+  what it is called are the page's to know (a count reads "3 quotes" through `recordTerms()`,
+  never a hardcoded noun). Not to be confused with `enhanced/accordion`, which is a config-object
+  component for panels of text.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted

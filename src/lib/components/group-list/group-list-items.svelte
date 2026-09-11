@@ -16,23 +16,9 @@
 	let {
 		ref = $bindable(null),
 		class: className,
-		layout = 'rows',
 		children,
 		...restProps
-	}: CollapsiblePrimitive.ContentProps & {
-		/**
-		 * How the things under the heading sit. `rows` is a divided column —
-		 * one record per line, the shape a list page wants. `grid` lays them
-		 * out as cards, for the surfaces whose records are objects rather than
-		 * lines (a note is a piece of paper, not a row).
-		 */
-		layout?: 'rows' | 'grid';
-	} = $props();
-
-	const LAYOUT = {
-		rows: 'divide-border flex flex-col divide-y',
-		grid: 'grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-	} as const;
+	}: CollapsiblePrimitive.ContentProps = $props();
 </script>
 
 <Collapsible.Content bind:ref data-slot="group-list-items" forceMount {...restProps}>
@@ -44,7 +30,7 @@
 				in:motionCollapse={{ transition: OPEN }}
 				out:motionCollapse={{ transition: SHUT }}
 			>
-				<div class={cn('border-t', LAYOUT[layout], className)}>
+				<div class={cn('divide-border flex flex-col divide-y border-t', className)}>
 					{@render children?.()}
 				</div>
 			</div>

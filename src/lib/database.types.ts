@@ -1223,50 +1223,11 @@ export type Database = {
           },
         ]
       }
-      note_categories: {
-        Row: {
-          color: Database["public"]["Enums"]["badge_tone"]
-          created_at: string
-          id: string
-          name: string
-          org_id: string
-          position: number
-          updated_at: string
-        }
-        Insert: {
-          color?: Database["public"]["Enums"]["badge_tone"]
-          created_at?: string
-          id?: string
-          name: string
-          org_id: string
-          position?: number
-          updated_at?: string
-        }
-        Update: {
-          color?: Database["public"]["Enums"]["badge_tone"]
-          created_at?: string
-          id?: string
-          name?: string
-          org_id?: string
-          position?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "note_categories_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       notes: {
         Row: {
           archived_at: string | null
           author_id: string | null
           body: string
-          category_id: string | null
           color: Database["public"]["Enums"]["badge_tone"]
           created_at: string
           entity_id: string | null
@@ -1281,7 +1242,6 @@ export type Database = {
           archived_at?: string | null
           author_id?: string | null
           body?: string
-          category_id?: string | null
           color?: Database["public"]["Enums"]["badge_tone"]
           created_at?: string
           entity_id?: string | null
@@ -1296,7 +1256,6 @@ export type Database = {
           archived_at?: string | null
           author_id?: string | null
           body?: string
-          category_id?: string | null
           color?: Database["public"]["Enums"]["badge_tone"]
           created_at?: string
           entity_id?: string | null
@@ -1308,13 +1267,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "notes_category_id_org_id_fkey"
-            columns: ["category_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "note_categories"
-            referencedColumns: ["id", "org_id"]
-          },
           {
             foreignKeyName: "notes_org_id_fkey"
             columns: ["org_id"]
