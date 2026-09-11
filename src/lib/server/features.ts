@@ -22,7 +22,10 @@ export type TierWithFeatures = Tables<'tiers'> & { tier_features: { feature_id: 
 /**
  * Every feature with its industry and tier maps, in one round trip — the
  * input `resolveFeatures()` folds per org. Each industry row carries the
- * industry's own words for the feature, if any. Ordered for the nav.
+ * industry's own words for the feature and its own position in the sidebar,
+ * if any. The `order` here is the default one: an org whose industry sets
+ * `sort_order` is reordered by the resolver, and `buildNav()` sorts what it
+ * is given regardless.
  */
 export async function loadFeatureRegistry(
 	supabase: SupabaseClient<Database>
@@ -30,7 +33,7 @@ export async function loadFeatureRegistry(
 	return unwrap(
 		await supabase
 			.from('features')
-			.select('*, industry_features(industry_id, name, noun), tier_features(tier_id)')
+			.select('*, industry_features(industry_id, name, noun, sort_order), tier_features(tier_id)')
 			.order('sort_order')
 	);
 }

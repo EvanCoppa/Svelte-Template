@@ -50,7 +50,7 @@ RLS mirrors `activities` for a **freestanding** note (`entity_type` null): every
 reads, anyone writes their own, the author or an owner/admin edits and deletes. A note
 **attached** to a record is a different thing — personal working notes about that
 record, not a statement meant for the team — so it takes the `user_preferences` model
-instead (`20260911120000_private_record_notes.sql`): only its author may see, edit or
+instead (`20260911100100_private_record_notes.sql`): only its author may see, edit or
 delete it, not even an owner/admin. One table, one set of columns, one detach-on-delete
 behavior; only SELECT/UPDATE/DELETE visibility splits on whether `entity_type` is set.
 

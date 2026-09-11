@@ -4,9 +4,20 @@ import type { FeatureRegistryRow } from './types';
 
 type IndustryRow = FeatureRegistryRow['industry_features'][number];
 
-/** An industry that includes the feature, calling it by its own words or not. */
-function industry(industry_id: string, words: { name?: string; noun?: string } = {}): IndustryRow {
-	return { industry_id, name: words.name ?? null, noun: words.noun ?? null };
+/**
+ * An industry that includes the feature, calling it by its own words and
+ * putting it where it wants in the section — or inheriting either.
+ */
+function industry(
+	industry_id: string,
+	own: { name?: string; noun?: string; sort_order?: number } = {}
+): IndustryRow {
+	return {
+		industry_id,
+		name: own.name ?? null,
+		noun: own.noun ?? null,
+		sort_order: own.sort_order ?? null
+	};
 }
 
 function row(
@@ -14,8 +25,14 @@ function row(
 	{
 		industries = [industry('general')],
 		tiers = ['free'],
-		noun = null
-	}: { industries?: IndustryRow[]; tiers?: string[]; noun?: string | null } = {}
+		noun = null,
+		sortOrder = 0
+	}: {
+		industries?: IndustryRow[];
+		tiers?: string[];
+		noun?: string | null;
+		sortOrder?: number;
+	} = {}
 ): FeatureRegistryRow {
 	return {
 		id,
@@ -25,7 +42,7 @@ function row(
 		route: `/${id}`,
 		icon: null,
 		category: 'crm',
-		sort_order: 0,
+		sort_order: sortOrder,
 		created_at: '2026-01-01T00:00:00Z',
 		industry_features: industries,
 		tier_features: tiers.map((tier_id) => ({ tier_id }))
@@ -146,6 +163,61 @@ describe('resolveFeatures — what the industry calls a feature', () => {
 		const { feature, mode } = resolveFeatures([proposals], outside).proposals;
 		expect(mode).toBe('enabled');
 		expect(feature).toMatchObject({ name: 'proposals', noun: 'proposal' });
+	});
+});
+
+describe('resolveFeatures — where the industry puts a feature', () => {
+	const registry = [
+		row('calendar', {
+			sortOrder: 100,
+			industries: [industry('crm'), industry('dentistry', { sort_order: 100 })]
+		}),
+		row('companies', {
+			sortOrder: 200,
+			industries: [industry('crm'), industry('dentistry', { sort_order: 600 })]
+		}),
+		row('contacts', {
+			sortOrder: 400,
+			industries: [industry('crm'), industry('dentistry', { sort_order: 200 })]
+		})
+	];
+
+	const positions = (industryId: string) =>
+		Object.values(resolveFeatures(registry, org({ industryId })))
+			.sort((a, b) => a.feature.sort_order - b.feature.sort_order)
+			.map(({ feature }) => feature.id);
+
+	it("takes the active industry's own position", () => {
+		expect(positions('dentistry')).toEqual(['calendar', 'contacts', 'companies']);
+	});
+
+	it("inherits the feature's position where the industry row leaves it null", () => {
+		expect(positions('crm')).toEqual(['calendar', 'companies', 'contacts']);
+	});
+
+	it('reorders without renaming, and renames without reordering', () => {
+		const proposals = row('proposals', {
+			sortOrder: 900,
+			industries: [
+				industry('roofing', { name: 'Quotes' }),
+				industry('beverage', { sort_order: 500 })
+			]
+		});
+		const roofing = resolveFeatures([proposals], org({ industryId: 'roofing' })).proposals.feature;
+		expect(roofing).toMatchObject({ name: 'Quotes', sort_order: 900 });
+		const beverage = resolveFeatures([proposals], org({ industryId: 'beverage' })).proposals
+			.feature;
+		expect(beverage).toMatchObject({ name: 'proposals', sort_order: 500 });
+	});
+
+	it("never borrows another industry's position", () => {
+		const outside = org({
+			industryId: 'cosmetic',
+			overrides: [{ feature_id: 'companies', mode: 'enabled' }]
+		});
+		const { feature, mode } = resolveFeatures(registry, outside).companies;
+		expect(mode).toBe('enabled');
+		expect(feature.sort_order).toBe(200);
 	});
 });
 
