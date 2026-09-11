@@ -17,7 +17,7 @@ const deck = {
 	slides: [
 		{
 			id: 's1',
-			templateId: 'cover',
+			templateId: 'v1-title',
 			content: { text: { heading: 'Hi' }, images: {}, colors: {}, styles: {}, variables: {} }
 		}
 	]
@@ -96,7 +96,8 @@ describe('loadPresentation', () => {
 					quantity: 1,
 					unit_cost: 450,
 					total: 450,
-					sort_order: 1
+					sort_order: 1,
+					product_id: null
 				},
 				{
 					label: 'Crown',
@@ -104,7 +105,8 @@ describe('loadPresentation', () => {
 					quantity: 2,
 					unit_cost: 1450,
 					total: 2900,
-					sort_order: 0
+					sort_order: 0,
+					product_id: 'prod-crown'
 				}
 			]
 		},
@@ -129,6 +131,17 @@ describe('loadPresentation', () => {
 	const values = [
 		{ field_definition_id: 'def-1', value_numeric: 5, value_text: null, value_boolean: null }
 	];
+	const products = [
+		{
+			id: 'prod-crown',
+			sku: 'CROWN',
+			name: 'Porcelain crown',
+			description: 'Lab-made, shade matched.',
+			unit_price: 1450,
+			currency: 'USD',
+			product_categories: null
+		}
+	];
 
 	function stack() {
 		return supabaseTablesMock({
@@ -137,7 +150,8 @@ describe('loadPresentation', () => {
 			contacts: { data: { id: CONTACT_ID, name: 'Dana Whitfield' } },
 			profiles: { data: [{ id: USER_ID, display_name: 'Evan Coppa', email: 'evan@example.com' }] },
 			custom_field_definitions: { data: definitions },
-			custom_field_values: { data: values }
+			custom_field_values: { data: values },
+			products: { data: products }
 		});
 	}
 
@@ -155,6 +169,7 @@ describe('loadPresentation', () => {
 		expect(builders.custom_field_values.eq).toHaveBeenCalledWith('entity_id', 'opt-1');
 		expect(builders.custom_field_values.eq).toHaveBeenCalledWith('entity_id', 'opt-2');
 		expect(builders.profiles.in).toHaveBeenCalledWith('id', [USER_ID]);
+		expect(builders.products.eq).toHaveBeenCalledWith('is_active', true);
 
 		expect(presentation).toMatchObject({
 			org: { name: 'Bright Smile Dental' },
@@ -168,7 +183,17 @@ describe('loadPresentation', () => {
 			client: { name: 'Dana Whitfield' },
 			presenter: { name: 'Evan Coppa' },
 			responsible: null,
-			labels: { presenter: 'Presenter', responsible: 'Provider' }
+			labels: { presenter: 'Presenter', responsible: 'Provider' },
+			products: [
+				{
+					id: 'prod-crown',
+					sku: 'CROWN',
+					name: 'Porcelain crown',
+					description: 'Lab-made, shade matched.',
+					price: 1450,
+					currency: 'USD'
+				}
+			]
 		});
 		expect(presentation?.options).toEqual([
 			{
@@ -180,8 +205,22 @@ describe('loadPresentation', () => {
 				duration: '1 month',
 				financing: '12 months at 4.99% APR',
 				lines: [
-					{ label: 'Crown', detail: '12, 13', quantity: 2, unitCost: 1450, total: 2900 },
-					{ label: 'Whitening', detail: 'Upper', quantity: 1, unitCost: 450, total: 450 }
+					{
+						label: 'Crown',
+						detail: '12, 13',
+						quantity: 2,
+						unitCost: 1450,
+						total: 2900,
+						productId: 'prod-crown'
+					},
+					{
+						label: 'Whitening',
+						detail: 'Upper',
+						quantity: 1,
+						unitCost: 450,
+						total: 450,
+						productId: null
+					}
 				],
 				fields: [
 					{ label: 'Warranty (years)', value: '5' },

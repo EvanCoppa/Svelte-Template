@@ -12,6 +12,7 @@
 	import { Combobox } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { BINDINGS } from '$lib/slides/bindings';
 	import { templateFor } from '$lib/slides/registry';
@@ -21,8 +22,9 @@
 
 	/**
 	 * The right pane: everything the author can set on the selected slide,
-	 * rendered from the template's registry entry — text slots, colours,
-	 * typography, images. No template has a section of its own.
+	 * rendered from the template's registry entry — text slots (drawn by the
+	 * `kind` each one declares), colours, typography, images. No template has
+	 * a section of its own.
 	 */
 	let {
 		slide,
@@ -137,38 +139,63 @@
 					<div class="space-y-3 px-1 pt-1 pb-2">
 						{#each template.text as field (field.key)}
 							{@const bound = slide.content.variables[field.key]?.sourceField ?? NONE}
-							<div class="space-y-1.5">
-								<label
-									for="text-{slide.id}-{field.key}"
-									class="text-[12px] leading-none font-medium text-gray-600 dark:text-gray-300"
-								>
-									{field.label}
-								</label>
-								{#if field.multiline}
-									<Textarea
+							{#if field.kind === 'toggle'}
+								<div class="flex items-center justify-between gap-3 px-1">
+									<label
+										for="text-{slide.id}-{field.key}"
+										class="text-[12px] leading-none font-medium text-gray-600 dark:text-gray-300"
+									>
+										{field.label}
+									</label>
+									<Switch
 										id="text-{slide.id}-{field.key}"
-										value={slide.content.text[field.key] ?? ''}
-										class="min-h-20 text-[13px] leading-relaxed"
-										placeholder={field.default || 'Enter text…'}
-										onchange={(event) => setText(field.key, event.currentTarget.value)}
+										checked={(slide.content.text[field.key] ?? field.default) === 'true'}
+										onCheckedChange={(checked) => setText(field.key, checked ? 'true' : 'false')}
 									/>
-								{:else}
-									<Input
-										id="text-{slide.id}-{field.key}"
-										value={slide.content.text[field.key] ?? ''}
-										class="h-8 text-[13px]"
-										placeholder={field.default || 'Enter text…'}
-										onchange={(event) => setText(field.key, event.currentTarget.value)}
-									/>
-									<Combobox
-										id="bind-{slide.id}-{field.key}"
-										options={bindingOptions}
-										value={bound}
-										onchange={(path) => setBinding(field.key, path)}
-										placeholder="Typed here"
-									/>
-								{/if}
-							</div>
+								</div>
+							{:else}
+								<div class="space-y-1.5">
+									<label
+										for="text-{slide.id}-{field.key}"
+										class="text-[12px] leading-none font-medium text-gray-600 dark:text-gray-300"
+									>
+										{field.label}
+									</label>
+									{#if field.kind === 'multiline'}
+										<Textarea
+											id="text-{slide.id}-{field.key}"
+											value={slide.content.text[field.key] ?? ''}
+											class="min-h-20 text-[13px] leading-relaxed"
+											placeholder={field.default || 'Enter text…'}
+											onchange={(event) => setText(field.key, event.currentTarget.value)}
+										/>
+									{:else if field.kind === 'number'}
+										<Input
+											id="text-{slide.id}-{field.key}"
+											type="number"
+											value={slide.content.text[field.key] ?? ''}
+											class="h-8 text-[13px]"
+											placeholder={field.default || '0'}
+											onchange={(event) => setText(field.key, event.currentTarget.value)}
+										/>
+									{:else}
+										<Input
+											id="text-{slide.id}-{field.key}"
+											value={slide.content.text[field.key] ?? ''}
+											class="h-8 text-[13px]"
+											placeholder={field.default || 'Enter text…'}
+											onchange={(event) => setText(field.key, event.currentTarget.value)}
+										/>
+										<Combobox
+											id="bind-{slide.id}-{field.key}"
+											options={bindingOptions}
+											value={bound}
+											onchange={(path) => setBinding(field.key, path)}
+											placeholder="Typed here"
+										/>
+									{/if}
+								</div>
+							{/if}
 						{/each}
 					</div>
 				</Collapsible.Content>

@@ -14,7 +14,7 @@ function slide(id: string, template: SlideTemplate): SlideInstance {
 
 export function defaultDeck(): SlideDeck {
 	const templates = new Map(TEMPLATES.map((template) => [template.id, template]));
-	const order = ['cover', 'option', 'comparison', 'next-steps', 'thank-you'];
+	const order = ['v1-title', 'option', 'comparison', 'next-steps', 'thank-you-contact'];
 	return {
 		version: DECK_VERSION,
 		slides: order.flatMap((id, index) => {

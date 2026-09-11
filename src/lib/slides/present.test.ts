@@ -31,15 +31,15 @@ function deck(...slides: SlideInstance[]): SlideDeck {
 describe('expandDeck', () => {
 	it('repeats a per-option slide once per option, in order, and keeps the rest as one', () => {
 		const shown = expandDeck(
-			deck(slide('cover'), slide('option'), slide('thank-you')),
+			deck(slide('v1-title'), slide('option'), slide('thank-you-contact')),
 			presentation
 		);
 		expect(shown.map((entry) => entry.key)).toEqual([
-			's-cover',
+			's-v1-title',
 			's-option:sample-1',
 			's-option:sample-2',
 			's-option:sample-3',
-			's-thank-you'
+			's-thank-you-contact'
 		]);
 		expect(shown[1]?.option?.label).toBe('Essential');
 		expect(shown[0]?.option).toBeNull();
@@ -52,10 +52,10 @@ describe('expandDeck', () => {
 	it('skips a slide whose template is no longer in the registry', () => {
 		const stale: SlideInstance = {
 			id: 'old',
-			templateId: 'v1-pricing',
+			templateId: 'education',
 			content: { text: {}, images: {}, colors: {}, styles: {}, variables: {} }
 		};
-		expect(expandDeck(deck(stale, slide('cover')), presentation)).toHaveLength(1);
+		expect(expandDeck(deck(stale, slide('v1-title')), presentation)).toHaveLength(1);
 	});
 });
 
@@ -63,28 +63,28 @@ describe('slideProps', () => {
 	it('fills the live value into a bound slot and keeps authored text where nothing binds', () => {
 		const [shown] = expandDeck(
 			deck(
-				slide('cover', {
-					text: { heading: 'A proposal for you', subheading: 'Custom line' },
-					variables: { heading: { sourceField: 'client.name' } }
+				slide('v1-title', {
+					text: { brandName: 'A proposal for you', subtitle: 'Custom line' },
+					variables: { brandName: { sourceField: 'client.name' } }
 				})
 			),
 			presentation
 		);
 		if (!shown) throw new Error('expected one slide');
 		const props = slideProps(shown, presentation);
-		expect(props.text.heading).toBe('Jordan Rivera');
-		expect(props.text.subheading).toBe('Custom line');
+		expect(props.text.brandName).toBe('Jordan Rivera');
+		expect(props.text.subtitle).toBe('Custom line');
 	});
 
 	it('falls back to the authored text, then the template default, when a binding resolves to nothing', () => {
 		const unnamed = { ...presentation, presenter: null, org: { name: '' } };
 		const [shown] = expandDeck(
 			deck(
-				slide('cover', {
-					text: { heading: 'Written by hand', subheading: '' },
+				slide('v1-title', {
+					text: { brandName: 'Written by hand', subtitle: '' },
 					variables: {
-						heading: { sourceField: 'presenter.name' },
-						subheading: { sourceField: 'org.name' }
+						brandName: { sourceField: 'presenter.name' },
+						subtitle: { sourceField: 'org.name' }
 					}
 				})
 			),
@@ -92,19 +92,19 @@ describe('slideProps', () => {
 		);
 		if (!shown) throw new Error('expected one slide');
 		const props = slideProps(shown, unnamed);
-		expect(props.text.heading).toBe('Written by hand');
-		expect(props.text.subheading).toBe('Prepared with care');
+		expect(props.text.brandName).toBe('Written by hand');
+		expect(props.text.subtitle).toBe('Cityscape');
 	});
 
 	it('merges the template defaults under the authored colours and images', () => {
 		const [shown] = expandDeck(
-			deck(slide('two-column', { colors: { accentColor: '#ff0000' }, images: {} })),
+			deck(slide('two-col-image-text', { colors: { accentColor: '#ff0000' }, images: {} })),
 			presentation
 		);
 		if (!shown) throw new Error('expected one slide');
 		const props = slideProps(shown, presentation);
 		expect(props.colors.accentColor).toBe('#ff0000');
-		expect(props.colors.backgroundColor).toBe('#ffffff');
+		expect(props.colors.backgroundColor).toBe('#f8fafc');
 		expect(props.images.image).toBe('');
 		expect(props.styleVars).toBe('');
 	});
@@ -112,7 +112,9 @@ describe('slideProps', () => {
 	it('turns style overrides into CSS custom properties', () => {
 		const [shown] = expandDeck(
 			deck(
-				slide('cover', { styles: { fontScale: '1.2', verticalAlign: 'top', fontWeight: 'bogus' } })
+				slide('v1-title', {
+					styles: { fontScale: '1.2', verticalAlign: 'top', fontWeight: 'bogus' }
+				})
 			),
 			presentation
 		);
@@ -127,13 +129,27 @@ describe('the default deck', () => {
 	it('names only templates that exist and presents the decision start to finish', () => {
 		const built = defaultDeck();
 		expect(built.slides.map((entry) => entry.templateId)).toEqual([
-			'cover',
+			'v1-title',
 			'option',
 			'comparison',
 			'next-steps',
-			'thank-you'
+			'thank-you-contact'
 		]);
 		expect(expandDeck(built, presentation)).toHaveLength(7);
+	});
+
+	it('binds the runtime slots Yes Smile bound, on the paths this proposal model has', () => {
+		const built = defaultDeck();
+		const cover = built.slides[0];
+		expect(cover?.content.variables).toEqual({
+			doctorName: { sourceField: 'responsible.name' },
+			patientName: { sourceField: 'client.name' }
+		});
+		const [shown] = expandDeck(built, presentation);
+		if (!shown) throw new Error('expected a cover');
+		const props = slideProps(shown, presentation);
+		expect(props.text.doctorName).toBe('Dr. Casey Morgan');
+		expect(props.text.patientName).toBe('Jordan Rivera');
 	});
 
 	it('every template starts with every slot it declares', () => {
@@ -142,6 +158,33 @@ describe('the default deck', () => {
 			expect(Object.keys(content.text)).toEqual(template.text.map((field) => field.key));
 			expect(Object.keys(content.colors)).toEqual(template.colors.map((color) => color.key));
 			expect(Object.keys(content.images)).toEqual(template.images.map((slot) => slot.key));
+		}
+	});
+});
+
+describe('the registry', () => {
+	it('carries every Yes Smile template except the education and AI ones', () => {
+		const ids = TEMPLATES.map((template) => template.id);
+		expect(ids).toContain('v1-pricing');
+		expect(ids).toContain('three-video');
+		expect(ids).toContain('aftercare-closer');
+		expect(ids).not.toContain('education');
+		expect(ids).not.toContain('ai-education');
+		expect(ids).not.toContain('ai-faq');
+		expect(new Set(ids).size).toBe(ids.length);
+	});
+
+	it('repeats the pricing slide per option like the option slide', () => {
+		expect(templateFor('v1-pricing')?.perOption).toBe(true);
+		expect(expandDeck(deck(slide('v1-pricing')), presentation)).toHaveLength(3);
+	});
+
+	it('draws every toggle and number slot from a string default', () => {
+		for (const template of TEMPLATES) {
+			for (const field of template.text) {
+				if (field.kind === 'toggle') expect(['true', 'false']).toContain(field.default);
+				if (field.kind === 'number') expect(Number.isFinite(Number(field.default))).toBe(true);
+			}
 		}
 	});
 });

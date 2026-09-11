@@ -371,8 +371,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   proposal data. Everything under `src/lib/slides/` sees only a deck and a
   `Presentation` — `loadPresentation()` is the one place a proposal is read and named
   for the slides — and every template is one entry in `registry.ts` (component, text
-  slots, image slots, colours) taking the same props, so the builder's editor renders
-  any template from the list and none has a screen of its own. Two pages, both under
+  slots drawn by `kind`, image slots, colours) taking the same props, so the builder's
+  editor renders any template from the list and none has a screen of its own. The
+  library is Yes Smile's, ported as it was (same ids, same look; the education and AI
+  slides and per-provider variants excepted), and the slides Yes Smile filled at
+  present time read the `Presentation` instead — `v1-pricing` is per-option,
+  `v1-products` draws `presentation.products`. Two pages, both under
   `/proposals` so the gate already covers them: `/proposals/slides` (the builder, a
   superforms JSON form on `slideBuilderSchema`, `manage` to open, its parts in `components/`)
   and `/proposals/[id]/present` (the slideshow, in the bare `(present)` route group).

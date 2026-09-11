@@ -6,6 +6,7 @@ import { getDisplayNames } from '$lib/server/profiles';
 import { defaultDeck } from '$lib/slides/default-deck';
 import type { Presentation, PresentationOption, SlideDeck } from '$lib/slides/types';
 import { type CustomField, listCustomFields } from './custom-fields';
+import { listProducts } from './products';
 import { getProposal } from './proposals';
 import { resolveProposalParent } from './records';
 import { ensure, unwrap } from './unwrap';
@@ -20,7 +21,8 @@ import { ensure, unwrap } from './unwrap';
  *                      request-scoped client + active org id.
  *   a presentation   — one proposal read and named for the slides:
  *                      its options with their lines and comparison rows, who
- *                      it is for, who presents it, in the industry's words.
+ *                      it is for, who presents it, in the industry's words —
+ *                      and the org's active catalog, for the products slide.
  *
  * Both pages (`/proposals/slides`, `/proposals/[id]/present`) call these and
  * hand the results to `$lib/slides`; neither reads a table itself.
@@ -115,7 +117,8 @@ function toOption(row: OptionRow, fields: CustomField[]): PresentationOption {
 				detail: line.detail,
 				quantity: line.quantity,
 				unitCost: line.unit_cost,
-				total: line.total ?? 0
+				total: line.total ?? 0,
+				productId: line.product_id
 			})),
 		fields: fields.map((field) => ({ label: field.definition.label, value: fieldText(field) }))
 	};
@@ -138,7 +141,7 @@ export async function loadPresentation(
 	const people = [proposal.presenter_id, proposal.responsible_id].filter(
 		(id): id is string => id !== null
 	);
-	const [rows, parent, names] = await Promise.all([
+	const [rows, parent, names, products] = await Promise.all([
 		supabase
 			.from('proposal_options')
 			.select('*, proposal_line_items(*)')
@@ -147,7 +150,8 @@ export async function loadPresentation(
 			.order('sort_order')
 			.then(unwrap),
 		resolveProposalParent(supabase, orgId, proposal),
-		getDisplayNames(supabase, people)
+		getDisplayNames(supabase, people),
+		listProducts(supabase, orgId, { activeOnly: true })
 	]);
 	const fields = await Promise.all(
 		rows.map((row) =>
@@ -176,6 +180,14 @@ export async function loadPresentation(
 			presenter: context.vocabulary.proposal_presenter,
 			responsible: context.vocabulary.proposal_responsible
 		},
-		options: rows.map((row, index) => toOption(row, fields[index] ?? []))
+		options: rows.map((row, index) => toOption(row, fields[index] ?? [])),
+		products: products.map((product) => ({
+			id: product.id,
+			sku: product.sku,
+			name: product.name,
+			description: product.description,
+			price: product.unit_price,
+			currency: product.currency
+		}))
 	};
 }

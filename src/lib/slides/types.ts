@@ -22,6 +22,18 @@ export type PresentationLine = {
 	quantity: number;
 	unitCost: number;
 	total: number;
+	/** The catalog product the line was picked from, when it was — provenance, like the column. */
+	productId: string | null;
+};
+
+/** One row of the org's catalog, as the products slide shows it. */
+export type PresentationProduct = {
+	id: string;
+	sku: string | null;
+	name: string;
+	description: string | null;
+	price: number;
+	currency: string;
 };
 
 /** One column of the decision — a priced, timed choice. */
@@ -60,6 +72,8 @@ export type Presentation = {
 	/** What the two people are called in this industry: "Presenter" / "Provider". */
 	labels: { presenter: string; responsible: string };
 	options: PresentationOption[];
+	/** The org's active catalog, in name order — what the products slide offers. */
+	products: PresentationProduct[];
 };
 
 /**

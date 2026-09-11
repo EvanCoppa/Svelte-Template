@@ -15,6 +15,8 @@ export const SLIDE_THEME = {
 	text: '#374151',
 	/** Accent: eyebrows, rules, buttons, decorative fills. */
 	accent: '#2563eb',
+	/** The accent's lighter end, for the far side of accent gradients. */
+	accentBright: '#60a5fa',
 	/** Deepest ink, for the far end of dark gradients. */
 	navy: '#0b1a2b',
 	/** Soft neutral surface for cards sitting on the background. */

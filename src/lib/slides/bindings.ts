@@ -4,11 +4,14 @@ import type { Presentation } from './types';
  * The dot paths a text slot may be bound to (`content.variables[key].sourceField`).
  * A fixed list rather than a generic traversal: the builder offers these in
  * a picker, and a path that is not here resolves to nothing, so the authored
- * text stands.
+ * text stands. Yes Smile's `patient.name` / `doctor.name` / `visit.date` /
+ * `visit.id` / `practice.name` are `client.name` / `responsible.name` /
+ * `proposal.date` / `proposal.id` / `org.name` here.
  */
 export const BINDINGS = [
 	{ path: 'proposal.title', label: 'Proposal title' },
 	{ path: 'proposal.date', label: 'Proposal date' },
+	{ path: 'proposal.id', label: 'Proposal id' },
 	{ path: 'client.name', label: 'Client name' },
 	{ path: 'presenter.name', label: 'Presenter name' },
 	{ path: 'responsible.name', label: 'Responsible name' },
@@ -24,6 +27,8 @@ export function bindingValue(presentation: Presentation, path: string): string |
 			return presentation.proposal.title;
 		case 'proposal.date':
 			return presentation.proposal.date;
+		case 'proposal.id':
+			return presentation.proposal.id;
 		case 'client.name':
 			return presentation.client?.name ?? null;
 		case 'presenter.name':

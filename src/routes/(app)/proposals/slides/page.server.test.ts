@@ -82,7 +82,7 @@ const deck = {
 	slides: [
 		{
 			id: 's1',
-			templateId: 'cover',
+			templateId: 'v1-title',
 			content: { text: { heading: 'Hello' }, images: {}, colors: {}, styles: {}, variables: {} }
 		}
 	]

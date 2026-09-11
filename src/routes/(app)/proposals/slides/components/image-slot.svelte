@@ -7,10 +7,11 @@
 	import type { ImageSlot } from '$lib/slides/registry';
 
 	/**
-	 * One image slot: a drop zone while empty, the picture with a remove
-	 * button once filled. The file goes to the upload endpoint (a `+server.ts`,
-	 * since the body is a file, not form inputs) and the URL it answers is
-	 * what the deck stores.
+	 * One image slot — or a video slot, when the registry says `accept:
+	 * 'video'`: a drop zone while empty, the picture (or the video's first
+	 * frame) with a remove button once filled. The file goes to the upload
+	 * endpoint (a `+server.ts`, since the body is a file, not form inputs) and
+	 * the URL it answers is what the deck stores.
 	 */
 	let {
 		slot,
@@ -26,6 +27,8 @@
 	// What the endpoint answers: the URL on success, SvelteKit's error body otherwise.
 	const uploaded = z.object({ url: z.url() });
 	const refused = z.object({ message: z.string() });
+
+	const video = $derived(slot.accept === 'video');
 
 	async function upload(file: File) {
 		uploading = true;
@@ -75,12 +78,16 @@
 		<div
 			class="group relative aspect-video overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
 		>
-			<img src={value} alt="" class="h-full w-full object-cover" />
+			{#if video}
+				<video src={value} preload="metadata" muted class="h-full w-full object-cover"></video>
+			{:else}
+				<img src={value} alt="" class="h-full w-full object-cover" />
+			{/if}
 			<Button
 				variant="ghost"
 				size="icon"
 				class="absolute top-1.5 right-1.5 size-6 bg-black/60 text-white opacity-0 backdrop-blur-sm group-hover:opacity-100 hover:bg-red-500 hover:text-white"
-				aria-label="Remove image"
+				aria-label={video ? 'Remove video' : 'Remove image'}
 				onclick={() => onchange('')}
 			>
 				<Trash2Icon class="size-3" />
@@ -94,7 +101,13 @@
 			ondrop={drop}
 		>
 			<label for={inputId} class="flex cursor-pointer flex-col items-center gap-1.5">
-				<input id={inputId} type="file" accept="image/*" class="hidden" onchange={pick} />
+				<input
+					id={inputId}
+					type="file"
+					accept={video ? 'video/*' : 'image/*'}
+					class="hidden"
+					onchange={pick}
+				/>
 				{#if uploading}
 					<LoaderIcon class="size-5 animate-spin text-blue-500" />
 					<span class="text-[11px] font-medium text-blue-600 dark:text-blue-400">Uploading…</span>

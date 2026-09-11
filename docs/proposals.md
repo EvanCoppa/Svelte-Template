@@ -206,10 +206,26 @@ field rows) and names it in the industry's words. The two pages call those and n
 else.
 
 - **The registry** (`registry.ts`) is one entry per template: the component that draws
-  it and the slots the builder edits — every text slot with its label and default, every
-  image slot, every colour, the typography controls — so the editor renders any template
-  from the list and no template has a screen of its own. Every template takes the same
-  props: `text`, `images`, `colors`, `styleVars`, `presentation`, `option`.
+  it and the slots the builder edits — every text slot with its label, default and
+  `kind` (`multiline`, `toggle`, `number`; a plain input when unset), every image slot
+  (`accept: 'video'` for a clip), every colour, the typography controls — so the editor
+  renders any template from the list and no template has a screen of its own. Every
+  template takes the same props: `text`, `images`, `colors`, `styleVars`,
+  `presentation`, `option`. The library is **Yes Smile's, ported as it was**
+  (`templates/<id>.svelte`, same ids, same look): each component destructures the six
+  props and derives the names its markup used, so a saved Yes Smile deck's keys mean the
+  same thing here. Three are deliberately not here — `education`, `ai-education` and
+  `ai-faq` came from a dental education library and an AI pipeline this template lacks
+  — and per-provider variants (a builder feature) are not either: a slot that named the
+  provider binds to `responsible.name`. The ones Yes Smile filled "in the background"
+  now read the presentation instead: **`v1-pricing`** is `perOption` and prices the
+  option it is handed (its lines add up to the treatment total, the stored `total` is
+  what the client pays, and the gap is the one discount line where Yes Smile listed
+  insurance, courtesy and case fee); **`v1-products`** shows the org's active catalog
+  (`presentation.products`, the SKUs typed on the slide picking which) and badges a
+  product a line already cites instead of adding it to the plan; **`aftercare-closer`**
+  takes its items as typed lines and draws its QR code with `qr.ts`; the video slides
+  take a clip and a poster per slot.
 - **Expansion** (`expandDeck()` in `present.ts`) — a template marked `perOption` (the
   option slide) is repeated once per `proposal_options` row, in `sort_order`, so the
   author places it once and never edits it again when an option is added. The comparison
@@ -218,7 +234,10 @@ else.
 - **Variables** (`slideProps()`) — `content.variables[key].sourceField` is one of the
   paths in `bindings.ts` (`client.name`, `presenter.name`, `proposal.title`, …), resolved
   against the presentation; the authored text, then the template default, stand in when
-  the path resolves to nothing, so a deck renders even with no client named.
+  the path resolves to nothing, so a deck renders even with no client named. Yes Smile's
+  `patient.name` / `doctor.name` / `visit.date` / `visit.id` / `practice.name` are
+  `client.name` / `responsible.name` / `proposal.date` / `proposal.id` / `org.name`,
+  and the templates that bound them still do.
 - **The canvas** is a fixed 1400×850 that `frame.svelte` scales to whatever width it is
   given — the list thumbnail, the picker card, the builder canvas and the presenter's
   stage are all the same frame — and colours are literals the author chose, written into
@@ -231,9 +250,10 @@ else.
   and templates on the left, the deck at reading size in the middle, the selected slide's
   controls on the right, rendered from the registry over a sample presentation. The deck
   is the form — one JSON document posted whole (`dataType: 'json'`, like the proposal
-  builder) and validated by `slideBuilderSchema` before `saveDeck()` upserts it. Images go
-  through `POST /api/slides/images` into the public `slides` bucket under the org's
-  folder (the body is a file, CLAUDE.md's endpoint exception) and the deck stores the URL.
+  builder) and validated by `slideBuilderSchema` before `saveDeck()` upserts it. Images
+  (and the video slides' clips, up to 50 MB — the `slide_videos` migration) go through
+  `POST /api/slides/images` into the public `slides` bucket under the org's folder (the
+  body is a file, CLAUDE.md's endpoint exception) and the deck stores the URL.
 - `/proposals/<id>/present` — the slideshow (`src/routes/(present)/…`, a bare route group
   with no sidebar; it titles itself from its load, the record-title exception). Load is
   `getDeck()` + `loadPresentation()`; the page expands and renders. Reached from the

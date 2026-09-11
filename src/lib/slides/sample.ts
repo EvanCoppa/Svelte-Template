@@ -34,8 +34,22 @@ export function samplePresentation(
 				duration: '6 months',
 				financing: null,
 				lines: [
-					{ label: 'Consultation', detail: null, quantity: 1, unitCost: 200, total: 200 },
-					{ label: 'Core service', detail: '12, 13', quantity: 2, unitCost: 2000, total: 4000 }
+					{
+						label: 'Consultation',
+						detail: null,
+						quantity: 1,
+						unitCost: 200,
+						total: 200,
+						productId: null
+					},
+					{
+						label: 'Core service',
+						detail: '12, 13',
+						quantity: 2,
+						unitCost: 2000,
+						total: 4000,
+						productId: null
+					}
 				],
 				fields: [
 					{ label: 'Warranty', value: '2 years' },
@@ -51,9 +65,30 @@ export function samplePresentation(
 				duration: '4 months',
 				financing: '12 months at 0% APR',
 				lines: [
-					{ label: 'Consultation', detail: null, quantity: 1, unitCost: 200, total: 200 },
-					{ label: 'Core service', detail: '12, 13', quantity: 2, unitCost: 2000, total: 4000 },
-					{ label: 'Premium finish', detail: 'Upper', quantity: 1, unitCost: 3700, total: 3700 }
+					{
+						label: 'Consultation',
+						detail: null,
+						quantity: 1,
+						unitCost: 200,
+						total: 200,
+						productId: null
+					},
+					{
+						label: 'Core service',
+						detail: '12, 13',
+						quantity: 2,
+						unitCost: 2000,
+						total: 4000,
+						productId: null
+					},
+					{
+						label: 'Premium finish',
+						detail: 'Upper',
+						quantity: 1,
+						unitCost: 3700,
+						total: 3700,
+						productId: null
+					}
 				],
 				fields: [
 					{ label: 'Warranty', value: '5 years' },
@@ -69,21 +104,69 @@ export function samplePresentation(
 				duration: '3 months',
 				financing: '24 months at 4.99% APR',
 				lines: [
-					{ label: 'Consultation', detail: null, quantity: 1, unitCost: 200, total: 200 },
-					{ label: 'Core service', detail: '12, 13', quantity: 2, unitCost: 2000, total: 4000 },
+					{
+						label: 'Consultation',
+						detail: null,
+						quantity: 1,
+						unitCost: 200,
+						total: 200,
+						productId: null
+					},
+					{
+						label: 'Core service',
+						detail: '12, 13',
+						quantity: 2,
+						unitCost: 2000,
+						total: 4000,
+						productId: null
+					},
 					{
 						label: 'Premium finish',
 						detail: 'Upper, Lower',
 						quantity: 2,
 						unitCost: 3700,
-						total: 7400
+						total: 7400,
+						productId: null
 					},
-					{ label: 'Aftercare kit', detail: null, quantity: 1, unitCost: 800, total: 800 }
+					{
+						label: 'Aftercare kit',
+						detail: null,
+						quantity: 1,
+						unitCost: 800,
+						total: 800,
+						productId: 'sample-kit'
+					}
 				],
 				fields: [
 					{ label: 'Warranty', value: 'Lifetime' },
 					{ label: 'Includes onboarding', value: 'Yes' }
 				]
+			}
+		],
+		products: [
+			{
+				id: 'sample-kit',
+				sku: 'KIT-1',
+				name: 'Aftercare kit',
+				description: 'Everything needed to look after the result at home.',
+				price: 800,
+				currency: 'USD'
+			},
+			{
+				id: 'sample-guard',
+				sku: 'GUARD-1',
+				name: 'Night guard',
+				description: 'Custom fitted, made in our own lab.',
+				price: 450,
+				currency: 'USD'
+			},
+			{
+				id: 'sample-whitening',
+				sku: 'WHITE-1',
+				name: 'Whitening refill',
+				description: 'A three-month supply of take-home gel.',
+				price: 120,
+				currency: 'USD'
 			}
 		]
 	};
