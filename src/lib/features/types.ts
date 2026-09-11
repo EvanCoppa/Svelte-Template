@@ -37,7 +37,10 @@ export const FEATURE_IDS = [
 	// Views — each a features row at /views/<id> (the views migration).
 	'suppliers',
 	'partner-contacts',
-	'patient-map'
+	'patient-map',
+	'merchant-map',
+	'prospects',
+	'referral-partners'
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];
