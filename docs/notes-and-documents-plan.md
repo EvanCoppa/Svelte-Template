@@ -366,7 +366,8 @@ until last, and puts the part people will judge the product by first.
 note editor only: `/math` with variables, currency, percentages and reactive recompute;
 `/list` checklists; sums, averages, counts. Pure module, vitest beside it, results
 rendered in a gutter (Decision 10). No `@`, no `::`, no AI, no schema change, no new
-dependency. _Exit: a note totals `price * quantity` as you type, and `noteLabel()`,
+dependency. Scoped in full in [antinote-in-notes.md](antinote-in-notes.md), including
+which of Antinote's own features travel to a web textarea and which do not. _Exit: a note totals `price * quantity` as you type, and `noteLabel()`,
 `noteExcerpt()`, search and `notesToMarkdown()` are all provably untouched by it._
 
 **Phase 1b — the language.** `@` with `GET /api/records/search` (gate-filtered), the `::`
