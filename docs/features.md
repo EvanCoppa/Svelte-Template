@@ -157,6 +157,38 @@ Adding a section = one entry in `NAV_CATEGORIES` and the same value in the check
 constraint, by migration. Nothing else changes: the sidebar, the ⌘K palette and the
 feature settings page all render the list.
 
+### Order inside a section
+
+`sort_order` decides where a feature sits inside its section, and it is **spaced**:
+multiples of 100, restarting at 100 in each category (the `nav_sort_order` migration).
+The gaps are the point — a feature that belongs between two others takes a number
+between them instead of renumbering its neighbours, so adding a page stays one insert.
+Values below 100 belong to the static shell entries (`staticNavItems`; Dashboard is 0),
+which is what keeps them above every feature in their section. Only renumber a whole
+section when its gaps genuinely run out, and then put all of it back on multiples of
+100 in one migration.
+
+The order itself is the order of the work — what you open first, then the records you
+keep, then what moves through a state. Never alphabetical, never ship date. A view sits
+directly after the records it filters, so Suppliers reads as a cut of Companies rather
+than a page of its own.
+
+**And the order is the industry's, like the words are** (the `industry_feature_order`
+migration). A practice opens its day on the Schedule and its Patients, a roofer on
+Quotes, a distributor on its accounts — so `industry_features.sort_order` is that
+industry's own position and null inherits `features.sort_order`, exactly the rule
+`name` and `noun` follow on the same row. `resolveFeatures()` applies it, so the
+sidebar, the palette and the feature settings page reorder with no change of their own;
+nothing outside the resolver knows the column exists. Null inherits **column by
+column**, so an industry can rename a feature without reordering it, or reorder it
+without renaming it.
+
+Sections are deliberately **not** per-industry: a feature is filed under the same
+heading everywhere, and only its position inside that heading moves. When a vertical
+does want its own order, set it for every feature in that section, not just the one —
+a section with some rows ordered and the rest inheriting reads as two interleaved
+lists. `crm` is the default and keeps every row null.
+
 ## Pages and titles
 
 A feature is made of **pages**, and a page has a **title**. `pages` is the registry of
@@ -237,9 +269,12 @@ exists, and `pages` is readable by signed-in users only.
 1. Create the route under `src/routes/(app)/<route>/`.
 2. A migration inserts its `features` row (id, name, noun — lower-case singular when
    the feature is a list of records — description, route, icon slug, category (the
-   sidebar section — see "Sidebar sections"; null files it under Other), sort_order), its `industry_features` rows (with the industry's own `name` / `noun`
-   where it calls the feature something else) and its `tier_features` rows — plus
-   `role_permissions` grants if plain members need it.
+   sidebar section — see "Sidebar sections"; null files it under Other), sort_order —
+   the last number in that section plus 100, or halfway between two entries), its
+   `industry_features` rows (with the industry's own `name` / `noun` where it calls the
+   feature something else, and its own `sort_order` where the vertical puts it
+   somewhere else) and its `tier_features` rows — plus `role_permissions` grants if
+   plain members need it.
 3. The same migration inserts a `pages` row per screen the feature is made of
    (`feature_id`, `path`, `title` — null for the feature's own list page, so it follows
    the feature's name).

@@ -958,6 +958,7 @@ export type Database = {
           industry_id: string
           name: string | null
           noun: string | null
+          sort_order: number | null
         }
         Insert: {
           created_at?: string
@@ -965,6 +966,7 @@ export type Database = {
           industry_id: string
           name?: string | null
           noun?: string | null
+          sort_order?: number | null
         }
         Update: {
           created_at?: string
@@ -972,6 +974,7 @@ export type Database = {
           industry_id?: string
           name?: string | null
           noun?: string | null
+          sort_order?: number | null
         }
         Relationships: [
           {
