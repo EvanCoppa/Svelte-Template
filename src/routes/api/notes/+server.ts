@@ -19,7 +19,7 @@ export const POST: RequestHandler = async (event) => {
 	if (!parsed.success) {
 		throw error(400, parsed.error.issues[0]?.message ?? 'That note could not be saved.');
 	}
-	const { title, body, color, entityType, entityId } = parsed.data;
+	const { title, body, color, categoryId, entityType, entityId } = parsed.data;
 
 	// A note about a record the caller may not open would be a note they can
 	// never see again — and asking whether the insert succeeds would say
@@ -37,7 +37,7 @@ export const POST: RequestHandler = async (event) => {
 		const note = await createNote(
 			supabase,
 			orgId,
-			{ title, body, color },
+			{ title, body, color, category_id: categoryId },
 			entityType && entityId ? { entityType, entityId } : undefined
 		);
 		return json(note, { status: 201 });

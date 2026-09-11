@@ -71,6 +71,8 @@
 	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
 	import { mapConfig } from '$lib/map';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import * as GroupList from '$lib/components/group-list/index.js';
+	import * as Kanban from '$lib/components/kanban/index.js';
 	import * as MapView from '$lib/components/map-view/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
@@ -105,6 +107,7 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import DownloadIcon from '@lucide/svelte/icons/download';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import {
@@ -253,6 +256,44 @@
 		{ id: 'INV-001', status: 'Paid', method: 'Credit card', amount: '$250.00' },
 		{ id: 'INV-002', status: 'Pending', method: 'PayPal', amount: '$150.00' },
 		{ id: 'INV-003', status: 'Unpaid', method: 'Bank transfer', amount: '$350.00' }
+	];
+
+	// Board and grouped list — the page owns the columns, the cards and what a
+	// move means, exactly as a real screen does. `/tasks` is the worked example.
+	const boardColumns = [
+		{ value: 'todo', label: 'To do', tone: 'neutral' },
+		{ value: 'doing', label: 'In progress', tone: 'info' },
+		{ value: 'done', label: 'Done', tone: 'success' }
+	] as const;
+
+	let boardCards = $state([
+		{ id: 'k1', title: 'Draft the retainer', column: 'todo', meta: 'Friday' },
+		{ id: 'k2', title: 'Site survey photos', column: 'todo', meta: 'Next week' },
+		{ id: 'k3', title: 'Chase the signature', column: 'doing', meta: 'Today' },
+		{ id: 'k4', title: 'Send the invoice', column: 'done', meta: 'Yesterday' }
+	]);
+
+	function moveBoardCard(id: string, column: string) {
+		boardCards = boardCards.map((card) => (card.id === id ? { ...card, column } : card));
+	}
+
+	const shelvedFiles = [
+		{
+			id: 'contracts',
+			label: 'Contracts',
+			tone: 'info' as const,
+			rows: [
+				{ id: 'f1', name: 'Retainer — Wayne Enterprises', meta: 'PDF · 240 KB' },
+				{ id: 'f2', name: 'Master services agreement', meta: 'PDF · 1.1 MB' }
+			]
+		},
+		{
+			id: 'photos',
+			label: 'Site photos',
+			tone: 'cyan' as const,
+			rows: [{ id: 'f3', name: 'North elevation', meta: 'JPG · 3.2 MB' }]
+		},
+		{ id: 'unfiled', label: 'Unfiled', tone: undefined, rows: [] }
 	];
 
 	// Data table — the page owns the rows, the columns and the table instance;
@@ -1991,6 +2032,83 @@
 						</Breadcrumb.Item>
 					</Breadcrumb.List>
 				</Breadcrumb.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Boards &amp; grouped lists</h2>
+		</div>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Kanban board</Card.Title>
+				<Card.Description>
+					Drag a card between columns, or focus its handle and move it with the arrow keys after
+					Space. The page owns the columns and the cards and decides what a move means — here it
+					only rearranges the array.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Kanban.Root onmove={moveBoardCard}>
+					{#each boardColumns as column (column.value)}
+						{@const cards = boardCards.filter((card) => card.column === column.value)}
+						<Kanban.Column value={column.value} label={column.label}>
+							<Kanban.ColumnHeader tone={column.tone} count={cards.length}>
+								{column.label}
+							</Kanban.ColumnHeader>
+							{#each cards as card (card.id)}
+								<Kanban.Card id={card.id} column={column.value} label={card.title}>
+									<p class="font-medium">{card.title}</p>
+									<p class="text-muted-foreground text-xs">{card.meta}</p>
+								</Kanban.Card>
+							{:else}
+								<Kanban.Empty>Nothing here</Kanban.Empty>
+							{/each}
+						</Kanban.Column>
+					{/each}
+				</Kanban.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Group list</Card.Title>
+				<Card.Description>
+					A list that comes in headings, each of which opens and shuts. Nothing here groups, counts
+					or names anything — the page arrives with its rows already in piles, because what a pile
+					means is the page's to know.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<GroupList.Root>
+					{#each shelvedFiles as shelf (shelf.id)}
+						<GroupList.Group open={shelf.rows.length > 0}>
+							<GroupList.Header
+								tone={shelf.tone}
+								count="{shelf.rows.length} {shelf.rows.length === 1 ? 'file' : 'files'}"
+							>
+								{shelf.label}
+							</GroupList.Header>
+							<GroupList.Items>
+								{#each shelf.rows as row (row.id)}
+									<GroupList.Item>
+										{#snippet lead()}<Checkbox aria-label={row.name} />{/snippet}
+										<GroupList.ItemTitle>{row.name}</GroupList.ItemTitle>
+										<GroupList.ItemMeta>{row.meta}</GroupList.ItemMeta>
+										{#snippet trail()}
+											<Button variant="ghost" size="icon" class="size-8">
+												<DownloadIcon class="size-4" />
+												<span class="sr-only">Download {row.name}</span>
+											</Button>
+										{/snippet}
+									</GroupList.Item>
+								{:else}
+									<GroupList.Empty>Nothing filed here yet.</GroupList.Empty>
+								{/each}
+							</GroupList.Items>
+						</GroupList.Group>
+					{/each}
+				</GroupList.Root>
 			</Card.Content>
 		</Card.Root>
 

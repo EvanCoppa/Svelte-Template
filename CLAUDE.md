@@ -404,6 +404,31 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
   the road for a JS-born mutation that belongs to the page it lives on. The feature
   is named by the industry ("Schedule" / "appointment" in a practice).
+- **A task has a column AND a finishing time, and a trigger holds them together**
+  (`task_workflow` migration + `src/lib/crm/tasks.ts` + `src/routes/(app)/tasks/`).
+  `tasks.status` (`task_status`: todo / in_progress / blocked / done) says WHERE the
+  task sits; `completed_at` says WHEN it was finished. They are not two ways to say
+  the same thing, and `private.tasks_sync_completion()` keeps the one relationship
+  between them — `status = 'done'` exactly when the timestamp is set — so the board
+  writes `status`, the checkbox writes `completed_at`, and neither knows the other
+  column exists. An enum rather than rows, unlike `pipeline_stages`: "not started,
+  underway, stuck, finished" is the same four states in every vertical, and what a
+  task is CALLED is already the industry's through the feature's terms. There is no
+  `cancelled` state on purpose — it would be a second closed state and the timestamp
+  can only be honest about one. **The page is not a table**: a `Kanban` board by
+  status and a `GroupList` by due-date bucket, the choice remembered per device
+  (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
+  and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
+  for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
+- **A note is filed on a shelf the org invented** (`note_categories` migration +
+  `src/lib/server/crm/note-categories.ts`). Rows, not an enum — the opposite call to
+  `task_status` and the same one `pipelines` made: no two orgs group their writing
+  alike. `notes.category_id` is nullable and always will be, so `/notes` opens on the
+  unfiled pile rather than demanding a category first, and deleting a shelf unfiles
+  its notes through `on delete set null` rather than taking them with it. The page
+  groups by category with `GroupList`; a category is edited from the page out of a
+  form, so it is an **ordinary form action**, while filing a note is editing the note
+  and still goes through `/api/notes` — one road per thing, not one per screen.
 
 ## Database
 
@@ -704,6 +729,19 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   (the sidebar, the palette and the feature gate already do); never navigate somewhere to pitch
   a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
   the reference.
+- **A board is `Kanban`** (`src/lib/components/kanban/`), the app-level compound for "cards in
+  columns you can move one between": `Kanban.Root` owns the drag state, `Kanban.Column` registers
+  its own drop zone, `Kanban.Card` is the draggable shell with a real handle button on it. The page
+  owns the columns, the cards and what a move means — the board hands back a card id and the
+  column it was released over, and nothing else. Moving works from the keyboard as well as under a
+  pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
+  `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
+- **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
+  sections over rows (`layout="rows"`) or cards (`layout="grid"`), used by `/tasks` and `/notes`.
+  Nothing in it groups, sorts, counts or names anything: the page arrives with its rows already in
+  piles, because what a pile means and what it is called are the page's to know (a count reads
+  "3 quotes" through `recordTerms()`, never a hardcoded noun). Not to be confused with
+  `enhanced/accordion`, which is a config-object component for panels of text.
 - Success feedback is a **toast**, per "Mutation feedback" below — never a hand-rolled banner.
 - An inline form message is `FormAlert` from `ui/alert` — `<FormAlert message={form?.message} />`,
   with `variant="success"` for the rare non-toast confirmation. Never a `<p>` with tinted

@@ -68,14 +68,48 @@ export const TICKET_PRIORITY_TONE = {
 	urgent: 'error'
 } satisfies Record<Enums<'ticket_priority'>, BadgeTone>;
 
-/** A task has no status column: done is `completed_at` being set (see tasks.ts). */
-export type TaskState = 'open' | 'done';
-
-export const TASK_STATE_TONE = {
-	open: 'info',
+/**
+ * Where a task sits on the board. `done` is pinned to `completed_at` by
+ * trigger (the task_workflow migration), so a done card and a ticked checkbox
+ * are the same row in the same state — there is no second flag to disagree.
+ */
+export const TASK_STATUS_TONE = {
+	todo: 'neutral',
+	in_progress: 'info',
+	blocked: 'warning',
 	done: 'success'
-} satisfies Record<TaskState, BadgeTone>;
+} satisfies Record<Enums<'task_status'>, BadgeTone>;
 
-export function taskState(task: Pick<Tables<'tasks'>, 'completed_at'>): TaskState {
-	return task.completed_at ? 'done' : 'open';
+/**
+ * The one enum in the app whose values are not already words, so the label
+ * lives next to the tone rather than in whichever screen drew it first —
+ * "in_progress" is not a thing to show anybody. Board column, list heading and
+ * record pill all read it, which is what keeps them from disagreeing.
+ */
+export const TASK_STATUS_LABEL = {
+	todo: 'To do',
+	in_progress: 'In progress',
+	blocked: 'Blocked',
+	done: 'Done'
+} satisfies Record<Enums<'task_status'>, string>;
+
+/** The board's columns, left to right: not started, moving, stuck, finished. */
+export const TASK_STATUSES = [
+	'todo',
+	'in_progress',
+	'blocked',
+	'done'
+] as const satisfies readonly Enums<'task_status'>[];
+
+/** Only the urgencies that ask for something get a colour; low and normal stay quiet. */
+export const TASK_PRIORITY_TONE = {
+	low: 'neutral',
+	normal: 'neutral',
+	high: 'orange',
+	urgent: 'error'
+} satisfies Record<Enums<'task_priority'>, BadgeTone>;
+
+/** Whether a task is finished, asked of the column rather than the timestamp. */
+export function taskIsDone(task: Pick<Tables<'tasks'>, 'status'>): boolean {
+	return task.status === 'done';
 }

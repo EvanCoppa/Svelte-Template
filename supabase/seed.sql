@@ -311,10 +311,35 @@ insert into public.deals (id, org_id, contact_id, title, amount, assigned_to, cr
 		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
-insert into public.tasks (id, org_id, company_id, title, due_at, assigned_to, created_by) values
+-- Tasks, spread so the board has a card in every column and the grouped list
+-- has a row in every bucket: one overdue, one due today, one later this week,
+-- one with no date at all, and one already finished. The status column and
+-- `completed_at` are held in step by trigger (the task_workflow migration), so
+-- the done row below sets only the status and the timestamp fills itself in.
+insert into public.tasks (id, org_id, company_id, contact_id, title, details, due_at, status, priority, assigned_to, created_by) values
 	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'20000000-0000-0000-0000-000000000001', 'Send renewal quote', now() + interval '7 days',
-		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003')
+		'20000000-0000-0000-0000-000000000001', null, 'Send renewal quote',
+		'Mid tier, hold the discount back.', now() + interval '7 days',
+		'todo', 'high',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+		'Chase the signed order form', null, now() - interval '2 days',
+		'in_progress', 'urgent',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001'),
+	('50000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		 null, '30000000-0000-0000-0000-000000000003', 'Confirm the site visit window',
+		'Waiting on building access.', date_trunc('day', now()) + interval '16 hours',
+		'blocked', 'normal',
+		'00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		null, null, 'Tidy the proposal templates', null, null,
+		'todo', 'low',
+		null, '00000000-0000-0000-0000-000000000001'),
+	('50000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', null, 'Book the Q4 pricing review', null,
+		now() - interval '5 days', 'done', 'normal',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
 -- The interaction log that replaced `notes`: a note, a call and an email, so a
@@ -361,6 +386,22 @@ insert into public.notes (id, org_id, entity_type, entity_id, title, body, color
 		E'Dev, then E2E, then Evan. Superseded by the rota.',
 		'neutral', now() - interval '3 days', '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
+
+-- The shelves the notes page groups by, and which notes sit on them. Two
+-- named categories plus the notes that stay unfiled, so the page renders the
+-- accordion with a filled group, a second group and the unfiled pile it always
+-- opens with.
+insert into public.note_categories (id, org_id, name, color, position) values
+	('e0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Accounts', 'info', 1),
+	('e0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'Office', 'cyan', 2)
+on conflict (id) do nothing;
+
+update public.notes set category_id = 'e0000000-0000-0000-0000-000000000001'
+where id in ('d0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002');
+update public.notes set category_id = 'e0000000-0000-0000-0000-000000000002'
+where id = 'd0000000-0000-0000-0000-000000000003';
 
 insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
 	('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',

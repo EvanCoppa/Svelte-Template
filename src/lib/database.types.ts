@@ -1223,11 +1223,50 @@ export type Database = {
           },
         ]
       }
+      note_categories: {
+        Row: {
+          color: Database["public"]["Enums"]["badge_tone"]
+          created_at: string
+          id: string
+          name: string
+          org_id: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          id?: string
+          name: string
+          org_id: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: Database["public"]["Enums"]["badge_tone"]
+          created_at?: string
+          id?: string
+          name?: string
+          org_id?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_categories_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           archived_at: string | null
           author_id: string | null
           body: string
+          category_id: string | null
           color: Database["public"]["Enums"]["badge_tone"]
           created_at: string
           entity_id: string | null
@@ -1242,6 +1281,7 @@ export type Database = {
           archived_at?: string | null
           author_id?: string | null
           body?: string
+          category_id?: string | null
           color?: Database["public"]["Enums"]["badge_tone"]
           created_at?: string
           entity_id?: string | null
@@ -1256,6 +1296,7 @@ export type Database = {
           archived_at?: string | null
           author_id?: string | null
           body?: string
+          category_id?: string | null
           color?: Database["public"]["Enums"]["badge_tone"]
           created_at?: string
           entity_id?: string | null
@@ -1267,6 +1308,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notes_category_id_org_id_fkey"
+            columns: ["category_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "note_categories"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "notes_org_id_fkey"
             columns: ["org_id"]
@@ -3246,6 +3294,8 @@ export type Database = {
           due_at: string | null
           id: string
           org_id: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
         }
@@ -3260,6 +3310,8 @@ export type Database = {
           due_at?: string | null
           id?: string
           org_id: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at?: string
         }
@@ -3274,6 +3326,8 @@ export type Database = {
           due_at?: string | null
           id?: string
           org_id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
         }
@@ -3593,6 +3647,8 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
+      task_priority: "low" | "normal" | "high" | "urgent"
+      task_status: "todo" | "in_progress" | "blocked" | "done"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
@@ -3829,6 +3885,8 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
+      task_priority: ["low", "normal", "high", "urgent"],
+      task_status: ["todo", "in_progress", "blocked", "done"],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },

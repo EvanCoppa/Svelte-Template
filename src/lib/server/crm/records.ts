@@ -9,10 +9,11 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
-	TASK_STATE_TONE,
+	TASK_PRIORITY_TONE,
+	TASK_STATUS_LABEL,
+	TASK_STATUS_TONE,
 	TICKET_PRIORITY_TONE,
-	TICKET_STATUS_TONE,
-	taskState
+	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
@@ -388,12 +389,14 @@ export function describeProposal(
 }
 
 export function describeTask(row: TaskWithParties, canOpen: CanOpen): RecordDetail {
-	const state = taskState(row);
 	return {
 		kind: 'task',
 		id: row.id,
 		name: row.title,
-		pills: [pill(state, TASK_STATE_TONE[state])],
+		pills: [
+			pill(TASK_STATUS_LABEL[row.status], TASK_STATUS_TONE[row.status]),
+			pill(row.priority, TASK_PRIORITY_TONE[row.priority])
+		],
 		fields: [
 			{ label: 'Company', value: record('company', row.companies, canOpen) },
 			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
@@ -594,12 +597,11 @@ function relatedProposal(row: ProposalWithOptions): RelatedRecord {
 }
 
 function relatedTask(row: Task): RelatedRecord {
-	const state = taskState(row);
 	return {
 		id: row.id,
 		name: row.title,
 		href: recordHref('task', row.id),
-		pill: pill(state, TASK_STATE_TONE[state]),
+		pill: pill(TASK_STATUS_LABEL[row.status], TASK_STATUS_TONE[row.status]),
 		meta: row.due_at ? `Due ${mediumDate.format(new Date(row.due_at))}` : null
 	};
 }
