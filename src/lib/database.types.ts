@@ -608,6 +608,7 @@ export type Database = {
           key: string
           label: string
           org_id: string
+          sort_order: number | null
           updated_at: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
         }
@@ -619,6 +620,7 @@ export type Database = {
           key: string
           label: string
           org_id: string
+          sort_order?: number | null
           updated_at?: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
         }
@@ -630,6 +632,7 @@ export type Database = {
           key?: string
           label?: string
           org_id?: string
+          sort_order?: number | null
           updated_at?: string
           value_type?: Database["public"]["Enums"]["custom_field_value_type"]
         }
@@ -950,6 +953,50 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      industry_custom_fields: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          industry_id: string
+          key: string
+          label: string
+          sort_order: number | null
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          industry_id: string
+          key: string
+          label: string
+          sort_order?: number | null
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          industry_id?: string
+          key?: string
+          label?: string
+          sort_order?: number | null
+          value_type?: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_custom_fields_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       industry_features: {
         Row: {
@@ -3587,6 +3634,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_industry_custom_fields: {
+        Args: { industry: string; org: string }
+        Returns: number
+      }
       create_default_pipeline: { Args: { org: string }; Returns: string }
     }
     Enums: {

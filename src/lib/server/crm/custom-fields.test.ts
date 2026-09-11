@@ -27,6 +27,9 @@ describe('custom fields data access', () => {
 		expect(definitions.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(definitions.eq).toHaveBeenCalledWith('entity_type', 'contact');
 		expect(definitions.eq).not.toHaveBeenCalledWith('entity_id', CONTACT_ID);
+		// Positioned fields first, then the rest by label (the industry_custom_fields
+		// migration ships a set whose order is part of what it ships).
+		expect(definitions.order).toHaveBeenCalledWith('sort_order', { nullsFirst: false });
 		expect(definitions.order).toHaveBeenCalledWith('label');
 		const values = builders.custom_field_values;
 		expect(values.eq).toHaveBeenCalledWith('entity_type', 'contact');

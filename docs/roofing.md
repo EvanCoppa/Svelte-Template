@@ -144,11 +144,11 @@ templates copied into an org on creation — not as a lookup consulted at read t
 
 Three options, and the middle one is right:
 
-| option                    | what it is                                                                                                                          | why not / why                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A — seed only             | put the roofing definitions in `seed.sql` against Ridgeline and Northwind                                                           | they exist only on the local stack; a real roofing org still starts blank. Fine as a fixture, not as an answer                                                                                                                                                                                                                                         |
-| **B — templates, copied** | `industry_custom_fields` reference rows; `handle_new_organization` copies the org's industry's rows into `custom_field_definitions` | follows the `tiers`/`features` precedent: reference data by migration, readable by all, written by migrations only. The org **owns** its copies — it can rename, reorder, add and delete them, which is what an org will want on day two. `custom_field_values` keeps pointing at a real `custom_field_definitions` row, so nothing downstream changes |
-| C — resolved at read      | definitions resolve industry rows + org rows at query time, null inheriting                                                         | matches the names/order precedent most literally, but a value has to reference a definition id, and an industry row is not an org's row. It would need the value table to carry a nullable pair, which is a real complication for no benefit an org would notice                                                                                       |
+| option                             | what it is                                                                                                                          | why not / why                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A — seed only                      | put the roofing definitions in `seed.sql` against Ridgeline and Northwind                                                           | they exist only on the local stack; a real roofing org still starts blank. Fine as a fixture, not as an answer                                                                                                                                                                                                                                         |
+| **B — templates, copied** (chosen) | `industry_custom_fields` reference rows, copied into `custom_field_definitions` by a trigger on org creation and on industry change | follows the `tiers`/`features` precedent: reference data by migration, readable by all, written by migrations only. The org **owns** its copies — it can rename, reorder, add and delete them, which is what an org will want on day two. `custom_field_values` keeps pointing at a real `custom_field_definitions` row, so nothing downstream changes |
+| C — resolved at read               | definitions resolve industry rows + org rows at query time, null inheriting                                                         | matches the names/order precedent most literally, but a value has to reference a definition id, and an industry row is not an org's row. It would need the value table to carry a nullable pair, which is a real complication for no benefit an org would notice                                                                                       |
 
 B is one migration (the table, its RLS, the copy in `handle_new_organization`, and a
 back-fill for existing orgs) and no app change at all: by the time any load runs, the rows
@@ -337,8 +337,15 @@ renames; roofing's re-numbered nav order. Proven by `npm run db:reset`.
 industry-aware `create_default_pipeline()` with a roofing board, the seed comment on
 Globex's override rewritten, and the job custom fields.
 
-**Phase 3 — industry custom fields.** The `industry_custom_fields` table, the copy in
-`handle_new_organization`, the back-fill, and every table above as rows.
+**Phase 3 — industry custom fields. Shipped** (`20260911160000_industry_custom_fields.sql`).
+The `industry_custom_fields` table, `apply_industry_custom_fields()`, a trigger on org
+creation **and** on an org's industry changing, the back-fill, and all 52 roofing rows
+above. `custom_field_definitions` gained a nullable `sort_order` so a shipped set keeps the
+order it was shipped in — `listCustomFields()` orders by it and falls back to label, which
+is the only app change. Two things worth knowing: there is **no `date` value type** (the
+enum is text / numeric / boolean / select), so the date fields above ship as `text` until a
+`date` type earns its own change; and a copy an org deletes comes back the next time a
+migration runs the back-fill, which the migration's closing comment explains and bounds.
 
 **Phase 4 — the material chain.** `purchases` and `shipments` as features: rows, routes,
 data modules, list pages, record-page branches.

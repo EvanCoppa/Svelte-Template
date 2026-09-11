@@ -21,11 +21,16 @@ export type CustomFieldValue = Tables<'custom_field_values'>;
 export type CustomField = { definition: CustomFieldDefinition; value: CustomFieldValue | null };
 
 /**
- * Every field the org declares for the record's kind, by label, paired with
- * the record's value where it has one. Two plain queries joined here rather
- * than one embed: the values table carries two foreign keys to definitions,
- * and naming one in an embed hint is the kind of detail a reader should not
- * have to know to trust the join.
+ * Every field the org declares for the record's kind, in the order the org
+ * put them in, paired with the record's value where it has one. A field with
+ * no `sort_order` sorts by label behind those that have one — the
+ * null-inherits rule, and what a shipped set (the industry_custom_fields
+ * migration) needs so eleven insurance fields read as a form instead of
+ * interleaving alphabetically with the permit and the dumpster.
+ *
+ * Two plain queries joined here rather than one embed: the values table
+ * carries two foreign keys to definitions, and naming one in an embed hint is
+ * the kind of detail a reader should not have to know to trust the join.
  */
 export async function listCustomFields(
 	supabase: SupabaseClient<Database>,
@@ -38,6 +43,7 @@ export async function listCustomFields(
 			.select('*')
 			.eq('org_id', orgId)
 			.eq('entity_type', entity.entityType)
+			.order('sort_order', { nullsFirst: false })
 			.order('label'),
 		supabase
 			.from('custom_field_values')

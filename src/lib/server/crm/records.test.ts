@@ -486,6 +486,7 @@ describe('describing a record', () => {
 			label: 'Preferred channel',
 			value_type,
 			allowed_values: ['email', 'phone'],
+			sort_order: null,
 			created_at: STAMPS.created_at,
 			updated_at: STAMPS.updated_at
 		});
