@@ -98,6 +98,7 @@ single story instead of "RLS, except on the API".
 | `src/lib/schemas/notes.ts`            | The bodies `/api/notes` accepts, and the length constraints.                                    |
 | `src/lib/notes.ts`                    | What a note IS to the browser: label, excerpt, search, markdown, colors, who may edit it. Pure. |
 | `src/lib/notes-api.ts`                | `noteCommands` — the four writes, with the refresh and the error toast in them.                 |
+| `src/lib/floating-notes.svelte.ts`    | Where the notes pulled off the dock float — this tab's, in `sessionStorage`, per user and org.  |
 | `src/lib/components/note/`            | `Note.Card` / `Editor` / `Palette` / `Actions`, composed by every surface.                      |
 | `src/lib/components/note-dock.svelte` | The dock itself, mounted once by the `(app)` layout.                                            |
 
@@ -112,21 +113,58 @@ The dock is the product's signature, so it is built the way the Mac app describe
 - **At rest** — one colored dash per open note, a few pixels wide, on the right edge.
 - **Fanned** — pointing at it (or focusing it) turns the notes into tabs sticking out of
   the edge: each one its own paper in its own color, its label — its title, or its
-  first line if it has none — written up the spine, and a dashed fold where the paper
-  disappears into the edge. A tab is as tall as its label. Under the tabs sit the two
-  round buttons: a new note, and the door to `/notes`.
+  first line if it has none — written up the spine, and a perforated fold where the
+  paper disappears into the edge (a painted gradient whose tiles are gap–dash–gap and
+  `round`ed to fit, so the run starts and ends with a gap and no dash touches the
+  card). A tab is as tall as its label. Under the tabs sit the two round buttons: a new
+  note, and the door to `/notes`.
 - **Previewing** — pointing at a tab slides it out (`w-11` → `w-80`) far enough to read
   the start of it: the label as a heading and the first lines of the body
   (`noteExcerpt()`, which skips an untitled note's first line rather than saying it
   twice). Nothing is opened yet, and the pointer moving to the next tab slides this one
   back in.
-- **Open** — clicking a tab replaces the fan with the note at full size, editing in
-  place.
+- **Grown** — clicking a tab grows it, where it is, into the whole note: still stuck to
+  the edge, the other tabs still beside it, editing in place. There is no window around
+  it; the × in its corner folds it back to a tab.
 
 `⌥⌘L` leaves all of it for `/notes`, which is the same notes with room to search them.
-Escape steps back one level at a time. The pointer leaving closes the fan, but never
-while a note is open — closing a note someone is typing into is the one thing the
-interaction must not do.
+Escape steps back one level at a time. The pointer leaving lets the fan **settle back
+in after a beat** (`RETRACT_DELAY`, 400 ms) — the previewed tab slides in, then the fan
+springs back to the rail — rather than snapping shut on it; and never while a note is
+grown, because closing a note someone is typing into is the one thing the interaction
+must not do.
+
+## The two drags
+
+Both ride on window pointer events rather than pointer capture, because the note being
+carried changes DOM nodes mid-gesture (a tab's `<li>` becomes a floating card), and a
+node that is replaced loses any capture it held. A press is a click until it has moved
+`LIFT` (6 px); after that the click the browser fires on release is swallowed.
+
+- **Along the rail: reorder.** Pick up a tab and the others make room
+  (`animate:motionFlip`); drop it and the rail is saved in that order. The order is a
+  column — `notes.position`, a double, the `notes_position` migration — and a drop
+  writes **one row**: the moved note takes the midpoint between its new neighbours
+  (`positionAt()` / `positionBetween()` in `$lib/notes.ts`), so nothing else is
+  renumbered. New notes default to the epoch of `now()`, which is `created_at desc` by
+  another name, so an untouched rail is exactly what it was. Moving a note is editing
+  it, so RLS decides who may: a member drags their own notes among everybody's, an
+  owner/admin drags any, and the dock only offers the drag where the save would land
+  (`canArchiveNote()`, the same test the actions use). The pointer's order stays on
+  screen until `QUERY.notes` comes back agreeing — or, on a refusal, with the order it
+  was.
+- **Off the edge: float.** Take a grown note by its rim — the paper's padding; the
+  words, the palette and the buttons stay what they are — and pull, and it comes off
+  the dock as a sticky note floating over the page, following the hand from where it
+  was grabbed. Let go anywhere and it stays there, over every screen: the dock is the
+  shell's, so a navigation does not move it, and `$lib/floating-notes.svelte` keeps the
+  corner in `sessionStorage` (this tab's own, scoped to user and org like the breadcrumb
+  trail) so a reload does not either. The × on it, or dropping it back over the dock,
+  puts it back on the rail; a drop that would leave it off screen is clamped so a
+  grabbable strip stays inside (`clampPlacement()`). While a note floats its tab leaves
+  the rail — it is on the desk, not on the edge. Only the placement is stored: the note
+  is still the layout's row, so archiving or deleting it takes it off the desk with no
+  wiring of its own.
 
 The dock is `hidden md:block`: a fixed rail on a phone fights the mobile sidebar, and
 `/notes` is the whole feature on a small screen.
@@ -164,9 +202,6 @@ as text.
 - **Re-pointing a note from the UI.** The column grant allows it and the data module
   would take it; what is missing is a record picker. A note is born attached (from a
   record page) or unattached (from the dock) today.
-- **Reordering the rail.** Notes sit newest first, by creation rather than by edit, so a
-  note never climbs the rail while it is being typed into. Drag-to-reorder would need a
-  `position` column and nothing yet asks for one.
 - **A no-JavaScript path.** The whole surface is autosave and hover; there is no form to
   post without it.
 - **Per-user private notes.** Notes are org-scoped like everything else here (`profiles`

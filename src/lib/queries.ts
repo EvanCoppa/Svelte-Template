@@ -28,6 +28,7 @@ export const QUERY = {
 	quickPlans: 'app:quick-plans',
 	/** The org's one slide deck — the builder saves it, the presenter reads it. */
 	slides: 'app:slides',
+	assets: 'app:assets',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	tasks: 'app:tasks',

@@ -181,6 +181,29 @@ describe('createRecord', () => {
 		);
 	});
 
+	it('writes an asset with its own columns only: no owner, no vendor, no assignee', async () => {
+		const { supabase, builder } = supabaseMock({ data: { id: 'f1' } });
+
+		await submit(supabase, OWNER, 'asset', {
+			name: 'MacBook Pro',
+			asset_type: 'device',
+			identifier: 'IT-001',
+			status: 'retired',
+			acquired_on: '2026-01-15',
+			purchase_price: '2399'
+		});
+		expect(builder.insert).toHaveBeenCalledWith({
+			name: 'MacBook Pro',
+			asset_type: 'device',
+			identifier: 'IT-001',
+			status: 'retired',
+			acquired_on: '2026-01-15',
+			purchase_price: 2399,
+			description: null,
+			org_id: ORG_ID
+		});
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 

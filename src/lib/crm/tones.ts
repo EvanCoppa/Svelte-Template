@@ -22,6 +22,12 @@ export const COMPANY_RELATIONSHIP_TONE = {
 	other: 'neutral'
 } satisfies Record<Enums<'company_relationship'>, BadgeTone>;
 
+export const ASSET_STATUS_TONE = {
+	active: 'success',
+	inactive: 'neutral',
+	retired: 'warning'
+} satisfies Record<Enums<'asset_status'>, BadgeTone>;
+
 export const PRODUCT_KIND_TONE = {
 	good: 'cyan',
 	service: 'violet'

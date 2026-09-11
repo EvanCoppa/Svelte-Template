@@ -944,3 +944,58 @@ cross join (values
 ) as e (id, org_id, entity_type, entity_id, title, description, location,
 	starts, ends, all_day, color, assigned_to, created_by)
 on conflict (id) do nothing;
+
+-- The register and the graph (the assets and relationships migrations), all
+-- inside Acme. Three assets — a laptop, a truck and the compressor that
+-- rides in it — and the relationships that say who holds what: the org's
+-- own employee (a 'member' endpoint, dev) has the laptop, Wayne owns the
+-- truck the org services, the truck was bought from the steel supplier, and
+-- Lucius Fox once worked at Stark before Wayne (an ENDED row beside the open
+-- one — the history the partial unique index allows). Ids use the f1… range
+-- for assets and f2… for relationships; the types are the system ones from
+-- the migration (f0…).
+insert into public.assets (id, org_id, name, asset_type, identifier, status, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'MacBook Pro 16"', 'device', 'IT-001', 'active', '2026-01-15', 2399.00,
+		'00000000-0000-0000-0000-000000000001'),
+	('f1000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'Box truck', 'vehicle', 'FL-01', 'active', '2024-06-01', 48500.00,
+		'00000000-0000-0000-0000-000000000001'),
+	('f1000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'Air compressor', 'equipment', 'EQ-014', 'inactive', '2024-06-01', 1250.00,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, ended_on, notes, created_by) values
+	-- The laptop is assigned to dev, who works here.
+	('f2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000012', 'asset', 'f1000000-0000-0000-0000-000000000001',
+		'member', '00000000-0000-0000-0000-000000000001', '2026-01-15', null, null,
+		'00000000-0000-0000-0000-000000000001'),
+	-- Wayne Enterprises owns the truck; it was bought from Gotham Steel Supply.
+	('f2000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000011', 'company', '20000000-0000-0000-0000-000000000001',
+		'asset', 'f1000000-0000-0000-0000-000000000002', '2024-06-01', null, null,
+		'00000000-0000-0000-0000-000000000001'),
+	('f2000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000014', 'asset', 'f1000000-0000-0000-0000-000000000002',
+		'company', '20000000-0000-0000-0000-000000000003', '2024-06-01', null, 'Invoice GS-2291',
+		'00000000-0000-0000-0000-000000000001'),
+	-- The compressor is part of the truck's kit.
+	('f2000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000016', 'asset', 'f1000000-0000-0000-0000-000000000003',
+		'asset', 'f1000000-0000-0000-0000-000000000002', null, null, null,
+		'00000000-0000-0000-0000-000000000001'),
+	-- Lucius worked at Stark before Wayne (his contacts.company_id): the ended
+	-- period is history the column cannot hold, and the reason the graph exists
+	-- beside it.
+	('f2000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000001', 'contact', '30000000-0000-0000-0000-000000000001',
+		'company', '20000000-0000-0000-0000-000000000002', '2012-03-01', '2019-08-31', null,
+		'00000000-0000-0000-0000-000000000001'),
+	-- Pepper referred Lucius.
+	('f2000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'f0000000-0000-0000-0000-000000000004', 'contact', '30000000-0000-0000-0000-000000000001',
+		'contact', '30000000-0000-0000-0000-000000000002', null, null, null,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;

@@ -4,6 +4,7 @@ import { match } from './record';
 describe('the [kind=record] matcher', () => {
 	it('accepts the list routes that serve records', () => {
 		const segments = [
+			'assets',
 			'billables',
 			'companies',
 			'contacts',

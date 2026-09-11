@@ -5,10 +5,13 @@ import {
 	canRemoveNote,
 	noteDash,
 	noteExcerpt,
+	moveNote,
 	noteLabel,
 	noteMatches,
 	noteSurface,
 	notesToMarkdown,
+	positionAt,
+	positionBetween,
 	type NoteAccess
 } from './notes';
 import type { Note } from './server/crm/notes';
@@ -158,5 +161,43 @@ describe('who may write on a note', () => {
 		expect(canRemoveNote(mine, access())).toBe(true);
 		expect(canRemoveNote(mine, access({ canDelete: false }))).toBe(false);
 		expect(canRemoveNote(theirs, access())).toBe(false);
+	});
+});
+
+describe('moveNote', () => {
+	const rail = [note({ id: 'a' }), note({ id: 'b' }), note({ id: 'c' })];
+
+	it('moves one note and keeps the others in order', () => {
+		expect(moveNote(rail, 'c', 0).map((n) => n.id)).toEqual(['c', 'a', 'b']);
+		expect(moveNote(rail, 'a', 2).map((n) => n.id)).toEqual(['b', 'c', 'a']);
+		expect(moveNote(rail, 'b', 1).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+	});
+
+	it('leaves the rail alone for an unknown note or a slot that is not there', () => {
+		expect(moveNote(rail, 'zzz', 0).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+		expect(moveNote(rail, 'a', 3).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+		expect(moveNote(rail, 'a', -1)).not.toBe(rail);
+	});
+});
+
+describe('positionBetween', () => {
+	it('is the midpoint between two neighbours, higher nearer the top', () => {
+		expect(positionBetween(30, 10)).toBe(20);
+	});
+
+	it('steps past the one neighbour it has, at either end of the rail', () => {
+		expect(positionBetween(undefined, 10)).toBe(11);
+		expect(positionBetween(30, undefined)).toBe(29);
+	});
+
+	it('reads the neighbours off a rail that has already been reordered', () => {
+		const rail = [
+			note({ id: 'a', position: 40 }),
+			note({ id: 'moved', position: 5 }),
+			note({ id: 'c', position: 20 })
+		];
+		expect(positionAt(rail, 1)).toBe(30);
+		expect(positionAt(rail, 0)).toBe(6);
+		expect(positionAt(rail, 2)).toBe(4);
 	});
 });
