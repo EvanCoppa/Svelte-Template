@@ -61,16 +61,16 @@ export const TICKET_STATUS_TONE = {
 	closed: 'neutral'
 } satisfies Record<Enums<'ticket_status'>, BadgeTone>;
 
-export const TICKET_PRIORITY_TONE = {
+export const PRIORITY_TONE = {
 	low: 'neutral',
 	normal: 'info',
 	high: 'orange',
 	urgent: 'error'
-} satisfies Record<Enums<'ticket_priority'>, BadgeTone>;
+} satisfies Record<Enums<'priority'>, BadgeTone>;
 
 /**
  * Where a task sits on the board. `done` is pinned to `completed_at` by
- * trigger (the task_workflow migration), so a done card and a ticked checkbox
+ * trigger (the task board migration), so a done card and a ticked checkbox
  * are the same row in the same state — there is no second flag to disagree.
  */
 export const TASK_STATUS_TONE = {
@@ -100,14 +100,6 @@ export const TASK_STATUSES = [
 	'blocked',
 	'done'
 ] as const satisfies readonly Enums<'task_status'>[];
-
-/** Only the urgencies that ask for something get a colour; low and normal stay quiet. */
-export const TASK_PRIORITY_TONE = {
-	low: 'neutral',
-	normal: 'neutral',
-	high: 'orange',
-	urgent: 'error'
-} satisfies Record<Enums<'task_priority'>, BadgeTone>;
 
 /** Whether a task is finished, asked of the column rather than the timestamp. */
 export function taskIsDone(task: Pick<Tables<'tasks'>, 'status'>): boolean {

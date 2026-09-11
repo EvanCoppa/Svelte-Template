@@ -27,7 +27,7 @@
 		taskIsOverdue
 	} from '$lib/crm/tasks';
 	import {
-		TASK_PRIORITY_TONE,
+		PRIORITY_TONE,
 		TASK_STATUS_LABEL,
 		TASK_STATUS_TONE,
 		TASK_STATUSES,
@@ -275,7 +275,7 @@
 		<!-- Normal is what most things are, and a pill on every row saying so
 		     is a pill that stops being read. -->
 		{#if task.priority !== 'normal'}
-			<StatusBadge tone={TASK_PRIORITY_TONE[task.priority]} size="sm">
+			<StatusBadge tone={PRIORITY_TONE[task.priority]} size="sm">
 				{capitalize(task.priority)}
 			</StatusBadge>
 		{/if}

@@ -1,4 +1,4 @@
--- tasks.status and tasks.priority — a to-do gets a board.
+-- tasks.status — a to-do gets a board.
 --
 -- The crm_core migration gave a task a `completed_at` and said why there was
 -- no status flag beside it: "done" is a timestamp that doubles as the flag
@@ -26,9 +26,14 @@
 -- Deliberately NOT here: a 'cancelled' state. It would be a second closed
 -- state, and `completed_at` can only be honest about one of them — a task
 -- nobody is going to do is deleted, which owners and admins already can.
+--
+-- Urgency is NOT here either: the task_system migration that precedes this one
+-- renamed `ticket_priority` to `priority` and gave tasks a column of it, which
+-- is the same call this file makes about status — one vocabulary we own,
+-- shared rather than declared twice.
 
 -- ---------------------------------------------------------------------------
--- The vocabularies
+-- The vocabulary
 -- ---------------------------------------------------------------------------
 
 create type public.task_status as enum ('todo', 'in_progress', 'blocked', 'done');
@@ -36,23 +41,15 @@ create type public.task_status as enum ('todo', 'in_progress', 'blocked', 'done'
 comment on type public.task_status is
 	'Where a task sits on the board. `done` is pinned to tasks.completed_at by trigger.';
 
--- The same four words as ticket_priority, and deliberately its own type: a
--- ticket's urgency is the customer's and a task's is the org's, so a vertical
--- that renames one has no business renaming the other.
-create type public.task_priority as enum ('low', 'normal', 'high', 'urgent');
-
 -- ---------------------------------------------------------------------------
--- The columns
+-- The column
 -- ---------------------------------------------------------------------------
 
 alter table public.tasks
-	add column status public.task_status not null default 'todo',
-	add column priority public.task_priority not null default 'normal';
+	add column status public.task_status not null default 'todo';
 
 comment on column public.tasks.status is
 	'Where the task sits on the board. Kept in step with completed_at by tasks_sync_completion.';
-comment on column public.tasks.priority is
-	'How much the task is asking for. Normal is the default and draws no attention.';
 
 -- Everything already finished lands in Done, so the board is right on the
 -- first load rather than after somebody drags a hundred cards.
@@ -112,15 +109,14 @@ create trigger tasks_sync_completion
 -- ---------------------------------------------------------------------------
 -- Column-level grants
 -- ---------------------------------------------------------------------------
--- The party-model migration's grant list, plus the two new columns. Moving a
--- card and setting an urgency are member acts, like every other edit to a
--- task; `status` is insertable so a task can be created straight into the
--- column it belongs in, while `completed_at` stays update-only as it was —
--- the trigger fills it in when that status is `done`.
+-- The task_system migration's grant list, plus the one new column. Moving a
+-- card is a member act, like every other edit to a task; `status` is
+-- insertable so a task can be created straight into the column it belongs in,
+-- while `completed_at` stays update-only as it was — the trigger fills it in
+-- when that status is `done`.
 
 revoke insert, update on table public.tasks from authenticated;
-grant insert (org_id, company_id, contact_id, title, details, due_at, assigned_to, status,
-		priority, created_by),
-	update (company_id, contact_id, title, details, due_at, completed_at, assigned_to, status,
-		priority)
+grant insert (org_id, company_id, contact_id, title, details, due_at, priority, status,
+		created_by),
+	update (company_id, contact_id, title, details, due_at, completed_at, priority, status)
 	on table public.tasks to authenticated;

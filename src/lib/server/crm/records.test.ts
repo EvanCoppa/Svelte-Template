@@ -154,7 +154,6 @@ const renewal: TaskWithParties = {
 	completed_at: null,
 	status: 'todo',
 	priority: 'high',
-	assigned_to: USER_ID,
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
 	contacts: null,
 	...STAMPS
@@ -407,15 +406,23 @@ describe('describing a record', () => {
 		expect(field(open, 'Contact')).toEqual({ type: 'empty' });
 
 		// The status is the pill, not the timestamp: the two are held in step by
-		// the task_workflow migration's trigger, so a done row carries both.
+		// the task board migration's trigger, so a done row carries both.
 		const done = describeTask(
 			{ ...renewal, status: 'done', completed_at: '2026-09-10T10:00:00Z' },
 			openAll
 		);
-		expect(done.pills[0]).toEqual({ label: 'Done', tone: 'success' });
+		expect(done.pills).toEqual([
+			{ label: 'Done', tone: 'success' },
+			{ label: 'High', tone: 'orange' }
+		]);
 
-		const blocked = describeTask({ ...renewal, status: 'in_progress' }, openAll);
-		expect(blocked.pills[0]).toEqual({ label: 'In progress', tone: 'info' });
+		const moving = describeTask({ ...renewal, status: 'in_progress' }, openAll);
+		expect(moving.pills[0]).toEqual({ label: 'In progress', tone: 'info' });
+	});
+
+	it('leaves a task assignee to the relationships card rather than a field', () => {
+		const detail = describeTask(renewal, openAll);
+		expect(detail.fields.some((entry) => entry.label === 'Assigned to')).toBe(false);
 	});
 
 	it('describes a ticket by status and priority, counting its thread rather than showing it', () => {

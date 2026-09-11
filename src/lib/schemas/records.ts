@@ -230,12 +230,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	ticket: ticketRecordSchema
 };
 
-/**
- * The four urgencies, shared by the two kinds of record that have one. They
- * are separate enums in the schema (a ticket's urgency is the customer's, a
- * task's the org's) and the same four words to whoever is filling the form in,
- * so the list is written once rather than drifting in one of the two.
- */
+/** One vocabulary, shared by tasks and tickets (the `priority` enum). */
 const PRIORITY_OPTIONS = [
 	{ value: 'low', label: 'Low' },
 	{ value: 'normal', label: 'Normal' },

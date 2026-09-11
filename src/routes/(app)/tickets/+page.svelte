@@ -5,7 +5,7 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { TICKET_PRIORITY_TONE, TICKET_STATUS_TONE } from '$lib/crm/tones';
+	import { PRIORITY_TONE, TICKET_STATUS_TONE } from '$lib/crm/tones';
 	import type { TicketWithParties } from '$lib/server/crm/tickets';
 
 	let { data } = $props();
@@ -34,7 +34,7 @@
 		columnHelper.accessor('priority', {
 			header: ({ column }) =>
 				renderComponent(DataTable.ColumnHeader, { column, title: 'Priority' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), TICKET_PRIORITY_TONE[getValue()])
+			cell: ({ getValue }) => DataTable.statusCell(getValue(), PRIORITY_TONE[getValue()])
 		})
 	]);
 
