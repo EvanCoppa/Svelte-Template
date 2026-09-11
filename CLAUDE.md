@@ -589,6 +589,28 @@ plans page, whose one field is a multi-select; the calendar, whose booking form 
 two instants behind wall-clock inputs, an all-day switch that changes what they mean,
 a colour and a record — docs/calendar.md) keeps its own form and says why.
 
+### Importing many records is one page, not one button per list
+
+Bulk import lives at `/import` (the `imports` feature, `tools` section; docs/imports.md)
+and nowhere else — never an "Import" button on a list page. It is the generic record
+form many rows at a time: `src/lib/schemas/imports.ts` registers which kinds a
+spreadsheet can bring in (`IMPORT_KINDS`, today the catalog-shaped five: companies,
+contacts, products, billables, assets), and a kind's columns ARE its `RECORD_FORMS`
+fields and its validation IS its `RECORD_SCHEMAS` entry, so a value the modal refuses
+is refused here with the same message. What the registry adds is the header `aliases`
+a column is recognised under and the `key` that says two rows are the same record (a
+SKU, a code, an email; `name` stands in when a key is missing on either side).
+`$lib/server/spreadsheet.ts` reads CSV, TSV and Excel alike into strings;
+`previewImport()` maps, coerces, validates and matches without writing, and the page
+shows every row as `new` / `match` (with what it would change) / `invalid` /
+`duplicate`; `commitImport()` writes each approved row on its own through
+`insertRecord()` or `updateRecord()` in `$lib/server/records.ts` — the one place
+strings become columns, shared with the modal — an overwrite touching only the fields
+the file filled in. Importing a kind needs `manage` on its feature, exactly like
+adding one record. Adding a kind = `IMPORT_KINDS` + an `IMPORT_SPECS` entry + its
+rows in `listRows()` + its `case` in `updateRecord()`; never a second parser, a
+second preview or a per-page upload.
+
 ## Data loading & invalidation
 
 Server data comes from load functions (never `onMount` fetches), using the load-provided

@@ -31,6 +31,7 @@ export const FEATURE_IDS = [
 	'tasks',
 	'tickets',
 	'staff',
+	'imports',
 	'components',
 	'best-practices',
 	'assistant',
