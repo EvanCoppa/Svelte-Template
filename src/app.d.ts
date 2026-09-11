@@ -47,6 +47,14 @@ declare global {
 			/** From the (app) layout: absent on public routes. */
 			organizations?: OrgMembership[];
 			activeOrg?: OrgMembership;
+			/**
+			 * Whether the signed-in user is a platform operator, from the (app)
+			 * layout — what the org picker draws its platform entry on. A
+			 * convenience for the menu, never an authorization: `/admin` checks
+			 * `system_admins` again on the server for every page, action and
+			 * endpoint (docs/platform-administration.md).
+			 */
+			systemAdmin?: boolean;
 			/** The sidebar/palette entries this session may see, from the (app) layout. */
 			nav?: NavItem[];
 			/**

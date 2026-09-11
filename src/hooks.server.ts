@@ -17,8 +17,10 @@ import {
 	isDevAutoLoginEnabled,
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
+import { ADMIN_HOME } from '$lib/admin/nav';
 import { featureGateFor } from '$lib/features/gate';
 import { mapConfig, mapOrigins } from '$lib/map';
+import { isPathUnder } from '$lib/navigation';
 import { readActiveOrg } from '$lib/server/active-org';
 import { loadOrgContext } from '$lib/server/org-context';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
@@ -160,6 +162,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const pathname = event.url.pathname;
 	const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 	const isApi = pathname.startsWith('/api/');
+	// The platform area is not a tenant surface — see the (admin) group and
+	// docs/platform-administration.md. It resolves no organization, so the
+	// active-org cookie is left exactly as the app left it, and it is gated
+	// on being a system admin rather than on a feature.
+	const isAdmin = isPathUnder(ADMIN_HOME, pathname);
 
 	if (!session || !user) {
 		if (!isPublic) {
@@ -190,12 +197,12 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		throw redirect(303, '/');
 	}
 
-	// Sign-out and the auth callbacks need no org, and API endpoints verify
-	// membership themselves (RLS is the boundary there); every other page
-	// request resolves the org context and is gated on it. `pathname` is
-	// already stripped of `/__data.json`, so client-side navigations are gated
-	// identically.
-	if (!isPublic && !isApi && pathname !== '/logout') {
+	// Sign-out, the auth callbacks and the platform area need no org, and API
+	// endpoints verify membership themselves (RLS is the boundary there);
+	// every other page request resolves the org context and is gated on it.
+	// `pathname` is already stripped of `/__data.json`, so client-side
+	// navigations are gated identically.
+	if (!isPublic && !isApi && !isAdmin && pathname !== '/logout') {
 		event.locals.org = await loadOrgContext(event);
 		const { features, access } = event.locals.org;
 		const gate = featureGateFor(pathname, features, (featureId) => hasGrant(access, featureId));

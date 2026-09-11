@@ -34,7 +34,7 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// is drawn at all (docs/user-preferences.md).
 	depends(QUERY.preferences);
 
-	const { organizations, activeOrg, features, access } = locals.org;
+	const { organizations, activeOrg, features, access, systemAdmin } = locals.org;
 	const canRead = (featureId: string) => hasGrant(access, featureId);
 
 	// The dock draws on every screen, so it asks the gate the same question
@@ -73,6 +73,10 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	return {
 		organizations,
 		activeOrg,
+		// Whether to draw the org picker's platform entry, and nothing more:
+		// `/admin` proves this again on the server for every page and action
+		// (docs/platform-administration.md). Never a substitute for that.
+		systemAdmin,
 		// Filtered server-side so grants never reach the browser: an entry is
 		// either linkable, or locked with an upgrade prompt, or absent.
 		nav: buildNav(features, canRead),
