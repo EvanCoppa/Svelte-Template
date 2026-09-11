@@ -15,6 +15,7 @@ import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import MapIcon from '@lucide/svelte/icons/map';
 import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
+import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import ShieldIcon from '@lucide/svelte/icons/shield';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
@@ -24,6 +25,7 @@ import TicketIcon from '@lucide/svelte/icons/ticket';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import TruckIcon from '@lucide/svelte/icons/truck';
 import UsersIcon from '@lucide/svelte/icons/users';
+import WalletIcon from '@lucide/svelte/icons/wallet';
 
 /**
  * The icons a nav entry may name. `features.icon` stores a lucide slug, and
@@ -48,6 +50,7 @@ export const ICONS = {
 	map: MapIcon,
 	'map-pin': MapPinIcon,
 	package: PackageIcon,
+	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
 	shield: ShieldIcon,
 	'sliders-horizontal': SlidersHorizontalIcon,
@@ -56,7 +59,8 @@ export const ICONS = {
 	ticket: TicketIcon,
 	'toggle-right': ToggleRightIcon,
 	truck: TruckIcon,
-	users: UsersIcon
+	users: UsersIcon,
+	wallet: WalletIcon
 } satisfies Record<string, NavIcon>;
 
 export type NavIcon = Component<{ class?: string }>;

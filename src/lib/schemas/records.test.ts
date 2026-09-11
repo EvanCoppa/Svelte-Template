@@ -5,6 +5,7 @@ import {
 	RECORD_TYPES,
 	companyRecordSchema,
 	dealRecordSchema,
+	invoiceRecordSchema,
 	taskRecordSchema,
 	type RecordField
 } from './records';
@@ -22,6 +23,11 @@ function sampleFor(field: RecordField): string {
 			return 'someone@example.com';
 		case 'number':
 			return '1200.50';
+		case 'integer':
+			return '30';
+		case 'company':
+		case 'contact':
+			return '20000000-0000-0000-0000-000000000001';
 		case 'date':
 			return '2026-09-10';
 		case 'datetime':
@@ -47,6 +53,16 @@ describe('the record registry', () => {
 
 			const parsed = RECORD_SCHEMAS[type].parse(filled);
 			expect(Object.keys(parsed).sort()).toEqual(fields.map((field) => field.name).sort());
+		}
+	});
+
+	it('names a picker kind only on the fields that pick a party', () => {
+		for (const type of RECORD_TYPES) {
+			for (const field of RECORD_FORMS[type].fields) {
+				if (field.type !== 'company' && field.type !== 'contact') continue;
+				// The picker's column is the party's id, named after the kind it picks.
+				expect(field.name).toBe(`${field.type}_id`);
+			}
 		}
 	});
 
@@ -100,5 +116,30 @@ describe('record schemas', () => {
 		expect(
 			messagesOf(taskRecordSchema.safeParse({ title: 'Call back', due_at: 'tomorrow' }))
 		).toMatch(/date and time/);
+	});
+
+	it('bills a company, a person, or both — never nobody', () => {
+		const wayne = '20000000-0000-0000-0000-000000000001';
+		const bruce = '30000000-0000-0000-0000-000000000003';
+		expect(invoiceRecordSchema.safeParse({ company_id: wayne }).success).toBe(true);
+		expect(invoiceRecordSchema.safeParse({ contact_id: bruce }).success).toBe(true);
+		expect(invoiceRecordSchema.safeParse({ company_id: wayne, contact_id: bruce }).success).toBe(
+			true
+		);
+
+		const nobody = invoiceRecordSchema.safeParse({ payment_terms_days: '30' });
+		expect(nobody.success).toBe(false);
+		expect(messagesOf(nobody)).toBe('Pick a company or a person to bill.');
+		expect(nobody.error?.issues[0]?.path).toEqual(['company_id']);
+	});
+
+	it('takes terms as whole days, or blank', () => {
+		const wayne = '20000000-0000-0000-0000-000000000001';
+		expect(
+			invoiceRecordSchema.safeParse({ company_id: wayne, payment_terms_days: '' }).success
+		).toBe(true);
+		expect(
+			messagesOf(invoiceRecordSchema.safeParse({ company_id: wayne, payment_terms_days: '30.5' }))
+		).toBe('Enter a whole number.');
 	});
 });

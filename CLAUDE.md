@@ -433,6 +433,27 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
   and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
   for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
+- **An invoice is a document and the ledger is the account it lands on** (`ledger`
+  migration + `src/lib/server/crm/invoices.ts`, `payments.ts`, `ledger.ts` + the pure
+  fold in `src/lib/crm/ledger.ts` + `src/routes/(app)/invoices/`, `(app)/ledger/`;
+  docs/ledger.md). Two features: `invoices` (one bill to one customer — `draft` →
+  `issued` → `void`, each step an act on the record page, never an edit; issuing
+  closes the lines by trigger and voiding hands its payments back to the account by
+  trigger, so neither is ever half-done) and `ledger` (every issued invoice and every payment, newest first, with
+  the balance that falls out of them — **a read, never a table**; `describeLedger()`
+  folds the two tables and the pages sum the rows by the viewer's own date, because
+  "overdue" is a wall-clock word like the task board's "today"). **A customer is a
+  party**: both tables name `company_id` and `contact_id`, both nullable, at least one
+  set, and the account is the company when one is named, else the person — decided
+  once in `accountSideOf()`, carried as the `company:<id>` / `contact:<id>` key that
+  the ledger's filter and the payment form share (the filter keeps only that account's
+  rows; the form offers every company and the people who stand alone). The document is the `invoices` grant's
+  and the money is the `ledger` grant's (record, apply, remove a payment), so an
+  invoice's record page checks both; the billing block is `billing.server.ts` beside
+  the generic record page plus `Detail.InvoiceLines` / `Detail.InvoicePayments`, drawn
+  whenever the load supplies `data.billing` — the thread's data-presence rule. Every
+  payment form carries an idempotency key the load minted, so a double submit collides
+  on the table instead of recording money twice.
 
 ## Database
 
@@ -555,9 +576,12 @@ export const actions: Actions = { create: (event) => createRecord(event, 'compan
 Every field posts a **string** — that is what lets one component render them all — and
 the server's insert switch is the one place strings become columns (blank → null, an
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
-schema so the enum unions come back without a cast). Adding a kind of record = a
-schema, a `RECORD_FORMS` entry and one `case` in that switch; never a second create
-modal, action or field-rendering loop. A screen whose creation is genuinely special
+schema so the enum unions come back without a cast). A record that points at a party
+(an invoice's customer) uses the `company` / `contact` **picker field types**: still a
+string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
+reads per request and ships as `createPickers` — never a second modal for "the same
+form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
+one `case` in that switch; never a second create modal, action or field-rendering loop. A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick

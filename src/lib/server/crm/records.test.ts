@@ -5,6 +5,7 @@ import type { CompanyWithContacts } from './companies';
 import type { ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import type { DealWithParties } from './deals';
+import type { InvoiceWithDetails } from './invoices';
 import type { ProductWithCategory } from './products';
 import type { ProposalWithOptions } from './proposals';
 import {
@@ -14,6 +15,7 @@ import {
 	describeContact,
 	describeCustomField,
 	describeDeal,
+	describeInvoice,
 	describeProduct,
 	describeProposal,
 	describeTask,
@@ -156,6 +158,41 @@ const renewal: TaskWithParties = {
 	priority: 'high',
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
 	contacts: null,
+	...STAMPS
+};
+
+const INVOICE_ID = 'e5000000-0000-0000-0000-000000000001';
+
+/** Net-30, issued, part paid and past due — the row the seed ships as INV-00001. */
+const siteWork: InvoiceWithDetails = {
+	id: INVOICE_ID,
+	org_id: ORG_ID,
+	company_id: COMPANY_ID,
+	contact_id: CONTACT_ID,
+	order_id: null,
+	number: 'INV-00001',
+	status: 'issued',
+	payment_status: 'partial',
+	currency: 'USD',
+	subtotal: 1800,
+	tax: 148.5,
+	shipping: 0,
+	discount: 0,
+	amount_paid: 1000,
+	total: 1948.5,
+	balance_due: 948.5,
+	payment_terms_days: 30,
+	due_date: '2026-09-01',
+	issued_at: '2026-08-02T09:00:00Z',
+	paid_at: null,
+	voided_at: null,
+	billing_email: 'ap@wayne.example.com',
+	memo: 'Site work, August.',
+	notes: null,
+	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
+	contacts: { id: CONTACT_ID, name: 'Lucius Fox' },
+	invoice_line_items: [],
+	payments: [],
 	...STAMPS
 };
 
@@ -478,6 +515,59 @@ describe('describing a record', () => {
 	});
 });
 
+describe('describeInvoice', () => {
+	it('names the bill by its number and reads it by its money, the customer as records', () => {
+		const detail = describeInvoice(siteWork, openAll);
+		expect(detail.kind).toBe('invoice');
+		expect(detail.name).toBe('INV-00001');
+		expect(detail.pills).toEqual([
+			{ label: 'Issued', tone: 'info' },
+			{ label: 'Partial', tone: 'info' }
+		]);
+		expect(field(detail, 'Company')).toEqual({
+			type: 'record',
+			value: 'Wayne Enterprises',
+			href: `/companies/${COMPANY_ID}`
+		});
+		expect(field(detail, 'Contact')).toEqual({
+			type: 'record',
+			value: 'Lucius Fox',
+			href: `/contacts/${CONTACT_ID}`
+		});
+		expect(field(detail, 'Terms')).toEqual({ type: 'text', value: 'Net 30' });
+		expect(field(detail, 'Due')).toEqual({ type: 'date', value: '2026-09-01' });
+		expect(field(detail, 'Total')).toEqual({
+			type: 'money',
+			value: 1948.5,
+			currency: 'USD',
+			unit: null
+		});
+		expect(field(detail, 'Balance due')).toEqual({
+			type: 'money',
+			value: 948.5,
+			currency: 'USD',
+			unit: null
+		});
+		expect(field(detail, 'Billing email')).toEqual({
+			type: 'link',
+			value: 'ap@wayne.example.com',
+			href: 'mailto:ap@wayne.example.com'
+		});
+		expect(field(detail, 'Voided')).toEqual({ type: 'empty' });
+	});
+
+	it('gives a draft one pill and a bill to a person no company', () => {
+		const draft = describeInvoice(
+			{ ...siteWork, status: 'draft', payment_status: 'unpaid', company_id: null, companies: null },
+			openNone
+		);
+		expect(draft.pills).toEqual([{ label: 'Draft', tone: 'neutral' }]);
+		expect(field(draft, 'Company')).toEqual({ type: 'empty' });
+		// Named, but not linked: the reader may not open contacts.
+		expect(field(draft, 'Contact')).toEqual({ type: 'record', value: 'Lucius Fox', href: null });
+	});
+});
+
 describe('describeAsset', () => {
 	const laptop: Asset = {
 		id: 'f1000000-0000-0000-0000-000000000001',
@@ -574,6 +664,7 @@ describe('getRecord', () => {
 			product: 'products',
 			deal: 'deals',
 			proposal: 'proposals',
+			invoice: 'invoices',
 			task: 'tasks',
 			ticket: 'support_tickets'
 		} as const;
@@ -626,19 +717,27 @@ describe('getRecord', () => {
 });
 
 describe('listRelatedRecords', () => {
-	it('lists the people, deals, proposals, tasks and tickets that name a company, in nav order', async () => {
+	it('lists the people, deals, proposals, invoices, tasks and tickets that name a company, in nav order', async () => {
 		const { supabase, from, builders } = supabaseTablesMock({
 			contacts: { data: [lucius] },
 			deals: { data: [contract] },
 			proposals: { data: [{ ...options, entity_type: 'company', entity_id: COMPANY_ID }] },
+			invoices: { data: [siteWork] },
 			tasks: { data: [renewal] },
 			support_tickets: { data: [exportBug] }
 		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);
 
-		expect(groups.map((g) => g.kind)).toEqual(['contact', 'deal', 'proposal', 'task', 'ticket']);
-		for (const table of ['contacts', 'deals', 'tasks', 'support_tickets']) {
+		expect(groups.map((g) => g.kind)).toEqual([
+			'contact',
+			'deal',
+			'proposal',
+			'invoice',
+			'task',
+			'ticket'
+		]);
+		for (const table of ['contacts', 'deals', 'invoices', 'tasks', 'support_tickets']) {
 			expect(from).toHaveBeenCalledWith(table);
 			expect(builders[table].eq).toHaveBeenCalledWith('company_id', COMPANY_ID);
 		}
@@ -664,11 +763,19 @@ describe('listRelatedRecords', () => {
 			pill: { label: 'Proposal', tone: 'info' },
 			meta: '$24,000.00'
 		});
-		expect(groups[3].records[0]).toMatchObject({
+		// A bill on the account: what it asked for, and what is still owed on it.
+		expect(groups[3].records[0]).toEqual({
+			id: INVOICE_ID,
+			name: 'INV-00001',
+			href: `/invoices/${INVOICE_ID}`,
+			pill: { label: 'Partial', tone: 'info' },
+			meta: '$1,948.50 · $948.50 due'
+		});
+		expect(groups[4].records[0]).toMatchObject({
 			pill: { label: 'To do', tone: 'neutral' },
 			meta: 'Due Sep 15, 2026'
 		});
-		expect(groups[4].records[0]).toMatchObject({
+		expect(groups[5].records[0]).toMatchObject({
 			href: `/tickets/${exportBug.id}`,
 			pill: { label: 'Open', tone: 'info' },
 			meta: '#1 · high priority'
@@ -688,6 +795,7 @@ describe('listRelatedRecords', () => {
 		expect(canOpen).not.toHaveBeenCalledWith('contact');
 		expect(from).not.toHaveBeenCalledWith('contacts');
 		expect(from).not.toHaveBeenCalledWith('proposals');
+		expect(from).not.toHaveBeenCalledWith('invoices');
 		expect(from).not.toHaveBeenCalledWith('support_tickets');
 		expect(from).toHaveBeenCalledWith('deals');
 		// Fetched, empty, omitted.

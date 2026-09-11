@@ -94,6 +94,18 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Two PRs can each add a migration with the same timestamp and both
+      # merge green; the CLI keys applied migrations by that stamp, so the
+      # second file is silently skipped on push and refused on replay. Cheap
+      # to catch here, and impossible to untangle later.
+      - name: Every migration has its own timestamp
+        run: |
+          dupes=$(ls supabase/migrations | cut -d_ -f1 | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "Duplicate migration timestamps: $dupes"
+            exit 1
+          fi
+
       # Replays every migration from scratch against a disposable Postgres, so
       # a migration that only applies against today's production schema fails
       # here instead of on deploy. Free — this never touches a cloud project.
