@@ -129,6 +129,50 @@
 				/>
 			{/if}
 
+			{#if data.billing}
+				{@const billing = data.billing}
+				<Detail.InvoiceLines
+					invoiceId={data.record.id}
+					status={billing.status}
+					currency={billing.currency}
+					totals={{
+						subtotal: billing.subtotal,
+						tax: billing.tax,
+						shipping: billing.shipping,
+						discount: billing.discount,
+						total: billing.total,
+						amountPaid: billing.amountPaid,
+						balanceDue: billing.balanceDue
+					}}
+					lines={billing.lines}
+					products={billing.products}
+					lineForm={billing.forms.line}
+					removeLineForm={billing.forms.removeLine}
+					detailsForm={billing.forms.details}
+					issueForm={billing.forms.issue}
+					voidForm={billing.forms.void}
+					removeForm={billing.forms.remove}
+					canManage={billing.canManage}
+					canDelete={billing.canDelete}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
+				<Detail.InvoicePayments
+					status={billing.status}
+					currency={billing.currency}
+					balanceDue={billing.balanceDue}
+					payments={billing.payments}
+					unapplied={billing.unapplied}
+					paymentForm={billing.forms.payment}
+					applyForm={billing.forms.applyPayment}
+					removePaymentForm={billing.forms.removePayment}
+					canRecord={billing.canRecordPayments}
+					canRemove={billing.canRemovePayments}
+					noun={terms.noun}
+					queryKey={QUERY.record(data.record.kind, data.record.id)}
+				/>
+			{/if}
+
 			{#if data.record.kind === 'asset'}
 				<Detail.Images
 					images={data.images}

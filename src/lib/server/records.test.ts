@@ -204,6 +204,65 @@ describe('createRecord', () => {
 		});
 	});
 
+	it('writes an invoice draft, borrowing the company’s terms only when none were typed', async () => {
+		const companyId = '20000000-0000-0000-0000-000000000001';
+		const contactId = '30000000-0000-0000-0000-000000000001';
+
+		const borrowed = supabaseMockSequence([
+			{ data: { id: companyId, payment_terms_days: 45 } },
+			{ data: { id: 'invoice' } }
+		]);
+		await submit(borrowed.supabase, OWNER, 'invoice', {
+			company_id: companyId,
+			contact_id: contactId,
+			payment_terms_days: '',
+			memo: 'September retainer'
+		});
+		expect(borrowed.from).toHaveBeenNthCalledWith(1, 'companies');
+		expect(borrowed.from).toHaveBeenNthCalledWith(2, 'invoices');
+		expect(borrowed.builder.insert).toHaveBeenCalledWith({
+			company_id: companyId,
+			contact_id: contactId,
+			payment_terms_days: 45,
+			due_date: null,
+			billing_email: null,
+			memo: 'September retainer',
+			org_id: ORG_ID
+		});
+
+		const typed = supabaseMockSequence([
+			{ data: { id: companyId, payment_terms_days: 45 } },
+			{ data: { id: 'invoice' } }
+		]);
+		await submit(typed.supabase, OWNER, 'invoice', {
+			company_id: companyId,
+			payment_terms_days: '14'
+		});
+		expect(typed.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ company_id: companyId, contact_id: null, payment_terms_days: 14 })
+		);
+
+		// A person billed alone has no company to ask, so nothing is read first.
+		const alone = supabaseMock({ data: { id: 'invoice' } });
+		await submit(alone.supabase, OWNER, 'invoice', { contact_id: contactId });
+		expect(alone.from).toHaveBeenCalledTimes(1);
+		expect(alone.from).toHaveBeenCalledWith('invoices');
+		expect(alone.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ company_id: null, contact_id: contactId, payment_terms_days: null })
+		);
+	});
+
+	it('refuses an invoice that bills nobody, and writes nothing', async () => {
+		const { supabase, from } = supabaseMock({ data: {} });
+
+		const result = await submit(supabase, OWNER, 'invoice', { memo: 'To whom?' });
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty('data.form.errors.company_id', [
+			'Pick a company or a person to bill.'
+		]);
+		expect(from).not.toHaveBeenCalled();
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 

@@ -20,9 +20,11 @@ import { QUERY } from '$lib/queries';
  * number, a picked instant into an ISO timestamp) inside that one switch.
  * Client-safe like every schema module — no `$lib/server` imports.
  *
- * The fields are deliberately the record's OWN columns. Pointing a new record
- * at a company or a person is the next step and belongs here as a field type
- * whose options are loaded per request, not as a second form.
+ * The fields are the record's own columns, plus the two that point it at a
+ * party: a `company` or `contact` field is a picker whose options
+ * `loadCreateRecord()` reads per request (an invoice is a bill to someone,
+ * so it cannot be created without one). Still one form — the picker is a
+ * field type, not a second modal.
  *
  * A proposal is not here on purpose: it is a title plus one to five priced
  * options made of catalog lines — more than one row of strings — so it has
@@ -38,6 +40,7 @@ export const RECORD_TYPES = [
 	'product',
 	'billable',
 	'asset',
+	'invoice',
 	'task',
 	'ticket'
 ] as const;
@@ -47,17 +50,38 @@ export type RecordType = (typeof RECORD_TYPES)[number];
 /** What every record form's values look like: one string per field. */
 export type RecordFormValues = Record<string, string>;
 
-export type RecordFieldOption = { value: string; label: string };
+export type RecordFieldOption = { value: string; label: string; sublabel?: string };
+
+/** The kinds of party a record form can point a new record at — each a picker over the org's rows. */
+export const RECORD_PICKER_KINDS = ['company', 'contact'] as const;
+
+export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
+
+/** The options behind each party picker on a form, loaded per request by `loadCreateRecord()`. */
+export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFieldOption[]>>;
 
 /**
  * How one field is rendered. `select` is a fixed vocabulary this app owns (an
- * enum column) and renders as a `Combobox`; `datetime` is a wall-clock pick
- * the browser converts to an instant before posting.
+ * enum column) and renders as a `Combobox`; `number` is money or a measure
+ * and `integer` a count (days of terms); `datetime` is a wall-clock pick the
+ * browser converts to an instant before posting; `company` and `contact` are
+ * pickers over the org's own rows, whose options arrive with the form rather
+ * than sitting in the registry.
  */
 export type RecordField = {
 	name: string;
 	label: string;
-	type: 'text' | 'email' | 'tel' | 'number' | 'date' | 'datetime' | 'textarea' | 'select';
+	type:
+		| 'text'
+		| 'email'
+		| 'tel'
+		| 'number'
+		| 'integer'
+		| 'date'
+		| 'datetime'
+		| 'textarea'
+		| 'select'
+		| RecordPickerKind;
 	placeholder?: string;
 	/** Required for `type: 'select'`, meaningless otherwise. */
 	options?: readonly RecordFieldOption[];
@@ -116,6 +140,16 @@ const optionalAmount = z
 	.trim()
 	.regex(/^$|^\d{1,12}(\.\d{1,2})?$/, 'Enter an amount like 1200 or 1200.50')
 	.default('');
+
+/** A whole number as typed, or blank: days of terms, a count. */
+const optionalInteger = z
+	.string()
+	.trim()
+	.regex(/^$|^\d{1,4}$/, 'Enter a whole number.')
+	.default('');
+
+/** A row picked from a party picker, or blank for none. */
+const optionalPick = z.guid().or(z.literal('')).default('');
 
 /** What `<input type="date">` posts. */
 const optionalDate = z
@@ -198,6 +232,25 @@ export const assetRecordSchema = z.object({
 	description: optionalLongText
 });
 
+/**
+ * A draft: who it bills and on what terms. The lines come after, on the
+ * invoice's own page, and issuing it is a separate act — a bill to nobody
+ * is refused here, exactly as the table's check refuses it.
+ */
+export const invoiceRecordSchema = z
+	.object({
+		company_id: optionalPick,
+		contact_id: optionalPick,
+		payment_terms_days: optionalInteger,
+		due_date: optionalDate,
+		billing_email: optionalEmail,
+		memo: optionalLongText
+	})
+	.refine((data) => data.company_id !== '' || data.contact_id !== '', {
+		error: 'Pick a company or a person to bill.',
+		path: ['company_id']
+	});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
@@ -226,6 +279,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	product: productRecordSchema,
 	billable: billableRecordSchema,
 	asset: assetRecordSchema,
+	invoice: invoiceRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
@@ -360,6 +414,24 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'acquired_on', label: 'Acquired', type: 'date' },
 			{ name: 'purchase_price', label: 'Purchase price', type: 'number', placeholder: '2399.00' },
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	invoice: {
+		feature: 'invoices',
+		query: QUERY.invoices,
+		fields: [
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'payment_terms_days', label: 'Terms (days)', type: 'integer', placeholder: '30' },
+			{ name: 'due_date', label: 'Due', type: 'date' },
+			{ name: 'billing_email', label: 'Billing email', type: 'email', placeholder: 'ap@acme.com' },
+			{
+				name: 'memo',
+				label: 'Memo',
+				type: 'textarea',
+				placeholder: 'Shown on the invoice',
+				wide: true
+			}
 		]
 	},
 	task: {

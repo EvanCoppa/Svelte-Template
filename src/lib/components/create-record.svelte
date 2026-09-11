@@ -18,6 +18,8 @@
 		RECORD_SCHEMAS,
 		type RecordField,
 		type RecordFormValues,
+		type RecordPickerKind,
+		type RecordPickers,
 		type RecordType
 	} from '$lib/schemas/records';
 	import { capitalize, cn } from '$lib/utils.js';
@@ -35,15 +37,20 @@
 	 * `?/create`, which delegates straight back to `createRecord()`.
 	 *
 	 * `type` is fixed for the lifetime of the component: a page creates one kind
-	 * of record, and superForm is wired once at init.
+	 * of record, and superForm is wired once at init. A form that points the
+	 * record at a party (an invoice's customer) gets the org's rows for each
+	 * picker from the same load (`createPickers`).
 	 */
 	let {
 		type,
 		form: data,
+		pickers = {},
 		action = '?/create'
 	}: {
 		type: RecordType;
 		form: SuperValidated<RecordFormValues>;
+		/** The options behind each `company` / `contact` field, as `loadCreateRecord()` read them. */
+		pickers?: RecordPickers;
 		/** Only when the create action lives somewhere other than this page's `?/create`. */
 		action?: string;
 	} = $props();
@@ -81,6 +88,20 @@
 		return `create-${type}-${field.name}`;
 	}
 
+	/**
+	 * A `type="number"` input hands the binding a number, or null once cleared;
+	 * every field here is a string (the schema's rule), so the setter puts the
+	 * text back — the way the proposal builder's function bindings do.
+	 */
+	function asText(value: string | number | null | undefined): string {
+		return value === null || value === undefined ? '' : String(value);
+	}
+
+	/** A field that picks one of the org's own rows — its options came with the form. */
+	function isPicker(field: RecordField): field is RecordField & { type: RecordPickerKind } {
+		return field.type === 'company' || field.type === 'contact';
+	}
+
 	function inputType(field: RecordField) {
 		switch (field.type) {
 			case 'datetime':
@@ -90,6 +111,7 @@
 			case 'tel':
 				return 'tel' as const;
 			case 'number':
+			case 'integer':
 				return 'number' as const;
 			case 'date':
 				return 'date' as const;
@@ -122,7 +144,7 @@
 
 					{#each definition.fields as field (field.name)}
 						{@const id = fieldId(field)}
-						{@const invalid = Boolean($errors[field.name])}
+						{@const invalid = ($errors[field.name]?.length ?? 0) > 0}
 						<div class={cn('grid gap-2', field.wide && 'sm:col-span-2')}>
 							<Label for={id}>{field.label}</Label>
 
@@ -132,6 +154,17 @@
 									name={field.name}
 									bind:value={$form[field.name]}
 									options={field.options ?? []}
+									{invalid}
+								/>
+							{:else if isPicker(field)}
+								<Combobox
+									{id}
+									name={field.name}
+									bind:value={$form[field.name]}
+									options={pickers[field.type] ?? []}
+									placeholder="None"
+									searchPlaceholder="Search by name…"
+									clearable
 									{invalid}
 								/>
 							{:else if field.type === 'textarea'}
@@ -150,10 +183,16 @@
 									name={field.name}
 									type={inputType(field)}
 									placeholder={field.placeholder}
-									step={field.type === 'number' ? '0.01' : undefined}
+									step={field.type === 'number'
+										? '0.01'
+										: field.type === 'integer'
+											? '1'
+											: undefined}
 									aria-invalid={invalid ? 'true' : undefined}
 									aria-describedby={invalid ? `${id}-error` : undefined}
-									bind:value={$form[field.name]}
+									bind:value={
+										() => $form[field.name], (value) => ($form[field.name] = asText(value))
+									}
 									{...$constraints[field.name] ?? {}}
 								/>
 							{/if}
