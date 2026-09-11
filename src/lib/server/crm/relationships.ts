@@ -126,6 +126,34 @@ export async function listRelationships(
 }
 
 /**
+ * Every relationship running FROM a set of records of one kind — one query for
+ * a page of them, where `listRelationships()` would be one query per row. Only
+ * the `from` side, because that is what it is for: a board of tasks asking who
+ * each is assigned to, where the task is always the `from` end.
+ */
+export async function listRelationshipsFrom(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType,
+	entityIds: readonly string[],
+	filter: { typeId?: string; openOnly?: boolean } = {}
+): Promise<RelationshipWithType[]> {
+	const ids = [...new Set(entityIds)];
+	if (ids.length === 0) return [];
+
+	let query = supabase
+		.from('relationships')
+		.select('*, relationship_types(*)')
+		.eq('org_id', orgId)
+		.eq('from_type', entityType)
+		.in('from_id', ids)
+		.order('created_at', { ascending: false });
+	if (filter.typeId) query = query.eq('relationship_type_id', filter.typeId);
+	if (filter.openOnly) query = query.is('ended_on', null);
+	return unwrap(await query);
+}
+
+/**
  * A row read from one record's side: which direction it runs, the label
  * that reads from there, and the record at the other end (not yet named).
  * Pure, so a test can hand it a row. A row from a record to itself reads

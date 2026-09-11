@@ -4,6 +4,7 @@ import {
 	getRelationships,
 	listRelationshipTypes,
 	listRelationships,
+	listRelationshipsFrom,
 	orientRelationship,
 	removeRelationship,
 	updateRelationship,
@@ -117,6 +118,33 @@ describe('listRelationships', () => {
 		await listRelationships(supabase, ORG_ID, laptop, { typeId: OWNS, openOnly: true });
 		expect(builder.eq).toHaveBeenCalledWith('relationship_type_id', OWNS);
 		expect(builder.is).toHaveBeenCalledWith('ended_on', null);
+	});
+});
+
+describe('listRelationshipsFrom', () => {
+	it('reads a page of records\u2019 rows in one query, from side only', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [wayneOwnsLaptop] });
+
+		await expect(
+			listRelationshipsFrom(supabase, ORG_ID, 'asset', [ASSET_ID], { typeId: OWNS, openOnly: true })
+		).resolves.toEqual([wayneOwnsLaptop]);
+		expect(from).toHaveBeenCalledWith('relationships');
+		expect(builder.eq).toHaveBeenCalledWith('from_type', 'asset');
+		expect(builder.in).toHaveBeenCalledWith('from_id', [ASSET_ID]);
+		expect(builder.eq).toHaveBeenCalledWith('relationship_type_id', OWNS);
+		expect(builder.is).toHaveBeenCalledWith('ended_on', null);
+		// No `or`: this side is known, which is what makes one query enough.
+		expect(builder.or).not.toHaveBeenCalled();
+	});
+
+	it('de-duplicates the ids, and asks nothing when there are none', async () => {
+		const repeated = supabaseMock({ data: [] });
+		await listRelationshipsFrom(repeated.supabase, ORG_ID, 'asset', [ASSET_ID, ASSET_ID]);
+		expect(repeated.builder.in).toHaveBeenCalledWith('from_id', [ASSET_ID]);
+
+		const empty = supabaseMock({ data: [] });
+		await expect(listRelationshipsFrom(empty.supabase, ORG_ID, 'asset', [])).resolves.toEqual([]);
+		expect(empty.builder.select).not.toHaveBeenCalled();
 	});
 });
 

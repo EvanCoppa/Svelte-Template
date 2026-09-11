@@ -428,11 +428,20 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   underway, stuck, finished" is the same four states in every vertical, and what a
   task is CALLED is already the industry's through the feature's terms. There is no
   `cancelled` state on purpose — it would be a second closed state and the timestamp
-  can only be honest about one. **The page is not a table**: a `Kanban` board by
-  status and a `GroupList` by due-date bucket, the choice remembered per device
+  can only be honest about one. **The board groups those statuses rather than adding
+  to them**: `TASK_STATUS_GROUPS` (`src/lib/crm/tones.ts`) is the columns — To do,
+  In progress (holding `in_progress` AND `blocked`), Done — and a group is a way of
+  reading the wall, never a value written to a row, so a drop on a grouped column
+  asks which status it meant and a card wears its own status on its eyebrow. Adding
+  a column means grouping differently; adding a _status_ is a migration and a change
+  to the four states above. **The page is not a table**: a `Kanban` board by status
+  group and a `GroupList` by due-date bucket, the choice remembered per device
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
-  and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
-  for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
+  and the checkbox alike, and `schedule` / `prioritize` / `assign` / `unassign`
+  behind the chips and the menus a card carries — every one a form action posted
+  through a hidden form, never a `fetch`. Bucketing is pure and local
+  (`taskBucket()`, `dueLabel()`) for the reason the calendar's dates are: "overdue"
+  and "today" are wall-clock words.
 - **An invoice is a document and the ledger is the account it lands on** (`ledger`
   migration + `src/lib/server/crm/invoices.ts`, `payments.ts`, `ledger.ts` + the pure
   fold in `src/lib/crm/ledger.ts` + `src/routes/(app)/invoices/`, `(app)/ledger/`;
@@ -785,12 +794,22 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
   the reference.
 - **A board is `Kanban`** (`src/lib/components/kanban/`), the app-level compound for "cards in
-  columns you can move one between": `Kanban.Root` owns the drag state, `Kanban.Column` registers
-  its own drop zone, `Kanban.Card` is the draggable shell with a real handle button on it. The page
-  owns the columns, the cards and what a move means — the board hands back a card id and the
-  column it was released over, and nothing else. Moving works from the keyboard as well as under a
-  pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
-  `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
+  columns you can move one between", and it has **two axes**: a `Kanban.Column` is a **status
+  group** — the coarse state a reader scans for — and the `statuses` it declares are the states a
+  record is actually in. A column holding one status takes a release straight away; a column
+  holding several shows `Kanban.Zones` (a `Kanban.DropZone` each) in place of its `Kanban.Cards`
+  while a card is over it, and asks which. **A group is never a state**: `onmove` is always called
+  with a status, because a group is a way of reading the board and not something a record can be
+  stored as. `Kanban.Root` owns the drag state and draws the card under the pointer (from the
+  lifted card's own snippet, so a column that splits cannot unmount what you are carrying) and
+  freezes the board's height for the length of the drag; `Kanban.Card` is the draggable shell with
+  a real handle button on it, and `Kanban.CardHeader` / `CardTitle` / `CardFooter` / `Ring` are
+  the regions every card has. The page owns the groups, the statuses, the cards and what a move
+  means — the board hands back a card id and the status it was released over, and nothing else.
+  Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
+  status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
+  and never leave a status the arrows cannot reach. `/tasks` is the worked example and
+  `/components` → Boards & grouped lists the reference.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and

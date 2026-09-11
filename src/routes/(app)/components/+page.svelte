@@ -73,6 +73,7 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as GroupList from '$lib/components/group-list/index.js';
 	import * as Kanban from '$lib/components/kanban/index.js';
+	import type { KanbanRingFill } from '$lib/components/kanban/index.js';
 	import * as MapView from '$lib/components/map-view/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
@@ -80,7 +81,7 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Badge, type BadgeTone } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Calendar } from '$lib/components/ui/calendar/index.js';
@@ -260,21 +261,68 @@
 
 	// Board and grouped list — the page owns the columns, the cards and what a
 	// move means, exactly as a real screen does. `/tasks` is the worked example.
+	/**
+	 * A board's two axes: the column is a status GROUP, and the statuses under
+	 * it are what a card is actually in. "In progress" holds two, so dragging
+	 * onto it splits it into a drop zone each.
+	 */
 	const boardColumns = [
-		{ value: 'todo', label: 'To do', tone: 'neutral' },
-		{ value: 'doing', label: 'In progress', tone: 'info' },
-		{ value: 'done', label: 'Done', tone: 'success' }
+		{
+			value: 'todo',
+			label: 'To do',
+			tone: 'neutral',
+			statuses: [{ value: 'todo', label: 'To do' }]
+		},
+		{
+			value: 'doing',
+			label: 'In progress',
+			tone: 'info',
+			statuses: [
+				{ value: 'in_progress', label: 'In progress' },
+				{ value: 'blocked', label: 'Blocked' }
+			]
+		},
+		{
+			value: 'done',
+			label: 'Done',
+			tone: 'success',
+			statuses: [{ value: 'done', label: 'Done' }]
+		}
 	] as const;
 
-	let boardCards = $state([
-		{ id: 'k1', title: 'Draft the retainer', column: 'todo', meta: 'Friday' },
-		{ id: 'k2', title: 'Site survey photos', column: 'todo', meta: 'Next week' },
-		{ id: 'k3', title: 'Chase the signature', column: 'doing', meta: 'Today' },
-		{ id: 'k4', title: 'Send the invoice', column: 'done', meta: 'Yesterday' }
+	type BoardStatus = 'todo' | 'in_progress' | 'blocked' | 'done';
+
+	const boardStatusTone = {
+		todo: 'neutral',
+		in_progress: 'info',
+		blocked: 'warning',
+		done: 'success'
+	} satisfies Record<BoardStatus, BadgeTone>;
+
+	const boardStatusRing = {
+		todo: 'empty',
+		in_progress: 0.5,
+		blocked: 0.5,
+		done: 'done'
+	} satisfies Record<BoardStatus, KanbanRingFill>;
+
+	let boardCards = $state<{ id: string; title: string; status: BoardStatus; meta: string }[]>([
+		{ id: 'k1', title: 'Draft the retainer', status: 'todo', meta: 'Friday' },
+		{ id: 'k2', title: 'Site survey photos', status: 'todo', meta: 'Next week' },
+		{ id: 'k3', title: 'Chase the signature', status: 'in_progress', meta: 'Today' },
+		{ id: 'k4', title: 'Waiting on the survey', status: 'blocked', meta: 'Today' },
+		{ id: 'k5', title: 'Send the invoice', status: 'done', meta: 'Yesterday' }
 	]);
 
-	function moveBoardCard(id: string, column: string) {
-		boardCards = boardCards.map((card) => (card.id === id ? { ...card, column } : card));
+	function isBoardStatus(value: string): value is BoardStatus {
+		return value in boardStatusTone;
+	}
+
+	function moveBoardCard(id: string, status: string) {
+		// The board hands a status back as a string, so it is checked rather
+		// than cast — the same guard the real page uses.
+		if (!isBoardStatus(status)) return;
+		boardCards = boardCards.map((card) => (card.id === id ? { ...card, status } : card));
 	}
 
 	const shelvedFiles = [
@@ -2043,27 +2091,62 @@
 			<Card.Header>
 				<Card.Title>Kanban board</Card.Title>
 				<Card.Description>
-					Drag a card between columns, or focus its handle and move it with the arrow keys after
-					Space. The page owns the columns and the cards and decides what a move means — here it
-					only rearranges the array.
+					Two axes: a column is a status group, and the statuses under it are what a card is
+					actually in. Drag onto "In progress" and it splits into a zone per status; drag onto a
+					column holding one and it lands straight away. The arrow keys walk the statuses after
+					Space. The page owns the groups, the cards and what a move means — here it only rearranges
+					the array.
 				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<Kanban.Root onmove={moveBoardCard}>
 					{#each boardColumns as column (column.value)}
-						{@const cards = boardCards.filter((card) => card.column === column.value)}
-						<Kanban.Column value={column.value} label={column.label}>
+						{@const cards = boardCards.filter((card) =>
+							column.statuses.some((status) => status.value === card.status)
+						)}
+						<Kanban.Column value={column.value} label={column.label} statuses={column.statuses}>
 							<Kanban.ColumnHeader tone={column.tone} count={cards.length}>
+								{#snippet lead()}
+									<Kanban.Ring
+										tone={column.tone}
+										fill={boardStatusRing[column.statuses[0].value]}
+										class="size-4"
+									/>
+								{/snippet}
 								{column.label}
 							</Kanban.ColumnHeader>
-							{#each cards as card (card.id)}
-								<Kanban.Card id={card.id} column={column.value} label={card.title}>
-									<p class="font-medium">{card.title}</p>
-									<p class="text-muted-foreground text-xs">{card.meta}</p>
-								</Kanban.Card>
-							{:else}
-								<Kanban.Empty>Nothing here</Kanban.Empty>
-							{/each}
+							<Kanban.Zones>
+								{#each column.statuses as status (status.value)}
+									<Kanban.DropZone status={status.value} tone={boardStatusTone[status.value]}>
+										<Kanban.Ring
+											tone={boardStatusTone[status.value]}
+											fill={boardStatusRing[status.value]}
+											class="size-5"
+										/>
+										{status.label}
+									</Kanban.DropZone>
+								{/each}
+							</Kanban.Zones>
+							<Kanban.Cards>
+								{#each cards as card (card.id)}
+									<Kanban.Card id={card.id} status={card.status} label={card.title}>
+										<Kanban.CardHeader>
+											<Kanban.Ring
+												tone={boardStatusTone[card.status]}
+												fill={boardStatusRing[card.status]}
+												class="size-3.5"
+											/>
+											<span class="truncate">
+												{column.statuses.find((status) => status.value === card.status)?.label}
+											</span>
+										</Kanban.CardHeader>
+										<p class="font-medium">{card.title}</p>
+										<p class="text-muted-foreground text-xs">{card.meta}</p>
+									</Kanban.Card>
+								{:else}
+									<Kanban.Empty>Nothing here</Kanban.Empty>
+								{/each}
+							</Kanban.Cards>
 						</Kanban.Column>
 					{/each}
 				</Kanban.Root>
