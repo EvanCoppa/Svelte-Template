@@ -48,6 +48,9 @@ const wayne: CompanyWithContacts = {
 	website: 'wayne.example.com',
 	status: 'active',
 	relationship: 'customer',
+	vendor_account_number: null,
+	payment_terms_days: null,
+	distribution_fee_pct: null,
 	contacts: [],
 	...STAMPS
 };
