@@ -45,6 +45,7 @@ npm run db:env         # write .env.local pointing at the local stack
 npm run db:new <name>  # scaffold a migration file
 npm run db:types       # regenerate src/lib/database.types.ts (local or hosted)
 npm run db:types:check # fail if the committed types disagree with the schema (CI)
+npm run db:seed-orgs   # give one user orgs to switch between (hosted or local)
 npm run db:lint        # schema static analysis — keep at ZERO
 npm run format         # prettier (svelte + tailwind plugins)
 ```

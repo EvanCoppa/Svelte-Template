@@ -27,7 +27,8 @@
 		"db:env": "node scripts/local-env.mjs",
 		"db:types": "node scripts/gen-db-types.mjs",
 		"db:types:check": "node scripts/gen-db-types.mjs --check",
-		"db:lint": "npx supabase db lint --level warning"
+		"db:lint": "npx supabase db lint --level warning",
+		"db:seed-orgs": "node scripts/seed-user-orgs.mjs"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.1.0",
