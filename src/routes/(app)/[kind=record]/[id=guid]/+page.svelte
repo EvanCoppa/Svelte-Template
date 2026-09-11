@@ -168,7 +168,8 @@
 					<Card.Header>
 						<Card.Title>Notes</Card.Title>
 						<Card.Description>
-							Written down about this {terms.noun}. They sit on the dock with every other note.
+							Written down about this {terms.noun}. Only visible to you — they don't show up on the
+							dock or the notes page.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-3">

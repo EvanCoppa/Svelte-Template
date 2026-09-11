@@ -46,10 +46,18 @@ the browser's reach — plus:
 - **`archived_at`** — off the desk, not gone. Nullable rather than a boolean, so the row
   records _when_.
 
-RLS mirrors `activities` exactly: every member reads, anyone writes their own, the
-author or an owner/admin edits and deletes. The one deliberate difference is that the
-entity link is **updatable** — you jot something down and attach it to the record it
-turned out to be about, which is the note working, not history being rewritten.
+RLS mirrors `activities` for a **freestanding** note (`entity_type` null): every member
+reads, anyone writes their own, the author or an owner/admin edits and deletes. A note
+**attached** to a record is a different thing — personal working notes about that
+record, not a statement meant for the team — so it takes the `user_preferences` model
+instead (`20260911100000_private_record_notes.sql`): only its author may see, edit or
+delete it, not even an owner/admin. One table, one set of columns, one detach-on-delete
+behavior; only SELECT/UPDATE/DELETE visibility splits on whether `entity_type` is set.
+
+The entity link is still **updatable** — you jot something down and attach it to the
+record it turned out to be about — but because attaching or detaching changes which
+rule applies, the update policy checks authorship on both the pre- and post-update row,
+so a note can't dodge the rule for one side of the edit.
 
 **Deleting the record a note points at detaches the note** (`on_crm_entity_deleted()`
 grows one branch, as that function's contract requires). Activities are facts about the
@@ -204,6 +212,6 @@ as text.
   record page) or unattached (from the dock) today.
 - **A no-JavaScript path.** The whole surface is autosave and hover; there is no form to
   post without it.
-- **Per-user private notes.** Notes are org-scoped like everything else here (`profiles`
-  is the one deliberate exception): the point of writing something down next to a
-  company is that whoever covers for you can read it.
+- **Per-user private freestanding notes.** The dock and `/notes` stay the org-shared
+  scratchpad: the point of jotting something down for the org is that whoever covers for
+  you can read it. Privacy is only for a note attached to a record — see above.
