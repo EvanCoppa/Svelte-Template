@@ -119,6 +119,25 @@
 				/>
 			{/if}
 
+			{#if data.relationships.length > 0}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>Relationships</Card.Title>
+						<Card.Description>
+							How this {terms.noun} relates to other records — read from its side, so the other side of
+							each one shows the inverse.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<ul class="divide-border divide-y">
+							{#each data.relationships as relationship (relationship.id)}
+								<Detail.Relationship {relationship} />
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
 			{#each data.related as group (group.kind)}
 				{@const related = recordTerms(page.data.terms, group.kind)}
 				<Card.Root>

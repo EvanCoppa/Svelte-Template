@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Asset } from './assets';
 import type { Billable } from './billables';
 import type { CompanyWithContacts } from './companies';
 import type { ContactWithCompany } from './contacts';
@@ -7,6 +8,7 @@ import type { DealWithParties } from './deals';
 import type { ProductWithCategory } from './products';
 import type { ProposalWithOptions } from './proposals';
 import {
+	describeAsset,
 	describeBillable,
 	describeCompany,
 	describeContact,
@@ -450,6 +452,41 @@ describe('describing a record', () => {
 		expect(of('numeric', true).value).toEqual({ type: 'number', value: 7 });
 		expect(of('boolean', true).value).toEqual({ type: 'boolean', value: false });
 		expect(of('text', false).value).toEqual({ type: 'empty' });
+	});
+});
+
+describe('describeAsset', () => {
+	const laptop: Asset = {
+		id: 'f1000000-0000-0000-0000-000000000001',
+		org_id: ORG_ID,
+		name: 'MacBook Pro',
+		asset_type: 'device',
+		identifier: 'IT-001',
+		status: 'active',
+		description: null,
+		acquired_on: '2026-01-15',
+		disposed_on: null,
+		purchase_price: 2399,
+		currency: 'USD',
+		...STAMPS
+	};
+
+	it('pills the status and shows the universal columns only — who holds it is a relationship', () => {
+		const detail = describeAsset(laptop);
+		expect(detail.kind).toBe('asset');
+		expect(detail.name).toBe('MacBook Pro');
+		expect(detail.pills).toEqual([{ label: 'Active', tone: 'success' }]);
+		expect(field(detail, 'Type')).toEqual({ type: 'text', value: 'device' });
+		expect(field(detail, 'Identifier')).toEqual({ type: 'text', value: 'IT-001' });
+		expect(field(detail, 'Acquired')).toEqual({ type: 'date', value: '2026-01-15' });
+		expect(field(detail, 'Disposed')).toEqual({ type: 'empty' });
+		expect(field(detail, 'Purchase price')).toEqual({
+			type: 'money',
+			value: 2399,
+			currency: 'USD',
+			unit: null
+		});
+		expect(detail.fields.map((f) => f.label)).not.toContain('Owner');
 	});
 });
 

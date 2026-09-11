@@ -3,6 +3,7 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import { recommendedOption } from '$lib/crm/proposals';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
+	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
 	PARTY_STATUS_TONE,
 	PRODUCT_KIND_TONE,
@@ -16,6 +17,7 @@ import {
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
+import { getAsset, type Asset } from './assets';
 import { getBillable, type Billable } from './billables';
 import { getCompany, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
@@ -201,6 +203,28 @@ function moneyText(value: number, currency: string): string {
 // ---------------------------------------------------------------------------
 // Describers — one per kind. Pure, so a test can hand one a row.
 // ---------------------------------------------------------------------------
+
+export function describeAsset(row: Asset): RecordDetail {
+	return {
+		kind: 'asset',
+		id: row.id,
+		name: row.name,
+		pills: [pill(row.status, ASSET_STATUS_TONE[row.status])],
+		// Who owns or holds it is not a field: it is a relationship, drawn by
+		// the page from `getRelationships()` beside every other kind's.
+		fields: [
+			{ label: 'Type', value: text(row.asset_type) },
+			{ label: 'Identifier', value: text(row.identifier) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Acquired', value: date(row.acquired_on) },
+			{ label: 'Disposed', value: date(row.disposed_on) },
+			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
 
 export function describeBillable(row: Billable): RecordDetail {
 	const pills: Pill[] = [];
@@ -451,6 +475,10 @@ export async function getRecord(
 	vocabulary: Vocabulary
 ): Promise<RecordDetail | null> {
 	switch (kind) {
+		case 'asset': {
+			const row = await getAsset(supabase, orgId, id);
+			return row && describeAsset(row);
+		}
 		case 'billable': {
 			const row = await getBillable(supabase, orgId, id);
 			return row && describeBillable(row);

@@ -23,6 +23,7 @@ const METHODS = [
 	'is',
 	'lt',
 	'not',
+	'or',
 	'order',
 	'limit',
 	'single',

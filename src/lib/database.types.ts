@@ -133,6 +133,65 @@ export type Database = {
           },
         ]
       }
+      assets: {
+        Row: {
+          acquired_on: string | null
+          asset_type: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          disposed_on: string | null
+          id: string
+          identifier: string | null
+          name: string
+          org_id: string
+          purchase_price: number | null
+          status: Database["public"]["Enums"]["asset_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          asset_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          name: string
+          org_id: string
+          purchase_price?: number | null
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          asset_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          name?: string
+          org_id?: string
+          purchase_price?: number | null
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assistant_conversations: {
         Row: {
           created_at: string
@@ -1892,6 +1951,116 @@ export type Database = {
           },
         ]
       }
+      relationship_types: {
+        Row: {
+          created_at: string
+          forward_label: string
+          id: string
+          inverse_label: string
+          is_system: boolean | null
+          key: string
+          org_id: string | null
+          source_type: Database["public"]["Enums"]["crm_entity_type"] | null
+          target_type: Database["public"]["Enums"]["crm_entity_type"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          forward_label: string
+          id?: string
+          inverse_label: string
+          is_system?: boolean | null
+          key: string
+          org_id?: string | null
+          source_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          target_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          forward_label?: string
+          id?: string
+          inverse_label?: string
+          is_system?: boolean | null
+          key?: string
+          org_id?: string | null
+          source_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          target_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationship_types_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      relationships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ended_on: string | null
+          from_id: string
+          from_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          notes: string | null
+          org_id: string
+          relationship_type_id: string
+          started_on: string | null
+          to_id: string
+          to_type: Database["public"]["Enums"]["crm_entity_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ended_on?: string | null
+          from_id: string
+          from_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          notes?: string | null
+          org_id: string
+          relationship_type_id: string
+          started_on?: string | null
+          to_id: string
+          to_type: Database["public"]["Enums"]["crm_entity_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ended_on?: string | null
+          from_id?: string
+          from_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          notes?: string | null
+          org_id?: string
+          relationship_type_id?: string
+          started_on?: string | null
+          to_id?: string
+          to_type?: Database["public"]["Enums"]["crm_entity_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationships_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationships_relationship_type_id_fkey"
+            columns: ["relationship_type_id"]
+            isOneToOne: false
+            referencedRelation: "relationship_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string
@@ -2443,6 +2612,7 @@ export type Database = {
       activity_direction: "inbound" | "outbound"
       activity_type: "note" | "call" | "email" | "meeting" | "sms" | "other"
       address_kind: "primary" | "billing" | "shipping" | "service" | "other"
+      asset_status: "active" | "inactive" | "retired"
       badge_tone:
         | "neutral"
         | "success"
@@ -2456,10 +2626,12 @@ export type Database = {
         | "indigo"
       company_relationship: "customer" | "supplier" | "partner" | "other"
       crm_entity_type:
+        | "asset"
         | "billable"
         | "company"
         | "contact"
         | "deal"
+        | "member"
         | "product"
         | "proposal"
         | "proposal_option"
@@ -2624,6 +2796,7 @@ export const Constants = {
       activity_direction: ["inbound", "outbound"],
       activity_type: ["note", "call", "email", "meeting", "sms", "other"],
       address_kind: ["primary", "billing", "shipping", "service", "other"],
+      asset_status: ["active", "inactive", "retired"],
       badge_tone: [
         "neutral",
         "success",
@@ -2638,10 +2811,12 @@ export const Constants = {
       ],
       company_relationship: ["customer", "supplier", "partner", "other"],
       crm_entity_type: [
+        "asset",
         "billable",
         "company",
         "contact",
         "deal",
+        "member",
         "product",
         "proposal",
         "proposal_option",

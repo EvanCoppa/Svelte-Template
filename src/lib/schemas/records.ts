@@ -37,6 +37,7 @@ export const RECORD_TYPES = [
 	'deal',
 	'product',
 	'billable',
+	'asset',
 	'task',
 	'ticket'
 ] as const;
@@ -187,6 +188,16 @@ export const billableRecordSchema = z.object({
 	description: optionalLongText
 });
 
+export const assetRecordSchema = z.object({
+	name: requiredText('Name'),
+	asset_type: optionalText,
+	identifier: optionalText,
+	status: z.enum(['active', 'inactive', 'retired']).default('active'),
+	acquired_on: optionalDate,
+	purchase_price: optionalAmount,
+	description: optionalLongText
+});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	due_at: optionalInstant,
@@ -213,6 +224,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	deal: dealRecordSchema,
 	product: productRecordSchema,
 	billable: billableRecordSchema,
+	asset: assetRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
@@ -314,6 +326,30 @@ export const RECORD_FORMS: RecordFormRegistry = {
 					{ value: 'true', label: 'Shown on every option' }
 				]
 			},
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	asset: {
+		feature: 'assets',
+		query: QUERY.assets,
+		// Who owns or holds it is deliberately not a field: that is a
+		// relationship, drawn on the record once it exists.
+		fields: [
+			{ name: 'name', label: 'Name', type: 'text', placeholder: 'MacBook Pro 16"' },
+			{ name: 'asset_type', label: 'Type', type: 'text', placeholder: 'device' },
+			{ name: 'identifier', label: 'Identifier', type: 'text', placeholder: 'IT-001' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'active', label: 'Active' },
+					{ value: 'inactive', label: 'Inactive' },
+					{ value: 'retired', label: 'Retired' }
+				]
+			},
+			{ name: 'acquired_on', label: 'Acquired', type: 'date' },
+			{ name: 'purchase_price', label: 'Purchase price', type: 'number', placeholder: '2399.00' },
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
 		]
 	},

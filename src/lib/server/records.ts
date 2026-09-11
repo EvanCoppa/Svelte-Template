@@ -5,6 +5,7 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
 import {
+	assetRecordSchema,
 	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
@@ -17,6 +18,7 @@ import {
 	type RecordFormValues,
 	type RecordType
 } from '$lib/schemas/records';
+import { createAsset } from './crm/assets';
 import { createBillable } from './crm/billables';
 import { createCompany } from './crm/companies';
 import { createContact } from './crm/contacts';
@@ -172,6 +174,19 @@ async function insertRecord(
 				unit: text(data.unit),
 				unit_choices: list(data.unit_choices),
 				is_featured: data.is_featured === 'true',
+				description: text(data.description)
+			});
+			return;
+		}
+		case 'asset': {
+			const data = assetRecordSchema.parse(values);
+			await createAsset(supabase, orgId, {
+				name: data.name,
+				asset_type: text(data.asset_type),
+				identifier: text(data.identifier),
+				status: data.status,
+				acquired_on: text(data.acquired_on),
+				purchase_price: amount(data.purchase_price) ?? null,
 				description: text(data.description)
 			});
 			return;

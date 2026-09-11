@@ -363,6 +363,27 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
   a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+- **Relationships are one table, not a junction table per pair of kinds**
+  (`relationships` migration + `src/lib/server/crm/relationships.ts`; docs/relationships.md).
+  A `relationships` row names two records through the shared entity link
+  (`from_type`/`from_id`, `to_type`/`to_id` — so a company, a contact, an asset, an
+  employee or a kind added later all take part) and a `relationship_types` row that
+  carries a forward label ("owns") and an inverse one ("owned by"). **One row is the
+  relationship whichever side you read it from**: `getRelationships()` orients every
+  row around the record on screen and names the other end, so no caller reconstructs
+  an inverse. System types ship by migration with `org_id` null; an org's own are
+  owner/admin rows. Both endpoints are checked to exist in the relationship's own org
+  by trigger (never across tenants), a type's `source_type`/`target_type` are hard
+  where set, at most one open relationship of a type exists per pair (ended ones are
+  history), and deleting either end deletes the row. **A record's structural columns
+  stay columns** — `contacts.company_id`, a deal's parties — and the graph is for
+  every other link; an owner, a vendor or an assignee is never a column on a table.
+  `'member'` is the kind for someone who works here (keyed by `organization_members.user_id`,
+  existing only while the membership does), distinct from a contact and an auth user.
+- **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
+  name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
+  a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).
+  Never add an `owner_id`-shaped column to it.
 - **The calendar is a third kind of "something written down against time"**
   (`calendar` migration + `src/lib/server/crm/calendar.ts` + `src/lib/calendar.ts` +
   `src/lib/components/calendar/` + `src/routes/(app)/calendar/`; docs/calendar.md).
