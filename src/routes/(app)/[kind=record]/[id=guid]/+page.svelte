@@ -124,8 +124,8 @@
 					<Card.Header>
 						<Card.Title>Relationships</Card.Title>
 						<Card.Description>
-							How this {terms.noun} relates to other records — read from its side, so the other side of
-							each one shows the inverse.
+							The records this {terms.noun} is linked to — who holds it, where it came from, who it refers
+							to.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>

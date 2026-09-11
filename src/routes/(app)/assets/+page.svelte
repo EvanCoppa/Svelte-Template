@@ -15,7 +15,9 @@
 	// An asset carries its own currency; format in it rather than assuming USD.
 	const money = (value: number, currency: string) =>
 		new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
-	const mediumDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+	// A `date` column has no time zone: read it as the day it names, not
+	// shifted into the viewer's zone.
+	const mediumDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Asset>();
 	const columns = columnHelper.columns([
@@ -39,7 +41,7 @@
 				renderComponent(DataTable.ColumnHeader, { column, title: 'Acquired' }),
 			cell: ({ getValue }) => {
 				const value = getValue();
-				return value ? mediumDate.format(new Date(`${value}T00:00:00`)) : '—';
+				return value ? mediumDate.format(new Date(value)) : '—';
 			}
 		}),
 		columnHelper.accessor('purchase_price', {

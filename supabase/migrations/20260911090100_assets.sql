@@ -93,7 +93,10 @@ create trigger assets_set_updated_at
 -- resolves through the membership: the entity id is the user id, and it
 -- exists in an org for exactly as long as the organization_members row
 -- does — so a relationship can name the employee a laptop is assigned to,
--- and can never name someone who is not on this org's roster.
+-- and can never name someone who is not on this org's roster. Like every
+-- kind, a member is then a legal target for every attach table (a tag, a
+-- custom value, an activity), all of it same-org data cleaned up when the
+-- membership ends; nothing draws those rows yet, and a member has no page.
 create or replace function private.crm_entity_exists(org uuid, kind public.crm_entity_type, entity uuid)
 returns boolean
 language sql stable
@@ -162,6 +165,9 @@ grant insert (org_id, name, asset_type, identifier, status, description, acquire
 -- The feature
 -- ---------------------------------------------------------------------------
 
+-- Filed under CRM beside the parties it relates to, not under Tools with
+-- the catalog its grants derive from: an asset is something you deal with,
+-- a product something you sell.
 insert into public.features (id, name, noun, description, route, icon, category, sort_order) values
 	('assets', 'Assets', 'asset',
 		'The things you own, use, lease or track — and who holds each one.',

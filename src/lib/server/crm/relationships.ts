@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { RECORD_KINDS } from '$lib/crm/records';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
 import { getDisplayNames } from '../profiles';
@@ -28,8 +27,10 @@ import { unwrap, unwrapDeleted } from './unwrap';
  * take part with no change here. The other record is named the way every
  * link is — `recordLinks()`, hence `getRecord()`, the app's one namer — and
  * a kind the reader may not open is left out entirely, the record page's
- * rule for a related group. A member is named through `getDisplayNames()`
- * and has no page: the roster is where people who work here are read.
+ * rule for a related group. A member is the exception: named through
+ * `getDisplayNames()` whatever the reader's staff grant (as the page names
+ * an author or an assignee), and with no page — the roster is where people
+ * who work here are read.
  *
  * Same contract as the other modules: request-scoped client + active org
  * id, RLS deciding what exists, write params Picked to the granted columns.
@@ -205,8 +206,9 @@ function nameEntity(
 		const name = people.get(other.entityId);
 		return name ? { ...other, name, href: null } : null;
 	}
-	const kind = RECORD_KINDS.find((candidate) => candidate === other.entityType);
-	if (!kind || !link) return null;
+	// `recordLinks()` already dropped kinds with no page and kinds the reader
+	// may not open, so no link means no row.
+	if (!link) return null;
 	return { ...other, name: link.label, href: link.href };
 }
 

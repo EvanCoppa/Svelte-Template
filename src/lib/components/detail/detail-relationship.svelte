@@ -9,8 +9,10 @@
 	 */
 	let { relationship }: { relationship: RelationshipView } = $props();
 
-	const mediumDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-	const day = (value: string) => mediumDate.format(new Date(`${value}T00:00:00`));
+	// A `date` column has no time zone: read it as the day it names, not
+	// shifted into the viewer's zone (the same formatter as Detail.Value).
+	const mediumDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
+	const day = (value: string) => mediumDate.format(new Date(value));
 
 	const period = $derived.by(() => {
 		const { startedOn, endedOn } = relationship;

@@ -316,7 +316,8 @@ features, access }` on `locals.org` — the hook gates the route on it, and
 - **One polymorphic link, not one per table.** "This row is about some CRM record"
   is answered everywhere by the same three pieces: the `crm_entity_type` enum plus
   an `entity_id`, `private.crm_entity_exists()` as the foreign key Postgres cannot
-  express, and `public.on_crm_entity_deleted()` as the one place that says what
+  express, and `private.on_crm_entity_gone()` (called by every parent's
+  `on_crm_entity_deleted` trigger) as the one place that says what
   happens when a record goes (proposals detach, addresses/activities/taggings/custom
   values are deleted). `addresses`, `activities`, `taggings` and `custom_field_values`
   all use it; app code names the pair once in `src/lib/server/crm/entity.ts`. A new
@@ -377,7 +378,9 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   where set, at most one open relationship of a type exists per pair (ended ones are
   history), and deleting either end deletes the row. **A record's structural columns
   stay columns** — `contacts.company_id`, a deal's parties — and the graph is for
-  every other link; an owner, a vendor or an assignee is never a column on a table.
+  every other link — the one the columns did not foresee. A record's own assignee
+  column (`deals.assigned_to`, an event's) stays; what never gets a column is a link
+  that would have to pick a kind (`owner_id`: a contact or a company?).
   `'member'` is the kind for someone who works here (keyed by `organization_members.user_id`,
   existing only while the membership does), distinct from a contact and an auth user.
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):

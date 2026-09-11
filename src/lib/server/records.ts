@@ -186,7 +186,7 @@ async function insertRecord(
 				identifier: text(data.identifier),
 				status: data.status,
 				acquired_on: text(data.acquired_on),
-				purchase_price: amount(data.purchase_price) ?? null,
+				purchase_price: amount(data.purchase_price),
 				description: text(data.description)
 			});
 			return;

@@ -136,6 +136,20 @@ mileage and warranty dates are custom fields with `entity_type = 'asset'`. The
 feature is `assets` (every industry, every tier; grants derived from products), the
 list page `/assets`, and the record page the generic one.
 
+## Rules the first writer must follow
+
+- **Symmetric types are stored in one direction.** `spouse_of` and `related_to`
+  read the same both ways, but the unique index is per direction, so a picker must
+  query both directions (`getRelationships()` already returns both) before inserting,
+  or the fact shows twice.
+- **An org's own type may reuse a system key** — the two unique indexes never
+  collide. App code therefore addresses types by `id`, never by key; `key` is a
+  handle for migrations and seeds.
+- **Drawing or removing a link needs `manage` on the on-screen record's feature**
+  (the same level as editing it), checked with `requirePermission()` in the action;
+  RLS lets any member write, so the check is the app-level gate exactly as it is for
+  addresses.
+
 ## Not built yet
 
 - A UI to draw a relationship (a type picker plus a record picker across kinds) and
