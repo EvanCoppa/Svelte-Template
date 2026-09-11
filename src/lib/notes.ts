@@ -121,21 +121,30 @@ export type NoteDeck = NoteAccess & { open: Note[]; docked: boolean };
  * policy applies, so the editor is never offered for a save that RLS would
  * refuse. An archived note is read until it is restored.
  */
-export function canEditNote(note: Pick<Note, 'author_id' | 'archived_at'>, access: NoteAccess) {
+export function canEditNote(
+	note: Pick<Note, 'author_id' | 'entity_type' | 'archived_at'>,
+	access: NoteAccess
+) {
 	return access.canManage && note.archived_at === null && isOwn(note, access);
 }
 
 /** The same question for deleting, which takes the `delete` level. */
-export function canRemoveNote(note: Pick<Note, 'author_id'>, access: NoteAccess) {
+export function canRemoveNote(note: Pick<Note, 'author_id' | 'entity_type'>, access: NoteAccess) {
 	return access.canDelete && isOwn(note, access);
 }
 
 /** Archiving is an edit, and an archived note is restored by the same people. */
-export function canArchiveNote(note: Pick<Note, 'author_id'>, access: NoteAccess) {
+export function canArchiveNote(note: Pick<Note, 'author_id' | 'entity_type'>, access: NoteAccess) {
 	return access.canManage && isOwn(note, access);
 }
 
-function isOwn(note: Pick<Note, 'author_id'>, access: NoteAccess): boolean {
+/**
+ * A note attached to a record is private to whoever wrote it — the RLS
+ * policies never grant an owner/admin a row they didn't author, so the
+ * manager override only applies to the freestanding, org-shared notes.
+ */
+function isOwn(note: Pick<Note, 'author_id' | 'entity_type'>, access: NoteAccess): boolean {
+	if (note.entity_type !== null) return note.author_id === access.viewer.userId;
 	return access.viewer.isOrgManager || note.author_id === access.viewer.userId;
 }
 

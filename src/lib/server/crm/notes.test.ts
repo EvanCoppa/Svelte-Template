@@ -44,6 +44,13 @@ describe('notes data access', () => {
 		expect(both.builder.not).not.toHaveBeenCalled();
 	});
 
+	it('restricts the rail to freestanding notes, never the ones attached to a record', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await listNotes(supabase, ORG_ID, { attached: false });
+		expect(builder.is).toHaveBeenCalledWith('entity_type', null);
+	});
+
 	it('caps the dock’s rail when asked', async () => {
 		const { supabase, builder } = supabaseMock({ data: [] });
 

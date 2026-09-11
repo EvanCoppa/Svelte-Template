@@ -58,7 +58,11 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		loadVocabulary(locals.supabase, activeOrg.industryId),
 		loadPreferences(locals.supabase, locals.user.id),
 		notesShown
-			? listNotes(locals.supabase, activeOrg.id, { archived: false, limit: DOCK_NOTE_LIMIT })
+			? listNotes(locals.supabase, activeOrg.id, {
+					attached: false,
+					archived: false,
+					limit: DOCK_NOTE_LIMIT
+				})
 			: []
 	]);
 

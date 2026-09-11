@@ -40,7 +40,19 @@ export const DOCK_NOTE_LIMIT = 40;
 export async function listNotes(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { entity?: CrmEntityRef; archived?: boolean; limit?: number } = {}
+	filter: {
+		entity?: CrmEntityRef;
+		/**
+		 * `false` restricts to the freestanding notes (no entity link) — what the
+		 * dock and `/notes` show. A note attached to a record is private to its
+		 * author (RLS), so this is a real filter, not a defense-in-depth one: the
+		 * shared rail must never show one even to the author who happens to be
+		 * looking at it, because it belongs to the record's card, not the rail.
+		 */
+		attached?: boolean;
+		archived?: boolean;
+		limit?: number;
+	} = {}
 ): Promise<Note[]> {
 	let query = supabase
 		.from('notes')
@@ -57,6 +69,8 @@ export async function listNotes(
 			.eq('entity_type', filter.entity.entityType)
 			.eq('entity_id', filter.entity.entityId);
 	}
+	if (filter.attached === false) query = query.is('entity_type', null);
+	if (filter.attached === true) query = query.not('entity_type', 'is', null);
 	// Unset means both; the page shows the archive behind a toggle.
 	if (filter.archived === true) query = query.not('archived_at', 'is', null);
 	if (filter.archived === false) query = query.is('archived_at', null);
