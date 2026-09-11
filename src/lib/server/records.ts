@@ -10,19 +10,25 @@ import {
 	companyRecordSchema,
 	contactRecordSchema,
 	dealRecordSchema,
+	invoiceRecordSchema,
 	productRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
+	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
+	type RecordFieldOption,
 	type RecordFormValues,
+	type RecordPickerKind,
+	type RecordPickers,
 	type RecordType
 } from '$lib/schemas/records';
 import { createAsset } from './crm/assets';
 import { createBillable } from './crm/billables';
-import { createCompany } from './crm/companies';
-import { createContact } from './crm/contacts';
+import { createCompany, getCompany, listCompanies } from './crm/companies';
+import { createContact, listContacts } from './crm/contacts';
 import { createDeal } from './crm/deals';
+import { createInvoice } from './crm/invoices';
 import { createProduct } from './crm/products';
 import { createTask } from './crm/tasks';
 import { createTicket } from './crm/tickets';
@@ -61,21 +67,64 @@ export function createRecordForm(
 }
 
 /**
- * What a list page's load adds for its "Add …" button: the form, and
- * whether this user may use it. A member without `manage` still reads the
- * list; the button simply isn't rendered, and the action refuses anyway.
+ * What a list page's load adds for its "Add …" button: the form, whether
+ * this user may use it, and the options behind any party picker the form
+ * has. A member without `manage` still reads the list; the button simply
+ * isn't rendered, and the action refuses anyway — so the pickers are read
+ * only for a writer, and only for the kinds the form points at.
  */
 export async function loadCreateRecord(
 	locals: App.Locals,
 	type: RecordType,
 	{ defaults = {} }: { defaults?: Partial<RecordFormValues> } = {}
-): Promise<{ createForm: SuperValidated<RecordFormValues>; canCreate: boolean }> {
-	if (!locals.org) throw redirect(303, '/login');
+): Promise<{
+	createForm: SuperValidated<RecordFormValues>;
+	canCreate: boolean;
+	createPickers: RecordPickers;
+}> {
+	const { supabase, activeOrgId, org } = locals;
+	if (!org || !activeOrgId) throw redirect(303, '/login');
 
-	return {
-		createForm: await createRecordForm(type, defaults),
-		canCreate: can(locals.org.access, RECORD_FORMS[type].feature, 'manage')
-	};
+	const canCreate = can(org.access, RECORD_FORMS[type].feature, 'manage');
+	const [createForm, createPickers] = await Promise.all([
+		createRecordForm(type, defaults),
+		canCreate ? loadPickers(supabase, activeOrgId, type) : {}
+	]);
+	return { createForm, canCreate, createPickers };
+}
+
+/** The org's rows behind each party picker on the form for `type` — none for a form without one. */
+async function loadPickers(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: RecordType
+): Promise<RecordPickers> {
+	const wanted = RECORD_PICKER_KINDS.filter((kind) =>
+		RECORD_FORMS[type].fields.some((field) => field.type === kind)
+	);
+	const loaded = await Promise.all(wanted.map((kind) => pickerOptions(supabase, orgId, kind)));
+	return Object.fromEntries(wanted.map((kind, index) => [kind, loaded[index]]));
+}
+
+async function pickerOptions(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	kind: RecordPickerKind
+): Promise<RecordFieldOption[]> {
+	switch (kind) {
+		case 'company':
+			return (await listCompanies(supabase, orgId)).map((company) => ({
+				value: company.id,
+				label: company.name
+			}));
+		case 'contact':
+			// A person at a company is shown with it, so two Dana Reyeses tell apart.
+			return (await listContacts(supabase, orgId)).map((contact) => ({
+				value: contact.id,
+				label: contact.name,
+				sublabel: contact.companies?.name ?? contact.email ?? undefined
+			}));
+	}
 }
 
 /** The `create` action every list page delegates to. */
@@ -191,6 +240,23 @@ async function insertRecord(
 			});
 			return;
 		}
+		case 'invoice': {
+			const data = invoiceRecordSchema.parse(values);
+			// A draft: the number is the database's, the lines come next on the
+			// invoice's own page, and nothing is owed until it is issued. Terms
+			// left blank are the company's own, when there is one to ask.
+			const company =
+				data.company_id === '' ? null : await getCompany(supabase, orgId, data.company_id);
+			await createInvoice(supabase, orgId, {
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				payment_terms_days: integer(data.payment_terms_days) ?? company?.payment_terms_days ?? null,
+				due_date: text(data.due_date),
+				billing_email: text(data.billing_email),
+				memo: text(data.memo)
+			});
+			return;
+		}
 		case 'task': {
 			const data = taskRecordSchema.parse(values);
 			await createTask(supabase, orgId, {
@@ -225,6 +291,11 @@ function list(value: string): string[] | null {
 		.map((item) => item.trim())
 		.filter(Boolean);
 	return items.length > 0 ? items : null;
+}
+
+/** A whole number as typed, or null when the field was left blank. */
+function integer(value: string): number | null {
+	return value === '' ? null : Number(value);
 }
 
 /**

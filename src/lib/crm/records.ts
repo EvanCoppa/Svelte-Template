@@ -30,6 +30,7 @@ export const RECORD_KINDS = [
 	'product',
 	'deal',
 	'proposal',
+	'invoice',
 	'task',
 	'ticket'
 ] as const satisfies readonly Enums<'crm_entity_type'>[];
@@ -55,6 +56,7 @@ export const RECORD_KIND_META = {
 	product: { feature: 'products', segment: 'products' },
 	deal: { feature: 'deals', segment: 'deals' },
 	proposal: { feature: 'proposals', segment: 'proposals' },
+	invoice: { feature: 'invoices', segment: 'invoices' },
 	task: { feature: 'tasks', segment: 'tasks' },
 	ticket: { feature: 'tickets', segment: 'tickets' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;

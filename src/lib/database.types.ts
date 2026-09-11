@@ -1107,7 +1107,7 @@ export type Database = {
           amount_paid: number
           balance_due: number | null
           billing_email: string | null
-          company_id: string
+          company_id: string | null
           contact_id: string | null
           created_at: string
           created_by: string | null
@@ -1136,7 +1136,7 @@ export type Database = {
           amount_paid?: number
           balance_due?: number | null
           billing_email?: string | null
-          company_id: string
+          company_id?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1147,7 +1147,7 @@ export type Database = {
           issued_at?: string | null
           memo?: string | null
           notes?: string | null
-          number: string
+          number?: string
           order_id?: string | null
           org_id: string
           paid_at?: string | null
@@ -1165,7 +1165,7 @@ export type Database = {
           amount_paid?: number
           balance_due?: number | null
           billing_email?: string | null
-          company_id?: string
+          company_id?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1786,7 +1786,8 @@ export type Database = {
       payments: {
         Row: {
           amount: number
-          company_id: string
+          company_id: string | null
+          contact_id: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -1804,7 +1805,8 @@ export type Database = {
         }
         Insert: {
           amount: number
-          company_id: string
+          company_id?: string | null
+          contact_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -1822,7 +1824,8 @@ export type Database = {
         }
         Update: {
           amount?: number
-          company_id?: string
+          company_id?: string | null
+          contact_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -1844,6 +1847,13 @@ export type Database = {
             columns: ["company_id", "org_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "payments_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id", "org_id"]
           },
           {

@@ -42,6 +42,7 @@ import { getDisplayNames } from '$lib/server/profiles';
 import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
+import { billingActions, loadBilling } from './billing.server';
 import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
 import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
@@ -63,7 +64,10 @@ import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-co
  * so the specific page takes over and this one stays the default for the rest.
  *
  * The one thing edited here is a party's addresses — the form below, whose
- * action geocodes what it saves so the record can sit on a view's map.
+ * action geocodes what it saves so the record can sit on a view's map. An
+ * invoice's lines and payments are the other: `billing.server.ts` keeps
+ * that block's reads and actions, and the page draws it whenever the load
+ * supplies `billing` — a data-presence check like the thread's.
  */
 
 /** Explicit form ids, shared by the load, the actions and the page's `superForm`s. */
@@ -137,7 +141,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		related,
 		relationships,
 		notes,
-		messages
+		messages,
+		billing
 	] = await Promise.all([
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
@@ -151,7 +156,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// assignees are in here, which is why it needs no field of its own.
 		getRelationships(supabase, activeOrgId, entity, canOpen, vocabulary),
 		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : [],
-		threaded ? listTaskComments(supabase, activeOrgId, id) : []
+		threaded ? listTaskComments(supabase, activeOrgId, id) : [],
+		// Null for every kind but an invoice; the block's own module decides.
+		loadBilling(locals, params)
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
@@ -220,6 +227,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
 		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,
+		// An invoice's lines and money, with the forms that change them.
+		billing,
 		people,
 		// The record's name titles the page and names its crumb — see
 		// `titleFor()` in $lib/features/pages.
@@ -262,6 +271,9 @@ function assetOf(locals: App.Locals, params: { kind: RecordSegment; id: string }
 }
 
 export const actions: Actions = {
+	// The invoice block's nine actions — lines, header, lifecycle, money.
+	...billingActions,
+
 	saveAddress: async ({ request, locals, params }) => {
 		const { supabase, orgId, entity } = partyOf(locals, params);
 		const form = await superValidate(request, zod4(addressSchema), { id: FORM_IDS.address });

@@ -105,3 +105,52 @@ export const TASK_STATUSES = [
 export function taskIsDone(task: Pick<Tables<'tasks'>, 'status'>): boolean {
 	return task.status === 'done';
 }
+
+/** An invoice's own lifecycle: being written, out with the customer, or withdrawn. */
+export const INVOICE_STATUS_TONE = {
+	draft: 'neutral',
+	issued: 'info',
+	void: 'warning'
+} satisfies Record<Enums<'invoice_status'>, BadgeTone>;
+
+/**
+ * The money axis of an invoice (and later an order), a second pill beside
+ * the status: how much of what it asks for has arrived.
+ */
+export const PAYMENT_STATE_TONE = {
+	unpaid: 'warning',
+	partial: 'info',
+	paid: 'success'
+} satisfies Record<Enums<'payment_state'>, BadgeTone>;
+
+/** Which way money moved: in, or back out to the customer. */
+export const PAYMENT_KIND_TONE = {
+	payment: 'success',
+	refund: 'rose'
+} satisfies Record<Enums<'payment_kind'>, BadgeTone>;
+
+/**
+ * How money moved, as a person would say it — the one enum here whose values
+ * are abbreviations ("ach") rather than words, so the label lives beside
+ * the vocabulary the way the task statuses' do.
+ */
+export const PAYMENT_METHOD_LABEL = {
+	check: 'Check',
+	ach: 'ACH',
+	wire: 'Wire',
+	card: 'Card',
+	cash: 'Cash',
+	credit: 'Credit',
+	other: 'Other'
+} satisfies Record<Enums<'payment_method'>, string>;
+
+/** The ways money moves, in the order the payment form offers them. */
+export const PAYMENT_METHODS = [
+	'check',
+	'ach',
+	'wire',
+	'card',
+	'cash',
+	'credit',
+	'other'
+] as const satisfies readonly Enums<'payment_method'>[];

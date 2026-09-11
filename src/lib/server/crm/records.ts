@@ -5,7 +5,9 @@ import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
+	PAYMENT_STATE_TONE,
 	PRODUCT_KIND_TONE,
 	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
@@ -23,6 +25,12 @@ import { getCompany, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
+import {
+	getInvoice,
+	listInvoices,
+	type InvoiceWithDetails,
+	type InvoiceWithParties
+} from './invoices';
 import { getProduct, type ProductWithCategory } from './products';
 import {
 	getProposal,
@@ -387,6 +395,52 @@ export function describeProposal(
 	};
 }
 
+/**
+ * An invoice is named by its number and read by its money: the status pill
+ * says where the document is, the payment pill how much of it has arrived.
+ * Overdue is not a pill here: it is a wall-clock word (the invoicing
+ * migration's decision 4), and the billing block asks it of the viewer's
+ * own date. The lines and the payments are that block, not fields.
+ */
+export function describeInvoice(row: InvoiceWithDetails, canOpen: CanOpen): RecordDetail {
+	const pills = [pill(row.status, INVOICE_STATUS_TONE[row.status])];
+	// A draft asks for nothing yet and a void one never will; only an issued
+	// invoice has a money state worth a second pill.
+	if (row.status === 'issued') {
+		pills.push(pill(row.payment_status, PAYMENT_STATE_TONE[row.payment_status]));
+	}
+	return {
+		kind: 'invoice',
+		id: row.id,
+		name: row.number,
+		pills,
+		fields: [
+			// One of the two is always named (the ledger migration's check);
+			// a bill to a person at a company names both.
+			{ label: 'Company', value: record('company', row.companies, canOpen) },
+			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
+			{ label: 'Issued', value: datetime(row.issued_at) },
+			{ label: 'Due', value: date(row.due_date) },
+			{
+				label: 'Terms',
+				value:
+					row.payment_terms_days === null ? EMPTY : text(`Net ${String(row.payment_terms_days)}`)
+			},
+			{ label: 'Total', value: money(row.total, row.currency) },
+			{ label: 'Paid', value: money(row.amount_paid, row.currency) },
+			{ label: 'Balance due', value: money(row.balance_due, row.currency) },
+			{ label: 'Billing email', value: email(row.billing_email) },
+			// Shown to the customer; `notes` is not.
+			{ label: 'Memo', value: text(row.memo) },
+			{ label: 'Internal notes', value: text(row.notes) },
+			{ label: 'Voided', value: datetime(row.voided_at) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
 export function describeTask(row: TaskWithParties, canOpen: CanOpen): RecordDetail {
 	return {
 		kind: 'task',
@@ -515,6 +569,10 @@ export async function getRecord(
 				)
 			);
 		}
+		case 'invoice': {
+			const row = await getInvoice(supabase, orgId, id);
+			return row && describeInvoice(row, canOpen);
+		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
 			return row && describeTask(row, canOpen);
@@ -597,6 +655,25 @@ function relatedProposal(row: ProposalWithOptions): RelatedRecord {
 	};
 }
 
+/** A bill on this account: what it asked for, and what is still owed on it. */
+function relatedInvoice(row: InvoiceWithParties): RelatedRecord {
+	const total = moneyText(row.total ?? 0, row.currency);
+	const balance = row.balance_due ?? 0;
+	return {
+		id: row.id,
+		name: row.number,
+		href: recordHref('invoice', row.id),
+		pill:
+			row.status === 'issued'
+				? pill(row.payment_status, PAYMENT_STATE_TONE[row.payment_status])
+				: pill(row.status, INVOICE_STATUS_TONE[row.status]),
+		meta:
+			row.status === 'issued' && balance > 0
+				? `${total} · ${moneyText(balance, row.currency)} due`
+				: total
+	};
+}
+
 function relatedTask(row: Task): RelatedRecord {
 	return {
 		id: row.id,
@@ -619,9 +696,9 @@ function relatedTicket(row: TicketWithParties): RelatedRecord {
 
 /**
  * The records that reference this one, grouped by kind, in the order the
- * sidebar lists those kinds. The parties collect other records — a deal, a
- * task and a ticket each name a company and a person, so a company or a
- * contact page lists the ones naming it — and a proposal hangs off a
+ * sidebar lists those kinds. The parties collect other records — a deal, an
+ * invoice, a task and a ticket each name a company and a person, so a
+ * company or a contact page lists the ones naming it — and a proposal hangs off a
  * company, a contact or a deal through the shared entity link, so those
  * three list their proposals. A group is fetched only when the reader may
  * open that kind (`canOpen`), so nothing is shown that its own list page
@@ -656,6 +733,12 @@ export async function listRelatedRecords(
 			? listProposals(supabase, orgId, { entity: { entityType: kind, entityId: id } }).then(
 					(rows): RelatedGroup => ({ kind: 'proposal', records: rows.map(relatedProposal) })
 				)
+			: null,
+		party && canOpen('invoice')
+			? listInvoices(supabase, orgId, party).then((rows): RelatedGroup => ({
+					kind: 'invoice',
+					records: rows.map(relatedInvoice)
+				}))
 			: null,
 		party && canOpen('task')
 			? listTasks(supabase, orgId, party).then((rows): RelatedGroup => ({

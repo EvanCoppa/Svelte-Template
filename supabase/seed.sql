@@ -1068,3 +1068,102 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'contact', '30000000-0000-0000-0000-000000000002', null, null, null,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- The ledger: what Acme is owed and what has come in (the invoicing and
+-- ledger migrations). Numbers are left to the trigger, so a fresh reset
+-- reads INV-00001 onwards in insert order and a new invoice never collides
+-- with a seeded one. Five documents cover every state the two pages draw —
+-- issued and overdue with a part payment, issued and settled, issued to a
+-- PERSON with no company at all (the reason the ledger migration made the
+-- customer a party), void, and a draft still being written — and the
+-- payments below leave one sum unapplied, sitting on that person's account.
+--
+-- Every invoice goes in as a draft and is moved to its real status after its
+-- lines: the trigger that freezes an issued invoice refuses a line on
+-- anything but a draft, and a seed is no exception to it.
+insert into public.invoices (id, org_id, company_id, contact_id, payment_terms_days, due_date,
+		billing_email, memo, created_by) values
+	-- Net-30, issued 40 days ago: overdue, with $1,000 of it paid.
+	('e5000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+		30, current_date - 10, 'ap@wayne.example.com', 'Site work, August.',
+		'00000000-0000-0000-0000-000000000001'),
+	-- Settled in full by card three days after it went out.
+	('e5000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002',
+		15, current_date + 10, null, null,
+		'00000000-0000-0000-0000-000000000001'),
+	-- A bill to a person: no company anywhere on it.
+	('e5000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, '30000000-0000-0000-0000-000000000003',
+		30, current_date + 18, 'client@example.com', 'Retainer, September.',
+		'00000000-0000-0000-0000-000000000003'),
+	-- Issued by mistake and voided the same day; stays in the record.
+	('e5000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000002', null,
+		15, current_date + 5, null, 'Duplicate of the September bill.',
+		'00000000-0000-0000-0000-000000000001'),
+	-- Still a draft: lines can change, nothing is owed yet, not on the ledger.
+	('e5000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', null,
+		30, null, null, null,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Lines cite the catalog where they came from and keep their own price; the
+-- header's subtotal and tax roll up from them by trigger.
+insert into public.invoice_line_items (id, org_id, invoice_id, product_id, description,
+		product_sku_snapshot, quantity, unit_price, discount, tax, sort_order) values
+	('e6000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000002',
+		'Site inspection', 'SVC-INSPECT', 2, 150.00, 0, 24.75, 0),
+	('e6000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000003',
+		'Consulting', null, 8, 200.00, 100.00, 123.75, 1),
+	('e6000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000002', 'b2000000-0000-0000-0000-000000000001',
+		'Stainless fixing pack (100)', 'FIX-SS-100', 4, 42.50, 0, 14.03, 0),
+	('e6000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000003', 'b2000000-0000-0000-0000-000000000003',
+		'Consulting — retainer', null, 20, 200.00, 0, 0, 0),
+	('e6000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000004', 'b2000000-0000-0000-0000-000000000001',
+		'Stainless fixing pack (100)', 'FIX-SS-100', 4, 42.50, 0, 14.03, 0),
+	('e6000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000005', 'b2000000-0000-0000-0000-000000000002',
+		'Site inspection', 'SVC-INSPECT', 1, 150.00, 0, 12.38, 0)
+on conflict (id) do nothing;
+
+-- Now the lifecycle. Idempotent: a re-run restates the same values.
+update public.invoices set status = 'issued', issued_at = now() - interval '40 days'
+	where id = 'e5000000-0000-0000-0000-000000000001';
+update public.invoices set status = 'issued', issued_at = now() - interval '5 days'
+	where id = 'e5000000-0000-0000-0000-000000000002';
+update public.invoices set status = 'issued', issued_at = now() - interval '12 days'
+	where id = 'e5000000-0000-0000-0000-000000000003';
+update public.invoices
+	set status = 'void', issued_at = now() - interval '9 days', voided_at = now() - interval '9 days'
+	where id = 'e5000000-0000-0000-0000-000000000004';
+
+-- Money that moved. The first two settle an invoice (the rollup marks one
+-- partial and the other paid); the third is a deposit from the person with
+-- no company, applied to nothing yet — the ledger shows it as credit on
+-- their account until someone puts it against a bill.
+insert into public.payments (id, org_id, company_id, contact_id, invoice_id, kind, method, amount,
+		reference, received_at, notes, created_by) values
+	('e7000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+		'e5000000-0000-0000-0000-000000000001', 'payment', 'check', 1000.00,
+		'4471', now() - interval '20 days', 'Part payment; balance promised end of month.',
+		'00000000-0000-0000-0000-000000000001'),
+	('e7000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002',
+		'e5000000-0000-0000-0000-000000000002', 'payment', 'card', 184.03,
+		'auth 88Q1', now() - interval '2 days', null,
+		'00000000-0000-0000-0000-000000000001'),
+	('e7000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		null, '30000000-0000-0000-0000-000000000003',
+		null, 'payment', 'cash', 500.00,
+		null, now() - interval '8 days', 'Deposit taken at the desk.',
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
