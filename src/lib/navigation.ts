@@ -64,7 +64,14 @@ export interface NavItem {
 	category: NavCategoryKey;
 	/** A lucide slug; `iconFor()` in `$lib/features/icons` turns it into a component. */
 	icon: string;
-	/** Position inside its category; features carry their registry sort_order. */
+	/**
+	 * Position inside its category; features carry their registry sort_order.
+	 * A feature's is a multiple of 100, restarting at 100 in each category
+	 * (the nav_sort_order migration) — the gaps are what let a new feature
+	 * land between two others without renumbering them. Numbers below 100 are
+	 * the static shell entries' own, which is what keeps Dashboard (0) above
+	 * every feature in General.
+	 */
 	sortOrder: number;
 	/** Extra search keywords for the ⌘K palette. */
 	aliases?: string[];
