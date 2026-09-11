@@ -70,10 +70,16 @@ font metrics. Empty for prose lines. It scrolls with the textarea and is
 worse than not reading the gutter at all. Give it a single `aria-live` summary instead
 when a total exists.
 
-Wrapped lines are the fiddly part and the reason to build this first: a long line
-occupies two rows in the textarea and one entry in the gutter. Measure the rendered
-rows rather than assuming a fixed line height — there is no helper for this, and
-`DataTable`'s page-size measuring is the nearest thing in the repo to copy the shape of.
+Wrapped lines are the fiddly part and the reason to build this first, and two of the
+three things that go wrong are invisible until you measure them in a real browser:
+
+- **A textarea breaks a long unbroken word and a plain div does not**, so the mirror
+  needs `break-words` or a single pasted URL pushes every answer below it up a row.
+- **`inset-0` makes the mirror a scrollbar wider than the text it shadows**, which
+  changes where long lines wrap. The field's `clientWidth` is measured with a
+  `ResizeObserver` instead — the same way `DataTable` sizes its page.
+- The overlay is only mounted when a note has at least one answer, so a note that is
+  only prose renders exactly what it renders today.
 
 **3. Checklists.**
 
@@ -84,9 +90,11 @@ character and lets the existing autosave carry it. No new endpoint, no new colum
 
 | file                                         | change                                    |
 | -------------------------------------------- | ----------------------------------------- |
-| `src/lib/editor/compute.ts`                  | new — the whole feature                   |
+| `src/lib/editor/compute.ts`                  | new — the calculator                      |
 | `src/lib/editor/compute.test.ts`             | new — vitest, the reference for the rules |
-| `src/lib/components/note/note-editor.svelte` | the gutter, and the checkbox click        |
+| `src/lib/editor/checklist.ts`                | new — reading and ticking one box         |
+| `src/lib/editor/checklist.test.ts`           | new                                       |
+| `src/lib/components/note/note-editor.svelte` | the answer layer, and the checkbox click  |
 | `src/lib/notes.ts`                           | nothing                                   |
 | `supabase/migrations/`                       | **nothing**                               |
 | `src/lib/database.types.ts`                  | **nothing**                               |
@@ -103,4 +111,5 @@ expression on every keystroke.
 - Prose notes look and behave exactly as they do today — no gutter, no change.
 - `noteLabel()`, `noteExcerpt()`, `noteMatches()` and `notesToMarkdown()` have no new
   tests, because nothing about them changed.
+- A long pasted URL does not shift the answers below it out of line.
 - `check`, `lint`, `lint:oxlint`, `knip` and `test` are at zero.
