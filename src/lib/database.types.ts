@@ -795,6 +795,47 @@ export type Database = {
           },
         ]
       }
+      entity_images: {
+        Row: {
+          caption: string | null
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          org_id: string
+          storage_path: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          org_id: string
+          storage_path: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          org_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_images_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       execution_records: {
         Row: {
           created_at: string

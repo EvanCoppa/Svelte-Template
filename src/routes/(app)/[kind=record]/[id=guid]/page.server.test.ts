@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
-import { ORG_ID, supabaseMockSequence } from '$lib/server/crm/test-support';
+import { ORG_ID, supabaseMockSequence, withStorage } from '$lib/server/crm/test-support';
 import type { UserAccess } from '$lib/server/roles';
 import { actions } from './+page.server';
 
@@ -24,8 +24,21 @@ const MANAGER: UserAccess = {
 	grants: new Map([['contacts', 'manage' as const]])
 };
 
+const ASSET_READER: UserAccess = {
+	role: 'member',
+	roles: [],
+	grants: new Map([['assets', 'read' as const]])
+};
+const ASSET_MANAGER: UserAccess = {
+	role: 'member',
+	roles: [],
+	grants: new Map([['assets', 'manage' as const]])
+};
+
 const CONTACT_ID = '30000000-0000-0000-0000-000000000003';
 const ADDRESS_ID = '32000000-0000-0000-0000-000000000002';
+const ASSET_ID = '40000000-0000-0000-0000-000000000004';
+const IMAGE_ID = '42000000-0000-0000-0000-000000000002';
 
 function localsFor(supabase: SupabaseClient<Database>, access: UserAccess): App.Locals {
 	// SAFETY: the actions read `supabase`, `activeOrgId` and `org.access`; the
@@ -33,10 +46,10 @@ function localsFor(supabase: SupabaseClient<Database>, access: UserAccess): App.
 	return { supabase, activeOrgId: ORG_ID, org: { access } } as never;
 }
 
-function post(fields: [name: string, value: string][]) {
+function post(fields: [name: string, value: string | File][], id = CONTACT_ID) {
 	const body = new FormData();
 	for (const [name, value] of fields) body.append(name, value);
-	return new Request(`https://app.test/contacts/${CONTACT_ID}`, { method: 'POST', body });
+	return new Request(`https://app.test/contacts/${id}`, { method: 'POST', body });
 }
 
 type ActionName = keyof typeof actions;
@@ -45,14 +58,15 @@ function run(
 	name: ActionName,
 	supabase: SupabaseClient<Database>,
 	access: UserAccess,
-	fields: [string, string][],
-	kind = 'contacts'
+	fields: [string, string | File][],
+	kind = 'contacts',
+	id = CONTACT_ID
 ) {
 	// SAFETY: the actions read `request`, `locals` and `params` only.
 	return actions[name]({
-		request: post(fields),
+		request: post(fields, id),
 		locals: localsFor(supabase, access),
-		params: { kind, id: CONTACT_ID }
+		params: { kind, id }
 	} as never);
 }
 
@@ -165,6 +179,98 @@ describe('the address actions', () => {
 			'data.form.message',
 			expect.stringContaining('Address was not deleted')
 		);
+	});
+});
+
+function photo(name = 'photo.jpg', type = 'image/jpeg') {
+	return new File(['bytes'], name, { type });
+}
+
+describe('the image actions', () => {
+	it('refuses a reader, and a kind that has no photos, before writing anything', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: {} }]);
+
+		await expect(
+			run('uploadImage', supabase, ASSET_READER, [['file', photo()]], 'assets', ASSET_ID)
+		).rejects.toMatchObject({ status: 403 });
+		await expect(
+			run('uploadImage', supabase, OWNER, [['file', photo()]], 'products', ASSET_ID)
+		).rejects.toMatchObject({ status: 400 });
+		await expect(
+			run('removeImage', supabase, ASSET_READER, [['id', IMAGE_ID]], 'assets', ASSET_ID)
+		).rejects.toMatchObject({ status: 403 });
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('uploads a photo and rows it', async () => {
+		const { supabase, bucket, builder } = withStorage(
+			supabaseMockSequence([{ data: { id: IMAGE_ID } }])
+		);
+
+		const result = await run(
+			'uploadImage',
+			supabase,
+			ASSET_MANAGER,
+			[
+				['file', photo()],
+				['caption', 'Front elevation']
+			],
+			'assets',
+			ASSET_ID
+		);
+		expect(result).toHaveProperty('form.valid', true);
+		expect(bucket.upload).toHaveBeenCalledTimes(1);
+		expect(builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({
+				org_id: ORG_ID,
+				entity_type: 'asset',
+				entity_id: ASSET_ID,
+				caption: 'Front elevation'
+			})
+		);
+	});
+
+	it('echoes a post with no file back inline', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: {} }]);
+
+		const result = await run(
+			'uploadImage',
+			supabase,
+			ASSET_MANAGER,
+			[['caption', 'Front elevation']],
+			'assets',
+			ASSET_ID
+		);
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty('data.form.errors.file', ['Choose an image to upload.']);
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('removes a photo, and says so when nothing was removed', async () => {
+		const removed = withStorage(
+			supabaseMockSequence([{ data: [{ id: IMAGE_ID, storage_path: 'p1' }] }])
+		);
+		await expect(
+			run('removeImage', removed.supabase, ASSET_MANAGER, [['id', IMAGE_ID]], 'assets', ASSET_ID)
+		).resolves.toHaveProperty('form.valid', true);
+		expect(removed.builder.delete).toHaveBeenCalled();
+		expect(removed.bucket.remove).toHaveBeenCalledWith(['p1']);
+
+		const missing = withStorage(supabaseMockSequence([{ data: [] }]));
+		const result = await run(
+			'removeImage',
+			missing.supabase,
+			ASSET_MANAGER,
+			[['id', IMAGE_ID]],
+			'assets',
+			ASSET_ID
+		);
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty(
+			'data.form.message',
+			expect.stringContaining('Image was not deleted')
+		);
+		expect(missing.bucket.remove).not.toHaveBeenCalled();
 	});
 });
 
