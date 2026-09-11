@@ -24,6 +24,7 @@ import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
 import TicketIcon from '@lucide/svelte/icons/ticket';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import TruckIcon from '@lucide/svelte/icons/truck';
+import UploadIcon from '@lucide/svelte/icons/upload';
 import UsersIcon from '@lucide/svelte/icons/users';
 import WalletIcon from '@lucide/svelte/icons/wallet';
 
@@ -59,6 +60,7 @@ export const ICONS = {
 	ticket: TicketIcon,
 	'toggle-right': ToggleRightIcon,
 	truck: TruckIcon,
+	upload: UploadIcon,
 	users: UsersIcon,
 	wallet: WalletIcon
 } satisfies Record<string, NavIcon>;

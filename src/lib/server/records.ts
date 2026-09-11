@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
-import type { Database } from '$lib/database.types';
+import type { z } from 'zod';
+import type { Database, TablesInsert } from '$lib/database.types';
 import {
 	assetRecordSchema,
 	billableRecordSchema,
@@ -23,13 +24,14 @@ import {
 	type RecordPickers,
 	type RecordType
 } from '$lib/schemas/records';
-import { createAsset } from './crm/assets';
-import { createBillable } from './crm/billables';
-import { createCompany, getCompany, listCompanies } from './crm/companies';
-import { createContact, listContacts } from './crm/contacts';
+import type { ImportKind } from '$lib/schemas/imports';
+import { createAsset, updateAsset } from './crm/assets';
+import { createBillable, updateBillable } from './crm/billables';
+import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
+import { createContact, listContacts, updateContact } from './crm/contacts';
 import { createDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
-import { createProduct } from './crm/products';
+import { createProduct, updateProduct } from './crm/products';
 import { createTask } from './crm/tasks';
 import { createTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
@@ -158,9 +160,10 @@ export async function createRecord(
  * The one place a record type becomes columns. Re-parsing with the concrete
  * schema is what narrows the form's strings back to the enum unions the
  * insert wants — the generic form erased them, and a cast here would only
- * hide a mismatch between the schema and the table.
+ * hide a mismatch between the schema and the table. Exported for the
+ * import page, which is this form many rows at a time (`$lib/server/imports`).
  */
-async function insertRecord(
+export async function insertRecord(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType,
@@ -168,26 +171,11 @@ async function insertRecord(
 ): Promise<void> {
 	switch (type) {
 		case 'company': {
-			const data = companyRecordSchema.parse(values);
-			await createCompany(supabase, orgId, {
-				name: data.name,
-				relationship: data.relationship,
-				status: data.status,
-				email: text(data.email),
-				phone: text(data.phone),
-				website: text(data.website)
-			});
+			await createCompany(supabase, orgId, companyColumns(companyRecordSchema.parse(values)));
 			return;
 		}
 		case 'contact': {
-			const data = contactRecordSchema.parse(values);
-			await createContact(supabase, orgId, {
-				name: data.name,
-				title: text(data.title),
-				email: text(data.email),
-				phone: text(data.phone),
-				status: data.status
-			});
+			await createContact(supabase, orgId, contactColumns(contactRecordSchema.parse(values)));
 			return;
 		}
 		case 'deal': {
@@ -202,42 +190,15 @@ async function insertRecord(
 			return;
 		}
 		case 'product': {
-			const data = productRecordSchema.parse(values);
-			await createProduct(supabase, orgId, {
-				name: data.name,
-				kind: data.kind,
-				sku: text(data.sku),
-				unit_price: amount(data.unit_price),
-				unit_cost: amount(data.unit_cost),
-				unit: text(data.unit),
-				description: text(data.description)
-			});
+			await createProduct(supabase, orgId, productColumns(productRecordSchema.parse(values)));
 			return;
 		}
 		case 'billable': {
-			const data = billableRecordSchema.parse(values);
-			await createBillable(supabase, orgId, {
-				name: data.name,
-				code: text(data.code),
-				unit_price: amount(data.unit_price),
-				unit: text(data.unit),
-				unit_choices: list(data.unit_choices),
-				is_featured: data.is_featured === 'true',
-				description: text(data.description)
-			});
+			await createBillable(supabase, orgId, billableColumns(billableRecordSchema.parse(values)));
 			return;
 		}
 		case 'asset': {
-			const data = assetRecordSchema.parse(values);
-			await createAsset(supabase, orgId, {
-				name: data.name,
-				asset_type: text(data.asset_type),
-				identifier: text(data.identifier),
-				status: data.status,
-				acquired_on: text(data.acquired_on),
-				purchase_price: amount(data.purchase_price),
-				description: text(data.description)
-			});
+			await createAsset(supabase, orgId, assetColumns(assetRecordSchema.parse(values)));
 			return;
 		}
 		case 'invoice': {
@@ -277,6 +238,139 @@ async function insertRecord(
 			return;
 		}
 	}
+}
+
+/**
+ * The columns each importable kind's parsed values become — shared by the
+ * insert above and the import page's overwrite below, so a spreadsheet cell
+ * lands in a column exactly as the form's field would have. Every field is
+ * named after its column, which is what lets an update pick the columns the
+ * file actually provided.
+ */
+function companyColumns(data: z.infer<typeof companyRecordSchema>) {
+	return {
+		name: data.name,
+		relationship: data.relationship,
+		status: data.status,
+		email: text(data.email),
+		phone: text(data.phone),
+		website: text(data.website)
+	} satisfies Partial<TablesInsert<'companies'>>;
+}
+
+function contactColumns(data: z.infer<typeof contactRecordSchema>) {
+	return {
+		name: data.name,
+		title: text(data.title),
+		email: text(data.email),
+		phone: text(data.phone),
+		status: data.status
+	} satisfies Partial<TablesInsert<'contacts'>>;
+}
+
+function productColumns(data: z.infer<typeof productRecordSchema>) {
+	return {
+		name: data.name,
+		kind: data.kind,
+		sku: text(data.sku),
+		unit_price: amount(data.unit_price),
+		unit_cost: amount(data.unit_cost),
+		unit: text(data.unit),
+		description: text(data.description)
+	} satisfies Partial<TablesInsert<'products'>>;
+}
+
+function billableColumns(data: z.infer<typeof billableRecordSchema>) {
+	return {
+		name: data.name,
+		code: text(data.code),
+		unit_price: amount(data.unit_price),
+		unit: text(data.unit),
+		unit_choices: list(data.unit_choices),
+		is_featured: data.is_featured === 'true',
+		description: text(data.description)
+	} satisfies Partial<TablesInsert<'billables'>>;
+}
+
+function assetColumns(data: z.infer<typeof assetRecordSchema>) {
+	return {
+		name: data.name,
+		asset_type: text(data.asset_type),
+		identifier: text(data.identifier),
+		status: data.status,
+		acquired_on: text(data.acquired_on),
+		purchase_price: amount(data.purchase_price),
+		description: text(data.description)
+	} satisfies Partial<TablesInsert<'assets'>>;
+}
+
+/**
+ * Overwrite an existing record with a form's values — the import page's
+ * "update" decision (`$lib/server/imports`). Only the `fields` the file
+ * provided are written, so a column the spreadsheet did not have, or left
+ * blank, keeps the value the org has; the same builders as the insert turn
+ * the strings into columns, so nothing is mapped twice.
+ */
+export async function updateRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: ImportKind,
+	id: string,
+	values: RecordFormValues,
+	fields: readonly string[]
+): Promise<void> {
+	switch (type) {
+		case 'company':
+			await updateCompany(
+				supabase,
+				orgId,
+				id,
+				pick(companyColumns(companyRecordSchema.parse(values)), fields)
+			);
+			return;
+		case 'contact':
+			await updateContact(
+				supabase,
+				orgId,
+				id,
+				pick(contactColumns(contactRecordSchema.parse(values)), fields)
+			);
+			return;
+		case 'product':
+			await updateProduct(
+				supabase,
+				orgId,
+				id,
+				pick(productColumns(productRecordSchema.parse(values)), fields)
+			);
+			return;
+		case 'billable':
+			await updateBillable(
+				supabase,
+				orgId,
+				id,
+				pick(billableColumns(billableRecordSchema.parse(values)), fields)
+			);
+			return;
+		case 'asset':
+			await updateAsset(
+				supabase,
+				orgId,
+				id,
+				pick(assetColumns(assetRecordSchema.parse(values)), fields)
+			);
+			return;
+	}
+}
+
+/** The columns named in `fields`, and nothing else — an update writes only what the file said. */
+function pick<T extends object>(columns: T, fields: readonly string[]): Partial<T> {
+	const wanted = new Set(fields);
+	// SAFETY: every entry kept is one of `columns`' own, so the result is a
+	// subset of T — `Object.fromEntries` just cannot say so.
+	return Object.fromEntries(
+		Object.entries(columns).filter(([key]) => wanted.has(key))
+	) as Partial<T>;
 }
 
 /** Blank is not a value: an untouched field becomes a null column. */

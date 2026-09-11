@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './crm/test-support';
-import { CREATE_FORM_ID, createRecord, loadCreateRecord } from './records';
+import { CREATE_FORM_ID, createRecord, loadCreateRecord, updateRecord } from './records';
 import type { UserAccess } from './roles';
 import type { RecordType } from '$lib/schemas/records';
 
@@ -269,5 +269,42 @@ describe('createRecord', () => {
 		const result = await submit(supabase, OWNER, 'product', { name: 'Standard install' });
 		expect(result).toMatchObject({ status: 400 });
 		expect(result).toHaveProperty('data.form.message', 'duplicate key value');
+	});
+});
+
+describe('updateRecord', () => {
+	const ID = '20000000-0000-0000-0000-000000000009';
+
+	it('overwrites only the fields named, through the same column mapping as the insert', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: ID } });
+
+		await updateRecord(
+			supabase,
+			ORG_ID,
+			'billable',
+			ID,
+			{
+				name: 'Crown',
+				code: 'D2740',
+				unit_price: '1450',
+				unit_choices: 'UR, UL',
+				is_featured: 'true'
+			},
+			['unit_price', 'unit_choices']
+		);
+
+		expect(from).toHaveBeenCalledWith('billables');
+		expect(builder.update).toHaveBeenCalledWith({ unit_price: 1450, unit_choices: ['UR', 'UL'] });
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', ID);
+	});
+
+	it('refuses values the kind’s schema refuses before touching the database', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: ID } });
+
+		await expect(
+			updateRecord(supabase, ORG_ID, 'product', ID, { name: '', kind: 'widget' }, ['kind'])
+		).rejects.toThrow();
+		expect(from).not.toHaveBeenCalled();
 	});
 });
