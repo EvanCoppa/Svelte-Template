@@ -38,8 +38,15 @@
 	 * one its own paper with its label written up the spine; pointing at a tab
 	 * pulls it out far enough to read the start of it; and picking one grows
 	 * it, right there in the fan, into the whole note — still stuck to the
-	 * edge, editing in place and saving itself. The pointer leaving lets the
-	 * fan settle back in after a beat rather than snapping shut on it.
+	 * edge, editing in place and saving itself.
+	 *
+	 * Each of those runs backwards on the way out, because the way back is the
+	 * way in: the pointer leaving a tab slides that tab straight into the edge
+	 * again, and the pointer leaving the tabs altogether lets the fan wait a
+	 * beat and then slide off the screen along the entrance it played, at the
+	 * same rate. Only the tabs themselves are the dock as far as the pointer is
+	 * concerned — the panel around them lets the page under it be clicked — so
+	 * "off the notes" means off the paper, not out of a box nobody can see.
 	 *
 	 * Two gestures on top of that. A tab can be picked up and dropped between
 	 * two others, which is how the rail is ordered (`notes.position`; the
@@ -57,8 +64,27 @@
 	 * and a drop that reorders the rail is one more of those writes.
 	 */
 
-	/** How long the fan waits after the pointer leaves before settling back in, in ms. */
+	/** How long the fan waits after the pointer leaves the tabs before settling back in, in ms. */
 	const RETRACT_DELAY = 1200;
+	/** How far the fan travels, in pixels: wider than a folded tab, so the tabs leave the screen. */
+	const FAN_SLIDE = 48;
+	/**
+	 * The fan coming out, and the same thing backwards. One pair, written here
+	 * rather than at the two ends of the `{#if}`, so the exit cannot drift into
+	 * an animation of its own: same distance, same spring, opposite direction.
+	 * The exit names only where it is going, so an exit that interrupts an
+	 * entrance carries on from wherever the fan had got to.
+	 */
+	const fanIn = {
+		keyframes: { opacity: [0, 1], x: [FAN_SLIDE, 0] },
+		transition: springs.snap,
+		reduced: { keyframes: { opacity: [0, 1] }, transition: springs.snap }
+	};
+	const fanOut = {
+		keyframes: { opacity: 0, x: FAN_SLIDE },
+		transition: springs.snap,
+		reduced: { keyframes: { opacity: 0 }, transition: springs.snap }
+	};
 	/** How far a press travels before it is a drag rather than a click, in pixels. */
 	const LIFT = 6;
 
@@ -199,10 +225,11 @@
 	}
 
 	/**
-	 * Leaving does not snap the fan shut: a beat later the previewed tab slides
-	 * back in and the fan settles into the rail — unless a note is open (it
-	 * would close mid-sentence) or something is being carried (it would be
-	 * dropped on a dock that had just left). Only the fan follows the pointer.
+	 * Leaving does not snap the fan shut: a beat later it slides back off the
+	 * edge the way it came — unless a note is open (it would close
+	 * mid-sentence) or something is being carried (it would be dropped on a
+	 * dock that had just left). The tab the pointer was on has folded itself
+	 * back into the rail already; this beat is the fan's own.
 	 */
 	function handlePointerLeave() {
 		clearTimeout(retract);
@@ -210,6 +237,11 @@
 			previewId = null;
 			if (!openedId && !gesture) fanned = false;
 		}, RETRACT_DELAY);
+	}
+
+	/** A tab the pointer or the focus has left slides straight back into the rail. */
+	function endPreview(id: string) {
+		if (previewId === id) previewId = null;
 	}
 
 	// --- the two drags ----------------------------------------------------
@@ -343,11 +375,18 @@
 
 {#if deck && docked}
 	<!-- The rail and the fan share one grid cell, so the fan can settle back
-	     in over the rail rather than the two trading places in a jump. -->
+	     in over the rail rather than the two trading places in a jump.
+
+	     `pointer-events-none` here, `pointer-events-auto` on the paper: the fan
+	     is 20rem wide so that a grown note fits in it, and a box nobody can see
+	     should neither eat the clicks meant for the page under it nor hold the
+	     fan out because the pointer came to rest in it. Enter and leave still
+	     fire here — they are dispatched up the ancestors of whatever was hit —
+	     so the tabs are what the fan follows. -->
 	<aside
 		bind:this={aside}
 		aria-label="Notes"
-		class="fixed top-1/2 right-0 z-30 hidden -translate-y-1/2 items-center justify-items-end md:grid [&>*]:col-start-1 [&>*]:row-start-1"
+		class="pointer-events-none fixed top-1/2 right-0 z-30 hidden -translate-y-1/2 items-center justify-items-end md:grid [&>*]:col-start-1 [&>*]:row-start-1"
 		onpointerenter={handlePointerEnter}
 		onpointerleave={handlePointerLeave}
 	>
@@ -356,11 +395,12 @@
 				type="button"
 				in:motionTransition={{
 					keyframes: { opacity: [0, 1] },
-					transition: { ...springs.settle, delay: 0.1 }
+					transition: { ...springs.snap, delay: 0.12 }
 				}}
+				out:motionTransition={{ keyframes: { opacity: 0 }, transition: springs.snap }}
 				onclick={() => (fanned = true)}
 				aria-label={railNotes.length === 1 ? '1 note' : `${railNotes.length} notes`}
-				class="border-border/60 bg-background/80 hover:bg-background focus-visible:ring-ring flex max-h-[70vh] flex-col items-center gap-1 overflow-hidden rounded-l-lg border border-r-0 py-2.5 pr-1 pl-1.5 shadow-sm outline-none focus-visible:ring-2"
+				class="border-border/60 bg-background/80 hover:bg-background focus-visible:ring-ring pointer-events-auto flex max-h-[70vh] flex-col items-center gap-1 overflow-hidden rounded-l-lg border border-r-0 py-2.5 pr-1 pl-1.5 shadow-sm outline-none focus-visible:ring-2"
 			>
 				{#each railNotes as note (note.id)}
 					<span
@@ -374,16 +414,8 @@
 			</button>
 		{:else}
 			<div
-				in:motionTransition={{
-					keyframes: { opacity: [0, 1], x: [24, 0] },
-					transition: springs.snap,
-					reduced: { keyframes: { opacity: [0, 1] } }
-				}}
-				out:motionTransition={{
-					keyframes: { opacity: 0, x: 24 },
-					transition: springs.settle,
-					reduced: { keyframes: { opacity: 0 } }
-				}}
+				in:motionTransition={fanIn}
+				out:motionTransition={fanOut}
 				class={cn(
 					'w-80 rounded-l-2xl transition-shadow duration-200',
 					overDock && 'bg-accent/40 shadow-[inset_0_0_0_2px_var(--ring)]'
@@ -404,7 +436,7 @@
 						<li
 							data-slot="note-tab-item"
 							data-id={note.id}
-							class="relative shrink-0"
+							class="pointer-events-auto relative shrink-0"
 							animate:motionFlip={{ transition: springs.snap }}
 						>
 							{#if openedId === note.id}
@@ -428,7 +460,9 @@
 									onpointerenter={() => {
 										if (!gesture) previewId = note.id;
 									}}
+									onpointerleave={() => endPreview(note.id)}
 									onfocus={() => (previewId = note.id)}
+									onblur={() => endPreview(note.id)}
 									onpointerdown={(e) => startSort(e, note)}
 									onclick={() => open(note.id)}
 									class={cn(
@@ -465,12 +499,15 @@
 									</span>
 									<!-- Out of the flow while folded, so the tab's height is
 									     the spine's; in the flow once pulled out, so the paper
-									     grows to fit what it says. -->
+									     grows to fit what it says. Out of the flow but still
+									     painted, so folding fades the words away under the paper
+									     closing over them rather than cutting them at the first
+									     frame — the narrowing tab clips what is left. -->
 									<span
 										aria-hidden="true"
 										class={cn(
 											'flex w-46 shrink-0 flex-col gap-1 p-3 transition-opacity duration-200 ease-out motion-reduce:transition-none',
-											previewing ? 'opacity-100 delay-100' : 'invisible absolute opacity-0'
+											previewing ? 'opacity-100 delay-100' : 'absolute opacity-0'
 										)}
 									>
 										<span class="truncate text-sm font-semibold">{noteLabel(note)}</span>
@@ -489,12 +526,12 @@
 				</ul>
 
 				{#if railNotes.length === 0}
-					<p class="text-muted-foreground px-2 py-4 text-center text-sm">
+					<p class="text-muted-foreground pointer-events-auto ml-auto w-fit px-2 py-4 text-sm">
 						{desk.length > 0 ? 'Every note is out on the desk.' : 'Nothing written down yet.'}
 					</p>
 				{/if}
 
-				<div class="flex items-center justify-end gap-1.5 pt-1.5 pr-1">
+				<div class="pointer-events-auto ml-auto flex w-fit items-center gap-1.5 pt-1.5 pr-1">
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
