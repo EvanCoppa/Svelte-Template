@@ -58,7 +58,7 @@
 	 */
 
 	/** How long the fan waits after the pointer leaves before settling back in, in ms. */
-	const RETRACT_DELAY = 400;
+	const RETRACT_DELAY = 1200;
 	/** How far a press travels before it is a drag rather than a click, in pixels. */
 	const LIFT = 6;
 
@@ -432,7 +432,10 @@
 									onpointerdown={(e) => startSort(e, note)}
 									onclick={() => open(note.id)}
 									class={cn(
-										'focus-visible:ring-ring flex touch-none items-stretch overflow-hidden rounded-l-xl border border-r-0 text-left shadow-sm transition-[width,min-height,box-shadow,scale] duration-300 ease-out outline-none select-none focus-visible:ring-2 motion-reduce:transition-none',
+										// `box-shadow` is deliberately not transitioned: it repaints every
+										// frame, and the shadow only changes on pick-up, which should
+										// answer the hand at once rather than fade in behind it.
+										'focus-visible:ring-ring flex touch-none items-stretch overflow-hidden rounded-l-xl border border-r-0 text-left shadow-sm transition-[width,min-height,scale] duration-300 ease-out outline-none select-none focus-visible:ring-2 motion-reduce:transition-none',
 										// Pulled out, it is a sticky note — squarer than wide,
 										// and a preview of how it starts, not the whole thing.
 										previewing ? 'min-h-44 w-56' : 'min-h-24 w-11',
