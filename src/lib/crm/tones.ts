@@ -61,12 +61,12 @@ export const TICKET_STATUS_TONE = {
 	closed: 'neutral'
 } satisfies Record<Enums<'ticket_status'>, BadgeTone>;
 
-export const TICKET_PRIORITY_TONE = {
+export const PRIORITY_TONE = {
 	low: 'neutral',
 	normal: 'info',
 	high: 'orange',
 	urgent: 'error'
-} satisfies Record<Enums<'ticket_priority'>, BadgeTone>;
+} satisfies Record<Enums<'priority'>, BadgeTone>;
 
 /** A task has no status column: done is `completed_at` being set (see tasks.ts). */
 export type TaskState = 'open' | 'done';

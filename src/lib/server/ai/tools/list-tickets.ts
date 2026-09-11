@@ -8,7 +8,7 @@ import { requireToolContext, type ToolAccess } from './access';
 export const listTicketsAccess: ToolAccess = { feature: 'tickets', level: 'read' };
 
 const ticketStatusSchema = z.enum(Constants.public.Enums.ticket_status);
-const ticketPrioritySchema = z.enum(Constants.public.Enums.ticket_priority);
+const ticketPrioritySchema = z.enum(Constants.public.Enums.priority);
 
 const ticketSummarySchema = z.object({
 	id: z.string(),

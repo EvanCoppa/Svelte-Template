@@ -195,6 +195,7 @@ async function insertRecord(
 			const data = taskRecordSchema.parse(values);
 			await createTask(supabase, orgId, {
 				title: data.title,
+				priority: data.priority,
 				due_at: instant(data.due_at),
 				details: text(data.details)
 			});

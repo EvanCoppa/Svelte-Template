@@ -152,7 +152,7 @@ const renewal: TaskWithParties = {
 	details: null,
 	due_at: '2026-09-15T09:00:00Z',
 	completed_at: null,
-	assigned_to: USER_ID,
+	priority: 'high',
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
 	contacts: null,
 	...STAMPS
@@ -394,15 +394,26 @@ describe('describing a record', () => {
 		expect(field(accepted, 'Selected option')).toEqual({ type: 'text', value: 'Basic' });
 	});
 
-	it('describes a task as open or done from completed_at', () => {
+	it('describes a task as open or done from completed_at, beside its priority', () => {
 		const open = describeTask(renewal, openAll);
-		expect(open.pills).toEqual([{ label: 'Open', tone: 'info' }]);
+		expect(open.pills).toEqual([
+			{ label: 'Open', tone: 'info' },
+			{ label: 'High', tone: 'orange' }
+		]);
 		expect(field(open, 'Due')).toEqual({ type: 'datetime', value: renewal.due_at });
 		expect(field(open, 'Completed')).toEqual({ type: 'empty' });
 		expect(field(open, 'Contact')).toEqual({ type: 'empty' });
 
 		const done = describeTask({ ...renewal, completed_at: '2026-09-10T10:00:00Z' }, openAll);
-		expect(done.pills).toEqual([{ label: 'Done', tone: 'success' }]);
+		expect(done.pills).toEqual([
+			{ label: 'Done', tone: 'success' },
+			{ label: 'High', tone: 'orange' }
+		]);
+	});
+
+	it('leaves a task assignee to the relationships card rather than a field', () => {
+		const detail = describeTask(renewal, openAll);
+		expect(detail.fields.some((entry) => entry.label === 'Assigned to')).toBe(false);
 	});
 
 	it('describes a ticket by status and priority, counting its thread rather than showing it', () => {

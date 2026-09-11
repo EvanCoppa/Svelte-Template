@@ -200,6 +200,7 @@ export const assetRecordSchema = z.object({
 
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
+	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
 	due_at: optionalInstant,
 	details: optionalLongText
 });
@@ -228,6 +229,14 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
+
+/** One vocabulary, shared by tasks and tickets (the `priority` enum). */
+const PRIORITY_OPTIONS = [
+	{ value: 'low', label: 'Low' },
+	{ value: 'normal', label: 'Normal' },
+	{ value: 'high', label: 'High' },
+	{ value: 'urgent', label: 'Urgent' }
+] as const;
 
 const PARTY_STATUS_OPTIONS = [
 	{ value: 'lead', label: 'Lead' },
@@ -358,6 +367,7 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		query: QUERY.tasks,
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Call back about the quote' },
+			{ name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS },
 			{ name: 'due_at', label: 'Due', type: 'datetime' },
 			{ name: 'details', label: 'Details', type: 'textarea', wide: true }
 		]
@@ -367,17 +377,7 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		query: QUERY.tickets,
 		fields: [
 			{ name: 'subject', label: 'Subject', type: 'text', placeholder: 'Panel is offline' },
-			{
-				name: 'priority',
-				label: 'Priority',
-				type: 'select',
-				options: [
-					{ value: 'low', label: 'Low' },
-					{ value: 'normal', label: 'Normal' },
-					{ value: 'high', label: 'High' },
-					{ value: 'urgent', label: 'Urgent' }
-				]
-			},
+			{ name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS },
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
 		]
 	}
