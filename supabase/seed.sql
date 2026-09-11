@@ -311,25 +311,41 @@ insert into public.deals (id, org_id, contact_id, title, amount, assigned_to, cr
 		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
--- Four tasks across the priority ladder, one of them already done, so the
--- list has something to sort and the state pill has both values.
-insert into public.tasks (id, org_id, company_id, title, details, due_at, priority, completed_at, created_by) values
+-- Tasks across the priority ladder and the board's four columns, with the
+-- due dates spread so the grouped list has a row in every bucket: one
+-- overdue, one due today, two this week, one later, one with no date at all
+-- and one already finished. `status` and `completed_at` are held in step by
+-- trigger (the task board migration), so the done row's two agree rather than
+-- one correcting the other.
+insert into public.tasks (id, org_id, company_id, title, details, due_at, priority, status, completed_at, created_by) values
 	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', 'Send renewal quote',
 		'Pull last year''s numbers before quoting.', now() + interval '7 days',
-		'high', null, '00000000-0000-0000-0000-000000000003'),
+		'high', 'todo', null, '00000000-0000-0000-0000-000000000003'),
 	('50000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', 'Chase the signed order form',
 		null, now() + interval '2 days',
-		'urgent', null, '00000000-0000-0000-0000-000000000001'),
+		'urgent', 'blocked', null, '00000000-0000-0000-0000-000000000001'),
 	('50000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
 		null, 'Write the Q4 renewal playbook',
 		'One page. What we say when they ask for a discount.', now() + interval '21 days',
-		'low', null, '00000000-0000-0000-0000-000000000003'),
+		'low', 'in_progress', null, '00000000-0000-0000-0000-000000000003'),
 	('50000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', 'Book the kickoff call',
 		null, now() - interval '3 days',
-		'normal', now() - interval '2 days', '00000000-0000-0000-0000-000000000001')
+		'normal', 'done', now() - interval '2 days', '00000000-0000-0000-0000-000000000001'),
+	-- Late, due today, and undated: the three buckets the four above do not reach.
+	('50000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Confirm the site visit window',
+		'Waiting on building access.', now() - interval '2 days',
+		'urgent', 'in_progress', null, '00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		null, 'Call the supplier back',
+		null, date_trunc('day', now()) + interval '16 hours',
+		'normal', 'todo', null, '00000000-0000-0000-0000-000000000001'),
+	('50000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
+		null, 'Tidy the proposal templates', null, null,
+		'low', 'todo', null, '00000000-0000-0000-0000-000000000001')
 on conflict (id) do nothing;
 
 -- Assignment is a relationship now, so a task can name more than one person:

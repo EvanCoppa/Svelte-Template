@@ -12,7 +12,8 @@ import {
 	endTaskAssignment,
 	getTask,
 	listTaskAssignees,
-	listTasks
+	listTasks,
+	setTaskStatus
 } from './tasks';
 import { ORG_ID, supabaseMock, supabaseTablesMock } from './test-support';
 
@@ -173,6 +174,32 @@ describe('tasks data access', () => {
 
 		await completeTask(supabase, ORG_ID, TASK_ID, false);
 		expect(builder.update).toHaveBeenCalledWith({ completed_at: null });
+	});
+
+	it('moves a task by writing the status alone', async () => {
+		const { supabase, builder } = supabaseMock({ data: { id: TASK_ID } });
+
+		await setTaskStatus(supabase, ORG_ID, TASK_ID, 'in_progress');
+		// Only the column the board changed: `completed_at` is the trigger's to
+		// set and clear (the task board migration), so a move never carries a
+		// timestamp the browser invented.
+		expect(builder.update).toHaveBeenCalledWith({ status: 'in_progress' });
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', TASK_ID);
+
+		const done = supabaseMock({ data: { id: TASK_ID } });
+		await setTaskStatus(done.supabase, ORG_ID, TASK_ID, 'done');
+		expect(done.builder.update).toHaveBeenCalledWith({ status: 'done' });
+	});
+
+	it('narrows the list to one column only when asked', async () => {
+		const filtered = supabaseMock({ data: [] });
+		await listTasks(filtered.supabase, ORG_ID, { status: 'blocked' });
+		expect(filtered.builder.eq).toHaveBeenCalledWith('status', 'blocked');
+
+		const bare = supabaseMock({ data: [] });
+		await listTasks(bare.supabase, ORG_ID);
+		expect(bare.builder.eq).toHaveBeenCalledTimes(1);
 	});
 
 	it('deletes scoped to org and id, with evidence, throwing on zero rows', async () => {

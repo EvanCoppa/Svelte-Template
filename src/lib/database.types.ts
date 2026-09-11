@@ -3332,6 +3332,7 @@ export type Database = {
           id: string
           org_id: string
           priority: Database["public"]["Enums"]["priority"]
+          status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
         }
@@ -3346,6 +3347,7 @@ export type Database = {
           id?: string
           org_id: string
           priority?: Database["public"]["Enums"]["priority"]
+          status?: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at?: string
         }
@@ -3360,6 +3362,7 @@ export type Database = {
           id?: string
           org_id?: string
           priority?: Database["public"]["Enums"]["priority"]
+          status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
         }
@@ -3673,6 +3676,7 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
+      task_status: "todo" | "in_progress" | "blocked" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -3909,6 +3913,7 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
+      task_status: ["todo", "in_progress", "blocked", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
   },

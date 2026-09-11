@@ -152,6 +152,7 @@ const renewal: TaskWithParties = {
 	details: null,
 	due_at: '2026-09-15T09:00:00Z',
 	completed_at: null,
+	status: 'todo',
 	priority: 'high',
 	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
 	contacts: null,
@@ -394,21 +395,29 @@ describe('describing a record', () => {
 		expect(field(accepted, 'Selected option')).toEqual({ type: 'text', value: 'Basic' });
 	});
 
-	it('describes a task as open or done from completed_at, beside its priority', () => {
+	it('describes a task by the column it is in and how much it is asking for', () => {
 		const open = describeTask(renewal, openAll);
 		expect(open.pills).toEqual([
-			{ label: 'Open', tone: 'info' },
+			{ label: 'To do', tone: 'neutral' },
 			{ label: 'High', tone: 'orange' }
 		]);
 		expect(field(open, 'Due')).toEqual({ type: 'datetime', value: renewal.due_at });
 		expect(field(open, 'Completed')).toEqual({ type: 'empty' });
 		expect(field(open, 'Contact')).toEqual({ type: 'empty' });
 
-		const done = describeTask({ ...renewal, completed_at: '2026-09-10T10:00:00Z' }, openAll);
+		// The status is the pill, not the timestamp: the two are held in step by
+		// the task board migration's trigger, so a done row carries both.
+		const done = describeTask(
+			{ ...renewal, status: 'done', completed_at: '2026-09-10T10:00:00Z' },
+			openAll
+		);
 		expect(done.pills).toEqual([
 			{ label: 'Done', tone: 'success' },
 			{ label: 'High', tone: 'orange' }
 		]);
+
+		const moving = describeTask({ ...renewal, status: 'in_progress' }, openAll);
+		expect(moving.pills[0]).toEqual({ label: 'In progress', tone: 'info' });
 	});
 
 	it('leaves a task assignee to the relationships card rather than a field', () => {
@@ -656,7 +665,7 @@ describe('listRelatedRecords', () => {
 			meta: '$24,000.00'
 		});
 		expect(groups[3].records[0]).toMatchObject({
-			pill: { label: 'Open', tone: 'info' },
+			pill: { label: 'To do', tone: 'neutral' },
 			meta: 'Due Sep 15, 2026'
 		});
 		expect(groups[4].records[0]).toMatchObject({
