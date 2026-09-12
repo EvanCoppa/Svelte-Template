@@ -13,7 +13,7 @@ export interface SecurityHeaderOptions {
 	dev?: boolean;
 	/**
 	 * Where the map's style, tiles, glyphs and sprite come from — derived from
-	 * `PUBLIC_MAP_STYLE_URL` by `mapOrigins()` in `$lib/map`, the way the
+	 * the map's style URLs by `mapOrigins()` in `$lib/map`, the way the
 	 * Supabase origin is derived above. MapLibre fetches all four, so they go
 	 * in connect-src as well as img-src; its worker is a blob, already admitted.
 	 */

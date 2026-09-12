@@ -232,8 +232,8 @@ application data is scoped to an organization, never to a bare user. The
   builder. The page draws `ViewRow`s and `MapPin`s the server described
   (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
   generic `CreateRecord` pre-filled from the filter. The map is `MapView`
-  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
-  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  (`src/lib/components/map-view/`, MapLibre GL) over the style URLs hardcoded in
+  `src/lib/map.ts` (the CSP derives their origins like Supabase's), and coordinates
   come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
   record page's address form saves. Per-org saved views are a later phase and
   reuse the same filter shape.
