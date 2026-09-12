@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { toast } from 'svelte-sonner';
 	import { superForm, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
@@ -10,6 +10,7 @@
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { recordTerms } from '$lib/crm/records';
+	import { QUERY } from '$lib/queries';
 	import {
 		RECORD_FORMS,
 		RECORD_SCHEMAS,
@@ -20,37 +21,32 @@
 	import { capitalize } from '$lib/utils.js';
 
 	/**
-	 * The one "Add …" button, and the one form behind it.
+	 * The one "Edit" button, and the same form behind it.
 	 *
-	 * A list page passes the kind of record it holds and the empty form its
-	 * load built (`loadCreateRecord()` in `$lib/server/records.ts`); the fields,
-	 * the labels and the validation all come from the registry entry for that
-	 * kind, so every object type gets the same form without a page writing one.
-	 * What the record is CALLED comes from the terms the layout shipped — the
-	 * feature's word as the org's industry says it, "Add quote" in a roofer.
-	 * The post is an ordinary form action on the page it was opened from —
-	 * `?/create`, which delegates straight back to `createRecord()`.
+	 * The mirror of `CreateRecord`: the record page passes the kind and the
+	 * form its load filled in from the row (`loadEditRecord()` in
+	 * `$lib/server/records.ts`), and the fields, the labels and the validation
+	 * come from the same registry entry — so a field only has to be described
+	 * once to be creatable, editable and validated the same way in both.
 	 *
-	 * `type` is fixed for the lifetime of the component: a page creates one kind
-	 * of record, and superForm is wired once at init. A form that points the
-	 * record at a party (an invoice's customer) or at a stage (a deal's) gets
-	 * the org's rows for each picker from the same load (`createPickers`).
+	 * A deal's stage is in that list, which is what makes this the way a deal
+	 * moves down the funnel.
 	 *
-	 * `EditRecord` is the same form with a different frame; the inputs
-	 * themselves are `RecordFields`, once, for both.
+	 * Two things are stale after a save and nothing else is: this record's own
+	 * page and the list it appears in (docs/data-invalidation.md).
 	 */
 	let {
 		type,
+		recordId,
 		form: data,
-		pickers = {},
-		action = '?/create'
+		pickers = {}
 	}: {
 		type: RecordType;
+		/** The row being edited — the record page's own id, for the freshness key. */
+		recordId: string;
 		form: SuperValidated<RecordFormValues>;
-		/** The options behind each picker field, as `loadCreateRecord()` read them. */
+		/** The options behind each picker field, as `loadEditRecord()` read them. */
 		pickers?: RecordPickers;
-		/** Only when the create action lives somewhere other than this page's `?/create`. */
-		action?: string;
 	} = $props();
 
 	const definition = RECORD_FORMS[type];
@@ -60,12 +56,13 @@
 
 	const superform = superForm(data, {
 		validators: zod4Client(RECORD_SCHEMAS[type]),
-		// Only the list this adds a row to is stale (docs/data-invalidation.md).
 		invalidateAll: false,
+		// What was just saved is what the record says now, so the form keeps it
+		// rather than snapping back to the values the page loaded with.
+		resetForm: false,
 		onSubmit({ formData }) {
-			// A `datetime-local` field posts wall-clock time with no offset, which
-			// only the browser can resolve. Rewrite it to an instant on the way
-			// out; the schema accepts both, so the no-JS path still posts.
+			// The wall clock the browser showed, back to the instant the column
+			// holds — the same rewrite `CreateRecord` does, for the same reason.
 			for (const field of definition.fields) {
 				if (field.type !== 'datetime') continue;
 				const picked = formData.get(field.name);
@@ -77,7 +74,8 @@
 		onUpdated({ form: result }) {
 			if (!result.valid) return;
 			open = false;
-			toast.success(`${capitalize(terms.noun)} created`);
+			toast.success(`${capitalize(terms.noun)} saved`);
+			invalidate(QUERY.record(type, recordId));
 			invalidate(definition.query);
 		}
 	});
@@ -87,30 +85,28 @@
 <Modal.Root bind:open>
 	<Modal.Trigger>
 		{#snippet child({ props })}
-			<Button {...props}>
-				<PlusIcon />
-				Add {terms.noun}
+			<Button {...props} variant="outline">
+				<PencilIcon />
+				Edit
 			</Button>
 		{/snippet}
 	</Modal.Trigger>
 
-	<!-- Roomier than the default tray: these forms lay their fields out in two columns. -->
 	<Modal.Content class="sm:max-w-2xl">
-		<!-- The form wraps the card and the footer so `Modal.Action type="submit"` posts it. -->
-		<form method="POST" {action} use:enhance>
+		<form method="POST" action="?/edit" use:enhance>
 			<Modal.Card>
 				<Modal.Header>
-					<Modal.Title><PlusIcon /> New {terms.noun}</Modal.Title>
+					<Modal.Title><PencilIcon /> Edit {terms.noun}</Modal.Title>
 				</Modal.Header>
 				<Modal.Body class="grid gap-5 pt-1 sm:grid-cols-2">
 					<FormAlert message={$message} class="mb-0 sm:col-span-2" />
-					<RecordFields {type} {superform} {pickers} idPrefix="create" />
+					<RecordFields {type} {superform} {pickers} idPrefix="edit" />
 				</Modal.Body>
 			</Modal.Card>
 			<Modal.Footer>
 				<Modal.Cancel>Cancel</Modal.Cancel>
 				<Modal.Action type="submit" disabled={$submitting}>
-					{$submitting ? 'Creating…' : `Create ${terms.noun}`}
+					{$submitting ? 'Saving…' : 'Save changes'}
 				</Modal.Action>
 			</Modal.Footer>
 		</form>

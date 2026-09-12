@@ -274,33 +274,41 @@ invitations. A new **view** is the one near-exception: rows plus a single line i
 `FEATURE_IDS` — free for any cut of companies or contacts, unavailable for deals until that
 source exists.
 
-**The sharp edge: the app is create-and-read.** Twenty-six write functions in
-`src/lib/server/crm/` have no screen calling them — `updateDeal`, `updateCompany`,
+**The sharp edge was that the app is create-and-read.** Twenty-six write functions in
+`src/lib/server/crm/` had no screen calling them — `updateDeal`, `updateCompany`,
 `deleteCompany`, `updateProposal`, `updateTicket`, `createRelationship` and the rest — and
-`custom_field_values` has no write function at all. Concretely, for this brief:
+`custom_field_values` has no write function at all. **The first two are now fixed**,
+because a deal that cannot move is not a pipeline:
 
-- **A deal cannot change stage.** `/deals` has exactly one action, `create`, and every new
-  deal lands in the default board's first stage. Their pipeline is a list, not a board.
-- **No record can be edited** — company, contact, deal, ticket, product, asset, proposal.
-  The generic form creates; nothing updates.
-- **Custom field values are read-only**, so MID, current processor and the rest can be
-  _defined_ by migration but only _filled_ by SQL.
-- **Nothing can be tagged**, and no relationship can be created from a screen — so
-  `referred_by`, which is otherwise the referral module for free, is unreachable.
-- **A rep cannot log a call.** `createActivity` is called by the proposal builder and one
-  assistant tool, nowhere else.
-- **A support case can be opened and never closed.**
+- **A deal changes stage**, and every other record changes its own fields, through the
+  generic record form on the record page — `loadEditRecord()` / `updateRecord()` behind an
+  `EditRecord` button, the same registry, schema and column switch that create it, with the
+  deal's stage as a `stage` picker over the org's own boards. One form, eight kinds; an
+  invoice keeps its own lifecycle actions instead.
+
+What is still read-only, and still worth knowing before the demo:
+
+- **Custom field values**, so MID, current processor and the rest can be _defined_ by
+  migration but only _filled_ by SQL.
+- **Tags and relationships** — nothing can be tagged and no relationship can be made from a
+  screen, so `referred_by`, otherwise the referral module for free, is unreachable.
+- **Activity logging**: `createActivity` is called by the proposal builder and one assistant
+  tool, nowhere else, so a rep cannot log a call.
+- **A support case can be opened and never closed** — `status` is a writable column with no
+  field in the registry, which is one line when they want it.
+- **Deleting anything.** Every `delete*` function exists; no screen calls one outside the
+  invoice block and the quick-plans page.
 
 So a rows-only GSP instance is a real, demonstrable _shape_ — their words, their funnel,
-their fee schedule, their roles — and it is not something Matt could run a week on. Say
-that plainly when demoing it.
+their fee schedule, their roles — and now a deal that actually moves. It is still not
+something Matt could run a week on until the rest of that list lands, and that is the
+sentence to say out loud when demoing it.
 
-**Which changes the first thing to build**, and it is not in their brief: wire the writes
-the data layer already has. An edit action per kind, a stage change, custom-field values,
-tagging, relationships and activity logging are a small, shared layer — every vertical
-needs it, the functions and their tests mostly exist, and every module in the brief from 3
-to 16 assumes it. It belongs in front of the deal-discipline columns, because those columns
-are unfillable without it.
+**Which is still the first thing to build**, and it is not in their brief: wire the
+remaining writes the data layer already has. Custom-field values, tagging, relationships
+and activity logging are a small, shared layer — every vertical needs it, the functions and
+their tests mostly exist, and every module in the brief from 3 to 16 assumes it. It belongs
+in front of the deal-discipline columns, because those columns are unfillable without it.
 
 ## What the config migration should change today
 

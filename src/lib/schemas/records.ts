@@ -52,21 +52,26 @@ export type RecordFormValues = Record<string, string>;
 
 export type RecordFieldOption = { value: string; label: string; sublabel?: string };
 
-/** The kinds of party a record form can point a new record at — each a picker over the org's rows. */
-export const RECORD_PICKER_KINDS = ['company', 'contact'] as const;
+/**
+ * The kinds of row a record form can point at — each a picker whose options
+ * are the org's own rows rather than a vocabulary the registry can hold: the
+ * two parties, and the stage a deal sits in (its board is `pipelines` rows,
+ * so the choices differ per org and per industry).
+ */
+export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage'] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
-/** The options behind each party picker on a form, loaded per request by `loadCreateRecord()`. */
+/** The options behind each picker on a form, loaded per request by `loadCreateRecord()`. */
 export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFieldOption[]>>;
 
 /**
  * How one field is rendered. `select` is a fixed vocabulary this app owns (an
  * enum column) and renders as a `Combobox`; `number` is money or a measure
  * and `integer` a count (days of terms); `datetime` is a wall-clock pick the
- * browser converts to an instant before posting; `company` and `contact` are
- * pickers over the org's own rows, whose options arrive with the form rather
- * than sitting in the registry.
+ * browser converts to an instant before posting; `company`, `contact` and
+ * `stage` are pickers over the org's own rows, whose options arrive with the
+ * form rather than sitting in the registry.
  */
 export type RecordField = {
 	name: string;
@@ -201,6 +206,13 @@ export const contactRecordSchema = z.object({
 
 export const dealRecordSchema = z.object({
 	title: requiredText('Title'),
+	/**
+	 * Where the deal sits on a board. Blank on create means "the org's default
+	 * board, first stage" (`crm/deals.ts` places it); blank on edit means the
+	 * same, which is why nothing here is required — a deal always has a stage,
+	 * but the form never has to know which one.
+	 */
+	stage_id: optionalPick,
 	amount: optionalAmount,
 	expected_close_date: optionalDate
 });
@@ -342,8 +354,11 @@ export const RECORD_FORMS: RecordFormRegistry = {
 	deal: {
 		feature: 'deals',
 		query: QUERY.deals,
+		// Stage is second because moving one is the commonest edit a deal ever
+		// gets — the funnel is the reason the record exists.
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual renewal' },
+			{ name: 'stage_id', label: 'Stage', type: 'stage' },
 			{ name: 'amount', label: 'Amount', type: 'number', placeholder: '12000' },
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]

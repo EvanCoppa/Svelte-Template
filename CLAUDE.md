@@ -566,7 +566,7 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
 /settings/profile are the reference implementations.
 
-### Creating a record is one form, not one per page
+### Creating and editing a record is one form, not one per page
 
 Adding a row of any kind goes through the **generic record form**: the registry in
 `src/lib/schemas/records.ts` (the feature that owns each kind of object — whose terms
@@ -582,15 +582,28 @@ return { companies: …, ...(await loadCreateRecord(locals, 'company')) };
 export const actions: Actions = { create: (event) => createRecord(event, 'company') };
 ```
 
+**The record page edits with the same form.** `loadEditRecord()` fills it in from the
+row and `updateRecord()` saves it, behind the `EditRecord` button on the generic record
+page — so a kind is described once and is creatable, editable and validated the same
+way, and `writeRecord()` is one switch for both (a blank field therefore means the
+column's empty value on both paths, never "leave it as it was", or clearing one would
+silently do nothing). **A deal's stage is a field in that list**, which is how a deal
+moves down the funnel. An invoice is the exception and says why: it is a document with
+a lifecycle — draft, issue, void — that its own record-page actions own
+(`billing.server.ts`), so it is not an `EditableRecordType`.
+
 Every field posts a **string** — that is what lets one component render them all — and
-the server's insert switch is the one place strings become columns (blank → null, an
+`writeRecord()` is the one place strings become columns (blank → null, an
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
-schema so the enum unions come back without a cast). A record that points at a party
-(an invoice's customer) uses the `company` / `contact` **picker field types**: still a
+schema so the enum unions come back without a cast), with `recordFormValues()` its
+mirror on the way back into the form. A record that points at another row — an
+invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
+field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
-one `case` in that switch; never a second create modal, action or field-rendering loop. A screen whose creation is genuinely special
+one `case` in each of those two functions; never a second create or edit modal, action
+or field-rendering loop (the inputs are `RecordFields`, once, for both frames). A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
