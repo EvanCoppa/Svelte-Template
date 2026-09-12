@@ -11,6 +11,7 @@ import {
 	deleteTask,
 	endTaskAssignment,
 	getTask,
+	listAssigneesByTask,
 	listTaskAssignees,
 	listTasks,
 	setTaskStatus
@@ -18,7 +19,9 @@ import {
 import { ORG_ID, supabaseMock, supabaseTablesMock } from './test-support';
 
 const TASK_ID = '50000000-0000-0000-0000-000000000001';
+const OTHER_TASK_ID = '50000000-0000-0000-0000-000000000002';
 const USER_ID = '00000000-0000-0000-0000-000000000001';
+const OTHER_USER_ID = '00000000-0000-0000-0000-000000000002';
 
 const STAMPS = { created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z' };
 
@@ -92,6 +95,45 @@ describe('tasks data access', () => {
 			'relationship_type_id',
 			RELATIONSHIP_TYPE.assignedTo
 		);
+	});
+
+	it('reads a whole board of assignees in one query, keyed by task', async () => {
+		const second = assignment({
+			id: 'f1000000-0000-0000-0000-000000000002',
+			from_id: OTHER_TASK_ID,
+			to_id: OTHER_USER_ID
+		});
+		const { supabase, builders } = supabaseTablesMock({
+			relationships: { data: [assignment(), second] },
+			profiles: {
+				data: [
+					{ id: USER_ID, display_name: 'Evan', email: 'evan@example.com' },
+					{ id: OTHER_USER_ID, display_name: 'Sam', email: 'sam@example.com' }
+				]
+			}
+		});
+
+		const held = await listAssigneesByTask(supabase, ORG_ID, [TASK_ID, OTHER_TASK_ID]);
+		expect(held.get(TASK_ID)?.map((person) => person.name)).toEqual(['Evan']);
+		expect(held.get(OTHER_TASK_ID)?.map((person) => person.name)).toEqual(['Sam']);
+		// One trip for the rows and one for the names, whatever the board holds.
+		expect(builders.relationships.in).toHaveBeenCalledWith('from_id', [TASK_ID, OTHER_TASK_ID]);
+		expect(builders.relationships.is).toHaveBeenCalledWith('ended_on', null);
+		expect(builders.relationships.eq).toHaveBeenCalledWith('from_type', 'task');
+	});
+
+	it('leaves a task with nobody on it out of the map, and asks nothing of an empty board', async () => {
+		const { supabase } = supabaseTablesMock({
+			relationships: { data: [assignment()] },
+			profiles: { data: [{ id: USER_ID, display_name: 'Evan', email: 'evan@example.com' }] }
+		});
+
+		const held = await listAssigneesByTask(supabase, ORG_ID, [TASK_ID, OTHER_TASK_ID]);
+		expect(held.has(OTHER_TASK_ID)).toBe(false);
+
+		const empty = supabaseTablesMock({ relationships: { data: [] }, profiles: { data: [] } });
+		await expect(listAssigneesByTask(empty.supabase, ORG_ID, [])).resolves.toEqual(new Map());
+		expect(empty.builders.relationships.select).not.toHaveBeenCalled();
 	});
 
 	it('keeps a handover in the list, and drops it when only current assignees are wanted', async () => {

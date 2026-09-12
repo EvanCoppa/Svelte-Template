@@ -163,8 +163,12 @@ const optionalDate = z
  * converts `2026-09-10T17:00` to an ISO string with the viewer's offset before
  * posting, so both shapes are legal here — and without JavaScript the naive
  * form still arrives and is read as UTC.
+ *
+ * Exported because a record's date is picked in more than one place — the
+ * create form, and the task board's cards — and two spellings of "what a date
+ * input posts" is how one of them starts rejecting what the other sends.
  */
-const optionalInstant = z
+export const optionalInstant = z
 	.string()
 	.trim()
 	.regex(/^$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/, {
@@ -285,7 +289,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 };
 
 /** One vocabulary, shared by tasks and tickets (the `priority` enum). */
-const PRIORITY_OPTIONS = [
+export const PRIORITY_OPTIONS = [
 	{ value: 'low', label: 'Low' },
 	{ value: 'normal', label: 'Normal' },
 	{ value: 'high', label: 'High' },
