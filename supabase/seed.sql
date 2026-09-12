@@ -1035,6 +1035,44 @@ insert into public.assets (id, org_id, name, asset_type, identifier, status, acq
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
+-- Marigold Beverage's assets are out in the field, and the beverage industry
+-- puts their location and serial number on the Assets list (the list_fields
+-- migration) — so the org declares those two custom fields, and its taps and
+-- coolers carry values for them. The definitions are the org's rows: the
+-- industry names them by key, and an org that never declared them simply
+-- shows the default columns.
+insert into public.custom_field_definitions (id, org_id, entity_type, key, label, value_type, allowed_values) values
+	('a3000000-0000-0000-0013-000000000001', '10000000-0000-0000-0000-000000000013',
+		'asset', 'location', 'Location', 'select', '["Warehouse", "Route 1", "Route 2"]'),
+	('a3000000-0000-0000-0013-000000000002', '10000000-0000-0000-0000-000000000013',
+		'asset', 'serial_number', 'Serial number', 'text', null)
+on conflict (id) do nothing;
+
+insert into public.assets (id, org_id, name, asset_type, identifier, status, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0013-000000000001', '10000000-0000-0000-0000-000000000013',
+		'Draft tower, 4-tap', 'tap', 'TAP-0041', 'active', '2025-03-10', 1850.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0013-000000000002', '10000000-0000-0000-0000-000000000013',
+		'Glass-door cooler', 'cooler', 'CLR-0107', 'active', '2025-05-22', 2400.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0013-000000000003', '10000000-0000-0000-0000-000000000013',
+		'Half-barrel keg', 'keg', 'KEG-2210', 'inactive', '2024-11-02', 160.00,
+		'00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.custom_field_values (org_id, entity_type, entity_id, field_definition_id, value_text) values
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000001',
+		'a3000000-0000-0000-0013-000000000001', 'Route 1'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000001',
+		'a3000000-0000-0000-0013-000000000002', 'MB-TT4-88213'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000002',
+		'a3000000-0000-0000-0013-000000000001', 'Route 2'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000002',
+		'a3000000-0000-0000-0013-000000000002', 'GD-C-5510'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000003',
+		'a3000000-0000-0000-0013-000000000001', 'Warehouse')
+on conflict (entity_type, entity_id, field_definition_id) do nothing;
+
 insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, ended_on, notes, created_by) values
 	-- The laptop is assigned to dev, who works here.
 	('f2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',

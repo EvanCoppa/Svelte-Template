@@ -23,6 +23,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { StaffMember } from '$lib/server/staff';
+	import { capitalize } from '$lib/utils.js';
 	import { inviteSchema } from './schema';
 
 	let { data } = $props();
@@ -37,6 +38,13 @@
 		admin: 'info',
 		member: 'neutral'
 	} satisfies Record<StaffMember['role'], BadgeTone>;
+
+	/** The ranks the org-role filter offers, in the tone map's order. */
+	const ORG_ROLE_OPTIONS = Object.entries(ORG_ROLE_TONES).map(([value, tone]) => ({
+		value,
+		label: capitalize(value),
+		tone
+	}));
 
 	// A fixed locale keeps the server render and the hydrated render identical;
 	// the visitor's own locale would differ from the server's and flag a mismatch.
@@ -95,8 +103,9 @@
 	const columns = $derived.by(() => {
 		const defs = columnHelper.columns([
 			DataTable.selectColumn(columnHelper),
-			// The accessor is what the search box filters and what sorting reads;
+			// The accessor is what the search box scans and what sorting reads;
 			// the cell shows the person. Name first, so sorting stays by name.
+			// The only column the search box scans: the rest opt out.
 			columnHelper.accessor((member) => `${Staff.memberName(member)} ${member.email ?? ''}`, {
 				id: 'member',
 				header: ({ column }) =>
@@ -106,12 +115,18 @@
 						member: row.original,
 						isYou: row.original.userId === user?.id
 					}),
-				enableHiding: false
+				enableHiding: false,
+				enableGlobalFilter: true,
+				meta: { title: 'Member' }
 			}),
+			// The org role is a filter: the values are the three ranks.
 			columnHelper.accessor('role', {
 				header: ({ column }) =>
 					renderComponent(DataTable.ColumnHeader, { column, title: 'Org role' }),
-				cell: ({ getValue }) => DataTable.statusCell(getValue(), ORG_ROLE_TONES[getValue()])
+				cell: ({ getValue }) => DataTable.statusCell(getValue(), ORG_ROLE_TONES[getValue()]),
+				enableGlobalFilter: false,
+				filterFn: 'oneOf',
+				meta: { title: 'Org role', filter: { options: ORG_ROLE_OPTIONS } }
 			}),
 			columnHelper.accessor((member) => member.roles.map((role) => role.name).join(', '), {
 				id: 'roles',
@@ -123,12 +138,16 @@
 						// cell there is not the gap it is for a plain member.
 						emptyLabel: row.original.role === 'member' ? 'No roles' : 'Full access'
 					}),
-				enableSorting: false
+				enableSorting: false,
+				enableGlobalFilter: false,
+				meta: { title: 'Roles' }
 			}),
 			columnHelper.accessor('joinedAt', {
 				header: ({ column }) =>
 					renderComponent(DataTable.ColumnHeader, { column, title: 'Joined' }),
-				cell: ({ getValue }) => formatDate(getValue())
+				cell: ({ getValue }) => formatDate(getValue()),
+				enableGlobalFilter: false,
+				meta: { title: 'Joined' }
 			}),
 			DataTable.actionsColumn(columnHelper, ({ row }) =>
 				renderComponent(Staff.RowActions, {
@@ -153,8 +172,6 @@
 			return columns;
 		}
 	});
-
-	const search = $derived(String(table.getColumn('member')?.getFilterValue() ?? ''));
 
 	/**
 	 * The two per-member dialogs address a member by id, not by a copied row:
@@ -348,17 +365,11 @@
 			<FormAlert message={$linkMessage} />
 
 			<DataTable.Root {table}>
-				<div class="flex items-center gap-2">
-					<Input
-						placeholder="Search by name or email…"
-						aria-label="Search staff"
-						value={search}
-						oninput={(event) =>
-							table.getColumn('member')?.setFilterValue(event.currentTarget.value)}
-						class="max-w-xs"
-					/>
+				<DataTable.Toolbar>
+					<DataTable.Search placeholder="Search by name or email…" ariaLabel="Search staff" />
+					<DataTable.Filters />
 					<DataTable.ViewOptions class="ms-auto" />
-				</div>
+				</DataTable.Toolbar>
 				<DataTable.Content emptyMessage="No members match that search." />
 				<DataTable.Pagination noun="member" />
 			</DataTable.Root>

@@ -37,9 +37,7 @@ describe('loadViewRegistry', () => {
 
 		await expect(loadViewRegistry(supabase)).resolves.toBe(rows);
 		expect(from).toHaveBeenCalledWith('views');
-		expect(builder.select).toHaveBeenCalledWith(
-			'id, source, filter, columns, layouts, default_layout'
-		);
+		expect(builder.select).toHaveBeenCalledWith('id, source, filter, layouts, default_layout');
 		expect(builder.order).toHaveBeenCalledWith('id');
 	});
 });

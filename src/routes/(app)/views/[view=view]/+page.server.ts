@@ -4,8 +4,10 @@ import { passesFeatureGate } from '$lib/features/gate';
 import { mapConfig } from '$lib/map';
 import { QUERY } from '$lib/queries';
 import { listAddressesFor } from '$lib/server/crm/addresses';
-import { describeViewRows, pinsFor, resultIds, runView } from '$lib/server/crm/views';
+import { resultIds } from '$lib/server/crm/lists';
+import { pinsFor, runView } from '$lib/server/crm/views';
 import { loadViewRegistry } from '$lib/server/features';
+import { loadList } from '$lib/server/lists';
 import { createRecord, loadCreateRecord } from '$lib/server/records';
 import { hasGrant } from '$lib/server/roles';
 import { defaultsFor, resolveView, type ViewDefinition } from '$lib/views/resolve';
@@ -19,9 +21,10 @@ import type { Actions, PageServerLoad } from './$types';
  * session may see it (hidden → 404, locked → the upgrade prompt, no grant →
  * 403) and the `pages` row titles it. The load's job is the definition: find
  * the row for the slug, resolve it against the feature the org context
- * already holds, run it, and describe the result for the page — rows typed
- * by how they render and pins typed by where they sit — so the page never
- * learns which table it is looking at.
+ * already holds, run it, and describe the result for the page — the rows as
+ * the view's own list (`loadList()`, over the view's list_fields rows) and
+ * pins typed by where they sit — so the page never learns which table it is
+ * looking at.
  */
 async function viewFor(locals: App.Locals, slug: string): Promise<ViewDefinition> {
 	const { supabase, org } = locals;
@@ -44,19 +47,21 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// form the source's list page uses) refreshes this list with no new key.
 	depends(QUERY[view.source === 'company' ? 'companies' : 'contacts']);
 
-	// Whether a name here may link into its record: the hook's own decision
-	// for that kind's routes, so a view still renders when its source feature
-	// is off for the org — with plain names instead of links.
+	// Whether a pin may link into its record: the hook's own decision for
+	// that kind's routes, so a view still renders when its source feature is
+	// off for the org — with plain names instead of links. The list makes the
+	// same call for its rows.
 	const { features, access } = org;
 	const canRead = (featureId: string) => hasGrant(access, featureId);
 	const canOpen = (kind: RecordKind) => passesFeatureGate(recordListHref(kind), features, canRead);
 
 	const result = await runView(supabase, activeOrgId, view);
+	// The map needs every address; the list reads its own when it has a city column.
 	const addresses = await listAddressesFor(supabase, activeOrgId, view.source, resultIds(result));
 
 	return {
 		view,
-		rows: describeViewRows(result, view, canOpen, addresses),
+		...(await loadList(locals, view.id, result)),
 		pins: pinsFor(result, canOpen, addresses),
 		// Null when there is no map configured; the map layout says so.
 		map: mapConfig(),

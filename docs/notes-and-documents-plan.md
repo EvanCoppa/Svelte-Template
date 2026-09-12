@@ -35,7 +35,7 @@ already shipped under a different name.
 | a sticky-note dock, quick capture | `note-dock.svelte`, `/notes`, autosave, colors, archive — [notes.md](notes.md)        |
 | notes attached to what you're on  | `notes.entity_type` + `entity_id`, the shared polymorphic link                        |
 | "@ mentions resolve to a record"  | `crm_entity_type` + `private.crm_entity_exists()` + `recordLinks()`                   |
-| "live data views inside a page"   | `views` rows, `runView()`, `describeViewRows()`, `pinsFor()` — [views.md](views.md)   |
+| "live data views inside a page"   | `views` rows, `runView()`, `describeListRows()`, `pinsFor()` — [views.md](views.md)   |
 | "modules register commands"       | the feature registry + `role_permissions` + `ToolAccess` on every AI tool             |
 | "cloud AI for expensive work"     | the assistant: `ToolLoopAgent`, tools gated by feature — [assistant.md](assistant.md) |
 | a block document stored whole     | `slide_decks.deck_json`, validated by `slideDeckSchema` on save                       |
@@ -199,7 +199,7 @@ of the time is a worse calculator than a calculator.
 ## Decision 6 — an embedded view is a `views` row, gate-checked at render
 
 `/view` inserts a block citing an existing `views` row by id. The server resolves it with
-`resolveView()`, runs `runView()`, and hands the page `describeViewRows()` output — the
+`resolveView()`, runs `runView()`, and hands the page `describeListRows()` output — the
 page never learns the source, which is views.md rule 3 and stays true inside a document.
 
 Two constraints that fall straight out of the existing design:

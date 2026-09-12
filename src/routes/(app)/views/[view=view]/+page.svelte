@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createTable } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
@@ -9,8 +8,8 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { featureTerms } from '$lib/features/terms';
 	import { capitalize } from '$lib/utils.js';
+	import { createListTable } from '$lib/lists/table';
 	import { VIEW_LAYOUTS, type ViewLayout } from '$lib/views/types';
-	import { viewColumns } from '$lib/views/table';
 
 	let { data } = $props();
 
@@ -18,16 +17,12 @@
 	// feature words it ("3 vendors"), not the source's.
 	const terms = $derived(featureTerms(page.data.terms, data.view.id));
 
-	// The definition is fixed for the page's lifetime: a navigation to another
-	// view is another page.
-	const columns = viewColumns(data.view, page.data.terms);
-	const table = createTable({
-		features: DataTable.features,
-		get data() {
-			return data.rows;
-		},
-		columns
-	});
+	// The view's list: its columns, search and filters are its own list_fields
+	// rows, resolved like any list page's (docs/lists.md).
+	const table = createListTable(
+		() => data.list,
+		() => page.data.terms
+	);
 
 	let layout: ViewLayout = $state(data.view.defaultLayout);
 
@@ -80,7 +75,12 @@
 		{/if}
 	{:else}
 		<DataTable.Root {table}>
-			<DataTable.Content emptyMessage={`No ${terms.plural} yet.`} />
+			<DataTable.Toolbar>
+				<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+				<DataTable.Filters />
+				<DataTable.ViewOptions class="ms-auto" />
+			</DataTable.Toolbar>
+			<DataTable.Content emptyMessage="No {terms.plural} match." />
 			<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 		</DataTable.Root>
 	{/if}

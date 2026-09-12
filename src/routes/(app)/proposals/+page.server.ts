@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { listProposals } from '$lib/server/crm/proposals';
 import { can } from '$lib/server/roles';
+import { loadRecordList } from '$lib/server/lists';
 import type { PageServerLoad } from './$types';
 
 // Gated by the hook on the `proposals` feature + read grant; see companies.
@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	depends(QUERY.proposals);
 
 	return {
-		proposals: await listProposals(locals.supabase, locals.activeOrgId),
+		...(await loadRecordList(locals, 'proposal')),
 		// Creating is the builder page at ./new, not the generic record form: a
 		// proposal is options and lines, not one row of strings. The button
 		// links there for whoever may write the feature; the builder's own load
