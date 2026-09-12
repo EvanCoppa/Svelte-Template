@@ -18,6 +18,13 @@ const rows: TermRegistryRow[] = [
 			{ industry_id: 'dentistry', label: 'Provider' },
 			{ industry_id: 'roofing', label: 'Project manager' }
 		]
+	},
+	{
+		id: 'graph_member',
+		label: 'Staff',
+		description: null,
+		created_at: '',
+		industry_terms: [{ industry_id: 'roofing', label: 'Crew' }]
 	}
 ];
 
@@ -25,18 +32,21 @@ describe('resolveVocabulary', () => {
 	it("uses the industry's own word where it has one, the default otherwise", () => {
 		expect(resolveVocabulary(rows, 'dentistry')).toEqual({
 			proposal_presenter: 'Presenter',
-			proposal_responsible: 'Provider'
+			proposal_responsible: 'Provider',
+			graph_member: 'Staff'
 		});
 		expect(resolveVocabulary(rows, 'roofing')).toEqual({
 			proposal_presenter: 'Estimator',
-			proposal_responsible: 'Project manager'
+			proposal_responsible: 'Project manager',
+			graph_member: 'Crew'
 		});
 	});
 
 	it('falls back to every default for an industry with no rows', () => {
 		expect(resolveVocabulary(rows, 'beverage')).toEqual({
 			proposal_presenter: 'Presenter',
-			proposal_responsible: 'Responsible'
+			proposal_responsible: 'Responsible',
+			graph_member: 'Staff'
 		});
 	});
 
@@ -48,7 +58,8 @@ describe('resolveVocabulary', () => {
 		];
 		expect(Object.keys(resolveVocabulary(extra, 'crm'))).toEqual([
 			'proposal_presenter',
-			'proposal_responsible'
+			'proposal_responsible',
+			'graph_member'
 		]);
 	});
 });

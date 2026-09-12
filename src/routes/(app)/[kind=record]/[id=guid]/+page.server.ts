@@ -9,6 +9,7 @@ import {
 	type RecordKind,
 	type RecordSegment
 } from '$lib/crm/records';
+import { graphNodeId } from '$lib/crm/graph';
 import { passesFeatureGate } from '$lib/features/gate';
 import { visibleTerms } from '$lib/features/terms';
 import { QUERY } from '$lib/queries';
@@ -227,6 +228,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
 		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,
+		// Where this record's relationships are drawn whole — when the graph is
+		// a page this session may open (the same gate the hook applies to /graph).
+		graphHref: passesFeatureGate('/graph', features, canRead)
+			? `/graph?focus=${graphNodeId(kind, id)}`
+			: null,
 		// An invoice's lines and money, with the forms that change them.
 		billing,
 		people,

@@ -145,7 +145,7 @@ A feature's `category` is the section of the sidebar it is filed under. The valu
 `NAV_CATEGORIES` in `src/lib/navigation.ts`, in the order the sections render, and
 mirrored by the check constraint on `features.category` (the `feature_categories`
 migration). `groupNav()` buckets the entries and drops the empty sections, so a
-category may ship before the features that will live in it (`insights` does today).
+category may ship before the features that will live in it (`insights` did, until the graph page).
 
 The column is **nullable on purpose**: a feature that says nothing about where it
 belongs is filed under Other rather than under a default the migration had to guess.
