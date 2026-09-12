@@ -495,26 +495,50 @@ generated `total` — and a $15.08 paint run at Home Depot would carry all of it
 breaks the rule that a kind's fields are typed by how they render, not by what an org
 happened to define. The transactions table is fifty lines of SQL; the hack costs more.
 
+## What has shipped, and what it is not
+
+The config half is **built**: `supabase/migrations/20260912090000_real_estate_industry.sql`
+is the industry, its feature map with this vertical's words and order, and the six-rung role
+ladder — data only, so `npm run db:types` produces no diff and, unlike merchant-services,
+**not one line of `src/` changed**, because no new view is registered and every feature named
+already has its `FEATURE_IDS` entry. `supabase/seed.sql` adds Ironwood Property Group (pro)
+and Larkspur Rentals (free), two duplexes and their four units as `assets` joined by
+`part_of`, three standalone-contact tenants, the vendor book split by `relationship`, an
+Acquisitions board in place of the generic one, beds/baths/square feet/market rent as custom
+fields, and two maintenance requests tied to their units the only way available — a
+`related_to` row, which is the workaround this document counts as one.
+
+Every ⚠️ above therefore shipped as a **default, not a decision**. "Properties", "Tenants",
+"Vendors", "Maintenance requests", "Acquisitions" are the words in the database today, and a
+word is a row: Q4–Q8 each cost one `update` when the answers come back, never a refactor.
+The same is true of the absences — turning invoices and the ledger on (Q13) is one
+`industry_features` row, and so is splitting the `suppliers` view out of Vendors.
+
+**And it is still not the product.** What is now demonstrable is a property-and-tenant CRM
+with photos, a maintenance queue, a schedule and a role model. The customer's problem is a
+tax return, and none of the accounting spine is in it. Do not show this and call it the
+thing; show it to settle the words and the shape, and price the accounting separately.
+
+Two limits the build surfaced, both written into the migration where they will be read:
+
+- **A property has no address**, because `addresses` is pinned to parties. Until that
+  constraint is widened, a portfolio has no map and no geocoding.
+- **A maintenance request cannot name its unit**, because `support_tickets` carries
+  `company_id` and `contact_id` and no entity link. `related_to` covers it and the
+  Relationships card draws it, but it is a workaround, and a second vertical wanting one is
+  the signal to give tickets the entity link the rest of the CRM has.
+
 ## Recommendation on sequencing
 
-**Do not ship a config-only migration for this vertical, and this is where it diverges from
-merchant-services.** That one could ship its whole front half as rows — an ISO's sale runs on
-companies, deals and proposals, all of which exist — so `20260911150000_merchant_services_industry.sql`
-is data-only and changes no behaviour. Here, a config-only slice would deliver Properties
-(assets renamed), Tenants (contacts renamed) and Maintenance requests (tickets renamed), and
-**none of the accounting** — which is to say, a property CRM for a customer who did not ask
-for a property CRM. It would demo well and mean nothing.
+The first slice that is a _product_ is items **1, 2 and 3 together** — chart of accounts,
+transactions, leases. That is every dollar categorised, every unit accounted for, and a
+category rollup already better than the workbook because it cannot silently drop a 2031 row.
+Item 4 (loans) is what makes the rollup _correct_ and should follow immediately; until it
+lands, the Schedule E pack must show mortgage payments as an undeducted line with a visible
+warning rather than quietly repeating the workbook's error.
 
-The first shippable slice is items **1, 2 and 3 together** — chart of accounts, transactions,
-leases — with the industry's config rows in the same migration. That is a product: every
-dollar categorised, every unit accounted for, and a category rollup that is already better
-than the workbook because it cannot silently drop a 2031 row. Item 4 (loans) is what makes
-the rollup _correct_ and should follow immediately; until it lands, the Schedule E pack must
-show mortgage payments as an undeducted line with a visible warning rather than quietly
-repeating the workbook's error.
-
-Item 5 (reports) is the visible deliverable and item 7 (receipts) is the daily one. Items
-6 and 8 are finishing.
+Item 5 (reports) is the visible deliverable and item 7 (receipts) is the daily one. Items 6
+and 8 are finishing.
 
 ## Open questions → the customer document
 

@@ -1455,3 +1455,282 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'company', '20000000-0000-0000-0007-000000000002', current_date - 28,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Real estate: two orgs in the rental-portfolio vertical
+-- ---------------------------------------------------------------------------
+-- The real_estate_industry migration is config only, so this is where the
+-- vertical becomes something you can look at: a pro org with a portfolio, and
+-- a free one so the tier axis has a fixture here too (on `free`, Acquisitions
+-- and the Assistant resolve `locked_visible` — an upgrade tease rather than a
+-- missing page; everything else in this vertical is on every plan).
+--
+-- Ironwood is the odd-numbered org, so Evan owns it and dev is a plain
+-- member, matching every other industry pair above.
+
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000017', 'Ironwood Property Group', 'pro', 'real-estate'),
+	('10000000-0000-0000-0000-000000000018', 'Larkspur Rentals', 'free', 'real-estate')
+on conflict (id) do nothing;
+
+insert into public.organization_members (org_id, user_id, role) values
+	-- Ironwood Property Group (real-estate)
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Larkspur Rentals (real-estate)
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000002', 'member')
+on conflict (org_id, user_id) do nothing;
+
+--   Ironwood Property Group:  dev = Property Manager; e2e = Accountant
+--   Larkspur Rentals:         e2e = Viewer
+-- Accountant is the one to sign in as, because of what it CANNOT do: it holds
+-- `read` on Properties and Vendors and nothing on Tenants, so /contacts is
+-- refused by the hook rather than merely hidden — the CPA sees the portfolio
+-- and the payees and never learns who lives in Unit 2.
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0008-000000000004'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0008-000000000003'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0008-000000000001')
+on conflict (org_id, user_id, role_id) do nothing;
+
+-- Buying the next building. Every org is born with the generic "Sales" board
+-- (`create_default_pipeline`, called by a trigger), which is the wrong seven
+-- words for someone whose funnel ends at a closing table — so the board is
+-- renamed and its stages replaced. This is the point of pipelines being rows.
+update public.pipelines
+set name = 'Acquisitions',
+	description = 'A building you have looked at, to a building you own.'
+where org_id in ('10000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000018')
+	and is_default;
+
+-- An UPSERT, not an insert: the trigger's board already contains 'Lead' and
+-- 'Lost', so conflict-skipping would leave those two wherever the generic
+-- board put them. The stage's position and outcome are what this fixture is
+-- asserting, so they are what the conflict updates.
+insert into public.pipeline_stages (org_id, pipeline_id, name, sort_order, outcome, probability)
+select p.org_id, p.id, s.name, s.sort_order, s.outcome::public.stage_outcome, s.probability
+from (values
+	('10000000-0000-0000-0000-000000000017'::uuid), ('10000000-0000-0000-0000-000000000018')
+) as o (org_id)
+join public.pipelines p on p.org_id = o.org_id and p.is_default
+cross join (values
+	('Identified', 10, 'open', 5),
+	('Offer made', 20, 'open', 25),
+	('Under contract', 30, 'open', 50),
+	('Due diligence', 40, 'open', 70),
+	('Financing', 50, 'open', 85),
+	('Closed', 60, 'won', 100),
+	('Passed', 70, 'lost', 0)
+) as s (name, sort_order, outcome, probability)
+on conflict (pipeline_id, name) do update
+	set sort_order = excluded.sort_order,
+		outcome = excluded.outcome,
+		probability = excluded.probability;
+
+-- The stages the trigger made, now that the seven above have replaced them.
+-- Guarded on nothing referencing them, so a re-run deletes nothing.
+delete from public.pipeline_stages s
+where s.org_id in ('10000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000018')
+	and s.name not in ('Identified', 'Offer made', 'Under contract', 'Due diligence',
+		'Financing', 'Closed', 'Passed')
+	and not exists (select 1 from public.deals d where d.stage_id = s.id);
+
+-- What a landlord looks up about a unit, as custom fields on `asset`. They
+-- are per-org working data, not reference data, so every org in the vertical
+-- needs its own set; the migration's closing comment says what it would take
+-- to hand them to a new org automatically.
+--
+-- These four are the honest cost of properties and units being `assets`
+-- rather than tables of their own: `assets` holds only universal columns by
+-- rule, so anything specific to a rentable unit lands here.
+insert into public.custom_field_definitions (id, org_id, entity_type, key, label, value_type) values
+	('a9000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'asset', 'bedrooms', 'Bedrooms', 'numeric'),
+	('a9000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'asset', 'bathrooms', 'Bathrooms', 'numeric'),
+	('a9000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'asset', 'square_feet', 'Square feet', 'numeric'),
+	('a9000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'asset', 'market_rent', 'Market rent', 'numeric'),
+	('a9000000-0000-0000-0008-000000000011', '10000000-0000-0000-0000-000000000018',
+		'asset', 'bedrooms', 'Bedrooms', 'numeric'),
+	('a9000000-0000-0000-0008-000000000012', '10000000-0000-0000-0000-000000000018',
+		'asset', 'bathrooms', 'Bathrooms', 'numeric'),
+	('a9000000-0000-0000-0008-000000000013', '10000000-0000-0000-0000-000000000018',
+		'asset', 'square_feet', 'Square feet', 'numeric'),
+	('a9000000-0000-0000-0008-000000000014', '10000000-0000-0000-0000-000000000018',
+		'asset', 'market_rent', 'Market rent', 'numeric')
+on conflict (org_id, entity_type, key) do nothing;
+
+-- The portfolio. Two duplexes and their four units, all `assets` rows told
+-- apart by `asset_type` — the modeling decision the migration explains. A
+-- property carries what it cost and when it was bought; a unit carries
+-- nothing but its name, because everything else about it is a custom field
+-- above or a relationship below.
+insert into public.assets (id, org_id, name, asset_type, identifier, status, description, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'Rowan Street Duplex', 'property', 'ROWAN', 'active',
+		'Two-unit, 1908 brick. Unit 1 runs short-term between leases.',
+		current_date - 540, 268000.00, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'Westbrook Duplex', 'property', 'WSTBK', 'active',
+		'Two-unit. Bought on hard money with a rehab still open.',
+		current_date - 210, 241500.00, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000011', '10000000-0000-0000-0000-000000000017',
+		'Rowan Street — Unit 1', 'unit', 'ROWAN-1', 'active',
+		'Furnished. Short-term when no lease is running.',
+		null, null, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000012', '10000000-0000-0000-0000-000000000017',
+		'Rowan Street — Unit 2', 'unit', 'ROWAN-2', 'active', null,
+		null, null, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000013', '10000000-0000-0000-0000-000000000017',
+		'Westbrook — Unit 1', 'unit', 'WSTBK-1', 'active', null,
+		null, null, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000014', '10000000-0000-0000-0000-000000000017',
+		'Westbrook — Unit 2', 'unit', 'WSTBK-2', 'active', null,
+		null, null, '00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000021', '10000000-0000-0000-0000-000000000018',
+		'Larkspur Court', 'property', 'LARK', 'active', 'Single-family rental.',
+		current_date - 320, 189000.00, '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_numeric) values
+	-- Rowan Unit 1 — the short-term one, so its market rent is the long-term
+	-- fallback rather than what it actually earns.
+	('a8000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000011', 'a9000000-0000-0000-0008-000000000001', 2),
+	('a8000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000011', 'a9000000-0000-0000-0008-000000000002', 1),
+	('a8000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000011', 'a9000000-0000-0000-0008-000000000003', 940),
+	('a8000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000011', 'a9000000-0000-0000-0008-000000000004', 2200),
+	-- Rowan Unit 2
+	('a8000000-0000-0000-0008-000000000005', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000012', 'a9000000-0000-0000-0008-000000000001', 1),
+	('a8000000-0000-0000-0008-000000000006', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000012', 'a9000000-0000-0000-0008-000000000004', 1150),
+	-- Westbrook
+	('a8000000-0000-0000-0008-000000000007', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000013', 'a9000000-0000-0000-0008-000000000004', 1650),
+	('a8000000-0000-0000-0008-000000000008', '10000000-0000-0000-0000-000000000017',
+		'asset', 'f1000000-0000-0000-0008-000000000014', 'a9000000-0000-0000-0008-000000000004', 900)
+on conflict (id) do nothing;
+
+-- The tenants. Contacts with NO company_id — the party model's standalone
+-- person, the same shape a dental patient or a homeowner takes. There is no
+-- lease table yet, so who rents what is not recorded anywhere here; that is
+-- the gap, and it is deliberate rather than forgotten.
+insert into public.contacts (id, org_id, company_id, name, email, phone, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		null, 'Marcus Reed', 'marcus.reed@example.com', '+1 555 040 0101', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		null, 'Priya Nadar', 'priya.nadar@example.com', '+1 555 040 0102', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		null, 'Jonah Wexler', 'jonah.wexler@example.com', '+1 555 040 0103', null, false,
+		'active', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Everyone you pay, in one list — and `relationship` is what keeps it from
+-- being a junk drawer: the utilities and trades are `supplier`, the lender
+-- and the booking platform are `partner`. That split is exactly what makes
+-- the already-shipped `suppliers` view a one-row upgrade if this org ever
+-- wants vendors separated from the rest.
+insert into public.companies (id, org_id, name, email, phone, status, relationship, created_by) values
+	('20000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'Genesee Power & Gas', 'billing@geneseepower.example.com', '+1 555 041 0101',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'Westbrook Municipal Water', 'utilities@westbrook.example.gov', '+1 555 041 0102',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'Ferris Home Supply', 'pro@ferrishome.example.com', '+1 555 041 0103',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'Hollis Plumbing & Heating', 'dispatch@hollisplumbing.example.com', '+1 555 041 0104',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	-- A lender and a booking platform. Neither is really a "vendor", and
+	-- neither has a home of its own until loans and payouts are built — so
+	-- they live here as partners, which the closing comment on the migration
+	-- says out loud rather than pretending otherwise.
+	('20000000-0000-0000-0008-000000000005', '10000000-0000-0000-0000-000000000017',
+		'Cedar Ridge Credit Union', 'lending@cedarridgecu.example.com', '+1 555 041 0105',
+		'active', 'partner', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000006', '10000000-0000-0000-0000-000000000017',
+		'StayHarbor', 'payouts@stayharbor.example.com', null,
+		'active', 'partner', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- The graph. A unit is `part_of` its property (the shipped 'asset' → 'asset'
+-- type), which is what makes a property's record page list its units without
+-- a units table existing — and an owner is a relationship, never a column, by
+-- the assets rule.
+--
+-- The last two rows are the honest ugly bit: a maintenance request cannot
+-- name the unit it is about, because support_tickets carries company_id and
+-- contact_id and no entity link. `related_to` covers it and the
+-- Relationships card draws it, but it is a workaround, and the design doc
+-- counts it as one.
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	-- Units under their properties
+	('f4000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000016', 'asset', 'f1000000-0000-0000-0008-000000000011',
+		'asset', 'f1000000-0000-0000-0008-000000000001', current_date - 540,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000016', 'asset', 'f1000000-0000-0000-0008-000000000012',
+		'asset', 'f1000000-0000-0000-0008-000000000001', current_date - 540,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000016', 'asset', 'f1000000-0000-0000-0008-000000000013',
+		'asset', 'f1000000-0000-0000-0008-000000000002', current_date - 210,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000016', 'asset', 'f1000000-0000-0000-0008-000000000014',
+		'asset', 'f1000000-0000-0000-0008-000000000002', current_date - 210,
+		'00000000-0000-0000-0000-000000000003'),
+	-- Who owns them: a member, not a column on the asset.
+	('f4000000-0000-0000-0008-000000000005', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000011', 'member', '00000000-0000-0000-0000-000000000003',
+		'asset', 'f1000000-0000-0000-0008-000000000001', current_date - 540,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000006', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000011', 'member', '00000000-0000-0000-0000-000000000003',
+		'asset', 'f1000000-0000-0000-0008-000000000002', current_date - 210,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- What broke. A maintenance request is a support ticket: it already has a
+-- thread, a priority, a status and a party, which is most of what a landlord
+-- needs. What it does not have is the unit — see the relationships below.
+insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
+	('50000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'20000000-0000-0000-0008-000000000004', '30000000-0000-0000-0008-000000000002',
+		'Kitchen sink backing up', 'Slow drain for a week, now standing water. Hollis is booked for Thursday.',
+		'open', 'high', '00000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		null, '30000000-0000-0000-0008-000000000003',
+		'Boiler short-cycling', 'Runs for two minutes and shuts off. No heat upstairs.',
+		'pending', 'urgent', '00000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	('f4000000-0000-0000-0008-000000000011', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000022', 'ticket', '50000000-0000-0000-0008-000000000001',
+		'asset', 'f1000000-0000-0000-0008-000000000012', current_date - 3,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000012', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000022', 'ticket', '50000000-0000-0000-0008-000000000002',
+		'asset', 'f1000000-0000-0000-0008-000000000013', current_date - 1,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
