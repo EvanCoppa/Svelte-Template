@@ -325,3 +325,25 @@ behaviour at all.
 Everything under "What has to be built" is still ahead, and should be scoped and
 priced as one piece of work — starting with gap 1, which is a platform decision
 rather than a customer one.
+
+## A real brief has since answered most of this
+
+Gold Standard Processing — an ISO with five people — sent a seventeen-module build
+brief, and `docs/discovery/gsp-brief-gap-analysis.md` reads it against everything
+above. It settles most of the ⚠️ words and, more usefully, moves two of the rankings
+on this page:
+
+- **Gap 1 (row-scoped visibility) is not their blocker.** Five users, full visibility
+  for the owner, and the brief's own instruction is not to build permissions strict
+  enough to stop a rep creating a deal. It stays the right platform answer for the
+  office of forty 1099 agents; it is not the first sentence of this engagement.
+- **Gap 3 (residuals) is explicitly deferred by the customer** — they keep their
+  spreadsheet and ask us for the commission fields and a clean export instead. The
+  import-and-split engine is not day-one work, which is the single largest change to
+  the shape of the build.
+
+What their brief adds that this page never anticipated is a **training and resource
+centre** with AI search grounded strictly in their own approved material, a
+**cadence engine**, and **call transcript storage** — and, ahead of all of them, four
+columns on `deals` (next action, its due date, last activity, source) without which
+their one non-negotiable rule cannot be expressed at all.
