@@ -7,6 +7,10 @@
 	/* ── Layout & typography ── */
 	--header-height: 48px;
 	--site-padding: 40px;
+	/* The gap the app shell keeps around the main content panel, so it reads as
+	   a rounded surface sitting on the sidebar's ground rather than a wall
+	   butted against it. Applied in `src/routes/(app)/+layout.svelte`. */
+	--shell-gap: 8px;
 
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', sans-serif;
