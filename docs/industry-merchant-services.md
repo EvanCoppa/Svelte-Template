@@ -111,7 +111,9 @@ Both are Q7. A word that is not a feature's name is never a constant in `src/` �
 ## Roles
 
 The ladder mirrors medical-supplies' six, which is the closest existing shape (a sales org
-with a support desk and a coordinator):
+with a support desk and a coordinator) — plus a seventh, the Prospector, added once a real
+brief showed that every office in this vertical has someone who works the list and never
+closes (the merchant_services_terminology migration):
 
 | id suffix | role                   | holds                                                                                                               |
 | --------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -121,6 +123,7 @@ with a support desk and a coordinator):
 | `…0004`   | Onboarding Coordinator | `manage` applications, tasks, terminals, equipment; `read` the rest                                                 |
 | `…0005`   | Sales Manager          | `manage` everything                                                                                                 |
 | `…0006`   | Principal              | `manage` + `delete` everything                                                                                      |
+| `…0007`   | Prospector             | `manage` merchants, contacts, tasks, schedule; `read` deals — the phone list, not the close                         |
 
 **And this is where the design stops being free.** See Gap 1 immediately below: a role
 grants a level on a _feature_, for the whole org. There is no role in this catalog, or any
