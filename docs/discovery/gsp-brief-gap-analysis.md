@@ -257,6 +257,51 @@ We have outbound transactional email and nothing else — no inbound mail, no te
 Google/Microsoft calendar sync. That is an integration workstream with real, ongoing cost,
 and it is invisible in a feature list. Name it and price it separately.
 
+## What we could stand up with no code at all
+
+Worth separating, because it is the cheapest thing we can put in front of Eli and because
+it has a sharp edge.
+
+**Rows only, working end to end today:** their industry's words and sidebar order; the
+ten-stage boarding board _and_ a second board for Davey's onboarding queue, since pipelines
+are per-org rows and a deal carries its `pipeline_id`; the role ladder including Cody's
+missing BDR rung; the two vocabulary terms; which features exist at all. Then, as ordinary
+data entry through the app: the fee schedule (`billables`), pricing programs
+(`quick_plans`), the equipment catalog (`products`), merchants and contacts, rate proposals
+with two to four priced options through the builder, tasks with due dates and priorities
+and assignment and comments, the calendar, notes, support cases, terminals, and staff
+invitations. A new **view** is the one near-exception: rows plus a single line in
+`FEATURE_IDS` — free for any cut of companies or contacts, unavailable for deals until that
+source exists.
+
+**The sharp edge: the app is create-and-read.** Twenty-six write functions in
+`src/lib/server/crm/` have no screen calling them — `updateDeal`, `updateCompany`,
+`deleteCompany`, `updateProposal`, `updateTicket`, `createRelationship` and the rest — and
+`custom_field_values` has no write function at all. Concretely, for this brief:
+
+- **A deal cannot change stage.** `/deals` has exactly one action, `create`, and every new
+  deal lands in the default board's first stage. Their pipeline is a list, not a board.
+- **No record can be edited** — company, contact, deal, ticket, product, asset, proposal.
+  The generic form creates; nothing updates.
+- **Custom field values are read-only**, so MID, current processor and the rest can be
+  _defined_ by migration but only _filled_ by SQL.
+- **Nothing can be tagged**, and no relationship can be created from a screen — so
+  `referred_by`, which is otherwise the referral module for free, is unreachable.
+- **A rep cannot log a call.** `createActivity` is called by the proposal builder and one
+  assistant tool, nowhere else.
+- **A support case can be opened and never closed.**
+
+So a rows-only GSP instance is a real, demonstrable _shape_ — their words, their funnel,
+their fee schedule, their roles — and it is not something Matt could run a week on. Say
+that plainly when demoing it.
+
+**Which changes the first thing to build**, and it is not in their brief: wire the writes
+the data layer already has. An edit action per kind, a stage change, custom-field values,
+tagging, relationships and activity logging are a small, shared layer — every vertical
+needs it, the functions and their tests mostly exist, and every module in the brief from 3
+to 16 assumes it. It belongs in front of the deal-discipline columns, because those columns
+are unfillable without it.
+
 ## What the config migration should change today
 
 All of this is rows — one migration, no behaviour change:
@@ -301,8 +346,9 @@ The brief answers most of the discovery questionnaire. What it does not:
 
 ## Phasing, against theirs
 
-Their Phase 1 is the honest starting point and it is mostly ours too: **the deal discipline
-columns, the two dashboards, documents, the activity taxonomy, and export** — plus the
+Their Phase 1 is the honest starting point and it is mostly ours too, with one thing in
+front of it that they had no way of knowing was missing: **the write layer above, then the
+deal discipline columns, the two dashboards, documents, the activity taxonomy, and export** — plus the
 config migration above, which should go first because it costs a day and makes every demo
 read in their language. Phase 2's cadence engine is cheaper than it looks and its stage-age
 alerts fall out of `last_activity_at` for free; the referral module is nearly assembled
