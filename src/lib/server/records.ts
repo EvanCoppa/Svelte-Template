@@ -11,7 +11,9 @@ import {
 	contactRecordSchema,
 	dealRecordSchema,
 	invoiceRecordSchema,
+	leaseRecordSchema,
 	productRecordSchema,
+	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -29,7 +31,9 @@ import { createCompany, getCompany, listCompanies } from './crm/companies';
 import { createContact, listContacts } from './crm/contacts';
 import { createDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
+import { createLease } from './crm/leases';
 import { createProduct } from './crm/products';
+import { createProperty, listProperties } from './crm/properties';
 import { createTask } from './crm/tasks';
 import { createTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
@@ -124,6 +128,21 @@ async function pickerOptions(
 				label: contact.name,
 				sublabel: contact.companies?.name ?? contact.email ?? undefined
 			}));
+		case 'property': {
+			// Buildings and units in one list, because they are one table — and
+			// a unit is shown under the building it belongs to, so two
+			// "Unit 1"s tell apart. One pass builds the name index, so the
+			// sublabel costs no extra query.
+			const rows = await listProperties(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id
+					? (names.get(row.parent_id) ?? undefined)
+					: (row.property_type ?? undefined)
+			}));
+		}
 	}
 }
 
@@ -237,6 +256,46 @@ async function insertRecord(
 				acquired_on: text(data.acquired_on),
 				purchase_price: amount(data.purchase_price),
 				description: text(data.description)
+			});
+			return;
+		}
+		case 'property': {
+			const data = propertyRecordSchema.parse(values);
+			// A blank parent is a building (or a single-family, which is its
+			// own unit); a picked one makes this a unit inside it. The
+			// database refuses a unit of a unit, so this cannot go deeper.
+			await createProperty(supabase, orgId, {
+				name: data.name,
+				parent_id: text(data.parent_id),
+				property_type: text(data.property_type),
+				identifier: text(data.identifier),
+				status: data.status,
+				bedrooms: integer(data.bedrooms),
+				bathrooms: amount(data.bathrooms),
+				square_feet: integer(data.square_feet),
+				market_rent: amount(data.market_rent),
+				acquired_on: text(data.acquired_on),
+				purchase_price: amount(data.purchase_price),
+				description: text(data.description)
+			});
+			return;
+		}
+		case 'lease': {
+			const data = leaseRecordSchema.parse(values);
+			// A blank end date is month-to-month, so it stays null rather than
+			// being invented; rent_due_day falls back to the column default.
+			await createLease(supabase, orgId, {
+				property_id: data.property_id,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				starts_on: data.starts_on,
+				ends_on: text(data.ends_on),
+				rent_amount: Number(data.rent_amount),
+				// Left out when blank, so the column's own default (the 1st)
+				// applies — the same way `amount()` omits a blank amount.
+				rent_due_day: data.rent_due_day === '' ? undefined : Number(data.rent_due_day),
+				security_deposit: amount(data.security_deposit),
+				notes: text(data.notes)
 			});
 			return;
 		}

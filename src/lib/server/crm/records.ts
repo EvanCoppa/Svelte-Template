@@ -9,6 +9,7 @@ import {
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
 	PRODUCT_KIND_TONE,
+	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	PRIORITY_TONE,
@@ -25,6 +26,8 @@ import { getCompany, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
+import { getLease, listLeases, type LeaseWithParties } from './leases';
+import { getProperty, isUnit, listProperties, type Property } from './properties';
 import {
 	getInvoice,
 	listInvoices,
@@ -227,6 +230,93 @@ export function describeAsset(row: Asset): RecordDetail {
 			{ label: 'Acquired', value: date(row.acquired_on) },
 			{ label: 'Disposed', value: date(row.disposed_on) },
 			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * A building or a unit — one describer, because they are one table. What
+ * differs is only which fields have anything in them: a building carries the
+ * money and the dates, a unit carries the bedrooms and the rent it could
+ * fetch. The pill says which it is, so a reader never has to work it out from
+ * a blank field.
+ *
+ * The building a unit belongs to is a `record` field pointing back into the
+ * same kind — the one link the tree needs, since the units under a building
+ * arrive as related records like every other kind's children.
+ */
+export function describeProperty(
+	row: Property,
+	building: Pick<Property, 'id' | 'name'> | null,
+	canOpen: CanOpen
+): RecordDetail {
+	const unit = isUnit(row);
+	return {
+		kind: 'property',
+		id: row.id,
+		name: row.name,
+		pills: [
+			pill(unit ? 'unit' : 'building', unit ? 'info' : 'neutral'),
+			pill(row.status, PROPERTY_STATUS_TONE[row.status])
+		],
+		// Who owns it, who manages it and which trade services it are not
+		// fields: they are relationships, drawn by the page from
+		// `getRelationships()` beside every other kind's.
+		fields: [
+			{ label: 'Building', value: record('property', building, canOpen) },
+			{ label: 'Type', value: text(row.property_type) },
+			{ label: 'Identifier', value: text(row.identifier) },
+			{ label: 'Bedrooms', value: count(row.bedrooms) },
+			{ label: 'Bathrooms', value: count(row.bathrooms) },
+			{ label: 'Square feet', value: count(row.square_feet) },
+			// What it could fetch. What anyone actually pays is on the lease.
+			{ label: 'Market rent', value: money(row.market_rent, row.currency) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Acquired', value: date(row.acquired_on) },
+			{ label: 'Disposed', value: date(row.disposed_on) },
+			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * A tenancy.
+ *
+ * The pill says whether the term is fixed or month-to-month, which is a
+ * STORED fact (`ends_on` null or not) — deliberately not whether the lease is
+ * running today. Whether it is running is a question about a day, and a day
+ * is a wall-clock word: `leaseStateOn()` answers it in the browser on the
+ * rent roll, the way the task board buckets by the viewer's clock and the
+ * ledger decides overdue by the viewer's date. A pill computed here would be
+ * the server deciding what "now" means, and wrong at midnight.
+ */
+export function describeLease(row: LeaseWithParties, canOpen: CanOpen): RecordDetail {
+	const tenant = row.contacts ?? row.companies;
+	const tenantKind: RecordKind = row.contacts ? 'contact' : 'company';
+	return {
+		kind: 'lease',
+		id: row.id,
+		// A lease is named for what is rented and by whom — it has no name
+		// column, because neither half of that is the lease's to own.
+		name: [row.properties?.name, tenant?.name].filter(Boolean).join(' — ') || 'Lease',
+		pills: [row.ends_on === null ? pill('month-to-month', 'info') : pill('fixed term', 'neutral')],
+		fields: [
+			{ label: 'Property', value: record('property', row.properties, canOpen) },
+			{ label: 'Tenant', value: record(tenantKind, tenant, canOpen) },
+			{ label: 'Starts', value: date(row.starts_on) },
+			// Null is month-to-month, which the pill already says; the blank
+			// field is honest rather than a made-up date.
+			{ label: 'Ends', value: date(row.ends_on) },
+			{ label: 'Rent', value: money(row.rent_amount, row.currency) },
+			{ label: 'Rent due', value: count(row.rent_due_day) },
+			{ label: 'Security deposit', value: money(row.security_deposit, row.currency) },
+			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -553,6 +643,18 @@ export async function getRecord(
 			const row = await getProduct(supabase, orgId, id);
 			return row && describeProduct(row);
 		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			if (!row) return null;
+			// A unit names the building above it; a building names nothing,
+			// so the second read only happens for the half that has a parent.
+			const building = row.parent_id ? await getProperty(supabase, orgId, row.parent_id) : null;
+			return describeProperty(row, building, canOpen);
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row && describeLease(row, canOpen);
+		}
 		case 'deal': {
 			const row = await getDeal(supabase, orgId, id);
 			return row && describeDeal(row, canOpen);
@@ -684,6 +786,38 @@ function relatedTask(row: Task): RelatedRecord {
 	};
 }
 
+/** A unit under the building on screen. Its meta is what makes a unit a unit. */
+function relatedProperty(row: Property): RelatedRecord {
+	const measurements = [
+		row.bedrooms === null ? null : `${row.bedrooms} bed`,
+		row.bathrooms === null ? null : `${row.bathrooms} bath`,
+		row.square_feet === null ? null : `${row.square_feet} sq ft`
+	].filter(Boolean);
+	return {
+		id: row.id,
+		name: row.name,
+		href: recordHref('property', row.id),
+		pill: pill(row.status, PROPERTY_STATUS_TONE[row.status]),
+		meta: measurements.length > 0 ? measurements.join(' · ') : (row.property_type ?? row.identifier)
+	};
+}
+
+/**
+ * A tenancy on the property or tenant on screen. The pill is the stored
+ * fixed/rolling fact, not whether it is running — see `describeLease()`.
+ */
+function relatedLease(row: LeaseWithParties): RelatedRecord {
+	const tenant = row.contacts?.name ?? row.companies?.name;
+	const term = row.ends_on === null ? `from ${row.starts_on}` : `${row.starts_on} – ${row.ends_on}`;
+	return {
+		id: row.id,
+		name: tenant ?? row.properties?.name ?? 'Lease',
+		href: recordHref('lease', row.id),
+		pill: row.ends_on === null ? pill('month-to-month', 'info') : pill('fixed term', 'neutral'),
+		meta: `${term} · ${moneyText(row.rent_amount, row.currency)}`
+	};
+}
+
 function relatedTicket(row: TicketWithParties): RelatedRecord {
 	return {
 		id: row.id,
@@ -712,6 +846,20 @@ export async function listRelatedRecords(
 	id: string,
 	canOpen: CanOpen
 ): Promise<RelatedGroup[]> {
+	// A property's related records are its own: the units inside it, and the
+	// tenancies on it. Handled before the party check because a property is
+	// not a party — this is the tree and the rent roll, not the CRM graph.
+	if (kind === 'property') {
+		const [units, leases] = await Promise.all([
+			canOpen('property') ? listProperties(supabase, orgId, { parentId: id }) : Promise.resolve([]),
+			canOpen('lease') ? listLeases(supabase, orgId, { propertyId: id }) : Promise.resolve([])
+		]);
+		return [
+			{ kind: 'property' as const, records: units.map(relatedProperty) },
+			{ kind: 'lease' as const, records: leases.map(relatedLease) }
+		].filter((group) => group.records.length > 0);
+	}
+
 	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return [];
 	const party =
 		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
@@ -721,6 +869,16 @@ export async function listRelatedRecords(
 			? listContacts(supabase, orgId, party ?? {}).then((rows): RelatedGroup => ({
 					kind: 'contact',
 					records: rows.map(relatedContact)
+				}))
+			: null,
+		// A tenant's tenancies, right after the people — for a landlord this is
+		// the most important thing about a contact. Companies rent too (a shop,
+		// a corporate let), so both sides of the party model ask for them, each
+		// by its own column rather than an unfiltered list.
+		party && canOpen('lease')
+			? listLeases(supabase, orgId, party).then((rows): RelatedGroup => ({
+					kind: 'lease',
+					records: rows.map(relatedLease)
 				}))
 			: null,
 		party && canOpen('deal')

@@ -7,6 +7,7 @@ import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
+import FileSignatureIcon from '@lucide/svelte/icons/file-signature';
 import FileTextIcon from '@lucide/svelte/icons/file-text';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
@@ -42,6 +43,7 @@ export const ICONS = {
 	'calendar-days': CalendarDaysIcon,
 	'circle-user': CircleUserIcon,
 	contact: ContactIcon,
+	'file-signature': FileSignatureIcon,
 	'file-text': FileTextIcon,
 	handshake: HandshakeIcon,
 	layers: LayersIcon,

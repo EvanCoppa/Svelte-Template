@@ -53,61 +53,97 @@ Two more that are only visible if you look at the dates against today (2026-09-1
 Those two are the single best demonstration of what an application does that a spreadsheet
 cannot, and they cost one query.
 
-## The one large modeling decision: a property is an `asset`
+## The one large modeling decision: properties are their own table
 
-Everything downstream depends on this, so it goes first.
+**This reverses the design's first answer, and the reversal is the interesting part.**
 
-**Proposal: a property and a unit are both `assets` rows**, distinguished by `asset_type`
-(`'property'` / `'unit'`) and joined by the shipped `part_of` relationship type
-(`'asset' → 'asset'`). No new table, no new `crm_entity_type`, no new record page.
+The original proposal was that a property and a unit both be `assets` rows, told apart by
+`asset_type` and joined by the shipped `part_of` type — no new table, no new
+`crm_entity_type`. That was the right call for the customer as read off the workbook: one
+landlord, two duplexes, five doors, where unit attributes are things you glance at rather
+than sort by. The section stated what would flip it: _if unit attributes turn out to be
+things they sort, filter and report on every day, or if they operate enough doors that a
+unit list is the primary screen._
 
-It fits better than it has any right to:
+Both are true of a property-**management** product, which is what this became. So
+`properties` and `leases` are real tables (the `properties_and_leases` migration), and
+`assets` goes back to meaning what it was built for — the dishwasher, the boiler, the mower.
+That is a better fit than the one it was standing in for, and the vertical keeps it as
+**Equipment**.
 
-| a property needs        | `assets` already has                                                 |
-| ----------------------- | -------------------------------------------------------------------- |
-| a name, a status        | `name`, `status` (`asset_status`)                                    |
-| what kind of thing      | `asset_type` — whose column comment names `'property'` as an example |
-| an address ⚠️           | `addresses` exists, but is pinned to parties — see the cost below    |
-| purchase price, dates   | `purchase_price`, `acquired_on`, `disposed_on`                       |
-| an owner, a manager     | relationships (`owns`, `managed_by`, `responsible_for`) — the rule   |
-| units underneath it     | `part_of`, already `'asset' → 'asset'`                               |
-| a child table to pin to | `unique (id, org_id)` — the composite target, already there          |
+### One table for buildings and units
 
-And the "Shared" pseudo-unit in their data (mortgage, water, lawn) stops being a fiction:
-**`unit_id` null means the property as a whole**, which is the same nullable-party shape
-`company_id` / `contact_id` follow everywhere else. Their Shared rows import as unit-less.
+A duplex has two rentable units and one mortgage. Utilities are per unit, the mortgage is
+per building, and a report has to add them up together — so the two levels cannot be
+unrelated rows, and they are alike enough (a name, an address, a status, a value) that two
+tables would be the same columns twice.
 
-What it costs, honestly:
+A unit is therefore a `properties` row with `parent_id` set:
 
-- **A property cannot have an address today.** `addresses.entity_type` is checked
-  `in ('company', 'contact')` (`addresses_entity_is_party`), and the generic record page
-  gates the address card on `party ? listAddresses(…) : []`. So the polymorphic link is
-  there but this kind is not admitted to it: widening is one constraint swap in a migration
-  plus dropping that `party` gate — the `entity_images` migration's own comment says to
-  widen by replacing the constraint, never by dropping it. Small, but it is code, and the
-  map and geocoder hang off it, so a property with no address has no pin.
-- `bedrooms`, `bathrooms`, `square_feet`, `market_rent` become **custom fields**
-  (`entity_type = 'asset'`), and `custom_field_definitions` is per-org working data — so a
-  new org starts with none of them. **This is the same gap merchant-services hit with
-  MID/MCC**, and two verticals hitting it is the argument for fixing it (see Platform gaps).
-- "Properties" and "Units" want to be two nav entries over one table. A view would do it,
-  but `views.source` is checked `in ('company', 'contact')` and `VIEW_FILTER_SCHEMAS` has
-  two schemas. Widening views to an `asset` source is a real, contained platform build.
-  **Until then: one "Properties" entry, and a property's units are the `part_of` children
-  already drawn by its record page's related-records card.** For two properties and five
-  units that is not a compromise, it is the better screen.
+```
+Rowan Street Duplex          parent_id null     the building
+  └ Rowan Street — Unit 1    parent_id → Rowan  the rentable thing
+  └ Rowan Street — Unit 2    parent_id → Rowan
+Larkspur Court               parent_id null     a single-family: BOTH
+```
 
-**What would flip this decision** to a dedicated `properties` + `units` pair: if unit
-attributes turn out to be things they sort, filter and report on every day rather than look
-at occasionally (Q3), or if they operate enough doors that a unit list is the primary
-screen. At five units it is clearly assets; at five hundred it is clearly not. Ask before
-building. **Q1, Q2, Q3.**
+Three things fall out of that, and they are why it is one table and not three:
+
+- **A single-family is one row** that is its own rentable unit, with no ceremony.
+- **Anything pointing at "a property" needs one column**, not a nullable property/unit
+  pair — so the workbook's "Shared" bucket (mortgage, water, lawn) is simply the parent
+  row, and a transaction will name whichever level the cost belongs to.
+- **Depth is capped at two** by `private.properties_enforce_depth()`, which is what keeps
+  it cheap: the building a row rolls up to is `coalesce(parent_id, id)` — a plain
+  expression, no recursive CTE, no denormalised root column to keep true. A
+  complex → building → unit hierarchy is a later migration; until someone needs it, each
+  building is a top-level property and nothing is paid for in advance.
+
+The cap is enforced in both directions and both are tested: a unit may not be parented to a
+unit, and a building that already has units may not become one.
+
+### A lease has no status column
+
+Whether a lease is upcoming, running or finished is a question about _today_, and today is a
+wall-clock word — the rule the ledger's "overdue" and the task board's "today" already
+follow. `starts_on` and `ends_on` are the truth, ending a lease early moves `ends_on` to the
+day it actually ended, and `leaseStateOn()` (`$lib/crm/leases.ts`, client-safe) answers the
+question in the browser with the viewer's own date. A status column would be a second copy
+needing a trigger to stay honest, and it would be wrong at midnight.
+
+`ends_on` is **inclusive** — the last day the tenancy covers — deliberately unlike
+`calendar_events.ends_at`, an exclusive instant. Different things: an event is a block of
+time, a lease is a set of days a human names. A null `ends_on` is month-to-month, which is
+also what a holdover becomes.
+
+Overlapping leases on one property are **allowed** on purpose: two roommates each holding
+their own lease on the same unit is a real arrangement.
+
+### What it bought, beyond the obvious
+
+- **Beds, baths, square feet and market rent are columns**, so a new org gets them. Under
+  the assets model they had to be per-org custom field definitions — the same gap
+  merchant-services hit with MID/MCC.
+- **A property has an address.** `addresses` was pinned to parties, which is why the
+  assets-shaped portfolio had no address and therefore no map pin and no geocoding. The
+  migration widens that constraint by replacing it, which is what its own comment says to
+  do. A unit may carry its own address too — "Unit 2" at the same street is how a mailing
+  address actually works.
+- **A property has photos**, via the same widening of `entity_images`.
+
+That last pair came with a lesson worth recording: **the same rule was written in three
+places** — the database constraint, a predicate in the record page's load, and a hardcoded
+kind check in its markup. Widening the constraint alone left the address card silently
+undrawn. The load now ships `hasAddresses` / `hasImages` and the page renders on those, so
+the rule lives in one place on each side of the wire.
 
 ## What they get from what exists
 
 | feature                | in? | called here                           | why                                                                                                              |
 | ---------------------- | --- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `assets`               | yes | **Properties** / property             | Per the decision above. Units are `part_of` children of the same table.                                          |
+| `properties` **(new)** | yes | **Properties** / property             | A table of its own, per the decision above. A unit is a row with a parent.                                       |
+| `leases` **(new)**     | yes | **Leases** / lease                    | The rent roll. Also what makes the LTR/STR split fall out with no second table.                                  |
+| `assets`               | yes | **Equipment** / equipment item        | Back to what it was built for: the dishwasher, the boiler, the mower. `located_at` says which unit one sits in.  |
 | `contacts`             | yes | **Tenants** / tenant ⚠️               | A tenant is a person with no company — exactly the party model's homeowner case. Q4.                             |
 | `companies`            | yes | **Vendors** / vendor ⚠️               | RGE, MCWA, Home Depot, FFCU, the plumbers. `relationship` splits supplier from partner (airbnb) from lender. Q5. |
 | `suppliers` **(view)** | yes | folds into **Vendors**                | Already shipped: a company view filtered `relationship in (supplier)`. Costs nothing.                            |
@@ -207,13 +243,13 @@ record form** (a `RECORD_FORMS` entry, a schema, one `case` in the insert switch
 `company` / `contact` picker field types for the vendor and the tenant — the same field
 types invoices already use for a customer.
 
-### 3. Leases — and a rent roll that cannot drift
+### 3. Leases — and a rent roll that cannot drift ✅ **BUILT**
 
-`leases`: `unit_id` (asset), `contact_id` (tenant), `starts_on`, `ends_on`, `monthly_rent`,
-`security_deposit`, `status`. A new `crm_entity_type` (`'lease'`), a
-`private.crm_entity_exists()` branch, a delete trigger, a module, a `RECORD_KINDS` entry and
-a `getRecord()` branch — the well-trodden new-kind checklist from the `crm_party_model`
-migration's closing comment.
+Shipped in the `properties_and_leases` migration: `property_id`, the tenant as a **party**
+(`company_id` / `contact_id`, both nullable, at least one set — a shop or a corporate let
+names the company), `starts_on`, `ends_on` (inclusive, null = month-to-month),
+`rent_amount`, `rent_due_day`, `security_deposit`. **No status column** — see the modeling
+decision above.
 
 The Rent Roll tab becomes this list page, and three of their current bugs stop being
 possible: a lease with no rent coming in is visible, rent coming in with no lease is
@@ -324,18 +360,26 @@ victor` are fixed by the vendor field being a `company` picker — a field type 
 an order sets it for **every** feature in that section. The order is the order of the work:
 they open the app to enter what they spent and see what it means.
 
+Shipped (the `real_estate_portfolio_features` migration):
+
 ```
-General    Assistant 100 · Notes 200 · Team 300            (inherited)
+General    Assistant 100 · Notes 200 · Staff 300           (inherited)
 
-CRM        Properties          100   the portfolio
-           Tenants             200   who is in it
-           Leases              300   on what terms
-           Maintenance requests 400  what broke
-           Schedule            500   today
-           Tasks               600
-           Vendors             700   who you pay
-           Acquisitions        800   the next one
+CRM        Properties           100   the portfolio
+           Leases               200   on what terms
+       [   250 left open for whatever slots in next    ]
+           Tenants              300   who is in it
+           Maintenance requests 400   what broke
+           Schedule             500   today
+           Tasks                600
+           Vendors              700   who you pay
+           Equipment            800   what you own that is not a building
+           Acquisitions         900   the next one
+```
 
+Still to come, once the accounting spine exists:
+
+```
 Money      Transactions        100   the spine — every dollar in or out
            Chart of accounts   200   what the categories mean
            Loans               300   and what is really interest
@@ -430,6 +474,13 @@ for this one.
 and the nav, the ⌘K palette, the page titles, the gate, the record pages and the role picker
 all follow from them. Three tiers, and the boundaries are not where they look.
 
+> **This tier analysis is kept as written, and it is the route the build actually took
+> first** — `20260912090000_real_estate_industry.sql` is exactly the Tier 0 migration
+> below. It was then superseded by the decision to make properties and leases real tables,
+> which is Tier 2 work. Both halves are on the branch, in that order, because the cheap
+> version is what proved the words and the shape before anything schema-shaped was
+> committed to. The boundaries below are still the boundaries.
+
 ### Tier 0 — pure data, zero `src/` change
 
 Ships as one migration, plus rows an owner/admin can type into the running app.
@@ -495,38 +546,60 @@ generated `total` — and a $15.08 paint run at Home Depot would carry all of it
 breaks the rule that a kind's fields are typed by how they render, not by what an org
 happened to define. The transactions table is fifty lines of SQL; the hack costs more.
 
-## What has shipped, and what it is not
+## What has shipped
 
-The config half is **built**: `supabase/migrations/20260912090000_real_estate_industry.sql`
-is the industry, its feature map with this vertical's words and order, and the six-rung role
-ladder — data only, so `npm run db:types` produces no diff and, unlike merchant-services,
-**not one line of `src/` changed**, because no new view is registered and every feature named
-already has its `FEATURE_IDS` entry. `supabase/seed.sql` adds Ironwood Property Group (pro)
-and Larkspur Rentals (free), two duplexes and their four units as `assets` joined by
-`part_of`, three standalone-contact tenants, the vendor book split by `relationship`, an
-Acquisitions board in place of the generic one, beds/baths/square feet/market rent as custom
-fields, and two maintenance requests tied to their units the only way available — a
-`related_to` row, which is the workaround this document counts as one.
+Four migrations, in the order they were built, and the order matters:
 
-Every ⚠️ above therefore shipped as a **default, not a decision**. "Properties", "Tenants",
-"Vendors", "Maintenance requests", "Acquisitions" are the words in the database today, and a
-word is a row: Q4–Q8 each cost one `update` when the answers come back, never a refactor.
-The same is true of the absences — turning invoices and the ledger on (Q13) is one
-`industry_features` row, and so is splitting the `suppliers` view out of Vendors.
+1. **`20260912090000_real_estate_industry.sql`** — the industry, its feature map with this
+   vertical's words and order, the six-rung role ladder. **Config only**: no table, no
+   column, no enum value, and not one line of `src/`. This is the Tier 0 migration above,
+   and it is what proved the words and the shape before anything schema-shaped was
+   committed to.
+2. **`20260912100000_property_entity_kinds.sql`** — `'property'` and `'lease'` as
+   `crm_entity_type` values, alone, because Postgres refuses to use an enum value in the
+   transaction that added it.
+3. **`20260912100100_properties_and_leases.sql`** — the two tables, their RLS and column
+   grants, the depth trigger, the `crm_entity_exists()` branches and delete triggers, the
+   two widened constraints (addresses, entity_images), the two features, and two new
+   relationship types (`services`, `located_at`). It also **widens `owns`** rather than
+   duplicating it: that type shipped as `(null → 'asset')`, which read as the whole truth
+   while an asset was the only thing an org could own.
+4. **`20260912100200_real_estate_portfolio_features.sql`** — the industry moves onto them:
+   Properties and Leases join the map, the CRM section is renumbered, and `assets` becomes
+   **Equipment**. Undoing the previous migration's naming is an `update`, which is the
+   point of a word being a row.
 
-**And it is still not the product.** What is now demonstrable is a property-and-tenant CRM
-with photos, a maintenance queue, a schedule and a role model. The customer's problem is a
-tax return, and none of the accounting spine is in it. Do not show this and call it the
-thing; show it to settle the words and the shape, and price the accounting separately.
+On the app side: `$lib/server/crm/properties.ts` and `leases.ts`, the pure
+`$lib/crm/leases.ts`, two describers and their `getRecord()` branches, a property's units
+and a tenant's leases as related records, two `RECORD_FORMS` entries with a new
+**`property` picker kind**, and the two list pages. `supabase/seed.sql` carries a fixture
+portfolio whose rent roll is deliberately untidy — a holdover whose fixed term ended five
+days ago and the month-to-month that replaced it at a higher rent, a lease ending in
+eighteen days, an ended tenancy on a unit now running short-term, and a vacant unit
+mid-rehab. Every one of those is a shape the model has to survive, taken from the workbook.
 
-Two limits the build surfaced, both written into the migration where they will be read:
+Proven with a full `db:reset` from empty, and smoke-tested against a running dev server:
+the pages render with the industry's words (Properties, Leases, Tenants, Vendors,
+Equipment), the rent roll computes Rolling / Ended / Current in the browser, a property
+shows its units, its leases, its address and its photos, creating a unit works, creating a
+unit _of a unit_ is refused by the database with its own message surfaced into the form as
+a 400, and `/properties` 404s for an org in another industry.
 
-- **A property has no address**, because `addresses` is pinned to parties. Until that
-  constraint is widened, a portfolio has no map and no geocoding.
-- **A maintenance request cannot name its unit**, because `support_tickets` carries
-  `company_id` and `contact_id` and no entity link. `related_to` covers it and the
-  Relationships card draws it, but it is a workaround, and a second vertical wanting one is
-  the signal to give tickets the entity link the rest of the CRM has.
+**And it is still not the whole product.** This is a property-management CRM: portfolio,
+rent roll, tenants, maintenance, schedule. The reference customer's problem is a tax
+return, and none of the accounting spine is in it. Show this to settle the words and the
+shape; price the accounting separately.
+
+Two limits worth knowing before they are promised:
+
+- **The relationship graph is read-only in the app.** `createRelationship()` has exactly
+  one caller (task assignment) and the record page has no action that writes one — so "who
+  services this building" and "which unit is this dishwasher in" are expressible in the
+  schema, seeded in the fixture, and not yet enterable in the UI.
+- **A maintenance request still cannot name its property.** `support_tickets` carries
+  `company_id` and `contact_id` and no entity link, so the seed uses `related_to`. A second
+  vertical wanting that is the signal to give tickets the entity link the rest of the CRM
+  has.
 
 ## Recommendation on sequencing
 

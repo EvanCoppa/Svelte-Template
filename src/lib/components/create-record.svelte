@@ -15,6 +15,7 @@
 	import { recordTerms } from '$lib/crm/records';
 	import {
 		RECORD_FORMS,
+		RECORD_PICKER_KINDS,
 		RECORD_SCHEMAS,
 		type RecordField,
 		type RecordFormValues,
@@ -38,8 +39,8 @@
 	 *
 	 * `type` is fixed for the lifetime of the component: a page creates one kind
 	 * of record, and superForm is wired once at init. A form that points the
-	 * record at a party (an invoice's customer) gets the org's rows for each
-	 * picker from the same load (`createPickers`).
+	 * record at another row (an invoice's customer, a lease's property) gets
+	 * the org's rows for each picker from the same load (`createPickers`).
 	 */
 	let {
 		type,
@@ -49,7 +50,7 @@
 	}: {
 		type: RecordType;
 		form: SuperValidated<RecordFormValues>;
-		/** The options behind each `company` / `contact` field, as `loadCreateRecord()` read them. */
+		/** The options behind each picker field, as `loadCreateRecord()` read them. */
 		pickers?: RecordPickers;
 		/** Only when the create action lives somewhere other than this page's `?/create`. */
 		action?: string;
@@ -97,9 +98,16 @@
 		return value === null || value === undefined ? '' : String(value);
 	}
 
-	/** A field that picks one of the org's own rows — its options came with the form. */
+	/**
+	 * A field that picks one of the org's own rows — its options came with the
+	 * form. Derived from `RECORD_PICKER_KINDS` rather than listed, so a kind
+	 * added to the registry renders here without a second edit.
+	 */
 	function isPicker(field: RecordField): field is RecordField & { type: RecordPickerKind } {
-		return field.type === 'company' || field.type === 'contact';
+		// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` so
+		// `includes` accepts the broader field-type union. Widening only, and
+		// the predicate's narrowing is what the return type asserts.
+		return (RECORD_PICKER_KINDS as readonly string[]).includes(field.type);
 	}
 
 	function inputType(field: RecordField) {

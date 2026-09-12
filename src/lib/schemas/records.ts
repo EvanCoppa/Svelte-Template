@@ -20,11 +20,11 @@ import { QUERY } from '$lib/queries';
  * number, a picked instant into an ISO timestamp) inside that one switch.
  * Client-safe like every schema module — no `$lib/server` imports.
  *
- * The fields are the record's own columns, plus the two that point it at a
- * party: a `company` or `contact` field is a picker whose options
- * `loadCreateRecord()` reads per request (an invoice is a bill to someone,
- * so it cannot be created without one). Still one form — the picker is a
- * field type, not a second modal.
+ * The fields are the record's own columns, plus the ones that point it at
+ * another row: a `company`, `contact` or `property` field is a picker whose
+ * options `loadCreateRecord()` reads per request (an invoice is a bill to
+ * someone and a lease is over something, so neither can be created without
+ * one). Still one form — the picker is a field type, not a second modal.
  *
  * A proposal is not here on purpose: it is a title plus one to five priced
  * options made of catalog lines — more than one row of strings — so it has
@@ -40,6 +40,8 @@ export const RECORD_TYPES = [
 	'product',
 	'billable',
 	'asset',
+	'property',
+	'lease',
 	'invoice',
 	'task',
 	'ticket'
@@ -52,8 +54,12 @@ export type RecordFormValues = Record<string, string>;
 
 export type RecordFieldOption = { value: string; label: string; sublabel?: string };
 
-/** The kinds of party a record form can point a new record at — each a picker over the org's rows. */
-export const RECORD_PICKER_KINDS = ['company', 'contact'] as const;
+/**
+ * The kinds of record a form can point a new record at — each a picker over
+ * the org's own rows. Two are parties; `property` is the third because a
+ * lease has to name what is rented, and a unit is a row like any other.
+ */
+export const RECORD_PICKER_KINDS = ['company', 'contact', 'property'] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
@@ -64,9 +70,9 @@ export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFiel
  * How one field is rendered. `select` is a fixed vocabulary this app owns (an
  * enum column) and renders as a `Combobox`; `number` is money or a measure
  * and `integer` a count (days of terms); `datetime` is a wall-clock pick the
- * browser converts to an instant before posting; `company` and `contact` are
- * pickers over the org's own rows, whose options arrive with the form rather
- * than sitting in the registry.
+ * browser converts to an instant before posting; the picker kinds
+ * (`RECORD_PICKER_KINDS`) are choices from the org's own rows, whose options
+ * arrive with the form rather than sitting in the registry.
  */
 export type RecordField = {
 	name: string;
@@ -237,6 +243,67 @@ export const assetRecordSchema = z.object({
 });
 
 /**
+ * A building, or a unit inside one — one form, because they are one table.
+ * Leaving `parent_id` blank makes a building (or a single-family, which is
+ * its own unit); picking one makes a unit inside it. The database refuses a
+ * unit of a unit, so the picker cannot be used to build a deeper tree.
+ */
+export const propertyRecordSchema = z.object({
+	name: requiredText('Name'),
+	parent_id: optionalPick,
+	property_type: optionalText,
+	identifier: optionalText,
+	status: z.enum(['active', 'inactive', 'sold']).default('active'),
+	bedrooms: optionalInteger,
+	// Not `optionalInteger`: half baths are the whole reason this field exists.
+	bathrooms: optionalAmount,
+	square_feet: optionalInteger,
+	market_rent: optionalAmount,
+	acquired_on: optionalDate,
+	purchase_price: optionalAmount,
+	description: optionalLongText
+});
+
+/**
+ * A tenancy. The property and a tenant are both required — a lease over
+ * nothing, or to nobody, is what the table's own checks refuse — and a blank
+ * end date is month-to-month rather than missing, which is why it is not
+ * required here.
+ */
+export const leaseRecordSchema = z
+	.object({
+		property_id: z.guid('Pick the property being rented.'),
+		company_id: optionalPick,
+		contact_id: optionalPick,
+		starts_on: z
+			.string()
+			.trim()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose the date the lease starts.'),
+		ends_on: optionalDate,
+		rent_amount: z
+			.string()
+			.trim()
+			.regex(/^\d{1,12}(\.\d{1,2})?$/, 'Enter a rent like 1200 or 1200.50'),
+		rent_due_day: optionalInteger,
+		security_deposit: optionalAmount,
+		notes: optionalLongText
+	})
+	.refine((data) => data.company_id !== '' || data.contact_id !== '', {
+		error: 'Pick a person or a company as the tenant.',
+		path: ['contact_id']
+	})
+	.refine((data) => data.ends_on === '' || data.ends_on >= data.starts_on, {
+		error: 'The lease cannot end before it starts.',
+		path: ['ends_on']
+	})
+	.refine(
+		(data) =>
+			data.rent_due_day === '' ||
+			(Number(data.rent_due_day) >= 1 && Number(data.rent_due_day) <= 31),
+		{ error: 'Rent is due on a day of the month, 1 to 31.', path: ['rent_due_day'] }
+	);
+
+/**
  * A draft: who it bills and on what terms. The lines come after, on the
  * invoice's own page, and issuing it is a separate act — a bill to nobody
  * is refused here, exactly as the table's check refuses it.
@@ -283,6 +350,8 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	product: productRecordSchema,
 	billable: billableRecordSchema,
 	asset: assetRecordSchema,
+	property: propertyRecordSchema,
+	lease: leaseRecordSchema,
 	invoice: invoiceRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
@@ -418,6 +487,62 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'acquired_on', label: 'Acquired', type: 'date' },
 			{ name: 'purchase_price', label: 'Purchase price', type: 'number', placeholder: '2399.00' },
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	property: {
+		feature: 'properties',
+		query: QUERY.properties,
+		// Who owns it, who manages it and which trade services it are
+		// deliberately not fields: those are relationships, drawn on the record
+		// once it exists.
+		fields: [
+			{ name: 'name', label: 'Name', type: 'text', placeholder: 'Rowan Street — Unit 1' },
+			// Blank makes a building (or a single-family, which is its own
+			// unit); picking one makes a unit inside it. The database refuses a
+			// unit of a unit, so this cannot build a deeper tree.
+			{ name: 'parent_id', label: 'Part of', type: 'property' },
+			{ name: 'property_type', label: 'Type', type: 'text', placeholder: 'duplex' },
+			{ name: 'identifier', label: 'Identifier', type: 'text', placeholder: 'ROWAN-1' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'active', label: 'Active' },
+					{ value: 'inactive', label: 'Inactive' },
+					{ value: 'sold', label: 'Sold' }
+				]
+			},
+			{ name: 'bedrooms', label: 'Bedrooms', type: 'integer', placeholder: '2' },
+			{ name: 'bathrooms', label: 'Bathrooms', type: 'number', placeholder: '1.5' },
+			{ name: 'square_feet', label: 'Square feet', type: 'integer', placeholder: '940' },
+			{ name: 'market_rent', label: 'Market rent', type: 'number', placeholder: '1200.00' },
+			{ name: 'acquired_on', label: 'Acquired', type: 'date' },
+			{ name: 'purchase_price', label: 'Purchase price', type: 'number', placeholder: '268000.00' },
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	lease: {
+		feature: 'leases',
+		query: QUERY.leases,
+		fields: [
+			{ name: 'property_id', label: 'Property', type: 'property' },
+			{ name: 'contact_id', label: 'Tenant', type: 'contact' },
+			// A shop or a corporate let names the company instead — the party
+			// model, same as an invoice's customer.
+			{ name: 'company_id', label: 'Tenant company', type: 'company' },
+			{ name: 'starts_on', label: 'Starts', type: 'date' },
+			// Blank is month-to-month, not missing.
+			{ name: 'ends_on', label: 'Ends', type: 'date' },
+			{ name: 'rent_amount', label: 'Rent', type: 'number', placeholder: '1200.00' },
+			{ name: 'rent_due_day', label: 'Rent due on', type: 'integer', placeholder: '1' },
+			{
+				name: 'security_deposit',
+				label: 'Security deposit',
+				type: 'number',
+				placeholder: '1200.00'
+			},
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
 		]
 	},
 	invoice: {

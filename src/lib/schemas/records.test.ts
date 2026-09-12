@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	RECORD_FORMS,
+	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
 	RECORD_TYPES,
 	companyRecordSchema,
@@ -16,6 +17,15 @@ function messagesOf(result: { error?: { issues: { message: string }[] } }) {
 
 /** Something the field would legally hold, so a whole form can be filled in. */
 function sampleFor(field: RecordField): string {
+	// Every picker holds a row id, so they are answered together rather than
+	// case by case — a kind added to RECORD_PICKER_KINDS is covered here
+	// without a second edit, which is the bug this line exists to stop.
+	// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` to ask
+	// `includes` about an arbitrary field type. Widening only — no value is
+	// created or narrowed by it.
+	if ((RECORD_PICKER_KINDS as readonly string[]).includes(field.type)) {
+		return '20000000-0000-0000-0000-000000000001';
+	}
 	switch (field.type) {
 		case 'select':
 			return field.options?.[0]?.value ?? '';
@@ -25,9 +35,6 @@ function sampleFor(field: RecordField): string {
 			return '1200.50';
 		case 'integer':
 			return '30';
-		case 'company':
-		case 'contact':
-			return '20000000-0000-0000-0000-000000000001';
 		case 'date':
 			return '2026-09-10';
 		case 'datetime':

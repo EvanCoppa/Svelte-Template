@@ -1,6 +1,7 @@
 import type { KanbanRingFill } from '$lib/components/kanban/index.js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import type { Enums, Tables } from '$lib/database.types';
+import type { LeaseState } from './leases';
 
 /**
  * The badge tone for every enum the CRM renders as a pill, in one place, so
@@ -28,6 +29,24 @@ export const ASSET_STATUS_TONE = {
 	inactive: 'neutral',
 	retired: 'warning'
 } satisfies Record<Enums<'asset_status'>, BadgeTone>;
+
+/**
+ * Where a lease sits relative to the viewer's today. Not an enum — there is
+ * no lease status column — so this is keyed by `LeaseState`, which
+ * `leaseStateOn()` computes in the browser.
+ */
+export const LEASE_STATE_TONE = {
+	upcoming: 'info',
+	current: 'success',
+	rolling: 'warning',
+	ended: 'neutral'
+} satisfies Record<LeaseState, BadgeTone>;
+
+export const PROPERTY_STATUS_TONE = {
+	active: 'success',
+	inactive: 'neutral',
+	sold: 'info'
+} satisfies Record<Enums<'property_status'>, BadgeTone>;
 
 export const PRODUCT_KIND_TONE = {
 	good: 'cyan',
