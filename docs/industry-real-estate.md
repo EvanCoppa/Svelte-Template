@@ -67,7 +67,7 @@ It fits better than it has any right to:
 | ----------------------- | -------------------------------------------------------------------- |
 | a name, a status        | `name`, `status` (`asset_status`)                                    |
 | what kind of thing      | `asset_type` — whose column comment names `'property'` as an example |
-| an address              | `addresses`, through the polymorphic entity link. Free, and geocoded |
+| an address ⚠️           | `addresses` exists, but is pinned to parties — see the cost below    |
 | purchase price, dates   | `purchase_price`, `acquired_on`, `disposed_on`                       |
 | an owner, a manager     | relationships (`owns`, `managed_by`, `responsible_for`) — the rule   |
 | units underneath it     | `part_of`, already `'asset' → 'asset'`                               |
@@ -79,6 +79,13 @@ And the "Shared" pseudo-unit in their data (mortgage, water, lawn) stops being a
 
 What it costs, honestly:
 
+- **A property cannot have an address today.** `addresses.entity_type` is checked
+  `in ('company', 'contact')` (`addresses_entity_is_party`), and the generic record page
+  gates the address card on `party ? listAddresses(…) : []`. So the polymorphic link is
+  there but this kind is not admitted to it: widening is one constraint swap in a migration
+  plus dropping that `party` gate — the `entity_images` migration's own comment says to
+  widen by replacing the constraint, never by dropping it. Small, but it is code, and the
+  map and geocoder hang off it, so a property with no address has no pin.
 - `bedrooms`, `bathrooms`, `square_feet`, `market_rent` become **custom fields**
   (`entity_type = 'asset'`), and `custom_field_definitions` is per-org working data — so a
   new org starts with none of them. **This is the same gap merchant-services hit with
@@ -415,6 +422,78 @@ And one this vertical adds alone: **views over a third source.** `views.source` 
 `in ('company', 'contact')`. A "Units" view, or "Vacant units", or "Leases expiring in 60
 days", all want `asset` and `lease` sources. Worth doing when a second vertical asks, not
 for this one.
+
+## Where the code line actually falls
+
+"No code" has a precise meaning in this repo: **no change under `src/`**. An industry is
+`industries` + `industry_features` + `roles` + `role_permissions` + `industry_terms` rows,
+and the nav, the ⌘K palette, the page titles, the gate, the record pages and the role picker
+all follow from them. Three tiers, and the boundaries are not where they look.
+
+### Tier 0 — pure data, zero `src/` change
+
+Ships as one migration, plus rows an owner/admin can type into the running app.
+
+| what                                          | how                                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| The industry and its whole feature map        | `industries` + `industry_features`, with this vertical's names and `sort_order`    |
+| Every rename                                  | `industry_features.name` / `.noun` — Properties, Tenants, Vendors, Maintenance     |
+| Every omission                                | the absence of a row — `hidden`, and the gate 404s it                              |
+| The six-rung role ladder, Accountant included | `roles` + `role_permissions` at `0008`                                             |
+| **Vendors as a nav entry**                    | the **already-shipped `suppliers` view**, renamed. No new view row at all.         |
+| Properties and units as records               | `assets` rows; `asset_type` is free text, so `'property'` / `'unit'` need nothing  |
+| Unit → property                               | a `part_of` relationship — the type is already shipped `'asset' → 'asset'`         |
+| Owner, manager, responsible party             | `owns`, `managed_by`, `responsible_for` — all shipped                              |
+| Maintenance request → the unit it is about    | a `related_to` relationship. Clunky, but real, and the Relationships card draws it |
+| Unit attributes (beds, baths, sqft, rent)     | custom fields on `entity_type = 'asset'` — no restriction to parties               |
+| **Photos of a property or unit**              | `entity_images` — its check constraint pins it to `'asset'`, which is exactly this |
+| An acquisitions pipeline with its stages      | `pipelines` + `pipeline_stages` are org rows, editable in the app                  |
+| Tenants, tasks, calendar, notes, assistant    | as they are                                                                        |
+
+That is a working property-and-tenant CRM with photos, a maintenance queue, a schedule and
+a role model, for one migration and no TypeScript. It is a real thing and it demos well.
+
+### Tier 1 — data plus one or two lines
+
+- **A new view** (`Vacant units`, `Expiring leases`) is a `views` + `features` + `pages` row
+  and **one line in `FEATURE_IDS`** (`src/lib/features/types.ts`). That is the whole `src/`
+  diff merchant-services needed. But note both examples want an `asset` / `lease` source and
+  `views.source` is checked `in ('company', 'contact')` — so the cheap views here are the
+  ones over companies and contacts, and those are largely already shipped.
+- **A `money` nav section** is one value in `features_category_check` and one entry in
+  `NAV_CATEGORIES`.
+
+### Tier 2 — genuinely needs code
+
+Everything that makes it an accounting system, and two smaller things that look free and
+are not:
+
+| what                              | why it is code                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Chart of accounts                 | new table + an industry-default trigger; no existing table carries `schedule_e_line`           |
+| Transactions                      | new table, new module, a `RECORD_FORMS` entry and an insert-switch `case`                      |
+| Leases                            | new table, new `crm_entity_type`, `crm_entity_exists()` branch, delete trigger, `RECORD_KINDS` |
+| Loans + payment splits            | two tables, a record kind, and a pure amortization fold                                        |
+| Schedule E pack, P&L, rent roll   | three new routes; the `insights` section is empty for a reason                                 |
+| Depreciation                      | a pure fold over capital transactions — small, but it is `src/`                                |
+| **A property's address**          | `addresses` is pinned to parties, and the record page gates the card on `party`                |
+| **Receipt photos on a spend row** | `entity_images` is pinned to `'asset'`; a transaction is not one                               |
+
+The last two are the instructive ones. `entity_images` accepts an asset and refuses
+everything else, and `addresses` accepts a party and refuses everything else — so **property
+photos are free and property addresses are not**, which is the opposite of what you would
+guess. Both are one-constraint widenings, both are named in their own migrations as the
+intended way to grow, and neither is zero.
+
+### The hack to refuse
+
+`purchases` is tempting: it has a vendor, a total, line items, and `'purchase'` is a
+`crm_entity_type`, so you could hang property / unit / category on it as custom fields and
+call it an expense ledger with no new table. Don't. It is a purchase order — `freight`,
+`distribution_fee_pct`, `expected_at`, `received_at`, a line-level receipt rollup and a
+generated `total` — and a $15.08 paint run at Home Depot would carry all of it. It also
+breaks the rule that a kind's fields are typed by how they render, not by what an org
+happened to define. The transactions table is fifty lines of SQL; the hack costs more.
 
 ## Recommendation on sequencing
 
