@@ -39,9 +39,10 @@
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
-	<Sidebar.Header>
-		<!-- One row: logo, workspace name, its dropdown chevron — and the sidebar's
-		     own collapse button, sitting where the switcher's chevrons used to. -->
+	<Sidebar.Header class="pt-4">
+		<!-- Extra top padding lines the workspace switcher and collapse button up
+		     with the main content's page title, which carries its own top padding
+		     from `.app-content` in the `(app)` layout. -->
 		<div class="flex items-center gap-1">
 			{#if activeOrg}
 				<div class="min-w-0 flex-1">
