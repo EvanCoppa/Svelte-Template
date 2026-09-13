@@ -48,7 +48,13 @@ type DealInsert = Pick<TablesInsert<'deals'>, Exclude<DealColumn, 'pipeline_id' 
 export async function listDeals(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { companyId?: string; contactId?: string; pipelineId?: string; stageId?: string } = {}
+	filter: {
+		companyId?: string;
+		contactId?: string;
+		pipelineId?: string;
+		stageId?: string;
+		ids?: readonly string[];
+	} = {}
 ): Promise<DealWithParties[]> {
 	let query = supabase
 		.from('deals')
@@ -61,6 +67,7 @@ export async function listDeals(
 	if (filter.contactId) query = query.eq('contact_id', filter.contactId);
 	if (filter.pipelineId) query = query.eq('pipeline_id', filter.pipelineId);
 	if (filter.stageId) query = query.eq('stage_id', filter.stageId);
+	if (filter.ids) query = query.in('id', [...filter.ids]);
 	return unwrap(await query);
 }
 

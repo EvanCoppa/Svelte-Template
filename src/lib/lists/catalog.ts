@@ -10,6 +10,7 @@ import {
 	PROPOSAL_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
+import type { TermId } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
 import type { FieldLabel, FieldType, FilterOption, ListKind } from './types';
 
@@ -56,6 +57,8 @@ const enumOf = (label: string, tones: Record<string, BadgeTone>): FieldMeta => (
 });
 /** A field naming another kind of record, labelled by that kind's word. */
 const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, type: 'record' });
+/** A member's name, labelled by a word that belongs to no feature (a proposal's presenter). */
+const person = (id: TermId): FieldMeta => ({ label: { term: id }, type: 'text' });
 
 /** A yes/no field's two values, as `cellText()` reads them. */
 export const BOOLEAN_OPTIONS: readonly FilterOption[] = [
@@ -154,10 +157,15 @@ export const LIST_FIELD_CATALOG = {
 	},
 	proposal: {
 		name: text('Title'),
+		// The record it hangs off — a company, a contact, or a deal — whichever
+		// it is (docs/proposals.md, "the record it hangs off"); an unattached
+		// draft reads blank.
+		contact: { label: { text: 'Contact' }, type: 'record' },
+		owner: person('proposal_responsible'),
+		presenter: person('proposal_presenter'),
 		status: enumOf('Status', PROPOSAL_STATUS_TONE),
-		options: { label: { text: 'Options' }, type: 'number' },
-		recommended: money('Recommended'),
-		valid_until: datetime('Valid until'),
+		// What a client actually chose; blank until `selected_option_id` is set.
+		value: money('Value'),
 		created_at: datetime('Created')
 	},
 	billable: {
