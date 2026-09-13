@@ -82,7 +82,7 @@
 >
 	<div
 		class={[
-			'aura pointer-events-none absolute top-1/2 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-700 motion-reduce:transition-none',
+			'aura pointer-events-none absolute top-1/3 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-700 motion-reduce:transition-none',
 			started ? 'opacity-0' : 'opacity-100'
 		]}
 		aria-hidden="true"
@@ -92,8 +92,10 @@
 
 <style>
 	/* A small, faint pool of the brand colour behind the opening question —
-	   not a wash across the screen. `color-mix` keeps it on the theme's own
-	   primary, so it reads the same on a dark ground. */
+	   not a wash across the screen, and centred on the composer's own resting
+	   place rather than the panel's, or it reads as a stray blob below it.
+	   `color-mix` keeps it on the theme's own primary, so it reads the same on
+	   a dark ground. */
 	.aura {
 		width: min(46vw, 460px);
 		height: min(40vh, 340px);

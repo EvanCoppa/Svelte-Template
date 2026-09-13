@@ -201,7 +201,7 @@
 						/>
 
 						{#if !started}
-							<div class="fade-in-up flex flex-wrap justify-center gap-2">
+							<div class="fade-in-up mt-6 flex flex-wrap justify-center gap-2">
 								{#each SUGGESTIONS as suggestion (suggestion)}
 									<Button
 										variant="outline"
