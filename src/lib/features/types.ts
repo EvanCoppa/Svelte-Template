@@ -40,6 +40,7 @@ export const FEATURE_IDS = [
 	'suppliers',
 	'partner-contacts',
 	'patient-map',
+	'homeowner-map',
 	'merchant-map',
 	'prospects',
 	'referral-partners'
