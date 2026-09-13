@@ -30,30 +30,35 @@ A list is keyed by **the feature that owns its page**: a kind's own feature
 need nothing different — and `views.columns` is gone: a view's columns are its
 `list_fields` rows, so a column is declared in exactly one place.
 
-`field` is one of two things:
+`field` is a key from the kind's entry in `LIST_FIELD_CATALOG`
+(`src/lib/lists/catalog.ts`) — a **built-in column**, which is what the catalog says each
+key renders as and, for an enum, the values a filter offers. Three flags, one meaning
+each: `shown` is a column on the table (a hidden field still searches and filters, and
+the reader can switch it on from `ViewOptions`); `searchable` puts it under the search
+box; `filterable` gives it a multi-select in the toolbar. `sort_order` is multiples of
+100 restarting at 100 per list, the `nav_sort_order` convention, so an industry slots a
+field between two others without renumbering. `name` is every list's first column and
+the link into the record whatever the rows say.
 
-- **a catalog key** — `status`, `city`, `company` — from the kind's entry in
-  `LIST_FIELD_CATALOG` (`src/lib/lists/catalog.ts`), which says what each key renders
-  as and, for an enum, the values a filter offers.
-- **`custom:<key>`** — a custom field definition of the kind, named by its `key`.
-  Definitions are an org's rows (`custom_field_definitions`), so an industry names
-  them by key: every org in the industry that has declared the field gets the column,
-  and one that has not simply does not (the resolver drops the row, never errors).
+## Custom fields: the industry ships them, and each one says how it sits
 
-**Extra custom fields.** A custom field the org declared that no row names is still
-part of the kind's list — appended after the listed fields, in label order, neither
-searched nor filtered — and the definition's own `is_default_shown` flag
-(`custom_field_default_shown` migration) says whether it starts as a visible column
-or waits behind the table's View menu. An org therefore puts a field on its own table
-with no migration at all; a row naming the field wins over the flag.
+A custom field is never named in `list_fields`. Instead (`industry_custom_fields`
+migration):
 
-Four flags, one meaning each: `shown` is a column on the table (a hidden field still
-searches and filters, and the reader can switch it on from `ViewOptions`);
-`searchable` puts it under the search box; `filterable` gives it a multi-select in the
-toolbar; `sort_order` is multiples of 100 restarting at 100 per list, the
-`nav_sort_order` convention, so an industry slots a field between two others without
-renumbering. `name` is every list's first column and the link into the record whatever
-the rows say.
+| table                      | one row means                                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `industry_custom_fields`   | a field an industry ships for a kind of record — key, label, type, choices — and how it sits on the kind's list              |
+| `custom_field_definitions` | the org's fields, as before, now each carrying the same three list flags: `list_shown`, `list_searchable`, `list_filterable` |
+
+Every org in an industry gets the industry's fields as its own definitions — copied by
+trigger when the org is created (and when its industry changes), and by backfill for the
+orgs that already exist — and the org adds its own on top, or renames and re-flags a
+shipped one. The copy is a starting point, not a link: a later change to a template
+reaches new orgs only. **Every custom field of the kind is a column of its list**, drawn
+after the built-ins in label order; the flags say whether it starts shown, whether the
+search box scans it, and whether it gets a filter. A filter needs values to pick from,
+so only a text, select or boolean field can be one — a check constraint refuses the flag
+on a numeric field, and the resolver reads it as off regardless.
 
 ## Resolution
 
@@ -63,18 +68,20 @@ the rows say.
 1. the list's default rows, then the active industry's rows applied over them, null
    inheriting column by column — an added row's nulls read as a default row would
    (shown, not searched, not filtered, last);
-2. each row becomes a `ListField`: a catalog key takes its type, label and options from
-   the catalog; a `custom:<key>` takes them from the org's definition (`text` → text,
-   `numeric` → number, `boolean` → yes/no, `select` → an enum of its allowed values),
-   and is dropped when the org has no such definition;
-3. `name` is forced first and shown.
+2. each row becomes a built-in `ListField`, taking its type, label and options from the
+   catalog; `name` is forced first and shown;
+3. every custom field of the kind follows, as a `ListField` from its definition (`text`
+   → text, `numeric` → number, `boolean` → yes/no, `select` → an enum of its allowed
+   values), flagged as the definition says, its column id `custom:<key>` so a custom
+   `status` never collides with the built-in one.
 
 What the database cannot check is checked here and **throws with the list's id**: a key
-the catalog does not have, a filter on a field that cannot be one. A filter is a
-multi-select of values, so only a `text`, `enum`, `boolean`, `record` or `payment`
+the catalog does not have, a filter on a built-in field that cannot be one. A filter is
+a multi-select of values, so only a `text`, `enum`, `boolean`, `record` or `payment`
 field can be filtered (`FILTERABLE_TYPES`); an amount or a date cannot. A throw is a
 migration that shipped a bad row, and a 500 is the right answer to that, the way
-`resolveView()` refuses a bad filter.
+`resolveView()` refuses a bad filter. A custom field's flags are an org's data and never
+a 500.
 
 ## The page never learns the source
 
@@ -141,34 +148,34 @@ goes in the URL.
 
 ## The industries that are not the default
 
-Two ship today, both in the `list_fields` migration:
+Two ship today:
 
-| industry            | list      | what the rows say                                                                                                                               |
-| ------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `merchant-services` | companies | `custom:mid` shown and searchable; `custom:mcc` and `custom:current_processor` filterable; `custom:average_ticket` shown; `relationship` hidden |
-| `beverage`          | assets    | `custom:location` filterable and `custom:serial_number` searchable, between the name and the status; `purchase_price` hidden                    |
+| industry            | custom fields (`industry_custom_fields`)                                                                     | built-in say (`industry_list_fields`) |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `merchant-services` | on companies: MID (shown, searchable), MCC and current processor (shown, filterable), average ticket (shown) | `relationship` hidden                 |
+| `beverage`          | on assets: location (shown, filterable — a select of routes), serial number (shown, searchable)              | `purchase_price` hidden               |
 
-The seed declares the matching custom fields for the fixture orgs (Keystone Payments,
-Cobalt Merchant Services, Marigold Beverage Co), so both lists show their columns after
-a reset. An org in either industry that never declared the field sees the default
-columns and nothing else.
+The seed relies on the trigger: the fixture orgs (Keystone Payments, Cobalt Merchant
+Services, Marigold Beverage Co) receive the definitions when they are inserted, and the
+seeded values look each field up by key. Acme's own "Preferred channel" contact field is
+flagged shown and filterable, the worked example of an org's field with no industry
+behind it.
 
 ## Adding a field, after this
 
 - **A built-in column on a list**: make sure the kind's catalog entry has the key and
   `describeListRows()` fills it, then insert its `list_fields` row. A key with no
   describer branch is a `check` error, not a blank column.
-- **A custom field on an industry's list**: no code — insert an `industry_list_fields`
-  row naming `custom:<key>`. Every org in that industry that has declared the field
-  sees it.
-- **An org's own custom field on its own list**: nothing at all — every declared field
-  is already a column; set `is_default_shown` on the definition to have it start
-  visible.
-- **An industry that wants a default column hidden, searchable, or renamed**: one
+- **An industry that wants a built-in column hidden, searchable, or renamed**: one
   `industry_list_fields` row setting only that column, the rest null.
+- **A custom field an industry ships**: one `industry_custom_fields` row with its three
+  flags, plus the migration's backfill loop for the orgs already in the industry. No
+  code.
+- **An org's own custom field**: a definition with its flags. Nothing else — every
+  declared field is already a column of its kind's list.
 - **A new kind of list**: add the kind to `LIST_KINDS`, its catalog entry, a branch in
   `listRecords()` and `describeListRows()`, and its default rows.
 
-Nothing is per org: an org that wants its own column set asks for a migration, like a
-feature's name. Per-org saved column sets are a later phase and would be a tenant table
-of the same shape, resolved after these.
+Nothing about the built-in columns is per org: an org that wants its own built-in
+column set asks for a migration, like a feature's name. Per-org saved column sets are a
+later phase and would be a tenant table of the same shape, resolved after these.

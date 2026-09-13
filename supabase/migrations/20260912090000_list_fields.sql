@@ -18,17 +18,13 @@
 --                           does for name / noun / sort_order, and a row
 --                           for a field the defaults do not list ADDS it
 --
--- A field is either a key from the kind's catalog (src/lib/lists/catalog.ts:
--- `status`, `city`, `company`) or `custom:<key>`, naming a custom field
--- definition of the kind by its key. The catalog says what each built-in key
--- renders as and whether it can be filtered; a custom field says the same
--- through its value_type (a select is filterable, a numeric is not). An
--- industry names custom fields by KEY rather than by definition id because
--- definitions are an org's rows: every org in the industry that has declared
--- the field gets the column, and one that has not simply does not — the
--- resolver (src/lib/lists/resolve.ts) drops the row, never errors.
+-- A field is a key from the kind's catalog (src/lib/lists/catalog.ts:
+-- `status`, `city`, `company`) — the built-in columns. An org's custom fields
+-- are columns of the list too, but they are not named here: a custom field
+-- definition carries its own list flags (the industry_custom_fields
+-- migration), and the industry ships the definitions themselves.
 --
--- Four booleans, one meaning each:
+-- Three booleans, one meaning each:
 --   shown        a column on the table (hidden fields still search / filter)
 --   searchable   the search box matches against it
 --   filterable   the toolbar offers a multi-select of its values
@@ -56,13 +52,13 @@ create table public.list_fields (
 	sort_order integer not null,
 	created_at timestamptz not null default now(),
 	primary key (feature_id, field),
-	constraint list_fields_field_is_key check (field ~ '^(custom:)?[a-z][a-z0-9_]*$'),
+	constraint list_fields_field_is_key check (field ~ '^[a-z][a-z0-9_]*$'),
 	constraint list_fields_label_not_blank check (label is null or length(trim(label)) > 0),
 	constraint list_fields_sort_order_positive check (sort_order > 0)
 );
 
 comment on table public.list_fields is
-	'The default fields of a list page, keyed by the feature that owns it: a catalog key or custom:<key>, whether it is shown as a column, searched by the search box, offered as a filter, and where it sits. Resolved per industry with industry_list_fields by src/lib/lists/resolve.ts. Reference data owned by migrations.';
+	'The default built-in fields of a list page, keyed by the feature that owns it: a catalog key, whether it is shown as a column, searched by the search box, offered as a filter, and where it sits. Resolved per industry with industry_list_fields by src/lib/lists/resolve.ts. Reference data owned by migrations.';
 
 create table public.industry_list_fields (
 	industry_id text not null references public.industries (id) on delete cascade,
@@ -78,7 +74,7 @@ create table public.industry_list_fields (
 	sort_order integer,
 	created_at timestamptz not null default now(),
 	primary key (industry_id, feature_id, field),
-	constraint industry_list_fields_field_is_key check (field ~ '^(custom:)?[a-z][a-z0-9_]*$'),
+	constraint industry_list_fields_field_is_key check (field ~ '^[a-z][a-z0-9_]*$'),
 	constraint industry_list_fields_label_not_blank check (label is null or length(trim(label)) > 0),
 	constraint industry_list_fields_sort_order_positive check (sort_order is null or sort_order > 0)
 );
@@ -221,23 +217,13 @@ comment on table public.views is
 -- ---------------------------------------------------------------------------
 -- The industries whose lists are not the default
 -- ---------------------------------------------------------------------------
--- Merchant services (the merchant_services_industry migration): a merchant is
--- known by its MID and sorted by its MCC, both custom fields on the company
--- (seeded for the two fixture orgs), so the book shows them right after the
--- name and offers the MCC and the processor being displaced as filters.
--- Between the name (100) and the relationship (200), no renumbering.
+-- Merchant services: the relationship is always `customer` in this book, so
+-- the column earns nothing. Beverage: assets are out in the field — a tap, a
+-- cooler, a keg — and what one cost matters less than where it is. (The
+-- custom columns those verticals add — MID, MCC, location, serial number —
+-- are the industry's custom fields, in the industry_custom_fields migration.)
 insert into public.industry_list_fields (industry_id, feature_id, field, shown, searchable, filterable, sort_order) values
-	('merchant-services', 'companies', 'custom:mid', true, true, false, 120),
-	('merchant-services', 'companies', 'custom:mcc', true, false, true, 140),
-	('merchant-services', 'companies', 'custom:current_processor', true, false, true, 160),
-	('merchant-services', 'companies', 'custom:average_ticket', true, false, false, 180),
-	-- The relationship is always `customer` in this book; the column earns nothing.
 	('merchant-services', 'companies', 'relationship', false, null, false, null),
-
-	-- Beverage: assets are out in the field — a tap, a cooler, a keg — so where
-	-- one is and what it is stamped with matter more than what it cost.
-	('beverage', 'assets', 'custom:location', true, false, true, 250),
-	('beverage', 'assets', 'custom:serial_number', true, true, false, 350),
 	('beverage', 'assets', 'purchase_price', false, null, null, null)
 on conflict (industry_id, feature_id, field) do nothing;
 
@@ -264,9 +250,9 @@ revoke insert, update on table public.industry_list_fields from authenticated;
 -- ---------------------------------------------------------------------------
 -- A built-in column: make sure the kind's catalog (src/lib/lists/catalog.ts)
 -- has the key and the describer (src/lib/server/crm/lists.ts) fills it, then
--- insert its list_fields row. A custom field: no code — insert an
--- industry_list_fields row naming `custom:<key>`, and every org in that
--- industry that has declared the field sees the column. An industry that
--- wants a built-in column hidden, or searchable, sets only that column on its
--- row and leaves the rest null to inherit. Nothing here is per org: an org
--- that wants its own column set asks for a migration, like a feature's name.
+-- insert its list_fields row. An industry that wants a built-in column
+-- hidden, or searchable, sets only that column on its row and leaves the
+-- rest null to inherit. A custom field is never named here: its definition
+-- says how it sits on the list (the industry_custom_fields migration).
+-- Nothing here is per org: an org that wants its own built-in column set asks
+-- for a migration, like a feature's name.

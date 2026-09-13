@@ -605,9 +605,11 @@ export type Database = {
           created_at: string
           entity_type: Database["public"]["Enums"]["crm_entity_type"]
           id: string
-          is_default_shown: boolean
           key: string
           label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
           org_id: string
           updated_at: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -617,9 +619,11 @@ export type Database = {
           created_at?: string
           entity_type: Database["public"]["Enums"]["crm_entity_type"]
           id?: string
-          is_default_shown?: boolean
           key: string
           label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id: string
           updated_at?: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -629,9 +633,11 @@ export type Database = {
           created_at?: string
           entity_type?: Database["public"]["Enums"]["crm_entity_type"]
           id?: string
-          is_default_shown?: boolean
           key?: string
           label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id?: string
           updated_at?: string
           value_type?: Database["public"]["Enums"]["custom_field_value_type"]
@@ -953,6 +959,53 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      industry_custom_fields: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id?: string
+          key?: string
+          label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type?: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_custom_fields_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       industry_features: {
         Row: {
@@ -3680,6 +3733,7 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      create_industry_custom_fields: { Args: { org: string }; Returns: undefined }
     }
     Enums: {
       activity_direction: "inbound" | "outbound"

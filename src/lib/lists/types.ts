@@ -10,10 +10,11 @@ import type { Enums } from '$lib/database.types';
  * column worth filtering. Which columns, which of them the box searches and
  * which get a filter are ROWS (`list_fields`, with an industry's own say in
  * `industry_list_fields` — the list_fields migration), resolved per industry
- * into a `ListSpec` by `resolve.ts` and drawn by `table.ts`. A field is a key
- * from the kind's catalog (`catalog.ts`) or `custom:<key>`, one of the org's
- * custom field definitions for the kind — so a distributor's Assets page
- * shows a serial number and filters by a location no code names.
+ * into a `ListSpec` by `resolve.ts` and drawn by `table.ts`. A built-in field
+ * is a key from the kind's catalog (`catalog.ts`); a custom field is one of
+ * the org's definitions for the kind, carrying its own list flags — so a
+ * distributor's Assets page shows a serial number and filters by a location
+ * no code names.
  *
  * Everything in this folder is client-safe: the page draws what the server
  * described (`$lib/server/crm/lists`) — rows of cells typed by how they
@@ -61,7 +62,7 @@ export type FilterOption = { value: string; label: string; tone?: BadgeTone };
 
 /** One field of a list, as the page draws it — a resolved `list_fields` row. */
 export type ListField = {
-	/** The catalog key, or `custom:<key>`; also the table column's id. */
+	/** The catalog key, or a custom field's column id (`customFieldColumnId()`). */
 	key: string;
 	label: FieldLabel;
 	type: FieldType;

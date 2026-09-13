@@ -15,7 +15,6 @@ import {
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
 import { BILLABLE_STATUS_TONE, isCatalogKey, type CatalogKey } from '$lib/lists/catalog';
-import { customFieldKey } from '$lib/lists/resolve';
 import type { ListCell, ListField, ListKind, ListRow, ListSpec } from '$lib/lists/types';
 import type { Address } from './addresses';
 import { listAssets, type Asset } from './assets';
@@ -400,9 +399,7 @@ function customValueReader(
 	return (recordId, field) => {
 		// SAFETY: only called for a field the resolver marked custom.
 		const custom = field.custom;
-		if (!custom || customFieldKey(field.key) === null) {
-			throw new Error(`${field.key} is not a custom field.`);
-		}
+		if (!custom) throw new Error(`${field.key} is not a custom field.`);
 		const value = byRecordAndField.get(`${recordId}:${custom.definitionId}`);
 		switch (custom.valueType) {
 			case 'text':

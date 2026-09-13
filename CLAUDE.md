@@ -246,13 +246,16 @@ application data is scoped to an organization, never to a bare user. The
   `list_fields` (the defaults, keyed by the feature that owns the page) and
   `industry_list_fields` (an industry's own say, null inheriting column by column
   exactly as `industry_features` does, and a row for a field the defaults do not
-  list adding it). A `field` is a key from the kind's catalog
-  (`LIST_FIELD_CATALOG`, which says what each renders as) or `custom:<key>`, one of
-  the org's custom field definitions named by key — so an industry puts a serial
-  number or a MID on a table and in the filters with no code, and an org that never
-  declared the field sees the defaults. A custom field no row names is still a
-  column of its kind's list, after the listed ones, and the definition's
-  `is_default_shown` says whether it starts visible or waits behind the View menu. `resolveList()` folds them into a `ListSpec`
+  list adding it) — the **built-in** columns, each a key from the kind's catalog
+  (`LIST_FIELD_CATALOG`, which says what each renders as). **Custom fields are
+  never named there: the industry ships them, and each one says how it sits**
+  (`industry_custom_fields` migration) — `industry_custom_fields` is what a
+  vertical's records carry (a beverage asset's location and serial number, a
+  merchant's MID and MCC), copied into every org in the industry as its own
+  `custom_field_definitions` by trigger on creation and by backfill, and every
+  definition — shipped or the org's own — carries `list_shown`,
+  `list_searchable`, `list_filterable`, so every custom field of a kind is a column
+  of its list, after the built-ins, drawn as its flags say. `resolveList()` folds them into a `ListSpec`
   (throwing with the list's id on a key the catalog lacks or a filter on an amount or
   a date — only text, enum, boolean, record and payment fields filter);
   `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);

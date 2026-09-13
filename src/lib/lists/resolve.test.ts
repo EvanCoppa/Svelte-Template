@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-	customFieldKey,
+	customFieldColumnId,
 	resolveList,
 	type CustomFieldSummary,
 	type IndustryListFieldRow,
@@ -52,48 +52,51 @@ const registry: ListRegistry = {
 		row('companies', 'name', 100, { searchable: true })
 	],
 	industries: [
-		industryRow('beverage', 'assets', 'custom:location', {
-			shown: true,
-			filterable: true,
-			sort_order: 250
-		}),
-		industryRow('beverage', 'assets', 'custom:serial_number', {
-			searchable: true,
-			sort_order: 350
-		}),
 		industryRow('beverage', 'assets', 'purchase_price', { shown: false }),
 		industryRow('beverage', 'assets', 'identifier', { label: 'Tag' }),
+		industryRow('beverage', 'assets', 'disposed_on', { sort_order: 650 }),
 		industryRow('dentistry', 'assets', 'status', { shown: false })
 	]
 };
 
-const location: CustomFieldSummary = {
+const definition = (
+	overrides: Partial<CustomFieldSummary> & Pick<CustomFieldSummary, 'id' | 'key' | 'label'>
+): CustomFieldSummary => ({
+	value_type: 'text',
+	allowed_values: null,
+	list_shown: false,
+	list_searchable: false,
+	list_filterable: false,
+	...overrides
+});
+
+const location = definition({
 	id: 'd1',
 	key: 'location',
 	label: 'Location',
 	value_type: 'select',
 	allowed_values: ['Warehouse', 'Route 1'],
-	is_default_shown: false
-};
-const serial: CustomFieldSummary = {
+	list_shown: true,
+	list_filterable: true
+});
+const serial = definition({
 	id: 'd2',
 	key: 'serial_number',
 	label: 'Serial number',
-	value_type: 'text',
-	allowed_values: null,
-	is_default_shown: false
-};
-const calibrated: CustomFieldSummary = {
+	list_shown: true,
+	list_searchable: true
+});
+const hours = definition({
 	id: 'd3',
-	key: 'calibrated',
-	label: 'Calibrated',
-	value_type: 'boolean',
-	allowed_values: null,
-	is_default_shown: true
-};
+	key: 'hours',
+	label: 'Hours',
+	value_type: 'numeric',
+	// Not filterable: the database refuses it, and the resolver reads it as false regardless.
+	list_filterable: true
+});
 
 describe('resolveList', () => {
-	it('orders the defaults, names each field from the catalog and keeps its flags', () => {
+	it('orders the built-in defaults, names each from the catalog and keeps its flags', () => {
 		const spec = resolveList('asset', 'assets', registry, 'crm', []);
 		expect(spec.kind).toBe('asset');
 		expect(spec.fields.map((field) => field.key)).toEqual([
@@ -116,22 +119,36 @@ describe('resolveList', () => {
 		});
 	});
 
-	it('applies the industry’s say column by column and adds its custom fields', () => {
-		const spec = resolveList('asset', 'assets', registry, 'beverage', [location, serial]);
+	it('applies the industry’s say on built-in columns, column by column', () => {
+		const spec = resolveList('asset', 'assets', registry, 'beverage', []);
 		expect(spec.fields.map((field) => field.key)).toEqual([
 			'name',
-			'custom:location',
 			'identifier',
-			'custom:serial_number',
 			'purchase_price',
-			'status'
+			'status',
+			'disposed_on'
 		]);
 		// Renamed, everything else inherited.
-		expect(spec.fields[2]).toMatchObject({ label: { text: 'Tag' }, searchable: true, shown: true });
+		expect(spec.fields[1]).toMatchObject({ label: { text: 'Tag' }, searchable: true, shown: true });
 		// Hidden, everything else inherited.
-		expect(spec.fields[4]).toMatchObject({ key: 'purchase_price', shown: false, type: 'money' });
+		expect(spec.fields[2]).toMatchObject({ key: 'purchase_price', shown: false, type: 'money' });
+		// Added by the industry: shown, the rest as a default row would be.
+		expect(spec.fields[4]).toMatchObject({ shown: true, searchable: false, filterable: false });
+	});
+
+	it('appends every custom field after the built-ins, each as its own flags say', () => {
+		const spec = resolveList('asset', 'assets', registry, 'crm', [hours, location, serial]);
+		expect(spec.fields.map((field) => field.key)).toEqual([
+			'name',
+			'identifier',
+			'purchase_price',
+			'status',
+			'custom:hours',
+			'custom:location',
+			'custom:serial_number'
+		]);
 		// A select field is an enum of its allowed values, plain.
-		expect(spec.fields[1]).toEqual({
+		expect(spec.fields[5]).toEqual({
 			key: 'custom:location',
 			label: { text: 'Location' },
 			type: 'enum',
@@ -144,51 +161,15 @@ describe('resolveList', () => {
 			filterable: true,
 			custom: { definitionId: 'd1', valueType: 'select' }
 		});
-		// An added row's nulls read as a default row would: shown, not filterable.
-		expect(spec.fields[3]).toMatchObject({
+		expect(spec.fields[6]).toMatchObject({
 			type: 'text',
 			shown: true,
 			searchable: true,
 			filterable: false,
 			custom: { definitionId: 'd2', valueType: 'text' }
 		});
-	});
-
-	it('appends the org’s own custom fields no row names, shown only when the definition says so', () => {
-		const spec = resolveList('asset', 'assets', registry, 'crm', [serial, calibrated]);
-		expect(spec.fields.map((field) => field.key)).toEqual([
-			'name',
-			'identifier',
-			'purchase_price',
-			'status',
-			'custom:serial_number',
-			'custom:calibrated'
-		]);
-		expect(spec.fields[4]).toMatchObject({
-			shown: false,
-			searchable: false,
-			filterable: false,
-			custom: { definitionId: 'd2', valueType: 'text' }
-		});
-		expect(spec.fields[5]).toMatchObject({
-			label: { text: 'Calibrated' },
-			type: 'boolean',
-			shown: true
-		});
-
-		// A row naming the field wins over the flag: beverage lists serial_number as searchable.
-		const listed = resolveList('asset', 'assets', registry, 'beverage', [serial]);
-		expect(listed.fields.filter((field) => field.key === 'custom:serial_number')).toHaveLength(1);
-		expect(listed.fields.find((field) => field.key === 'custom:serial_number')).toMatchObject({
-			shown: true,
-			searchable: true
-		});
-	});
-
-	it('drops a custom field the org has not declared, without a word', () => {
-		const spec = resolveList('asset', 'assets', registry, 'beverage', [serial]);
-		expect(spec.fields.map((field) => field.key)).not.toContain('custom:location');
-		expect(spec.fields.map((field) => field.key)).toContain('custom:serial_number');
+		// A numeric field has no values to pick from, so it is never a filter.
+		expect(spec.fields[4]).toMatchObject({ type: 'number', shown: false, filterable: false });
 	});
 
 	it('leads with the name column even when the rows forgot it or hid it', () => {
@@ -248,9 +229,8 @@ describe('resolveList', () => {
 	});
 });
 
-describe('customFieldKey', () => {
-	it('reads the key off a custom field and nothing off a catalog key', () => {
-		expect(customFieldKey('custom:serial_number')).toBe('serial_number');
-		expect(customFieldKey('status')).toBeNull();
+describe('customFieldColumnId', () => {
+	it('keeps a custom field’s column apart from a built-in of the same key', () => {
+		expect(customFieldColumnId('status')).toBe('custom:status');
 	});
 });

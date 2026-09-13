@@ -486,7 +486,9 @@ describe('describing a record', () => {
 			label: 'Preferred channel',
 			value_type,
 			allowed_values: ['email', 'phone'],
-			is_default_shown: false,
+			list_shown: false,
+			list_searchable: false,
+			list_filterable: false,
 			created_at: STAMPS.created_at,
 			updated_at: STAMPS.updated_at
 		});
