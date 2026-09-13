@@ -29,7 +29,7 @@ import { createAsset, getAsset, updateAsset } from './crm/assets';
 import { createBillable, getBillable, updateBillable } from './crm/billables';
 import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
 import { createContact, getContact, listContacts, updateContact } from './crm/contacts';
-import { createDeal, getDeal, updateDeal } from './crm/deals';
+import { createDeal, dealPlacement, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
 import { listPipelines } from './crm/pipelines';
 import { createProduct, getProduct, updateProduct } from './crm/products';
@@ -144,27 +144,6 @@ async function pickerOptions(
 				}))
 			);
 	}
-}
-
-/**
- * The board a stage belongs to, as the pair `deals` stores. A stage only
- * means something inside its own pipeline, so the two ids always move
- * together — and looking the pair up here is also what proves the stage is
- * this org's: `listPipelines` reads through RLS, so a forged id simply is not
- * in the list.
- */
-async function placementFor(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	stageId: string
-): Promise<{ pipeline_id: string; stage_id: string }> {
-	const boards = await listPipelines(supabase, orgId);
-	for (const board of boards) {
-		if (board.pipeline_stages.some((stage) => stage.id === stageId)) {
-			return { pipeline_id: board.id, stage_id: stageId };
-		}
-	}
-	throw new Error('That stage is not on any board in this organization.');
 }
 
 /** The `create` action every list page delegates to. */
@@ -458,7 +437,7 @@ async function writeRecord(
 			// where it is — a stage is the one field the form cannot clear,
 			// because every deal is somewhere.
 			const placement =
-				data.stage_id === '' ? null : await placementFor(supabase, orgId, data.stage_id);
+				data.stage_id === '' ? null : await dealPlacement(supabase, orgId, data.stage_id);
 			if (id) {
 				await updateDeal(supabase, orgId, id, placement ? { ...columns, ...placement } : columns);
 			} else if (placement) {
