@@ -3,6 +3,7 @@ import * as DataTable from '$lib/components/data-table/index.js';
 import { localDate } from '$lib/crm/ledger';
 import { RECORD_KIND_META } from '$lib/crm/records';
 import type { TermsMap } from '$lib/features/terms';
+import { term, type Vocabulary } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
 import { cellSortValue, paymentTone, paymentWord } from './cells';
 import type { FieldLabel, ListCell, ListField, ListRow, ListSpec } from './types';
@@ -21,6 +22,9 @@ import type { FieldLabel, ListCell, ListField, ListRow, ListSpec } from './types
  *
  *   const table = createListTable(() => data.list, () => page.data.terms);
  *   <DataTable.Root {table}> <DataTable.Toolbar> … <DataTable.Content /> …
+ *
+ * A list with a field labelled by the vocabulary (a proposal's presenter,
+ * its owner) passes a third getter: `() => page.data.vocabulary`.
  */
 
 // Fixed locale on purpose: the server render and the hydrated render must
@@ -34,14 +38,20 @@ const money = (value: number, currency: string) =>
 	new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
 
 /**
- * A column's heading: its text, or the word for the kind it names as the
- * org's industry says it — read from the terms the layout shipped. A kind
- * whose feature is off for this org has no terms; its column is still a
- * column (a contact's company is a fact whether or not Companies is on),
- * so it falls back to the kind's own name rather than throwing.
+ * A column's heading: its text, the word for the kind it names as the org's
+ * industry says it (read from the terms the layout shipped — a kind whose
+ * feature is off for this org has no terms, so it falls back to the kind's
+ * own name rather than throwing), or a word that belongs to no feature (who
+ * presents a proposal, who is responsible for it), read from the vocabulary
+ * the layout ships unconditionally.
  */
-export function fieldLabel(label: FieldLabel, terms: TermsMap | undefined): string {
+export function fieldLabel(
+	label: FieldLabel,
+	terms: TermsMap | undefined,
+	vocabulary: Vocabulary | undefined
+): string {
 	if ('text' in label) return label.text;
+	if ('term' in label) return term(vocabulary, label.term);
 	const noun = terms?.[RECORD_KIND_META[label.kind].feature]?.noun;
 	return capitalize(noun ?? label.kind);
 }
@@ -82,12 +92,17 @@ function sortFn(field: ListField): 'basic' | 'text' {
 	return field.type === 'number' || field.type === 'money' ? 'basic' : 'text';
 }
 
-export function listColumns(spec: ListSpec, terms: TermsMap | undefined, today: string) {
+export function listColumns(
+	spec: ListSpec,
+	terms: TermsMap | undefined,
+	vocabulary: Vocabulary | undefined,
+	today: string
+) {
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, ListRow>();
 	return columnHelper.columns([
 		DataTable.selectColumn(columnHelper),
 		...spec.fields.map((field, index) => {
-			const title = fieldLabel(field.label, terms);
+			const title = fieldLabel(field.label, terms, vocabulary);
 			return columnHelper.accessor(
 				(row) => {
 					const cell = row.cells[index];
@@ -106,7 +121,13 @@ export function listColumns(spec: ListSpec, terms: TermsMap | undefined, today: 
 					enableGlobalFilter: field.searchable,
 					enableColumnFilter: field.filterable,
 					filterFn: 'oneOf',
-					meta: { title, filter: field.filterable ? { options: field.options } : null }
+					meta: {
+						title,
+						filter: field.filterable ? { options: field.options } : null,
+						// Companies carry more columns than most lists; a name rarely
+						// needs the room a full-width column gives it.
+						class: spec.kind === 'company' && field.key === 'name' ? 'max-w-48 truncate' : undefined
+					}
 				}
 			);
 		})
@@ -122,7 +143,10 @@ export function listColumns(spec: ListSpec, terms: TermsMap | undefined, today: 
  */
 export function createListTable(
 	list: () => { spec: ListSpec; rows: ListRow[] },
-	terms: () => TermsMap | undefined
+	terms: () => TermsMap | undefined,
+	// Only a proposals-shaped list has a term-labelled column today; every
+	// other page's call site leaves this out.
+	vocabulary: () => Vocabulary | undefined = () => undefined
 ) {
 	// "Overdue" is decided by the viewer's own date, once per page.
 	const today = localDate(new Date());
@@ -137,7 +161,7 @@ export function createListTable(
 			return list().rows;
 		},
 		get columns() {
-			return listColumns(list().spec, terms(), today);
+			return listColumns(list().spec, terms(), vocabulary(), today);
 		},
 		initialState: { columnVisibility: hidden },
 		globalFilterFn: 'includesString',

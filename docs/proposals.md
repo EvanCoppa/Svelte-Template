@@ -92,6 +92,11 @@ Adding a genuinely new parent kind (a new table) is one enum value plus one `whe
 branch in `private.proposal_entity_exists()` and one detach trigger — still never a
 column.
 
+This link, along with `presenter_id` and `responsible_id` below, also draws as an
+edge on `/graph` — computed at read time from these columns, never written as a
+`relationships` row. See docs/relationships.md, "The graph page," for why; don't
+"fix" the gap by adding real rows for them.
+
 ## Rule 3 — enforce values at the right layer
 
 Three kinds of value, three enforcement points. Put a rule at the wrong tier and it

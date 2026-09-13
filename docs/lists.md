@@ -11,7 +11,7 @@ leads with each merchant's MID and is filtered by its MCC. Neither column exists
 **rows**, resolved per industry exactly as a feature's name and its sidebar position
 are.
 
-The `list_fields` migration (`supabase/migrations/20260912090002_list_fields.sql`) is
+The `list_fields` migration (`supabase/migrations/20260912090000_list_fields.sql`) is
 the implementation; the client side is `src/lib/lists/`, the server side is
 `src/lib/server/crm/lists.ts` + `src/lib/server/lists.ts`, and the chrome is
 `DataTable.Toolbar` / `Search` / `Filters` in `src/lib/components/data-table/`.

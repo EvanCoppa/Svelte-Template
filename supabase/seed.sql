@@ -311,12 +311,13 @@ insert into public.deals (id, org_id, contact_id, title, amount, assigned_to, cr
 		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
--- Tasks across the priority ladder and the board's four columns, with the
+-- Tasks across the priority ladder and every column of the board, with the
 -- due dates spread so the grouped list has a row in every bucket: one
 -- overdue, one due today, two this week, one later, one with no date at all
 -- and one already finished. `status` and `completed_at` are held in step by
 -- trigger (the task board migration), so the done row's two agree rather than
--- one correcting the other.
+-- one correcting the other — and the in-review row is the case that keeps
+-- them honest: finished work with no finishing time, because it can come back.
 insert into public.tasks (id, org_id, company_id, title, details, due_at, priority, status, completed_at, created_by) values
 	('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
 		'20000000-0000-0000-0000-000000000001', 'Send renewal quote',
@@ -345,7 +346,12 @@ insert into public.tasks (id, org_id, company_id, title, details, due_at, priori
 		'normal', 'todo', null, '00000000-0000-0000-0000-000000000001'),
 	('50000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
 		null, 'Tidy the proposal templates', null, null,
-		'low', 'todo', null, '00000000-0000-0000-0000-000000000001')
+		'low', 'todo', null, '00000000-0000-0000-0000-000000000001'),
+	-- Out of the doer's hands and waiting on a reader: the In review column.
+	('50000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', 'Draft the renewal terms',
+		'With Evan for a read before it goes out.', now() + interval '4 days',
+		'high', 'in_review', null, '00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
 -- Assignment is a relationship now, so a task can name more than one person:

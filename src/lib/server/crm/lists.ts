@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
-import { recommendedOption } from '$lib/crm/proposals';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	ASSET_STATUS_TONE,
@@ -25,8 +24,8 @@ import type { CustomFieldValue } from './custom-fields';
 import { listDeals, type DealWithParties } from './deals';
 import { listInvoices, type InvoiceWithParties } from './invoices';
 import { listProducts, type ProductWithCategory } from './products';
-import { listProposals, type ProposalWithOptions } from './proposals';
-import type { CanOpen } from './records';
+import { listProposals, proposalParentKind, type ProposalWithOptions } from './proposals';
+import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
 
 /**
@@ -92,20 +91,34 @@ export function resultIds(result: ListResult): string[] {
 /**
  * What the describer needs beyond the rows, and only when the spec asks:
  * the records' addresses for a `city` field, their custom values for a
- * custom field. The load reads exactly these.
+ * custom field, a proposal's parent records for its `contact` field, and
+ * the display names behind a proposal's `owner` / `presenter` ids. The load
+ * reads exactly these.
  */
-export type ListNeeds = { addresses: boolean; customValues: boolean };
+export type ListNeeds = {
+	addresses: boolean;
+	customValues: boolean;
+	proposalParents: boolean;
+	memberNames: boolean;
+};
 
 export function listNeeds(spec: ListSpec): ListNeeds {
 	return {
 		addresses: spec.fields.some((field) => field.key === 'city'),
-		customValues: spec.fields.some((field) => field.custom !== null)
+		customValues: spec.fields.some((field) => field.custom !== null),
+		proposalParents:
+			spec.kind === 'proposal' && spec.fields.some((field) => field.key === 'contact'),
+		memberNames:
+			spec.kind === 'proposal' &&
+			spec.fields.some((field) => field.key === 'owner' || field.key === 'presenter')
 	};
 }
 
 export type ListExtras = {
 	addresses: readonly Address[];
 	customValues: readonly CustomFieldValue[];
+	proposalParents: ReadonlyMap<string, ProposalParent>;
+	memberNames: ReadonlyMap<string, string>;
 };
 
 /** The first address listed for each record — the primary one, the way `listAddressesFor()` orders them. */
@@ -156,6 +169,17 @@ export function describeListRows(
 		tone
 	});
 	const custom = customValueReader(extras.customValues);
+	// The record a proposal hangs off — whichever kind — read from the batch
+	// `resolveProposalParents()` fetched; blank for an unattached draft.
+	const proposalParent = (
+		row: Pick<ProposalWithOptions, 'entity_type' | 'entity_id'>
+	): ProposalParent | null => {
+		const kind = proposalParentKind(row.entity_type);
+		if (kind === null || row.entity_id === null) return null;
+		return extras.proposalParents.get(proposalParentKey(kind, row.entity_id)) ?? null;
+	};
+	const memberName = (userId: string | null): string | undefined =>
+		userId ? extras.memberNames.get(userId) : undefined;
 
 	// Each kind's cell for one of its catalog keys. The switch is on the
 	// result and the spec together: a spec of companies can only ever have
@@ -343,18 +367,28 @@ export function describeListRows(
 				switch (key) {
 					case 'name':
 						return link('proposal', proposal.id, proposal.title);
+					case 'contact': {
+						const parent = proposalParent(proposal);
+						return {
+							type: 'record',
+							text: parent?.name ?? '',
+							href: parent && canOpen(parent.kind) ? recordHref(parent.kind, parent.id) : null
+						};
+					}
+					case 'owner':
+						return text(memberName(proposal.responsible_id));
+					case 'presenter':
+						return text(memberName(proposal.presenter_id));
 					case 'status':
 						return status(proposal.status, PROPOSAL_STATUS_TONE[proposal.status]);
-					case 'options':
-						return number(proposal.proposal_options.length);
-					case 'recommended': {
-						// The figure a client is steered to; a proposal with no
-						// recommended option (or one not yet priced) shows nothing.
-						const option = recommendedOption(proposal.proposal_options);
-						return money(option?.computed_total ?? null, option?.currency ?? 'USD');
+					case 'value': {
+						// What a client actually chose; blank until they have (a draft
+						// or sent proposal has no `selected_option_id` yet).
+						const selected = proposal.proposal_options.find(
+							(option) => option.id === proposal.selected_option_id
+						);
+						return money(selected?.computed_total ?? null, selected?.currency ?? 'USD');
 					}
-					case 'valid_until':
-						return datetime(proposal.valid_until);
 					case 'created_at':
 						return datetime(proposal.created_at);
 				}

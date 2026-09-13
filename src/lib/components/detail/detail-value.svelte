@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import type { FieldValue } from '$lib/server/crm/records';
 
 	/**
@@ -60,11 +61,13 @@
 		{value.value}
 	</a>
 {:else if value.type === 'record'}
-	{#if value.href}
-		<a href={value.href} class="font-medium underline-offset-4 hover:underline">{value.value}</a>
-	{:else}
+	<!-- Another record, and a member, wear a chip: a value that names something
+	     with a page of its own reads as a thing, not as a sentence. -->
+	<Badge variant="secondary" href={value.href ?? undefined} class="max-w-full truncate">
 		{value.value}
-	{/if}
+	</Badge>
 {:else if value.type === 'person'}
-	{people.get(value.userId) ?? 'Former member'}
+	<Badge variant="secondary" class="max-w-full truncate">
+		{people.get(value.userId) ?? 'Former member'}
+	</Badge>
 {/if}

@@ -27,6 +27,8 @@ import type { FilterOption } from '$lib/lists/types';
 export type DataTableColumnMeta = {
 	title?: string;
 	filter?: { options: readonly FilterOption[] | null } | null;
+	/** Extra classes for the column's header and cells — a narrower name column, say. */
+	class?: string;
 };
 
 /** What a filterable column's accessor reads: a cell's text, or nothing. */

@@ -2030,6 +2030,35 @@
 
 		<Card.Root class="lg:col-span-2">
 			<Card.Header>
+				<Card.Title>Tabs — underline</Card.Title>
+				<Card.Description>
+					<code>variant="underline"</code> on <code>Tabs.Root</code>: a full-width strip on a
+					hairline, for a screen whose tabs are its own navigation rather than a control inside a
+					card. The record page is the worked example.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Tabs.Root value="overview" variant="underline">
+					<Tabs.List>
+						<Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+						<Tabs.Trigger value="activity">Activity</Tabs.Trigger>
+						<Tabs.Trigger value="files">Files</Tabs.Trigger>
+					</Tabs.List>
+					<Tabs.Content value="overview" class="text-muted-foreground pt-3 text-sm">
+						The active tab is marked by the rule under it.
+					</Tabs.Content>
+					<Tabs.Content value="activity" class="text-muted-foreground pt-3 text-sm">
+						Nothing happened, which is its own kind of news.
+					</Tabs.Content>
+					<Tabs.Content value="files" class="text-muted-foreground pt-3 text-sm">
+						Three spreadsheets and a photo of a whiteboard.
+					</Tabs.Content>
+				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
 				<Card.Title>Tabs</Card.Title>
 				<Card.Description>Switch between related views without navigation.</Card.Description>
 			</Card.Header>
