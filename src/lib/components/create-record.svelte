@@ -33,8 +33,9 @@
 	 *
 	 * `type` is fixed for the lifetime of the component: a page creates one kind
 	 * of record, and superForm is wired once at init. A form that points the
-	 * record at a party (an invoice's customer) or at a stage (a deal's) gets
-	 * the org's rows for each picker from the same load (`createPickers`).
+	 * record at another row (an invoice's customer, a deal's stage, a lease's
+	 * property) gets the org's rows for each picker from the same load
+	 * (`createPickers`).
 	 *
 	 * `EditRecord` is the same form with a different frame; the inputs
 	 * themselves are `RecordFields`, once, for both.

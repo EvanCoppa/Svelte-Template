@@ -1331,6 +1331,89 @@ export type Database = {
           },
         ]
       }
+      leases: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          ends_on: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day: number
+          security_deposit: number | null
+          starts_on: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          property_id?: string
+          rent_amount?: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leases_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leases_property_id_org_id_fkey"
+            columns: ["property_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       list_fields: {
         Row: {
           created_at: string
@@ -2264,6 +2347,87 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      properties: {
+        Row: {
+          acquired_on: string | null
+          bathrooms: number | null
+          bedrooms: number | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          disposed_on: string | null
+          id: string
+          identifier: string | null
+          market_rent: number | null
+          name: string
+          org_id: string
+          parent_id: string | null
+          property_type: string | null
+          purchase_price: number | null
+          square_feet: number | null
+          status: Database["public"]["Enums"]["property_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name: string
+          org_id: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name?: string
+          org_id?: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_parent_id_org_id_fkey"
+            columns: ["parent_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
       }
       proposal_events: {
         Row: {
@@ -3763,8 +3927,10 @@ export type Database = {
         | "deal"
         | "member"
         | "invoice"
+        | "lease"
         | "order"
         | "product"
+        | "property"
         | "proposal"
         | "proposal_option"
         | "purchase"
@@ -3805,6 +3971,7 @@ export type Database = {
       permission_level: "read" | "manage" | "delete"
       priority: "low" | "normal" | "high" | "urgent"
       product_kind: "good" | "service"
+      property_status: "active" | "inactive" | "sold"
       proposal_event_type:
         | "sent"
         | "viewed"
@@ -3992,8 +4159,10 @@ export const Constants = {
         "deal",
         "member",
         "invoice",
+        "lease",
         "order",
         "product",
+        "property",
         "proposal",
         "proposal_option",
         "purchase",
@@ -4038,6 +4207,7 @@ export const Constants = {
       permission_level: ["read", "manage", "delete"],
       priority: ["low", "normal", "high", "urgent"],
       product_kind: ["good", "service"],
+      property_status: ["active", "inactive", "sold"],
       proposal_event_type: [
         "sent",
         "viewed",

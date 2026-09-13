@@ -30,6 +30,10 @@ export const QUERY = {
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',
 	assets: 'app:assets',
+	/** The portfolio — buildings and the units inside them, which are rows in the same list. */
+	properties: 'app:properties',
+	/** The rent roll: every tenancy, running, upcoming or ended. */
+	leases: 'app:leases',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	tasks: 'app:tasks',

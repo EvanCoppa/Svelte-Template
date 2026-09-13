@@ -109,6 +109,8 @@ function mock() {
 		billables: { data: [] },
 		contacts: { data: [] },
 		products: { data: [] },
+		properties: { data: [] },
+		leases: { data: [] },
 		deals: { data: [] },
 		proposals: { data: [] },
 		invoices: { data: [] },

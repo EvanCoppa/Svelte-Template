@@ -27,6 +27,10 @@ export const FEATURE_IDS = [
 	'invoices',
 	'ledger',
 	'assets',
+	// The rental portfolio (the properties_and_leases migration). Real-estate
+	// only — every other industry resolves both `hidden` for want of a row.
+	'properties',
+	'leases',
 	'notes',
 	'tasks',
 	'tickets',

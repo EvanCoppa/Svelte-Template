@@ -1481,3 +1481,299 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'company', '20000000-0000-0000-0007-000000000002', current_date - 28,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Real estate: two orgs in the rental-portfolio vertical
+-- ---------------------------------------------------------------------------
+-- The vertical's config is three migrations (real_estate_industry, then
+-- properties_and_leases and real_estate_portfolio_features), and this is
+-- where it becomes something you can look at: a pro org with a portfolio and
+-- a rent roll, and a free one so the tier axis has a fixture here too (on
+-- `free`, Acquisitions and the Assistant resolve `locked_visible`; Properties
+-- and Leases are on every plan, because a portfolio you cannot see is not a
+-- product).
+--
+-- Ironwood is the odd-numbered org, so Evan owns it and dev is a plain
+-- member, matching every other industry pair above.
+
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000017', 'Ironwood Property Group', 'pro', 'real-estate'),
+	('10000000-0000-0000-0000-000000000018', 'Larkspur Rentals', 'free', 'real-estate')
+on conflict (id) do nothing;
+
+insert into public.organization_members (org_id, user_id, role) values
+	-- Ironwood Property Group (real-estate)
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Larkspur Rentals (real-estate)
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000002', 'member')
+on conflict (org_id, user_id) do nothing;
+
+--   Ironwood Property Group:  dev = Property Manager; e2e = Accountant
+--   Larkspur Rentals:         e2e = Viewer
+-- Accountant is the one to sign in as, because of what it CANNOT do: it holds
+-- `read` on Properties, Equipment and Vendors and nothing on Tenants or
+-- Leases, so /contacts and /leases are refused by the hook rather than merely
+-- hidden. The CPA sees the portfolio and the payees and never learns who
+-- lives in Unit 2.
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0008-000000000004'),
+	('10000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0008-000000000003'),
+	('10000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0008-000000000001')
+on conflict (org_id, user_id, role_id) do nothing;
+
+-- Buying the next building. Every org is born with the generic "Sales" board
+-- (`create_default_pipeline`, called by a trigger), which is the wrong seven
+-- words for someone whose funnel ends at a closing table — so the board is
+-- renamed and its stages replaced. This is the point of pipelines being rows.
+update public.pipelines
+set name = 'Acquisitions',
+	description = 'A building you have looked at, to a building you own.'
+where org_id in ('10000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000018')
+	and is_default;
+
+-- An UPSERT, not an insert: the trigger's board already contains 'Lead' and
+-- 'Lost', so conflict-skipping would leave those two wherever the generic
+-- board put them. The stage's position and outcome are what this fixture is
+-- asserting, so they are what the conflict updates.
+insert into public.pipeline_stages (org_id, pipeline_id, name, sort_order, outcome, probability)
+select p.org_id, p.id, s.name, s.sort_order, s.outcome::public.stage_outcome, s.probability
+from (values
+	('10000000-0000-0000-0000-000000000017'::uuid), ('10000000-0000-0000-0000-000000000018')
+) as o (org_id)
+join public.pipelines p on p.org_id = o.org_id and p.is_default
+cross join (values
+	('Identified', 10, 'open', 5),
+	('Offer made', 20, 'open', 25),
+	('Under contract', 30, 'open', 50),
+	('Due diligence', 40, 'open', 70),
+	('Financing', 50, 'open', 85),
+	('Closed', 60, 'won', 100),
+	('Passed', 70, 'lost', 0)
+) as s (name, sort_order, outcome, probability)
+on conflict (pipeline_id, name) do update
+	set sort_order = excluded.sort_order,
+		outcome = excluded.outcome,
+		probability = excluded.probability;
+
+-- The stages the trigger made, now that the seven above have replaced them.
+-- Guarded on nothing referencing them, so a re-run deletes nothing.
+delete from public.pipeline_stages s
+where s.org_id in ('10000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000018')
+	and s.name not in ('Identified', 'Offer made', 'Under contract', 'Due diligence',
+		'Financing', 'Closed', 'Passed')
+	and not exists (select 1 from public.deals d where d.stage_id = s.id);
+
+-- The portfolio: two buildings and their four units, plus a single-family.
+-- A unit is a `properties` row with `parent_id` set, so all three shapes the
+-- model has to carry are here — a duplex with units, and a single-family that
+-- IS its own unit with no ceremony.
+--
+-- Note where the physical columns land: on the units, not the buildings. A
+-- building has no bedroom count, which is why every one of them is nullable.
+insert into public.properties (id, org_id, parent_id, name, property_type, identifier, status, description, bedrooms, bathrooms, square_feet, market_rent, acquired_on, purchase_price, created_by) values
+	-- Buildings
+	('c1000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		null, 'Rowan Street Duplex', 'duplex', 'ROWAN', 'active',
+		'Two-unit, 1908 brick. Unit 1 runs short-term between leases.',
+		null, null, 2180, null, current_date - 540, 268000.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		null, 'Westbrook Duplex', 'duplex', 'WSTBK', 'active',
+		'Two-unit. Bought on hard money with a rehab still open.',
+		null, null, 2040, null, current_date - 210, 241500.00,
+		'00000000-0000-0000-0000-000000000003'),
+	-- Units
+	('c1000000-0000-0000-0008-000000000011', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000001', 'Rowan Street — Unit 1', 'apartment', 'ROWAN-1',
+		'active', 'Furnished. Short-term when no lease is running.',
+		2, 1.0, 940, 2200.00, null, null, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0008-000000000012', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000001', 'Rowan Street — Unit 2', 'apartment', 'ROWAN-2',
+		'active', null, 1, 1.0, 720, 1150.00, null, null,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0008-000000000013', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000002', 'Westbrook — Unit 1', 'apartment', 'WSTBK-1',
+		'active', null, 3, 1.5, 1180, 1650.00, null, null,
+		'00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0008-000000000014', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000002', 'Westbrook — Unit 2', 'apartment', 'WSTBK-2',
+		'active', 'Vacant since the rehab started.', 1, 1.0, 860, 900.00, null, null,
+		'00000000-0000-0000-0000-000000000003'),
+	-- A single-family: one row, its own rentable unit, parent_id null.
+	('c1000000-0000-0000-0008-000000000021', '10000000-0000-0000-0000-000000000018',
+		null, 'Larkspur Court', 'single_family', 'LARK', 'active', 'Single-family rental.',
+		3, 2.0, 1420, 1750.00, current_date - 320, 189000.00,
+		'00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+-- A property has an address now — the properties_and_leases migration widened
+-- `addresses` to admit one, which is what gives the portfolio a map pin and a
+-- geocode. Units carry their own, because "Unit 2" at the same street address
+-- is how a mailing address actually works.
+insert into public.addresses (id, org_id, entity_type, entity_id, label, line1, line2, city, region, postal_code, country, is_primary) values
+	('c2000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'property', 'c1000000-0000-0000-0008-000000000001', 'Building',
+		'184 Rowan Street', null, 'Rochester', 'NY', '14608', 'US', true),
+	('c2000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'property', 'c1000000-0000-0000-0008-000000000011', 'Unit',
+		'184 Rowan Street', 'Unit 1', 'Rochester', 'NY', '14608', 'US', true),
+	('c2000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'property', 'c1000000-0000-0000-0008-000000000002', 'Building',
+		'27 Westbrook Lane', null, 'Victor', 'NY', '14564', 'US', true),
+	('c2000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000018',
+		'property', 'c1000000-0000-0000-0008-000000000021', 'Home',
+		'9 Larkspur Court', null, 'Pittsford', 'NY', '14534', 'US', true)
+on conflict (id) do nothing;
+
+-- The tenants. Contacts with NO company_id — the party model's standalone
+-- person, the same shape a dental patient or a homeowner takes.
+insert into public.contacts (id, org_id, company_id, name, email, phone, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		null, 'Marcus Reed', 'marcus.reed@example.com', '+1 555 040 0101', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		null, 'Priya Nadar', 'priya.nadar@example.com', '+1 555 040 0102', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		null, 'Jonah Wexler', 'jonah.wexler@example.com', '+1 555 040 0103', null, false,
+		'active', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- The rent roll, and it is deliberately not tidy — every row here is a shape
+-- the model has to survive, taken from the reference workbook:
+--
+--   Marcus     a running lease, ends in eighteen days. The renewal chase.
+--   Priya      HOLDOVER: her fixed term ended five days ago and she is still
+--              there paying more than the lease said. `ends_on` in the past
+--              is what a holdover looks like before anyone re-papers it.
+--   Priya (2)  the month-to-month that replaced it — `ends_on` null — at the
+--              rent actually being paid. The old row stays as history, which
+--              is the whole reason a lease is a row and not a column.
+--   Jonah      a lease that ENDED, kept so the unit has a history.
+--   Unit 1     no lease at all today: that IS the short-term shape. A unit
+--              with no lease covering a date is on short-term for that date,
+--              which is how the two revenue shapes fall out of one table.
+--   Westbrook Unit 2 — vacant, mid-rehab. Also no row.
+insert into public.leases (id, org_id, property_id, contact_id, starts_on, ends_on, rent_amount, rent_due_day, security_deposit, notes, created_by) values
+	('c3000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000013', '30000000-0000-0000-0008-000000000001',
+		current_date - 347, current_date + 18, 1650.00, 1, 1650.00,
+		'Renewal not yet discussed.', '00000000-0000-0000-0000-000000000003'),
+	('c3000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000012', '30000000-0000-0000-0008-000000000002',
+		current_date - 370, current_date - 5, 900.00, 1, 800.00,
+		'Fixed term. Expired; tenant stayed on.', '00000000-0000-0000-0000-000000000003'),
+	('c3000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000012', '30000000-0000-0000-0008-000000000002',
+		current_date - 4, null, 1200.00, 1, 800.00,
+		'Month-to-month at the new rent.', '00000000-0000-0000-0000-000000000003'),
+	('c3000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'c1000000-0000-0000-0008-000000000011', '30000000-0000-0000-0008-000000000003',
+		current_date - 190, current_date - 68, 2200.00, 1, 1100.00,
+		'Furnished mid-term. Moved out; unit went back to short-term.',
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Everyone you pay, in one list — and `relationship` is what keeps it from
+-- being a junk drawer: the utilities and trades are `supplier`, the lender
+-- and the booking platform are `partner`.
+insert into public.companies (id, org_id, name, email, phone, status, relationship, created_by) values
+	('20000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'Genesee Power & Gas', 'billing@geneseepower.example.com', '+1 555 041 0101',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'Westbrook Municipal Water', 'utilities@westbrook.example.gov', '+1 555 041 0102',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000003', '10000000-0000-0000-0000-000000000017',
+		'Ferris Home Supply', 'pro@ferrishome.example.com', '+1 555 041 0103',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000004', '10000000-0000-0000-0000-000000000017',
+		'Hollis Plumbing & Heating', 'dispatch@hollisplumbing.example.com', '+1 555 041 0104',
+		'active', 'supplier', '00000000-0000-0000-0000-000000000003'),
+	-- A lender and a booking platform. Neither is really a "vendor", and
+	-- neither has a home of its own until loans and payouts are built.
+	('20000000-0000-0000-0008-000000000005', '10000000-0000-0000-0000-000000000017',
+		'Cedar Ridge Credit Union', 'lending@cedarridgecu.example.com', '+1 555 041 0105',
+		'active', 'partner', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0008-000000000006', '10000000-0000-0000-0000-000000000017',
+		'StayHarbor', 'payouts@stayharbor.example.com', null,
+		'active', 'partner', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Equipment: `assets` back to meaning what it was built for, now that it is
+-- not standing in for the portfolio. A dishwasher is a thing you own, and
+-- `located_at` says which unit it sits in.
+insert into public.assets (id, org_id, name, asset_type, identifier, status, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'Whirlpool dishwasher', 'appliance', 'APP-4471', 'active', current_date - 96, 636.63,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		'Weil-McLain boiler', 'hvac', 'HVAC-2201', 'active', current_date - 540, 4200.00,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- The graph. Units no longer need `part_of` — that is `parent_id` now, a
+-- column on the row — so what is left here is what the graph is actually for:
+-- links that would otherwise need a column per kind. Who owns a building,
+-- which trade services it, and which unit a dishwasher is installed in.
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	-- Who owns them: a member, not a column on the property.
+	('f4000000-0000-0000-0008-000000000005', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000011', 'member', '00000000-0000-0000-0000-000000000003',
+		'property', 'c1000000-0000-0000-0008-000000000001', current_date - 540,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000006', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000011', 'member', '00000000-0000-0000-0000-000000000003',
+		'property', 'c1000000-0000-0000-0008-000000000002', current_date - 210,
+		'00000000-0000-0000-0000-000000000003'),
+	-- The trade that services a building (`services`, new in this vertical).
+	('f4000000-0000-0000-0008-000000000007', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000031', 'company', '20000000-0000-0000-0008-000000000004',
+		'property', 'c1000000-0000-0000-0008-000000000002', current_date - 150,
+		'00000000-0000-0000-0000-000000000003'),
+	-- The unit a piece of equipment sits in (`located_at`, likewise).
+	('f4000000-0000-0000-0008-000000000008', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000032', 'asset', 'f1000000-0000-0000-0008-000000000001',
+		'property', 'c1000000-0000-0000-0008-000000000013', current_date - 96,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000009', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000032', 'asset', 'f1000000-0000-0000-0008-000000000002',
+		'property', 'c1000000-0000-0000-0008-000000000002', current_date - 540,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- What broke. A maintenance request is a support ticket: it already has a
+-- thread, a priority, a status and a party. It still cannot name the property
+-- it is about — support_tickets carries company_id and contact_id and no
+-- entity link — so `related_to` stands in, and that remains a workaround
+-- rather than the answer.
+insert into public.support_tickets (id, org_id, company_id, contact_id, subject, description, status, priority, assigned_to, created_by) values
+	('50000000-0000-0000-0008-000000000001', '10000000-0000-0000-0000-000000000017',
+		'20000000-0000-0000-0008-000000000004', '30000000-0000-0000-0008-000000000002',
+		'Kitchen sink backing up', 'Slow drain for a week, now standing water. Hollis is booked for Thursday.',
+		'open', 'high', '00000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003'),
+	('50000000-0000-0000-0008-000000000002', '10000000-0000-0000-0000-000000000017',
+		null, '30000000-0000-0000-0008-000000000001',
+		'Boiler short-cycling', 'Runs for two minutes and shuts off. No heat upstairs.',
+		'pending', 'urgent', '00000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	('f4000000-0000-0000-0008-000000000011', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000022', 'ticket', '50000000-0000-0000-0008-000000000001',
+		'property', 'c1000000-0000-0000-0008-000000000012', current_date - 3,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0008-000000000012', '10000000-0000-0000-0000-000000000017',
+		'f0000000-0000-0000-0000-000000000022', 'ticket', '50000000-0000-0000-0008-000000000002',
+		'property', 'c1000000-0000-0000-0008-000000000013', current_date - 1,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;

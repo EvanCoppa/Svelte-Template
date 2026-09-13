@@ -124,7 +124,7 @@
 				</Card.Root>
 			{/if}
 
-			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+			{#if data.hasAddresses}
 				<Detail.Addresses
 					addresses={data.addresses}
 					form={data.addressForm}
@@ -179,7 +179,7 @@
 				/>
 			{/if}
 
-			{#if data.record.kind === 'asset'}
+			{#if data.hasImages}
 				<Detail.Images
 					images={data.images}
 					form={data.imageForm}
