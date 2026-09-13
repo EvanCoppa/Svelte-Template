@@ -55,3 +55,21 @@ export const BADGE_TONES =
 	// SAFETY: BADGE_TONE_CLASSES satisfies Record<BadgeTone, string> with no
 	// extra keys, so its keys are exactly the BadgeTone union.
 	Object.keys(BADGE_TONE_CLASSES) as BadgeTone[];
+
+/**
+ * Ink colour for a tone — for a mark drawn on the page rather than on a pill,
+ * which on the board is the status ring. The same saturated step as the dots
+ * above, so a ring, a dot and a pill of one tone are one colour.
+ */
+export const BADGE_TONE_TEXT_CLASSES = {
+	neutral: 'text-slate-400',
+	success: 'text-emerald-500',
+	info: 'text-blue-500',
+	warning: 'text-amber-500',
+	error: 'text-red-500',
+	violet: 'text-violet-500',
+	orange: 'text-orange-500',
+	cyan: 'text-cyan-500',
+	rose: 'text-rose-500',
+	indigo: 'text-indigo-500'
+} satisfies Record<BadgeTone, string>;

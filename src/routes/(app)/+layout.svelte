@@ -31,13 +31,23 @@
 	{#if title && !page.error}<title>{title}</title>{/if}
 </svelte:head>
 
-<Sidebar.Provider open={data.sidebarOpen}>
+<!-- The wrapper is the ground the content panel sits on, so it wears the
+     sidebar's colour: what shows through the gap around the panel. -->
+<Sidebar.Provider class="bg-sidebar" open={data.sidebarOpen}>
 	{#if inSettings}
 		<SettingsSidebar />
 	{:else}
 		<AppSidebar />
 	{/if}
-	<Sidebar.Inset>
+	<!--
+		The content panel: inset by `--shell-gap` on every side and rounded, so the
+		sidebar's ground shows around it. `overflow-clip` — not `hidden` — is what
+		rounds the corners: it clips to the rounded box without becoming a scroll
+		container, so the header inside keeps sticking to the viewport and the page
+		keeps scrolling at the document level (which is what `fitPageSize()` and the
+		scroll spy measure against).
+	-->
+	<Sidebar.Inset class="border-border m-(--shell-gap) overflow-clip rounded-xl border shadow-sm">
 		<AppHeader />
 		<div class="app-content">
 			{@render children()}

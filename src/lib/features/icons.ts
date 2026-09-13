@@ -26,6 +26,7 @@ import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import TruckIcon from '@lucide/svelte/icons/truck';
 import UsersIcon from '@lucide/svelte/icons/users';
 import WalletIcon from '@lucide/svelte/icons/wallet';
+import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 
 /**
  * The icons a nav entry may name. `features.icon` stores a lucide slug, and
@@ -60,7 +61,8 @@ export const ICONS = {
 	'toggle-right': ToggleRightIcon,
 	truck: TruckIcon,
 	users: UsersIcon,
-	wallet: WalletIcon
+	wallet: WalletIcon,
+	waypoints: WaypointsIcon
 } satisfies Record<string, NavIcon>;
 
 export type NavIcon = Component<{ class?: string }>;

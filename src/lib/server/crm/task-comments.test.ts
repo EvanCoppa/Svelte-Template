@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	addTaskComment,
+	countTaskComments,
 	deleteTaskComment,
 	listTaskComments,
 	updateTaskComment,
@@ -73,6 +74,28 @@ describe('task comments data access', () => {
 		expect(builder.update).toHaveBeenCalledWith({ body: 'Edited.' });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', COMMENT_ID);
+	});
+
+	it('counts a board of threads in one query, and leaves a silent task out', async () => {
+		const other = '50000000-0000-0000-0000-000000000002';
+		const { supabase, builder } = supabaseMock({
+			data: [{ task_id: TASK_ID }, { task_id: TASK_ID }, { task_id: other }]
+		});
+
+		const counts = await countTaskComments(supabase, ORG_ID, [TASK_ID, other, 'quiet-one']);
+		expect(counts.get(TASK_ID)).toBe(2);
+		expect(counts.get(other)).toBe(1);
+		expect(counts.has('quiet-one')).toBe(false);
+		// The messages themselves are never read — a card shows a number.
+		expect(builder.select).toHaveBeenCalledWith('task_id');
+		expect(builder.in).toHaveBeenCalledWith('task_id', [TASK_ID, other, 'quiet-one']);
+	});
+
+	it('asks nothing of an empty board', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await expect(countTaskComments(supabase, ORG_ID, [])).resolves.toEqual(new Map());
+		expect(builder.select).not.toHaveBeenCalled();
 	});
 
 	it('deletes with evidence, throwing when RLS filtered the row away', async () => {

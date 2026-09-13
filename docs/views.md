@@ -100,14 +100,14 @@ record, coloured from the `app.css` tokens and framed to the pins. The library i
 inside the attachment — it touches `window` on import, so a top-level import would break
 the server render — and lands in its own chunk.
 
-The map is a style URL, `PUBLIC_MAP_STYLE_URL` (and `_DARK` for the dark theme), read by
-`mapConfig()` in `src/lib/map.ts` through `$env/dynamic/public` so an unset value is a
-null config rather than a build error. `mapOrigins()` derives the origins from the same
-URLs and `hooks.server.ts` hands them to the CSP — `connect-src` and `img-src`, since
-MapLibre fetches the style, tiles, glyphs and sprite — the way the Supabase origin is
-derived there; no tile host is ever hardcoded. The style's tiles, glyphs and sprite must
-therefore come from the style URL's origin (true of the MapLibre demo style and of
-OpenFreeMap). Without a URL the map layout says it is not configured.
+The map is a style URL, and a second one for the dark theme: both are constants in
+`mapConfig()` (`src/lib/map.ts`) — OpenFreeMap's Liberty and Dark styles, which need no
+key and no account, so a clone draws a map with nothing to configure. `mapOrigins()`
+derives the origins from the same URLs and `hooks.server.ts` hands them to the CSP —
+`connect-src` and `img-src`, since MapLibre fetches the style, tiles, glyphs and sprite —
+the way the Supabase origin is derived there, so changing the style is those two lines and
+the CSP follows. The style's tiles, glyphs and sprite must come from the style URL's own
+origin (true of OpenFreeMap and of the MapLibre demo style).
 
 ## Geocoding
 

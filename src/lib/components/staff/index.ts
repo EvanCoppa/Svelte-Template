@@ -7,7 +7,7 @@ import RowActions from './staff-row-actions.svelte';
  * the naming helpers the page's dialogs share with them. The page still owns
  * the data and every handler — each part takes what it shows as a prop.
  */
-export { memberInitials, memberName } from './member.js';
+export { initialsOf, memberInitials, memberName } from './member.js';
 
 export {
 	MemberCell,
