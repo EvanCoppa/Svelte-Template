@@ -219,14 +219,19 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
-  **The page is a header and then tabs, never two columns of cards**: the
-  header (initials avatar, the name and its pills, the `link` fields as a row
-  of quick facts, the actions) and immediately under it `ui/tabs`, which are
-  the rest of the page — Overview (Details with the Notes column beside it,
-  then highlights that jump to a tab, relationships and the latest activity),
-  Activity, the sections only some kinds have (Addresses, Billing, Photos,
-  Conversation) and one tab per related-records group. A new section is a tab,
-  drawn only while active; never a card outside them.
+  **The page is a header, then tabs with a record rail beside them**, never a
+  wall of cards: the header is the way back (one `←` icon button, since the
+  breadcrumb trail is the way back on a wide screen), the initials avatar, the
+  name with its pills and the `link` fields as a row of quick facts. Under it,
+  `ui/tabs` are the page — Overview (highlights that jump to a tab,
+  relationships, the latest activity), Activity, the sections only some kinds
+  have (Addresses, Billing, Photos, Conversation) and one tab per
+  related-records group — with the rail on the end side holding what the
+  record IS whichever tab is open: `Record details` (its fields as
+  label-and-value rows, then its custom fields, then created / updated / id),
+  with `EditRecord compact` in that card's header, and the Notes card under
+  it. A new section is a tab, drawn only while active; a new fact about the
+  record is a row in the rail; never a card outside the two.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
