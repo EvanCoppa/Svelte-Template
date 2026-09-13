@@ -144,9 +144,41 @@ record gets. If a task ever earns its own screen, it goes at `(app)/tasks/[id]/`
 a static segment outranks the `[kind=record]` matcher — and composes the same
 `RecordDetail` and `detail/` parts rather than a second renderer.
 
-The list is `(app)/tasks/`, creation is the generic `CreateRecord` form
-(`RECORD_FORMS.task`), and freshness is `QUERY.tasks` for the list and
-`QUERY.record('task', id)` for one task, including after a message is posted.
+The list is `(app)/tasks/`, creation is the task modal below, and freshness is
+`QUERY.tasks` for the list and `QUERY.record('task', id)` for one task, including
+after a message is posted.
+
+## The task modal
+
+A task is the one kind of record that is **not** created through the generic
+`CreateRecord` form. `(app)/tasks/create-task.svelte` is its own modal, and it earns
+that the way the calendar's booking form does — by writing more than a row of
+strings:
+
+- **who is on it is a relationship**, so the post writes the task AND one
+  `assigned_to` row per person named, in the one action (`?/create`,
+  `createTaskSchema` in `schema.ts`). Several people at once, because that is what
+  the graph allows and a column never did. A new task starts assigned to the writer.
+- **what it is about is a party** — a company or a person — chosen from one picker
+  over both kinds rather than two fields, posted as the shared `<kind>:<id>` ref
+  (`$lib/schemas/record-ref`, the calendar's spelling) and accepted only when the
+  caller may open that kind (the same `passesFeatureGate()` the hook applies).
+- **when is a calendar with the days that get picked most as one-click choices** —
+  today, tomorrow, next week, no date — stored as the end of that day in the
+  writer's zone so "today" is not late the moment it is written. The chip reads
+  the day in the same words a card does (`dueLabel()`).
+
+The three are chips under the title rather than fields beside it, because they are
+set far more often than they are typed. **Create more** keeps the modal open after
+a save and clears the title only: five tasks in a row are usually five things for
+the same person about the same account. Details and priority are not in the modal
+on purpose — they are edited on the record page through the generic form
+(`RECORD_FORMS.task`, which is why `task` stays an `EditableRecordType`), where
+every other kind's fields live.
+
+The page's load reads the modal's pickers for writers only (the roster it already
+had for the cards, plus the companies and contacts the reader may open), and
+`page.server.test.ts` pins what the action writes and refuses.
 
 ## Adding this to another kind
 
