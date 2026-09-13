@@ -16,9 +16,16 @@
 -- only production has this person. Where the address names nobody the block
 -- writes nothing and says so in the deploy log — which is what makes it
 -- safe to replay everywhere, alongside `on conflict do nothing`. It is also
--- the failure mode to watch: if the account does not exist yet when this
--- lands, the operator row is never written, and the fix is a new migration
--- (or one insert by the service role) once they have signed up.
+-- the failure mode to watch: an address that names nobody grants nobody,
+-- silently. This one was checked against production first, where the
+-- account is nick@guaranteeth.net — not .com, which is what made checking
+-- worth doing.
+--
+-- The production row was written directly, by the statement this file
+-- carries and the path the system_admins migration documents, so there the
+-- block finds its row and does nothing. It is kept as the version-
+-- controlled record of the grant, and as what restores it to a database
+-- rebuilt from migrations.
 --
 -- Revoking is one statement, and it is not the whole job — a membership row
 -- an operator also holds outlives their row here:
@@ -29,17 +36,17 @@ declare
 begin
 	select id into operator
 	from auth.users
-	where lower(email) = 'nick@guaranteeth.com'
+	where lower(email) = 'nick@guaranteeth.net'
 	order by created_at
 	limit 1;
 
 	if operator is null then
-		raise notice 'No auth user for nick@guaranteeth.com; no operator row written.';
+		raise notice 'No auth user for nick@guaranteeth.net; no operator row written.';
 		return;
 	end if;
 
 	insert into public.system_admins (user_id, note)
-	values (operator, 'Platform operator: Nick (nick@guaranteeth.com).')
+	values (operator, 'Platform operator: Nick (nick@guaranteeth.net).')
 	on conflict (user_id) do nothing;
 end;
 $$;
