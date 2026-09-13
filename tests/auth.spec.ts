@@ -539,6 +539,55 @@ test.describe('the workspace switcher', () => {
 		await expect(page.getByRole('menuitem', { name: 'Acme Inc' })).toBeVisible();
 		await expect(page.getByRole('menuitem', { name: 'Globex' })).toHaveCount(0);
 	});
+
+	test('offers no way into the platform area to someone who is not an operator', async ({
+		page
+	}) => {
+		await clickWhenLive(switcher(page).getByRole('button', { name: 'Acme Inc' }), () =>
+			expect(page.getByRole('menuitem', { name: 'E2E Robot' })).toBeVisible()
+		);
+
+		// seed.sql makes only the developer account a system admin, so
+		// e2e@example.com sees workspaces and nothing else.
+		await expect(page.getByRole('menuitem', { name: 'Platform Administration' })).toHaveCount(0);
+	});
+});
+
+test.describe('the platform area', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	test('is a 404 for a signed-in user who is not a system admin', async ({ page }) => {
+		// A hidden menu entry is not the protection: the server refuses the
+		// route itself, and refuses it with 404 rather than 403 so the console
+		// does not announce itself to every tenant user.
+		const response = await page.goto('/admin');
+
+		expect(response?.status()).toBe(404);
+		await expect(page).toHaveURL('/admin');
+	});
+
+	test('refuses its data pages and its one mutation the same way', async ({ page }) => {
+		// Each page and each action proves the operator flag for itself, so
+		// reaching past the landing page changes nothing.
+		expect((await page.goto('/admin/organizations'))?.status()).toBe(404);
+		expect((await page.goto('/admin/tiers'))?.status()).toBe(404);
+
+		// seed.sql's Acme Inc — a real organization, so the refusal is the
+		// operator check and nothing else. The origin header is what gets the
+		// POST past SvelteKit's CSRF check, which would otherwise answer 403
+		// before the action ever ran and prove nothing about the guard.
+		const posted = await page.request.post(
+			'/admin/organizations/10000000-0000-0000-0000-000000000001?/setTier',
+			{
+				form: { tierId: 'enterprise' },
+				headers: { origin: new URL(page.url()).origin }
+			}
+		);
+		expect(posted.status()).toBe(404);
+	});
 });
 
 test.describe('the note dock', () => {

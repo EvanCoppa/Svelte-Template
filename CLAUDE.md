@@ -326,7 +326,8 @@ application data is scoped to an organization, never to a bare user. The
   visibility, never a membership row — copy that when a new surface needs
   "may this user act in this org". A user can only read their own
   `system_admins` row, so nothing can list operators. Locally,
-  `evancoppa@gmail.com` is the seeded operator.
+  `evancoppa@gmail.com` is the seeded operator. What an operator does with
+  that access has one home — "Platform administration" below.
 - **Staff management is the reference gated page** (`staff_management`
   migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
   all three levels: `read` shows the roster, `manage` invites people and
@@ -537,6 +538,49 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   whenever the load supplies `data.billing` — the thread's data-presence rule. Every
   payment form carries an idempotency key the load minted, so a double submit collides
   on the table instead of recording money twice.
+
+## Platform administration — the one surface outside the tenant
+
+`/admin` is where the product itself is administered, as opposed to the
+organizations using it: the `(admin)` route group, `$lib/admin/` and
+`$lib/server/admin/`. The full account is `docs/platform-administration.md`;
+the rules that must not drift:
+
+- **It is not a tenant surface.** No active organization, no industry
+  vocabulary, no tier, no feature registry, no role grants —
+  `hooks.server.ts` skips `loadOrgContext()` for `/admin` entirely, so
+  nothing there can read or repair the active-org cookie. An operator's
+  workspace in the app stays exactly where they left it while they work in
+  the console.
+- **The way in is the org picker's own Platform section**, drawn from the
+  `systemAdmin` flag the `(app)` layout ships (`loadOrgContext()` already
+  looked it up). It is a destination, not a workspace: no check mark, its own
+  label behind a separator, and selecting it switches no organization. Never
+  add platform administration to `navigation.ts`, the sidebar, the ⌘K palette
+  or the feature registry.
+- **That flag authorizes nothing.** Every admin page, action and endpoint
+  calls `requireSystemAdmin()` (`$lib/server/admin/guard`) for itself — the
+  layout load covers pages, and each action repeats it because a POST reaches
+  an action with no load in front of it. A non-operator gets **404, not 403**,
+  for the reason a hidden feature does: a 403 confirms the console is real.
+- **It owns its shell and its names.** The `(admin)` layout is one inverted
+  bar with the area's identity, its pages and the way back; titles and nav
+  labels both come from the hand-kept `adminNav` in `$lib/admin/nav.ts`
+  (like `settingsNav`, and for the same reason — these pages are not
+  features). Adding an admin page = the route plus one entry there. No
+  migration: `/admin` is outside `features` and outside `pages` on purpose.
+- **Read-only by default, with exactly one mutation**: moving an organization
+  to another plan, on that organization's page. It validates the target and
+  the tier through the caller's own client first, and only then reaches for
+  the service-role client, because `organizations.tier_id` is revoked from
+  `authenticated`. A second write earns the same scrutiny or does not ship —
+  role editing, feature editing, industry changes, system-admin management
+  and an audit table are all deliberately deferred.
+- Reuse from the app is limited to organization-agnostic primitives (`ui/`,
+  `DataTable`, `PageHeader`, `iconFor`, `isPathUnder`, `titleFor`) and data
+  modules that already take an explicit org id (`listStaff()`). Never reach
+  for a tenant-context-bound service, and never use the active organization
+  as a surrogate for an admin target.
 
 ## Database
 

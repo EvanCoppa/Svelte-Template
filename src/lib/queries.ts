@@ -37,5 +37,13 @@ export const QUERY = {
 	/** One CRM record of any kind, as the generic record page shows it. */
 	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */
-	assistant: 'app:assistant'
+	assistant: 'app:assistant',
+	/**
+	 * The platform area's organization directory and detail page
+	 * (docs/platform-administration.md) — changed by the one mutation there,
+	 * moving an organization to another plan. Its own `admin:` domain: this
+	 * is platform data, read outside any tenant, and nothing under `app:`
+	 * depends on it.
+	 */
+	adminOrganizations: 'admin:organizations'
 } as const;

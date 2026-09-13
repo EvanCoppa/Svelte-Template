@@ -68,7 +68,8 @@ export function orgContext({
 		organizations: [activeOrg],
 		activeOrg,
 		features,
-		access: { role, roles: [], grants: new Map(Object.entries(grants)) }
+		access: { role, roles: [], grants: new Map(Object.entries(grants)) },
+		systemAdmin: false
 	};
 }
 

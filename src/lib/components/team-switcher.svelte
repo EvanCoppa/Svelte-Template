@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
+	import { ADMIN_AREA_NAME, ADMIN_HOME } from '$lib/admin/nav';
 	import AppLogo from '$lib/components/app-logo.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -8,10 +9,25 @@
 	import { QUERY } from '$lib/queries';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { toast } from 'svelte-sonner';
 
-	let { organizations, activeOrg }: { organizations: OrgMembership[]; activeOrg: OrgMembership } =
-		$props();
+	/**
+	 * The workspace picker — and, for a platform operator, the way into the
+	 * platform area.
+	 *
+	 * `systemAdmin` draws that entry and nothing else: it is a menu decision,
+	 * not an authorization one, and `/admin` proves the operator flag again on
+	 * the server for every page and action it serves. The entry is kept in its
+	 * own labelled section because it is NOT an organization — selecting it
+	 * navigates out of the tenant app and deliberately leaves the active
+	 * organization exactly where it was (docs/platform-administration.md).
+	 */
+	let {
+		organizations,
+		activeOrg,
+		systemAdmin = false
+	}: { organizations: OrgMembership[]; activeOrg: OrgMembership; systemAdmin?: boolean } = $props();
 
 	const sidebar = useSidebar();
 
@@ -69,6 +85,18 @@
 						{/if}
 					</DropdownMenu.Item>
 				{/each}
+				{#if systemAdmin}
+					<DropdownMenu.Separator />
+					<DropdownMenu.Label class="text-muted-foreground text-xs">Platform</DropdownMenu.Label>
+					<!-- A destination, not a workspace: no org is switched, and no
+					     check mark can ever sit beside it. -->
+					<DropdownMenu.Item onSelect={() => goto(ADMIN_HOME)} class="gap-2 p-2">
+						<div class="flex size-6 items-center justify-center rounded-md border">
+							<ShieldIcon class="size-3.5 shrink-0" />
+						</div>
+						{ADMIN_AREA_NAME}
+					</DropdownMenu.Item>
+				{/if}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>

@@ -39,7 +39,8 @@ describe('noteAccess', () => {
 				industryId: 'crm'
 			},
 			features: {},
-			access: { role, roles: [], grants: new Map(grants) }
+			access: { role, roles: [], grants: new Map(grants) },
+			systemAdmin: false
 		};
 	}
 
