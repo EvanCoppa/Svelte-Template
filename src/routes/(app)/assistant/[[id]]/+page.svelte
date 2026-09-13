@@ -7,7 +7,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
-	import * as Assistant from '$lib/components/assistant/index.js';
+	import * as Assistant from './components/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';

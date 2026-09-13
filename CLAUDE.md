@@ -433,6 +433,25 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   entity link below, also draw as edges on `/graph`, computed at read time from these
   columns rather than stored as `relationships` rows (see the graph bullet below and
   `proposal_graph_edges` migration).
+- **An org has one slideshow, and every proposal is presented through it**
+  (`org_slides` migration + `src/lib/slides/` + `src/lib/server/crm/slides.ts` —
+  docs/proposals.md, "One deck per org"). `slide_decks` is one jsonb row per org (the
+  built-in default deck stands in until the first save); it holds slides, never
+  proposal data. Everything under `src/lib/slides/` sees only a deck and a
+  `Presentation` — `loadPresentation()` is the one place a proposal is read and named
+  for the slides — and every template is one entry in `registry.ts` (component, text
+  slots drawn by `kind`, image slots, colours) taking the same props, so the builder's
+  editor renders any template from the list and none has a screen of its own. The
+  library is Yes Smile's, ported as it was (same ids, same look; the education and AI
+  slides and per-provider variants excepted), and the slides Yes Smile filled at
+  present time read the `Presentation` instead — `v1-pricing` is per-option,
+  `v1-products` draws `presentation.products`. Two pages, both under
+  `/proposals` so the gate already covers them: `/proposals/slides` (the builder, a
+  superforms JSON form on `slideBuilderSchema`, `manage` to open, its parts in `components/`)
+  and `/proposals/[id]/present` (the slideshow, in the bare `(present)` route group).
+  A per-option slide repeats once per option at present time; a text slot bound to a
+  path in `bindings.ts` fills from the proposal. Slide images upload through
+  `POST /api/slides/images` into the public `slides` bucket, under the org's folder.
 - **Relationships are one table, not a junction table per pair of kinds**
   (`relationships` migration + `src/lib/server/crm/relationships.ts`; docs/relationships.md).
   A `relationships` row names two records through the shared entity link
@@ -1015,6 +1034,20 @@ and the page-owns-data rules — is the `compound-components` skill
 (`.claude/skills/compound-components/SKILL.md`); the `compound-component-builder`
 agent owns this work. App-level compounds live in `src/lib/components/<name>/`;
 context carries coordination state only (open/active/selection), never fetched data.
+
+### Where a component lives
+
+`src/lib/components/` is for components **used by more than one route** — the shell,
+the compounds every list page composes, the `ui/` and `enhanced/` shelves. A
+component one route uses goes in a **`components/` folder inside that route**
+(`src/routes/(app)/proposals/slides/components/editor.svelte`), imported relatively
+(`./components/editor.svelte`), so the route folder is the whole feature and deleting
+it deletes everything it owned. The rule is by use, not by size: the proposal builder's
+option fieldset, the assistant's thread parts and the slide builder's panes all live
+beside their pages, and a part moves up to `src/lib/components/` on the day a second
+route imports it — never pre-emptively. A route-level folder may carry an `index.ts`
+namespace like the app-level compounds do (`import * as Builder from
+'./components/index.js'`).
 
 ## Key patterns
 

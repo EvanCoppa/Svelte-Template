@@ -4,7 +4,7 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import * as Builder from '$lib/components/proposal-builder/index.js';
+	import * as Builder from './components/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import type { ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
@@ -26,7 +26,7 @@
 	 *
 	 * The look is Yes Smile's on purpose — literal greys and blues rather than
 	 * the theme's tokens — so those classes live in
-	 * `$lib/components/proposal-builder/classes.ts` with their dark pairs, and
+	 * `./components/classes.ts` with their dark pairs, and
 	 * nothing here re-spells them. Photos, insurance coverage and the cash
 	 * offer toggle have no home in the model and are not here.
 	 */

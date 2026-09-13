@@ -125,7 +125,6 @@ const options: ProposalWithOptions = {
 	tax_rate: 8.25,
 	valid_until: '2026-10-01T09:00:00Z',
 	selected_option_id: null,
-	deck_id: null,
 	presenter_id: USER_ID,
 	responsible_id: null,
 	proposal_options: [

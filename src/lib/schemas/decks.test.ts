@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	DECK_VERSION,
-	emptyDeck,
+	slideBuilderSchema,
 	slideContentSchema,
-	slideDeckRowSchema,
 	slideDeckSchema,
 	slideInstanceSchema,
 	slideVariableSchema
@@ -43,10 +42,12 @@ describe('slideContentSchema', () => {
 		});
 	});
 
-	it('takes image URLs but never inline data', () => {
+	it('takes image URLs or an unfilled slot, but never inline data', () => {
 		expect(slideContentSchema.safeParse({ images: { logo: 'https://x.test/a.png' } }).success).toBe(
 			true
 		);
+		expect(slideContentSchema.safeParse({ images: { logo: '' } }).success).toBe(true);
+		expect(slideContentSchema.safeParse({ images: { logo: 'not a url' } }).success).toBe(false);
 		expect(
 			messagesOf(slideContentSchema.safeParse({ images: { logo: 'data:image/png;base64,AAAA' } }))
 		).toMatch(/not inline data/);
@@ -82,7 +83,7 @@ describe('slideInstanceSchema', () => {
 
 describe('slideDeckSchema', () => {
 	it('accepts an empty deck', () => {
-		expect(slideDeckSchema.safeParse(emptyDeck()).success).toBe(true);
+		expect(slideDeckSchema.safeParse({ version: DECK_VERSION, slides: [] }).success).toBe(true);
 		expect(slideDeckSchema.safeParse({ version: 1 }).data?.slides).toEqual([]);
 	});
 
@@ -124,11 +125,13 @@ describe('slideDeckSchema', () => {
 	});
 });
 
-describe('slideDeckRowSchema', () => {
-	it('trims the name and requires one', () => {
-		expect(slideDeckRowSchema.safeParse({ name: '  Standard deck  ' }).data?.name).toBe(
-			'Standard deck'
-		);
-		expect(messagesOf(slideDeckRowSchema.safeParse({ name: '' }))).toMatch(/name/);
+describe('slideBuilderSchema', () => {
+	it('is the deck, whole, under one key', () => {
+		const result = slideBuilderSchema.safeParse({
+			deck: { version: DECK_VERSION, slides: [slide] }
+		});
+		expect(result.success).toBe(true);
+		expect(result.data?.deck.slides).toHaveLength(1);
+		expect(slideBuilderSchema.safeParse({}).success).toBe(false);
 	});
 });

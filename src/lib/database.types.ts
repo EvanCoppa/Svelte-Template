@@ -2492,7 +2492,6 @@ export type Database = {
           base_config: Json
           created_at: string
           created_by: string | null
-          deck_id: string | null
           default_fee: number | null
           entity_id: string | null
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -2511,7 +2510,6 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
-          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -2530,7 +2528,6 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
-          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -2546,13 +2543,6 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "proposals_deck_id_org_id_fkey"
-            columns: ["deck_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "slide_decks"
-            referencedColumns: ["id", "org_id"]
-          },
           {
             foreignKeyName: "proposals_org_id_fkey"
             columns: ["org_id"]
@@ -3226,7 +3216,6 @@ export type Database = {
           created_by: string | null
           deck_json: Json
           id: string
-          name: string
           org_id: string
           updated_at: string
           updated_by: string | null
@@ -3236,7 +3225,6 @@ export type Database = {
           created_by?: string | null
           deck_json?: Json
           id?: string
-          name: string
           org_id: string
           updated_at?: string
           updated_by?: string | null
@@ -3246,7 +3234,6 @@ export type Database = {
           created_by?: string | null
           deck_json?: Json
           id?: string
-          name?: string
           org_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -3255,7 +3242,7 @@ export type Database = {
           {
             foreignKeyName: "slide_decks_org_id_fkey"
             columns: ["org_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },

@@ -12,6 +12,7 @@
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PhoneIcon from '@lucide/svelte/icons/phone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import ReceiptIcon from '@lucide/svelte/icons/receipt';
 	import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 	import * as Detail from '$lib/components/detail/index.js';
@@ -167,6 +168,14 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if data.record.kind === 'proposal'}
+			<!-- The slideshow: this {terms.noun} through the org's deck, full screen. -->
+			<Button href="/proposals/{data.record.id}/present" class="ml-auto shrink-0">
+				<PresentationIcon />
+				Present
+			</Button>
+		{/if}
 	</div>
 
 	<!-- The tabs are the page; the rail beside them says what the record is and

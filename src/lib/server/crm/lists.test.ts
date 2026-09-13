@@ -305,7 +305,6 @@ describe('describeListRows', () => {
 			tax_rate: null,
 			valid_until: null,
 			selected_option_id: OPTION_PREMIUM,
-			deck_id: null,
 			presenter_id: PRESENTER_ID,
 			responsible_id: OWNER_ID,
 			...STAMPS,

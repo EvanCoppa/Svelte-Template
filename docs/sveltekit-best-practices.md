@@ -118,6 +118,10 @@ Action mechanics:
 - `src/lib/components/ui/` is **vendored** shadcn-svelte source — edit it in place,
   commit the diff. Add new primitives with `npx shadcn-svelte@latest add <name>`.
 - One navigation config (`src/lib/navigation.ts`) drives the sidebar and ⌘K palette.
+- A component lives where it is used: `src/lib/components/` only when more than one
+  route imports it; otherwise in a `components/` folder inside its route
+  (`src/routes/(app)/<page>/components/`), imported relatively. A part moves up on the
+  day a second route needs it, never before. See CLAUDE.md, "Where a component lives".
 - Icons: `@lucide/svelte/icons/<name>` one-per-file imports only — the barrel import
   (`import { X } from '@lucide/svelte'`) drags the whole icon set through the dev
   server and bundler.

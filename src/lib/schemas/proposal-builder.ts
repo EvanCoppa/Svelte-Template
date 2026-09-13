@@ -14,7 +14,7 @@ import { moneySchema, percentSchema } from './proposals';
  * the column names are used as field names so the action needs no renaming.
  *
  * In `src/lib/schemas/` rather than beside the route because the builder's
- * parts (`$lib/components/proposal-builder`) type their props with it.
+ * parts (`src/routes/(app)/proposals/new/components/`) type their props with it.
  */
 
 /** The most options one proposal offers — the same ceiling the source form had. */
