@@ -31,7 +31,7 @@
 	 * prints its hubs from across the room and the rest as the reader comes
 	 * in; a name is then drawn only where one fits whole, trying each side of
 	 * its dot before it is left off; it is cut to a width no name may exceed;
-	 * and it is drawn over a halo of the page's own background so a name that
+	 * and it is drawn over a halo of the map's own backdrop so a name that
 	 * crosses a line is still a name. Resting on a node narrows that to its
 	 * neighbourhood alone — the rest of the map goes quiet rather than fading
 	 * to a grey mush behind it. All of it is measured in screen pixels
@@ -99,8 +99,51 @@
 	 */
 	const NAME_MAX_WIDTH = 148;
 
-	/** A node's radius in map units: the square root of its degree, so the dot's area is its standing. */
+	/**
+	 * How much of a line the map spends on a relationship at rest. A line's
+	 * job when nothing is lit is to say *there is one here* — the
+	 * neighbourhood pass says what it is — so it is drawn as a light dash
+	 * rather than a solid hairline. Dashing spends about half the ink of a
+	 * solid line at the same alpha, and the two together put a resting line
+	 * at well under a third of the weight a solid hairline was laying down.
+	 * Grey felt is the state a dense map stops being readable in, and it is
+	 * the lines, not the dots, that get it there.
+	 */
+	const EDGE_REST_ALPHA = 0.22;
+	/** The dash, in screen pixels — constant at every zoom, as the names are. */
+	const EDGE_DASH = 3;
+	/** An edge outside the lit neighbourhood: present, and nothing more. */
+	const EDGE_QUIET_ALPHA = 0.06;
+	/** An edge inside it, which is where a relationship is actually read. */
+	const EDGE_LIT_ALPHA = 0.95;
+
+	/**
+	 * A node's radius in map units: the square root of its degree, so the
+	 * dot's area is its standing. This is the room the **layout** reserves
+	 * for a record — uncapped, because a hub genuinely needs it for its
+	 * spokes — and deliberately not the size the dot is drawn at.
+	 */
 	const radiusOf = (node: SimNode) => 3.5 + Math.sqrt(node.degree) * 1.6;
+
+	/**
+	 * The dot as it is **drawn**, in screen pixels — the one place the map
+	 * reconciles its two coordinate systems, and what decides whether it
+	 * reads as words or as bubbles.
+	 *
+	 * A dot is laid out in map units and so scales with the zoom; a name is
+	 * drawn at a fixed size in screen pixels and does not. Multiply the one
+	 * straight by the other and a record sits right beside its own name at
+	 * exactly one zoom: from across the room the dots are specks with type
+	 * scattered between them, and coming in they swell into discs a name is
+	 * lost against — a hub with two hundred relationships reaching a disc
+	 * several names wide. So the zoom is damped, and the result held to a
+	 * band either side of a name's own line: a record reads as a word with a
+	 * dot on it at every zoom, which is the whole job.
+	 */
+	const DOT_MIN_RADIUS = 2.75;
+	const DOT_MAX_RADIUS = NAME_LINE - 1;
+	const screenRadiusOf = (node: SimNode, zoom: number) =>
+		Math.min(DOT_MAX_RADIUS, Math.max(DOT_MIN_RADIUS, radiusOf(node) * Math.sqrt(zoom)));
 
 	let hovered = $state<string | null>(null);
 	const lit = $derived(hovered ?? focus);
@@ -141,7 +184,14 @@
 			const kinds: Record<string, string> = {};
 			for (const [kind, swatch] of Object.entries(swatches)) kinds[kind] = token(`--${swatch}`);
 			return {
-				surface: token('--background'),
+				// The halo behind a name and the hairline around a dot are both
+				// "the colour of whatever is behind this", so they have to be the
+				// map's real backdrop rather than a token that resembles it — a
+				// near-miss reads as a patch around every name, which is the one
+				// place a halo exists to be invisible. Hence the opaque `bg-card`
+				// on the container below: a tint over the page (`bg-muted/40`)
+				// has no colour of its own to hand back here.
+				surface: token('--card'),
 				edge: token('--muted-foreground'),
 				label: token('--foreground'),
 				muted: token('--muted-foreground'),
@@ -204,7 +254,9 @@
 				const dx = (node.x ?? 0) - point.x;
 				const dy = (node.y ?? 0) - point.y;
 				const distance = Math.hypot(dx, dy);
-				const reach = radiusOf(node) + 4 / view.k;
+				// The dot as it is drawn plus a little slack, back in map units,
+				// so what the pointer catches is what the reader can see.
+				const reach = (screenRadiusOf(node, view.k) + 4) / view.k;
 				if (distance <= reach && distance < bestDistance) {
 					best = node;
 					bestDistance = distance;
@@ -247,11 +299,20 @@
 			view.y = height / 2 - ((minY + maxY) / 2) * view.k;
 		}
 
-		/** One line between two records, at the weight its standing in the scope earns it. */
-		function strokeLink(link: SimLink, alpha: number) {
+		/**
+		 * One line between two records, at the weight its standing in the
+		 * scope earns it. Lit, it is solid — and dashed only when the
+		 * relationship has ended, which is where that distinction is worth the
+		 * ink, because the reader is looking straight at it. At rest every
+		 * line is a light dash instead: ongoing-or-ended is unreadable at that
+		 * weight anyway, and a solid hairline per relationship is what turns
+		 * the map into felt.
+		 */
+		function strokeLink(link: SimLink, alpha: number, solid: boolean) {
 			context.globalAlpha = alpha * (link.ended ? 0.55 : 1);
 			context.strokeStyle = colours.edge;
-			context.setLineDash(link.ended ? [4 / view.k, 4 / view.k] : []);
+			const dash = EDGE_DASH / view.k;
+			context.setLineDash(solid && !link.ended ? [] : [dash, dash]);
 			context.beginPath();
 			context.moveTo(link.source.x ?? 0, link.source.y ?? 0);
 			context.lineTo(link.target.x ?? 0, link.target.y ?? 0);
@@ -284,7 +345,7 @@
 					id: node.id,
 					x,
 					y,
-					radius: radiusOf(node) * view.k,
+					radius: screenRadiusOf(node, view.k),
 					width: widthOf(NAME_SIZE, text),
 					height: NAME_LINE,
 					priority: node.degree,
@@ -347,26 +408,35 @@
 			context.scale(view.k, view.k);
 
 			const scope = neighbourhood;
-			const dim = scope ? 0.12 : 1;
+			// A record outside the lit neighbourhood stays a legible dot; a line
+			// outside it goes quieter still, because lines are the thing there
+			// are hundreds of.
+			const dimNode = scope ? 0.12 : 1;
 
 			// The lit lines are drawn last so they sit on top of the rest.
 			const litLinks: SimLink[] = [];
 			context.lineWidth = 1 / view.k;
 			for (const link of simLinks) {
 				if (scope?.edges.has(link.id)) litLinks.push(link);
-				else strokeLink(link, scope ? dim : 0.4);
+				else strokeLink(link, scope ? EDGE_QUIET_ALPHA : EDGE_REST_ALPHA, false);
 			}
-			for (const link of litLinks) strokeLink(link, 0.95);
+			for (const link of litLinks) strokeLink(link, EDGE_LIT_ALPHA, true);
 			context.setLineDash([]);
 
 			for (const node of simNodes) {
 				const inScope = scope?.nodes.has(node.id) ?? true;
-				context.globalAlpha = inScope ? 1 : dim;
+				context.globalAlpha = inScope ? 1 : dimNode;
 				context.beginPath();
-				context.arc(node.x ?? 0, node.y ?? 0, radiusOf(node), 0, Math.PI * 2);
+				context.arc(
+					node.x ?? 0,
+					node.y ?? 0,
+					screenRadiusOf(node, view.k) / view.k,
+					0,
+					Math.PI * 2
+				);
 				context.fillStyle = colours.kinds[node.kind] ?? colours.muted;
 				context.fill();
-				// A hairline in the page's own colour: where the layout packs a
+				// A hairline in the map's own backdrop: where the layout packs a
 				// hub's neighbours together, two dots that touch still read as two.
 				const isLit = node.id === lit;
 				context.lineWidth = (isLit ? 2.5 : 1.25) / view.k;
@@ -646,7 +716,7 @@
 <div
 	bind:this={ref}
 	data-slot="relationship-graph"
-	class={cn('bg-muted/40 relative min-h-64 w-full overflow-hidden rounded-lg border', className)}
+	class={cn('bg-card relative min-h-64 w-full overflow-hidden rounded-lg border', className)}
 	{...restProps}
 	{@attach graphAttachment}
 >
