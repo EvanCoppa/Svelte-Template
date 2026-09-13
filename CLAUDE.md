@@ -219,6 +219,13 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+  **The page reads top to bottom, never as two columns of cards**: a header
+  (initials avatar, the name and its pills, the `link` fields as a row of quick
+  facts, the actions), then Details with the Notes column beside it, then
+  `ui/tabs` — Overview (highlights that jump to a tab, relationships, the latest
+  activity), Activity, the sections only some kinds have (Addresses, Billing,
+  Photos, Conversation) and one tab per related-records group. A new section is
+  a tab, drawn only while active; never a card appended below the tabs.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
