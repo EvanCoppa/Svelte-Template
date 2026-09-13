@@ -380,15 +380,24 @@
 
 	const paymentColumns = paymentColumnHelper.columns([
 		DataTable.selectColumn(paymentColumnHelper),
+		// The search box scans this column only; the status is a filter over
+		// whatever values the rows hold (`options: null`).
 		paymentColumnHelper.accessor('email', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' }),
+			enableGlobalFilter: true,
+			meta: { title: 'Email' }
 		}),
 		paymentColumnHelper.accessor('status', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
+			enableGlobalFilter: false,
+			filterFn: 'oneOf',
+			meta: { title: 'Status', filter: { options: null } }
 		}),
 		paymentColumnHelper.accessor('amount', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Amount' }),
-			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.amount })
+			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.amount }),
+			enableGlobalFilter: false,
+			meta: { title: 'Amount' }
 		})
 	]);
 
@@ -408,10 +417,6 @@
 		},
 		onRowSelectionChange: setPaymentSelection
 	});
-
-	const paymentEmailFilter = $derived(
-		String(paymentsTable.getColumn('email')?.getFilterValue() ?? '')
-	);
 
 	// Map — the page owns the pins and the style; the compound draws them.
 	const map = mapConfig();
@@ -3363,8 +3368,11 @@
 				<code>@tanstack/svelte-table</code> and the table primitives above. The page owns the rows,
 				builds its columns with <code>createColumnHelper</code> and creates the table with
 				<code>createTable</code> against the shared <code>DataTable.features</code> preset; the
-				parts render it. The toolbar row here is page markup — search inputs and
-				<code>ViewOptions</code> compose per page — and the checkbox column is
+				parts render it. <code>DataTable.Toolbar</code> is the row over the table:
+				<code>Search</code> scans the columns that opt in with <code>enableGlobalFilter</code>,
+				<code>Filters</code> draws a multi-select for every column whose <code>meta.filter</code> is
+				set, and <code>ViewOptions</code> sits at the end. A list page gets all of that from its
+				fields (docs/lists.md); the checkbox column is
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
@@ -3375,15 +3383,11 @@
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
 			<DataTable.Root table={paymentsTable} pageSize={5}>
-				<div class="flex items-center gap-2">
-					<Input
-						placeholder="Filter emails…"
-						value={paymentEmailFilter}
-						oninput={(e) => paymentsTable.getColumn('email')?.setFilterValue(e.currentTarget.value)}
-						class="max-w-sm"
-					/>
+				<DataTable.Toolbar>
+					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
+					<DataTable.Filters />
 					<DataTable.ViewOptions class="ms-auto" />
-				</div>
+				</DataTable.Toolbar>
 				<DataTable.Content />
 				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>

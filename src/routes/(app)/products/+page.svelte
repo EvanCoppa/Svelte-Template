@@ -1,61 +1,21 @@
 <script lang="ts">
-	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { PRODUCT_KIND_TONE } from '$lib/crm/tones';
-	import type { ProductWithCategory } from '$lib/server/crm/products';
+	import { recordTerms } from '$lib/crm/records';
+	import { createListTable } from '$lib/lists/table';
 
 	let { data } = $props();
 
 	const terms = $derived(recordTerms(page.data.terms, 'product'));
 
-	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-
-	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, ProductWithCategory>();
-	const columns = columnHelper.columns([
-		DataTable.selectColumn(columnHelper),
-		columnHelper.accessor('name', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' }),
-			cell: ({ getValue, row }) =>
-				DataTable.linkCell(getValue(), recordHref('product', row.original.id))
-		}),
-		columnHelper.accessor('kind', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Kind' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), PRODUCT_KIND_TONE[getValue()])
-		}),
-		columnHelper.accessor((row) => row.product_categories?.name ?? '—', {
-			id: 'category',
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Category' })
-		}),
-		columnHelper.accessor('sku', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'SKU' }),
-			cell: ({ getValue }) => getValue() ?? '—'
-		}),
-		columnHelper.accessor('unit_price', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Price' }),
-			cell: ({ getValue, row }) => {
-				const unit = row.original.unit;
-				return unit ? `${usd.format(getValue())} / ${unit}` : usd.format(getValue());
-			}
-		}),
-		// Only goods carry stock, so a service reads as a dash rather than a
-		// misleading zero.
-		columnHelper.accessor('quantity_on_hand', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'On hand' }),
-			cell: ({ getValue, row }) => (row.original.track_inventory ? String(getValue() ?? 0) : '—')
-		})
-	]);
-
-	const table = createTable({
-		features: DataTable.features,
-		get data() {
-			return data.products;
-		},
-		columns
-	});
+	// The columns, the search and the filters are the list's fields as the
+	// org's industry has them (docs/lists.md); the page only composes the parts.
+	const table = createListTable(
+		() => data.list,
+		() => page.data.terms
+	);
 </script>
 
 <div class="space-y-6">
@@ -69,7 +29,12 @@
 	</PageHeader.Root>
 
 	<DataTable.Root {table}>
-		<DataTable.Content />
+		<DataTable.Toolbar>
+			<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+			<DataTable.Filters />
+			<DataTable.ViewOptions class="ms-auto" />
+		</DataTable.Toolbar>
+		<DataTable.Content emptyMessage="No {terms.plural} match." />
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>

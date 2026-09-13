@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
 import type { FeatureRegistryRow, PageRow } from '$lib/features/types';
+import type { ListRegistry } from '$lib/lists/resolve';
 import type { ViewRegistryRow } from '$lib/views/resolve';
 import { resolveVocabulary, type TermRegistryRow, type Vocabulary } from '$lib/features/vocabulary';
 import { ensure, unwrap } from './crm/unwrap';
@@ -56,11 +57,27 @@ export async function loadViewRegistry(
 	supabase: SupabaseClient<Database>
 ): Promise<ViewRegistryRow[]> {
 	return unwrap(
-		await supabase
-			.from('views')
-			.select('id, source, filter, columns, layouts, default_layout')
-			.order('id')
+		await supabase.from('views').select('id, source, filter, layouts, default_layout').order('id')
 	);
+}
+
+/**
+ * Every list's fields and every industry's say on them (the list_fields
+ * migration) — what `resolveList()` folds per list per industry. Two small
+ * reference tables in one round trip; the resolver picks the list's rows.
+ */
+export async function loadListRegistry(supabase: SupabaseClient<Database>): Promise<ListRegistry> {
+	const [defaults, industries] = await Promise.all([
+		supabase
+			.from('list_fields')
+			.select('feature_id, field, label, shown, searchable, filterable, sort_order')
+			.order('sort_order'),
+		supabase
+			.from('industry_list_fields')
+			.select('industry_id, feature_id, field, label, shown, searchable, filterable, sort_order')
+			.order('sort_order')
+	]);
+	return { defaults: unwrap(defaults), industries: unwrap(industries) };
 }
 
 /**

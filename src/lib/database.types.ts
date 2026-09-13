@@ -607,6 +607,9 @@ export type Database = {
           id: string
           key: string
           label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
           org_id: string
           updated_at: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -618,6 +621,9 @@ export type Database = {
           id?: string
           key: string
           label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id: string
           updated_at?: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -629,6 +635,9 @@ export type Database = {
           id?: string
           key?: string
           label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id?: string
           updated_at?: string
           value_type?: Database["public"]["Enums"]["custom_field_value_type"]
@@ -951,6 +960,53 @@ export type Database = {
         }
         Relationships: []
       }
+      industry_custom_fields: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id?: string
+          key?: string
+          label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type?: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_custom_fields_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_features: {
         Row: {
           created_at: string
@@ -986,6 +1042,57 @@ export type Database = {
           },
           {
             foreignKeyName: "industry_features_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_list_fields: {
+        Row: {
+          created_at: string
+          feature_id: string
+          field: string
+          filterable: boolean | null
+          industry_id: string
+          label: string | null
+          searchable: boolean | null
+          shown: boolean | null
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          field: string
+          filterable?: boolean | null
+          industry_id: string
+          label?: string | null
+          searchable?: boolean | null
+          shown?: boolean | null
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          field?: string
+          filterable?: boolean | null
+          industry_id?: string
+          label?: string | null
+          searchable?: boolean | null
+          shown?: boolean | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_list_fields_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "industry_list_fields_industry_id_fkey"
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "industries"
@@ -1220,6 +1327,47 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      list_fields: {
+        Row: {
+          created_at: string
+          feature_id: string
+          field: string
+          filterable: boolean
+          label: string | null
+          searchable: boolean
+          shown: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          field: string
+          filterable?: boolean
+          label?: string | null
+          searchable?: boolean
+          shown?: boolean
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          field?: string
+          filterable?: boolean
+          label?: string | null
+          searchable?: boolean
+          shown?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_fields_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
             referencedColumns: ["id"]
           },
         ]
@@ -3546,7 +3694,6 @@ export type Database = {
       }
       views: {
         Row: {
-          columns: string[]
           created_at: string
           default_layout: string
           filter: Json
@@ -3555,7 +3702,6 @@ export type Database = {
           source: Database["public"]["Enums"]["crm_entity_type"]
         }
         Insert: {
-          columns: string[]
           created_at?: string
           default_layout?: string
           filter?: Json
@@ -3564,7 +3710,6 @@ export type Database = {
           source: Database["public"]["Enums"]["crm_entity_type"]
         }
         Update: {
-          columns?: string[]
           created_at?: string
           default_layout?: string
           filter?: Json
@@ -3588,6 +3733,7 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      create_industry_custom_fields: { Args: { org: string }; Returns: undefined }
     }
     Enums: {
       activity_direction: "inbound" | "outbound"

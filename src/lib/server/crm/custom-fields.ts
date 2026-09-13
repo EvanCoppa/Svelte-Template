@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '$lib/database.types';
-import type { CrmEntityRef } from './entity';
+import type { CrmEntityRef, CrmEntityType } from './entity';
 import { unwrap } from './unwrap';
 
 /**
@@ -12,6 +12,10 @@ import { unwrap } from './unwrap';
  *
  * Reads only, for now; declaring fields is a settings screen and filling
  * them in belongs to a record's edit form, both following companies.ts.
+ * The record page reads one record's fields (`listCustomFields()`); a list
+ * page reads the kind's definitions and every listed record's values in
+ * two reads (`listCustomFieldDefinitions()`, `listCustomFieldValuesFor()`),
+ * the shape the industry's list fields resolve against ($lib/lists).
  */
 
 export type CustomFieldDefinition = Tables<'custom_field_definitions'>;
@@ -51,4 +55,42 @@ export async function listCustomFields(
 		definition,
 		value: byDefinition.get(definition.id) ?? null
 	}));
+}
+
+/** Every field the org declares for a kind, by label — what a list resolves `custom:<key>` against. */
+export async function listCustomFieldDefinitions(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType
+): Promise<CustomFieldDefinition[]> {
+	return unwrap(
+		await supabase
+			.from('custom_field_definitions')
+			.select('*')
+			.eq('org_id', orgId)
+			.eq('entity_type', entityType)
+			.order('label')
+	);
+}
+
+/**
+ * The custom values of many records of one kind in one read — what a list
+ * page needs to fill a custom field's column. Nothing to look up is nothing
+ * to fetch.
+ */
+export async function listCustomFieldValuesFor(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType,
+	entityIds: readonly string[]
+): Promise<CustomFieldValue[]> {
+	if (entityIds.length === 0) return [];
+	return unwrap(
+		await supabase
+			.from('custom_field_values')
+			.select('*')
+			.eq('org_id', orgId)
+			.eq('entity_type', entityType)
+			.in('entity_id', [...entityIds])
+	);
 }

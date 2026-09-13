@@ -629,6 +629,12 @@ insert into public.custom_field_definitions (id, org_id, entity_type, key, label
 		'contact', 'preferred_channel', 'Preferred channel', 'select', '["email", "phone", "text"]')
 on conflict (id) do nothing;
 
+-- The org's own field on its own list (the industry_custom_fields
+-- migration): its flags put it on the Contacts table from the start, and
+-- offer its three choices as a filter.
+update public.custom_field_definitions set list_shown = true, list_filterable = true
+where id = 'a3000000-0000-0000-0000-000000000004';
+
 insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_text) values
 	('a4000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001',
 		'contact', '30000000-0000-0000-0000-000000000003',
@@ -1035,6 +1041,35 @@ insert into public.assets (id, org_id, name, asset_type, identifier, status, acq
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
 
+-- Marigold Beverage's assets are out in the field. The beverage industry ships
+-- the Location and Serial number fields (the industry_custom_fields migration),
+-- so the org's definitions already exist by the time this runs — the values
+-- below look them up by key rather than naming an id.
+insert into public.assets (id, org_id, name, asset_type, identifier, status, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0013-000000000001', '10000000-0000-0000-0000-000000000013',
+		'Draft tower, 4-tap', 'tap', 'TAP-0041', 'active', '2025-03-10', 1850.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0013-000000000002', '10000000-0000-0000-0000-000000000013',
+		'Glass-door cooler', 'cooler', 'CLR-0107', 'active', '2025-05-22', 2400.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0013-000000000003', '10000000-0000-0000-0000-000000000013',
+		'Half-barrel keg', 'keg', 'KEG-2210', 'inactive', '2024-11-02', 160.00,
+		'00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.custom_field_values (org_id, entity_type, entity_id, field_definition_id, value_text) values
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000001',
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000013' and entity_type = 'asset' and key = 'location'), 'Route 1'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000001',
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000013' and entity_type = 'asset' and key = 'serial_number'), 'MB-TT4-88213'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000002',
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000013' and entity_type = 'asset' and key = 'location'), 'Route 2'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000002',
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000013' and entity_type = 'asset' and key = 'serial_number'), 'GD-C-5510'),
+	('10000000-0000-0000-0000-000000000013', 'asset', 'f1000000-0000-0000-0013-000000000003',
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000013' and entity_type = 'asset' and key = 'location'), 'Warehouse')
+on conflict (entity_type, entity_id, field_definition_id) do nothing;
+
 insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, ended_on, notes, created_by) values
 	-- The laptop is assigned to dev, who works here.
 	('f2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
@@ -1265,33 +1300,13 @@ where s.org_id in ('10000000-0000-0000-0000-000000000015', '10000000-0000-0000-0
 	and not exists (select 1 from public.deals d where d.stage_id = s.id);
 
 -- MID, MCC, average ticket and current processor — the four things a rep
--- looks up about a merchant, as custom fields on `company`. They are per-org
--- working data, not reference data, so every org in the vertical needs its
--- own set; the migration's closing comment says what it would take to hand
--- them to a new org automatically.
+-- looks up about a merchant — are the industry's custom fields on `company`
+-- (the industry_custom_fields migration): both orgs received them when they
+-- were inserted above, so the values below look each field up by key.
 --
--- `mid` and `mcc` are text, not numeric, because both are identifiers whose
--- leading zeros matter. And `mid` holds ONE value, which is honest only
--- while a merchant has one MID — a business with three locations wants
--- merchant accounts as a record kind of their own.
-insert into public.custom_field_definitions (id, org_id, entity_type, key, label, value_type) values
-	('a9000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
-		'company', 'mid', 'MID', 'text'),
-	('a9000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
-		'company', 'mcc', 'MCC', 'text'),
-	('a9000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015',
-		'company', 'average_ticket', 'Average ticket', 'numeric'),
-	('a9000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015',
-		'company', 'current_processor', 'Current processor', 'text'),
-	('a9000000-0000-0000-0007-000000000011', '10000000-0000-0000-0000-000000000016',
-		'company', 'mid', 'MID', 'text'),
-	('a9000000-0000-0000-0007-000000000012', '10000000-0000-0000-0000-000000000016',
-		'company', 'mcc', 'MCC', 'text'),
-	('a9000000-0000-0000-0007-000000000013', '10000000-0000-0000-0000-000000000016',
-		'company', 'average_ticket', 'Average ticket', 'numeric'),
-	('a9000000-0000-0000-0007-000000000014', '10000000-0000-0000-0000-000000000016',
-		'company', 'current_processor', 'Current processor', 'text')
-on conflict (org_id, entity_type, key) do nothing;
+-- `mid` holds ONE value, which is honest only while a merchant has one MID —
+-- a business with three locations wants merchant accounts as a record kind
+-- of their own.
 
 -- The book. Deliberately unalike — a smoothie bar, a liquor store, a barber,
 -- a dental group — because "any business that takes money" is the whole
@@ -1327,27 +1342,27 @@ on conflict (id) do nothing;
 insert into public.custom_field_values (org_id, entity_type, entity_id, field_definition_id, value_text, value_numeric)
 values
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
-		'a9000000-0000-0000-0007-000000000001', '519000012345678', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'mid'), '519000012345678', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
-		'a9000000-0000-0000-0007-000000000002', '5812', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'mcc'), '5812', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
-		'a9000000-0000-0000-0007-000000000003', null, 9.40),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'average_ticket'), null, 9.40),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
-		'a9000000-0000-0000-0007-000000000004', 'Square', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'current_processor'), 'Square', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
-		'a9000000-0000-0000-0007-000000000001', '519000098765432', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'mid'), '519000098765432', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
-		'a9000000-0000-0000-0007-000000000002', '5921', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'mcc'), '5921', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
-		'a9000000-0000-0000-0007-000000000003', null, 42.15),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'average_ticket'), null, 42.15),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
-		'a9000000-0000-0000-0007-000000000004', 'Heartland', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'current_processor'), 'Heartland', null),
 	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000003',
-		'a9000000-0000-0000-0007-000000000004', 'Toast', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000015' and entity_type = 'company' and key = 'current_processor'), 'Toast', null),
 	('10000000-0000-0000-0000-000000000016', 'company', '20000000-0000-0000-0007-000000000006',
-		'a9000000-0000-0000-0007-000000000011', '442000011223344', null),
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000016' and entity_type = 'company' and key = 'mid'), '442000011223344', null),
 	('10000000-0000-0000-0000-000000000016', 'company', '20000000-0000-0000-0007-000000000006',
-		'a9000000-0000-0000-0007-000000000013', null, 16.80)
+		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000016' and entity_type = 'company' and key = 'average_ticket'), null, 16.80)
 on conflict (entity_type, entity_id, field_definition_id) do nothing;
 
 -- Where they are, so the Merchant map opens on pins rather than an empty map
