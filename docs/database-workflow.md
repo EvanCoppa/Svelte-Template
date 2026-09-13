@@ -42,6 +42,13 @@ The job runs in the `production` GitHub environment, so adding required reviewer
 gates every production schema change behind a human. A `concurrency` group keeps two
 deploys from interleaving on one migration history.
 
+**Before any of that, it checks whether the three secrets below are set.** If they are
+not, it skips the deploy and finishes green, with a `::warning::` on the run and a note in
+the job summary saying migrations were not applied. That keeps a fresh clone of this
+template from showing a red `main` it cannot fix — but it is loud rather than silent,
+because the same condition means a project that _was_ deploying has stopped. The warning
+names exactly which secret is missing.
+
 ## Preview branches (the expensive path)
 
 A Supabase preview branch is a **real, separately billed Postgres project**. The economics
