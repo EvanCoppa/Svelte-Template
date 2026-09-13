@@ -3405,13 +3405,15 @@
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
-				<code>pageSize</code>.
+				<code>pageSize</code>. A table wider than its screen scrolls sideways;
+				<code>&lt;DataTable.Content pinFirstColumn /&gt;</code> keeps the first column (and the checkbox
+				in front of it) in place while the rest scroll — narrow the window to see it.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
-			<DataTable.Root table={paymentsTable} pageSize={5}>
+			<DataTable.Root table={paymentsTable} pageSize={5} pinFirstColumn>
 				<DataTable.Toolbar>
 					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
 					<DataTable.Filters />

@@ -34,5 +34,17 @@
 				</DropdownMenu.CheckboxItem>
 			{/each}
 		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			<DropdownMenu.Label>Layout</DropdownMenu.Label>
+			<DropdownMenu.Separator />
+			<!-- Remembered per device for this page (`DataTable.Root`), like a board
+			     versus list choice: a wide screen and a narrow one want different answers. -->
+			<DropdownMenu.CheckboxItem
+				bind:checked={() => dataTable.pinFirstColumn, (v) => (dataTable.pinFirstColumn = !!v)}
+			>
+				Pin first column
+			</DropdownMenu.CheckboxItem>
+		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
