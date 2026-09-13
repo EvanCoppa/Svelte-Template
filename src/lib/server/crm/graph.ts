@@ -13,8 +13,14 @@ import type { Database } from '$lib/database.types';
 import type { TermsMap } from '$lib/features/terms';
 import { term, type Vocabulary } from '$lib/features/vocabulary';
 import { getDisplayNames } from '../profiles';
+import { listProposalGraphFacts, type ProposalGraphFact } from './proposals';
 import { listRecordNames, type CanOpen } from './records';
-import { listOrgRelationships } from './relationships';
+import {
+	listOrgRelationships,
+	listRelationshipTypes,
+	RELATIONSHIP_TYPE,
+	type RelationshipType
+} from './relationships';
 
 /**
  * The relationship graph, read whole — what the graph page draws.
@@ -51,8 +57,16 @@ export async function describeGraph(
 	terms: TermsMap
 ): Promise<GraphData> {
 	const kinds = RECORD_KINDS.filter((kind) => canOpen(kind));
-	const [rows, ...listed] = await Promise.all([
+	// A proposal's presenter, responsible member and parent link are drawn
+	// too, even though they stay plain columns on `proposals` rather than
+	// `relationships` rows (see the proposal_graph_edges migration for why) —
+	// fetched, and their labels resolved, only when the reader may open a
+	// proposal at all.
+	const drawsProposalFacts = canOpen('proposal');
+	const [rows, proposalFacts, relationshipTypes, ...listed] = await Promise.all([
 		listOrgRelationships(supabase, orgId),
+		drawsProposalFacts ? listProposalGraphFacts(supabase, orgId) : Promise.resolve([]),
+		drawsProposalFacts ? listRelationshipTypes(supabase, orgId) : Promise.resolve([]),
 		...kinds.map((kind) => listRecordNames(supabase, orgId, kind))
 	]);
 
@@ -67,13 +81,18 @@ export async function describeGraph(
 		}))
 	);
 
-	// Members join the map only where a relationship names one.
+	// Members join the map only where a relationship, or a proposal's
+	// presenter/responsible column, names one.
 	const memberIds = new Set(
 		rows.flatMap((row) => [
 			...(row.from_type === 'member' ? [row.from_id] : []),
 			...(row.to_type === 'member' ? [row.to_id] : [])
 		])
 	);
+	for (const fact of proposalFacts) {
+		if (fact.presenter_id) memberIds.add(fact.presenter_id);
+		if (fact.responsible_id) memberIds.add(fact.responsible_id);
+	}
 	const people = await getDisplayNames(supabase, [...memberIds]);
 	for (const [id, name] of people) {
 		nodes.push({ id: graphNodeId('member', id), kind: 'member', name, href: null });
@@ -98,12 +117,79 @@ export async function describeGraph(
 		];
 	});
 
+	if (drawsProposalFacts) {
+		const types = new Map(relationshipTypes.map((type) => [type.id, type]));
+		edges.push(...proposalGraphEdges(proposalFacts, types, drawn));
+	}
+
 	return {
 		nodes,
 		edges,
 		kinds: describeKinds(nodes, vocabulary, terms),
 		types: describeTypes(edges)
 	};
+}
+
+/**
+ * Presenter, responsible and parent-link edges, computed at read time from
+ * `proposals` columns rather than read from `relationships` — the row never
+ * exists, so there is nothing to keep in sync. Labelled from the same
+ * `relationship_types` rows a real edge would use, so the legend reads no
+ * differently; ids are synthetic (there is no `relationships` row behind
+ * them) but stable across loads. Filtered through `drawn` exactly like a
+ * real edge, so a kind or a proposal the reader may not open drops its edge
+ * for free.
+ */
+function proposalGraphEdges(
+	facts: readonly ProposalGraphFact[],
+	types: ReadonlyMap<string, RelationshipType>,
+	drawn: ReadonlySet<string>
+): GraphEdge[] {
+	const edge = (id: string, typeId: string, source: string, target: string): GraphEdge[] => {
+		const type = types.get(typeId);
+		if (!type || !drawn.has(source) || !drawn.has(target)) return [];
+		return [
+			{
+				id,
+				source,
+				target,
+				typeId,
+				label: type.forward_label,
+				inverseLabel: type.inverse_label,
+				ended: false
+			}
+		];
+	};
+
+	return facts.flatMap((fact): GraphEdge[] => {
+		const proposal = graphNodeId('proposal', fact.id);
+		return [
+			...(fact.presenter_id
+				? edge(
+						`proposal-presenter:${fact.id}`,
+						RELATIONSHIP_TYPE.presents,
+						graphNodeId('member', fact.presenter_id),
+						proposal
+					)
+				: []),
+			...(fact.responsible_id
+				? edge(
+						`proposal-responsible:${fact.id}`,
+						RELATIONSHIP_TYPE.responsibleFor,
+						graphNodeId('member', fact.responsible_id),
+						proposal
+					)
+				: []),
+			...(fact.entity_type && fact.entity_id
+				? edge(
+						`proposal-entity:${fact.id}`,
+						RELATIONSHIP_TYPE.proposedTo,
+						proposal,
+						graphNodeId(fact.entity_type, fact.entity_id)
+					)
+				: [])
+		];
+	});
 }
 
 /**
