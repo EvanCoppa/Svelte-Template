@@ -44,7 +44,16 @@ export type ListKind = (typeof LIST_KINDS)[number];
  * record, a payment state. An amount or a date cannot (`FILTERABLE_TYPES`).
  */
 export type FieldType =
-	'text' | 'number' | 'money' | 'boolean' | 'date' | 'datetime' | 'enum' | 'record' | 'payment';
+	| 'text'
+	| 'number'
+	| 'money'
+	| 'boolean'
+	| 'date'
+	| 'datetime'
+	| 'enum'
+	| 'record'
+	| 'person'
+	| 'payment';
 
 export const FILTERABLE_TYPES = [
 	'text',
@@ -90,6 +99,12 @@ export type ListCell =
 	| { type: 'status'; text: string; tone: BadgeTone }
 	/** Another record, linked when the reader may open its kind; blank when none. */
 	| { type: 'record'; text: string; href: string | null }
+	/**
+	 * A member of this org — an assignee, drawn as plain text like the record
+	 * page's `person` field (a member has no page of their own to link to;
+	 * the roster is where people who work here are read).
+	 */
+	| { type: 'person'; userId: string | null; name: string | null }
 	/** Plain text; blank when the column is empty (the page prints a dash). */
 	| { type: 'text'; text: string }
 	| { type: 'number'; value: number | null }

@@ -53,6 +53,8 @@ function renderCell(cell: ListCell, today: string) {
 		case 'record':
 			if (cell.text === '') return '—';
 			return cell.href === null ? cell.text : DataTable.linkCell(cell.text, cell.href);
+		case 'person':
+			return cell.name ?? '—';
 		case 'status':
 			return DataTable.statusCell(cell.text, cell.tone);
 		case 'text':

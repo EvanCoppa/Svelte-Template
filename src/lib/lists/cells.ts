@@ -43,6 +43,8 @@ export function cellText(cell: ListCell, today: string): string {
 		case 'record':
 		case 'text':
 			return cell.text;
+		case 'person':
+			return cell.name ?? '';
 		case 'number':
 		case 'money':
 			return cell.value === null ? '' : String(cell.value);

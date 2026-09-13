@@ -56,6 +56,8 @@ const enumOf = (label: string, tones: Record<string, BadgeTone>): FieldMeta => (
 });
 /** A field naming another kind of record, labelled by that kind's word. */
 const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, type: 'record' });
+/** A field naming a member of this org — an assignee, not a CRM record. */
+const person = (label: string): FieldMeta => ({ label: { text: label }, type: 'person' });
 
 /** A yes/no field's two values, as `cellText()` reads them. */
 export const BOOLEAN_OPTIONS: readonly FilterOption[] = [
@@ -91,6 +93,7 @@ export const LIST_FIELD_CATALOG = {
 		phone: text('Phone'),
 		website: text('Website'),
 		city: text('City'),
+		assigned_to: person('Assigned to'),
 		created_at: created
 	},
 	contact: {

@@ -94,20 +94,22 @@ describe('listRecords', () => {
 });
 
 describe('listNeeds', () => {
-	it('asks for addresses only for a city column and custom values only for a custom field', () => {
+	it('asks for addresses only for a city column, custom values only for a custom field, and assignees only for a person field', () => {
 		expect(listNeeds({ kind: 'company', fields: [field('name', 'text')] })).toEqual({
 			addresses: false,
-			customValues: false
+			customValues: false,
+			assignees: false
 		});
 		expect(
 			listNeeds({
 				kind: 'company',
 				fields: [
 					field('city', 'text'),
-					field('custom:mid', 'text', { custom: { definitionId: 'd', valueType: 'text' } })
+					field('custom:mid', 'text', { custom: { definitionId: 'd', valueType: 'text' } }),
+					field('assigned_to', 'person')
 				]
 			})
-		).toEqual({ addresses: true, customValues: true });
+		).toEqual({ addresses: true, customValues: true, assignees: true });
 	});
 });
 
@@ -120,12 +122,14 @@ describe('describeListRows', () => {
 				field('relationship', 'enum'),
 				field('phone', 'text'),
 				field('city', 'text'),
+				field('assigned_to', 'person'),
 				field('created_at', 'datetime')
 			]
 		};
 		const rows = describeListRows({ kind: 'company', rows: [steel] }, spec, () => true, {
 			addresses: [address],
-			customValues: []
+			customValues: [],
+			assignees: new Map([[STEEL, { userId: 'u1', name: 'Ada Lovelace' }]])
 		});
 		expect(rows).toEqual([
 			{
@@ -135,9 +139,26 @@ describe('describeListRows', () => {
 					{ type: 'status', text: 'supplier', tone: 'cyan' },
 					{ type: 'text', text: '+1 555 0180' },
 					{ type: 'text', text: 'Jersey City' },
+					{ type: 'person', userId: 'u1', name: 'Ada Lovelace' },
 					{ type: 'datetime', value: '2026-01-01T00:00:00Z' }
 				]
 			}
+		]);
+	});
+
+	it('reads a company with no open assignment as an empty person cell', () => {
+		const spec: ListSpec = {
+			kind: 'company',
+			fields: [field('name', 'text'), field('assigned_to', 'person')]
+		};
+		const [row] = describeListRows({ kind: 'company', rows: [steel] }, spec, () => true, {
+			addresses: [],
+			customValues: [],
+			assignees: new Map()
+		});
+		expect(row?.cells).toEqual([
+			{ type: 'link', text: 'Gotham Steel Supply', href: `/companies/${STEEL}` },
+			{ type: 'person', userId: null, name: null }
 		]);
 	});
 
@@ -170,7 +191,8 @@ describe('describeListRows', () => {
 		};
 		const [row] = describeListRows({ kind: 'asset', rows: [tap] }, spec, () => false, {
 			addresses: [],
-			customValues: [location]
+			customValues: [location],
+			assignees: new Map()
 		});
 		expect(row?.cells).toEqual([
 			{ type: 'link', text: 'Draft tower, 4-tap', href: null },
@@ -225,7 +247,7 @@ describe('describeListRows', () => {
 			{ kind: 'invoice', rows: [invoice] },
 			spec,
 			(kind) => kind === 'invoice',
-			{ addresses: [], customValues: [] }
+			{ addresses: [], customValues: [], assignees: new Map() }
 		);
 		expect(row?.cells).toEqual([
 			{ type: 'link', text: 'INV-0001', href: '/invoices/i1' },
@@ -242,7 +264,7 @@ describe('describeListRows', () => {
 				{ kind: 'asset', rows: [tap] },
 				{ kind: 'company', fields: [field('name', 'text')] },
 				() => true,
-				{ addresses: [], customValues: [] }
+				{ addresses: [], customValues: [], assignees: new Map() }
 			)
 		).toEqual([]);
 	});

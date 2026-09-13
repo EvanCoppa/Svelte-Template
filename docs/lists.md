@@ -87,8 +87,12 @@ a 500.
 
 The server describes; the page draws. `describeListRows()`
 (`src/lib/server/crm/lists.ts`) turns each row into a `ListRow` of cells **typed by
-how they render** — `link`, `status`, `record`, `text`, `number`, `money`, `boolean`,
-`date`, `datetime`, `payment` — the rule `RecordDetail` follows on the record page. A
+how they render** — `link`, `status`, `record`, `person`, `text`, `number`, `money`,
+`boolean`, `date`, `datetime`, `payment` — the rule `RecordDetail` follows on the record
+page. A `person` field names a member of the org rather than a CRM record — an
+assignee, drawn as plain text like the record page's own `person` field — and is
+filled from the relationship graph (`listAssignedMembers()`), not a column, so a list's
+"Assigned to" and `/graph`'s edges read the same rows. A
 built-in field is a switch on the kind's catalog key (so a key the catalog has and the
 describer cannot fill is a `check` error); a custom field is read from the values
 fetched for the rows, in the column its definition's type names. A name or a party

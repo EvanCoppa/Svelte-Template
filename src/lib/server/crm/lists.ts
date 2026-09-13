@@ -16,6 +16,7 @@ import {
 import type { Database } from '$lib/database.types';
 import { BILLABLE_STATUS_TONE, isCatalogKey, type CatalogKey } from '$lib/lists/catalog';
 import type { ListCell, ListField, ListKind, ListRow, ListSpec } from '$lib/lists/types';
+import { getDisplayNames } from '../profiles';
 import type { Address } from './addresses';
 import { listAssets, type Asset } from './assets';
 import { listBillables, type Billable } from './billables';
@@ -23,10 +24,12 @@ import { listCompanies, type Company } from './companies';
 import { listContacts, type ContactWithCompany } from './contacts';
 import type { CustomFieldValue } from './custom-fields';
 import { listDeals, type DealWithParties } from './deals';
+import type { CrmEntityType } from './entity';
 import { listInvoices, type InvoiceWithParties } from './invoices';
 import { listProducts, type ProductWithCategory } from './products';
 import { listProposals, type ProposalWithOptions } from './proposals';
 import type { CanOpen } from './records';
+import { listRelationshipsFrom, RELATIONSHIP_TYPE } from './relationships';
 import { listTickets, type TicketWithParties } from './tickets';
 
 /**
@@ -94,19 +97,59 @@ export function resultIds(result: ListResult): string[] {
  * the records' addresses for a `city` field, their custom values for a
  * custom field. The load reads exactly these.
  */
-export type ListNeeds = { addresses: boolean; customValues: boolean };
+export type ListNeeds = { addresses: boolean; customValues: boolean; assignees: boolean };
 
 export function listNeeds(spec: ListSpec): ListNeeds {
 	return {
 		addresses: spec.fields.some((field) => field.key === 'city'),
-		customValues: spec.fields.some((field) => field.custom !== null)
+		customValues: spec.fields.some((field) => field.custom !== null),
+		assignees: spec.fields.some((field) => field.type === 'person')
 	};
 }
 
 export type ListExtras = {
 	addresses: readonly Address[];
 	customValues: readonly CustomFieldValue[];
+	assignees: ReadonlyMap<string, { userId: string; name: string }>;
 };
+
+/**
+ * Who each record is assigned to — the `assigned_to` relationship
+ * (`RELATIONSHIP_TYPE.assignedTo`), not a column, so the graph and a list's
+ * "Assigned to" column read the same rows. One query for every row of a
+ * page (`listRelationshipsFrom()`), plus one naming the assigned members
+ * (`getDisplayNames()`, the way `getRelationships()` names a related
+ * member); an id with no open assignment, or whose relationship points
+ * somewhere other than a member, has no entry.
+ */
+export async function listAssignedMembers(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType,
+	entityIds: readonly string[]
+): Promise<ReadonlyMap<string, { userId: string; name: string }>> {
+	const rows = await listRelationshipsFrom(supabase, orgId, entityType, entityIds, {
+		typeId: RELATIONSHIP_TYPE.assignedTo,
+		openOnly: true
+	});
+
+	// Newest first (`listRelationshipsFrom()`'s order): keep only the most
+	// recent assignment per record.
+	const memberIdByRecord = new Map<string, string>();
+	for (const row of rows) {
+		if (row.to_type === 'member' && !memberIdByRecord.has(row.from_id)) {
+			memberIdByRecord.set(row.from_id, row.to_id);
+		}
+	}
+
+	const people = await getDisplayNames(supabase, [...memberIdByRecord.values()]);
+	const assignees = new Map<string, { userId: string; name: string }>();
+	for (const [recordId, userId] of memberIdByRecord) {
+		const name = people.get(userId);
+		if (name) assignees.set(recordId, { userId, name });
+	}
+	return assignees;
+}
 
 /** The first address listed for each record — the primary one, the way `listAddressesFor()` orders them. */
 function firstAddressByRecord(addresses: readonly Address[]): Map<string, Address> {
@@ -196,6 +239,14 @@ export function describeListRows(
 						return text(company.website);
 					case 'city':
 						return text(cityOf.get(company.id)?.city);
+					case 'assigned_to': {
+						const assignee = extras.assignees.get(company.id);
+						return {
+							type: 'person',
+							userId: assignee?.userId ?? null,
+							name: assignee?.name ?? null
+						};
+					}
 					case 'created_at':
 						return datetime(company.created_at);
 				}

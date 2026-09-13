@@ -5,7 +5,14 @@ import { resolveList } from '$lib/lists/resolve';
 import type { ListKind, ListRow, ListSpec } from '$lib/lists/types';
 import { listAddressesFor } from './crm/addresses';
 import { listCustomFieldDefinitions, listCustomFieldValuesFor } from './crm/custom-fields';
-import { describeListRows, listNeeds, listRecords, resultIds, type ListResult } from './crm/lists';
+import {
+	describeListRows,
+	listAssignedMembers,
+	listNeeds,
+	listRecords,
+	resultIds,
+	type ListResult
+} from './crm/lists';
 import { loadListRegistry } from './features';
 import { hasGrant } from './roles';
 
@@ -55,15 +62,20 @@ export async function loadList(
 	]);
 	const spec = resolveList(result.kind, featureId, registry, activeOrg.industryId, customFields);
 
-	// Only what the spec draws: a list with no city column reads no addresses.
+	// Only what the spec draws: a list with no city column reads no addresses,
+	// and no "Assigned to" column reads no relationships.
 	const needs = listNeeds(spec);
 	const ids = resultIds(result);
-	const [addresses, customValues] = await Promise.all([
+	const [addresses, customValues, assignees] = await Promise.all([
 		needs.addresses ? listAddressesFor(supabase, activeOrgId, result.kind, ids) : [],
-		needs.customValues ? listCustomFieldValuesFor(supabase, activeOrgId, result.kind, ids) : []
+		needs.customValues ? listCustomFieldValuesFor(supabase, activeOrgId, result.kind, ids) : [],
+		needs.assignees ? listAssignedMembers(supabase, activeOrgId, result.kind, ids) : new Map()
 	]);
 
 	return {
-		list: { spec, rows: describeListRows(result, spec, canOpen, { addresses, customValues }) }
+		list: {
+			spec,
+			rows: describeListRows(result, spec, canOpen, { addresses, customValues, assignees })
+		}
 	};
 }
