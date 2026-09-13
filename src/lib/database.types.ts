@@ -3733,7 +3733,10 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
-      create_industry_custom_fields: { Args: { org: string }; Returns: undefined }
+      create_industry_custom_fields: {
+        Args: { org: string }
+        Returns: undefined
+      }
     }
     Enums: {
       activity_direction: "inbound" | "outbound"
@@ -3835,7 +3838,7 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
-      task_status: "todo" | "in_progress" | "blocked" | "done"
+      task_status: "todo" | "in_progress" | "blocked" | "in_review" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -4072,7 +4075,7 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
-      task_status: ["todo", "in_progress", "blocked", "done"],
+      task_status: ["todo", "in_progress", "blocked", "in_review", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
   },

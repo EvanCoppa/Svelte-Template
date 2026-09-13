@@ -19,7 +19,8 @@ Nothing outside those two modules and the record page knows how any of it is sto
 
 ## Where it sits, when it finished, how urgent it is
 
-`status` (`public.task_status`: `todo` / `in_progress` / `blocked` / `done`) says
+`status` (`public.task_status`: `todo` / `in_progress` / `blocked` / `in_review` /
+`done`) says
 WHERE a task sits; `completed_at` says WHEN it was finished. They are not two ways
 to say the same thing, and `private.tasks_sync_completion()` (the task board
 migration) keeps the one relationship between them — `status = 'done'` exactly when
@@ -90,6 +91,7 @@ it are what a task is actually in:
 | ----------- | ------------------------ |
 | To do       | `todo`                   |
 | In progress | `in_progress`, `blocked` |
+| In review   | `in_review`              |
 | Done        | `done`                   |
 
 Nobody scanning a wall wants a separate column to find the one piece of work that is
@@ -99,12 +101,21 @@ things to know about a card. So they share a column, the card says which it is
 under "In progress" is news rather than the same word twice), and dragging onto that
 column splits it into a drop zone per status and asks.
 
+`in_review` does **not** share that column, for the same reason `blocked` does: the
+question a column answers is whose the work is. Everything under In progress is the
+doer's; a task in review is the reader's, and work waiting on somebody who is not
+looking at the board is exactly what a board exists to show. It is not `done` either
+— `done` is pinned to `completed_at`, so parking a task there would claim a
+finishing time for work that can still come back.
+
 **A group is never a state.** `TASK_STATUS_GROUPS[1].id` is `doing`, and nothing is
 ever stored as `doing`: `onmove` is called with a status, the `move` action's schema
 is `z.enum(TASK_STATUSES)`, and a group id would be rejected there. Regrouping the
 columns is an edit to one array in `src/lib/crm/tones.ts`; adding a _status_ is a
-migration and a change to the four states the enum deliberately holds (CLAUDE.md,
-"A task has a column AND a finishing time" — there is no `cancelled`).
+migration and a change to the states the enum deliberately holds — what `in_review`
+took (the task in-review migration), and what a `cancelled` state is still refused
+(CLAUDE.md, "A task has a column AND a finishing time": `completed_at` can only be
+honest about one closed state).
 
 A test in `src/lib/crm/tasks.test.ts` pins the invariant that ties the two axes
 together: every status appears in exactly one group, in workflow order. A status
