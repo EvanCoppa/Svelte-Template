@@ -40,6 +40,13 @@ need nothing different — and `views.columns` is gone: a view's columns are its
   them by key: every org in the industry that has declared the field gets the column,
   and one that has not simply does not (the resolver drops the row, never errors).
 
+**Extra custom fields.** A custom field the org declared that no row names is still
+part of the kind's list — appended after the listed fields, in label order, neither
+searched nor filtered — and the definition's own `is_default_shown` flag
+(`custom_field_default_shown` migration) says whether it starts as a visible column
+or waits behind the table's View menu. An org therefore puts a field on its own table
+with no migration at all; a row naming the field wins over the flag.
+
 Four flags, one meaning each: `shown` is a column on the table (a hidden field still
 searches and filters, and the reader can switch it on from `ViewOptions`);
 `searchable` puts it under the search box; `filterable` gives it a multi-select in the
@@ -154,6 +161,9 @@ columns and nothing else.
 - **A custom field on an industry's list**: no code — insert an `industry_list_fields`
   row naming `custom:<key>`. Every org in that industry that has declared the field
   sees it.
+- **An org's own custom field on its own list**: nothing at all — every declared field
+  is already a column; set `is_default_shown` on the definition to have it start
+  visible.
 - **An industry that wants a default column hidden, searchable, or renamed**: one
   `industry_list_fields` row setting only that column, the rest null.
 - **A new kind of list**: add the kind to `LIST_KINDS`, its catalog entry, a branch in

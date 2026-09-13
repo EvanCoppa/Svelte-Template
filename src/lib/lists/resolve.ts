@@ -49,7 +49,7 @@ export type ListRegistry = {
 /** What the resolver needs of a custom field definition — client-safe, no org id. */
 export type CustomFieldSummary = Pick<
 	Tables<'custom_field_definitions'>,
-	'id' | 'key' | 'label' | 'value_type' | 'allowed_values'
+	'id' | 'key' | 'label' | 'value_type' | 'allowed_values' | 'is_default_shown'
 >;
 
 export const CUSTOM_FIELD_PREFIX = 'custom:';
@@ -102,6 +102,22 @@ export function resolveList(
 	const fields: ListField[] = [];
 	for (const row of [...merged.values()].sort(bySortOrder)) {
 		const field = fieldFor(kind, featureId, row, byKey);
+		if (field) fields.push(field);
+	}
+
+	// The org's own fields that no row names are part of the list too — after
+	// the listed ones, in label order — and the definition says whether each
+	// starts shown (`is_default_shown`) or waits behind the View menu. Neither
+	// searched nor filtered: a row can promise that, a definition cannot.
+	for (const definition of customFields) {
+		const key = `${CUSTOM_FIELD_PREFIX}${definition.key}`;
+		if (merged.has(key)) continue;
+		const field = fieldFor(
+			kind,
+			featureId,
+			{ ...ADDED_DEFAULTS, field: key, shown: definition.is_default_shown, sort_order: null },
+			byKey
+		);
 		if (field) fields.push(field);
 	}
 

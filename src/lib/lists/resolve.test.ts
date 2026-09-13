@@ -72,14 +72,24 @@ const location: CustomFieldSummary = {
 	key: 'location',
 	label: 'Location',
 	value_type: 'select',
-	allowed_values: ['Warehouse', 'Route 1']
+	allowed_values: ['Warehouse', 'Route 1'],
+	is_default_shown: false
 };
 const serial: CustomFieldSummary = {
 	id: 'd2',
 	key: 'serial_number',
 	label: 'Serial number',
 	value_type: 'text',
-	allowed_values: null
+	allowed_values: null,
+	is_default_shown: false
+};
+const calibrated: CustomFieldSummary = {
+	id: 'd3',
+	key: 'calibrated',
+	label: 'Calibrated',
+	value_type: 'boolean',
+	allowed_values: null,
+	is_default_shown: true
 };
 
 describe('resolveList', () => {
@@ -141,6 +151,37 @@ describe('resolveList', () => {
 			searchable: true,
 			filterable: false,
 			custom: { definitionId: 'd2', valueType: 'text' }
+		});
+	});
+
+	it('appends the org’s own custom fields no row names, shown only when the definition says so', () => {
+		const spec = resolveList('asset', 'assets', registry, 'crm', [serial, calibrated]);
+		expect(spec.fields.map((field) => field.key)).toEqual([
+			'name',
+			'identifier',
+			'purchase_price',
+			'status',
+			'custom:serial_number',
+			'custom:calibrated'
+		]);
+		expect(spec.fields[4]).toMatchObject({
+			shown: false,
+			searchable: false,
+			filterable: false,
+			custom: { definitionId: 'd2', valueType: 'text' }
+		});
+		expect(spec.fields[5]).toMatchObject({
+			label: { text: 'Calibrated' },
+			type: 'boolean',
+			shown: true
+		});
+
+		// A row naming the field wins over the flag: beverage lists serial_number as searchable.
+		const listed = resolveList('asset', 'assets', registry, 'beverage', [serial]);
+		expect(listed.fields.filter((field) => field.key === 'custom:serial_number')).toHaveLength(1);
+		expect(listed.fields.find((field) => field.key === 'custom:serial_number')).toMatchObject({
+			shown: true,
+			searchable: true
 		});
 	});
 

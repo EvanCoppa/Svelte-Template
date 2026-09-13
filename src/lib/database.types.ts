@@ -605,6 +605,7 @@ export type Database = {
           created_at: string
           entity_type: Database["public"]["Enums"]["crm_entity_type"]
           id: string
+          is_default_shown: boolean
           key: string
           label: string
           org_id: string
@@ -616,6 +617,7 @@ export type Database = {
           created_at?: string
           entity_type: Database["public"]["Enums"]["crm_entity_type"]
           id?: string
+          is_default_shown?: boolean
           key: string
           label: string
           org_id: string
@@ -627,6 +629,7 @@ export type Database = {
           created_at?: string
           entity_type?: Database["public"]["Enums"]["crm_entity_type"]
           id?: string
+          is_default_shown?: boolean
           key?: string
           label?: string
           org_id?: string

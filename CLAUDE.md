@@ -250,7 +250,9 @@ application data is scoped to an organization, never to a bare user. The
   (`LIST_FIELD_CATALOG`, which says what each renders as) or `custom:<key>`, one of
   the org's custom field definitions named by key — so an industry puts a serial
   number or a MID on a table and in the filters with no code, and an org that never
-  declared the field sees the defaults. `resolveList()` folds them into a `ListSpec`
+  declared the field sees the defaults. A custom field no row names is still a
+  column of its kind's list, after the listed ones, and the definition's
+  `is_default_shown` says whether it starts visible or waits behind the View menu. `resolveList()` folds them into a `ListSpec`
   (throwing with the list's id on a key the catalog lacks or a filter on an amount or
   a date — only text, enum, boolean, record and payment fields filter);
   `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);

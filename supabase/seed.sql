@@ -629,6 +629,12 @@ insert into public.custom_field_definitions (id, org_id, entity_type, key, label
 		'contact', 'preferred_channel', 'Preferred channel', 'select', '["email", "phone", "text"]')
 on conflict (id) do nothing;
 
+-- The org's own field on its own list (the custom_field_default_shown
+-- migration): no industry row names it, so the flag is what puts it on the
+-- Contacts table from the start rather than behind the View menu.
+update public.custom_field_definitions set is_default_shown = true
+where id = 'a3000000-0000-0000-0000-000000000004';
+
 insert into public.custom_field_values (id, org_id, entity_type, entity_id, field_definition_id, value_text) values
 	('a4000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001',
 		'contact', '30000000-0000-0000-0000-000000000003',
