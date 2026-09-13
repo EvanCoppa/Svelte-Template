@@ -29,6 +29,8 @@ export const LIST_KINDS = [
 	'company',
 	'contact',
 	'product',
+	'property',
+	'lease',
 	'deal',
 	'proposal',
 	'invoice',

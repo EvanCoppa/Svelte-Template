@@ -6,10 +6,15 @@
  * **A lease has no status column** (the properties_and_leases migration,
  * decision 2). Whether one is upcoming, running or finished is a question
  * about a day, and a day is a wall-clock word — so it is answered here, by a
- * function that takes the date as an argument, and the pages pass the
+ * function that takes the date as an argument, for a caller that passes the
  * viewer's own (`localDate(new Date())`). That is the rule the ledger's
  * "overdue" and the task board's "today" already follow: nothing on the
  * server decides what now means.
+ *
+ * The rent roll's columns are its `list_fields` rows and are described on the
+ * server, so they carry the STORED half — the dates, and fixed vs
+ * month-to-month. This is the half a screen computes for itself, and it is
+ * what the delinquency view will be built on.
  */
 
 /** What a lease covers, relative to some day. */

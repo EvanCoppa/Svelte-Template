@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import { recommendedOption } from '$lib/crm/proposals';
+import { leaseName } from '$lib/crm/leases';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	ASSET_STATUS_TONE,
@@ -9,12 +10,18 @@ import {
 	PARTY_STATUS_TONE,
 	PRIORITY_TONE,
 	PRODUCT_KIND_TONE,
+	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
-import { BILLABLE_STATUS_TONE, isCatalogKey, type CatalogKey } from '$lib/lists/catalog';
+import {
+	BILLABLE_STATUS_TONE,
+	LEASE_TERM_TONE,
+	isCatalogKey,
+	type CatalogKey
+} from '$lib/lists/catalog';
 import type { ListCell, ListField, ListKind, ListRow, ListSpec } from '$lib/lists/types';
 import type { Address } from './addresses';
 import { listAssets, type Asset } from './assets';
@@ -24,7 +31,9 @@ import { listContacts, type ContactWithCompany } from './contacts';
 import type { CustomFieldValue } from './custom-fields';
 import { listDeals, type DealWithParties } from './deals';
 import { listInvoices, type InvoiceWithParties } from './invoices';
+import { listLeases, type LeaseWithParties } from './leases';
 import { listProducts, type ProductWithCategory } from './products';
+import { listProperties, type Property } from './properties';
 import { listProposals, type ProposalWithOptions } from './proposals';
 import type { CanOpen } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
@@ -50,6 +59,8 @@ export type ListResult =
 	| { kind: 'contact'; rows: ContactWithCompany[] }
 	| { kind: 'asset'; rows: Asset[] }
 	| { kind: 'product'; rows: ProductWithCategory[] }
+	| { kind: 'property'; rows: Property[] }
+	| { kind: 'lease'; rows: LeaseWithParties[] }
 	| { kind: 'deal'; rows: DealWithParties[] }
 	| { kind: 'ticket'; rows: TicketWithParties[] }
 	| { kind: 'invoice'; rows: InvoiceWithParties[] }
@@ -71,6 +82,10 @@ export async function listRecords(
 			return { kind, rows: await listAssets(supabase, orgId) };
 		case 'product':
 			return { kind, rows: await listProducts(supabase, orgId) };
+		case 'property':
+			return { kind, rows: await listProperties(supabase, orgId) };
+		case 'lease':
+			return { kind, rows: await listLeases(supabase, orgId) };
 		case 'deal':
 			return { kind, rows: await listDeals(supabase, orgId) };
 		case 'ticket':
@@ -145,7 +160,7 @@ export function describeListRows(
 		text: name,
 		href: canOpen(kind) ? recordHref(kind, id) : null
 	});
-	const party = (kind: 'company' | 'contact', value: Party): ListCell => ({
+	const related = (kind: 'company' | 'contact' | 'property', value: Party): ListCell => ({
 		type: 'record',
 		text: value?.name ?? '',
 		href: value && canOpen(kind) ? recordHref(kind, value.id) : null
@@ -206,7 +221,7 @@ export function describeListRows(
 					case 'name':
 						return link('contact', contact.id, contact.name);
 					case 'company':
-						return party('company', contact.companies);
+						return related('company', contact.companies);
 					case 'title':
 						return text(contact.title);
 					case 'email':
@@ -243,6 +258,80 @@ export function describeListRows(
 						return datetime(asset.created_at);
 				}
 			});
+		case 'property': {
+			// Buildings and units are one table and the list is the whole of
+			// it, so the parent's name is already in hand — no second read.
+			const nameOf = new Map(result.rows.map((row) => [row.id, row.name]));
+			return describe(result.kind, result.rows, (property, key) => {
+				switch (key) {
+					case 'name':
+						return link('property', property.id, property.name);
+					case 'parent':
+						return related(
+							'property',
+							property.parent_id
+								? { id: property.parent_id, name: nameOf.get(property.parent_id) ?? '' }
+								: null
+						);
+					case 'property_type':
+						return text(property.property_type);
+					case 'identifier':
+						return text(property.identifier);
+					case 'status':
+						return status(property.status, PROPERTY_STATUS_TONE[property.status]);
+					case 'bedrooms':
+						return number(property.bedrooms);
+					case 'bathrooms':
+						return number(property.bathrooms);
+					case 'square_feet':
+						return number(property.square_feet);
+					case 'market_rent':
+						return money(property.market_rent, property.currency);
+					case 'acquired_on':
+						return date(property.acquired_on);
+					case 'purchase_price':
+						return money(property.purchase_price, property.currency);
+					case 'created_at':
+						return datetime(property.created_at);
+				}
+			});
+		}
+		case 'lease':
+			return describe(result.kind, result.rows, (lease, key) => {
+				const tenant = lease.contacts ?? lease.companies;
+				switch (key) {
+					case 'name':
+						return link(
+							'lease',
+							lease.id,
+							leaseName({ property: lease.properties?.name, tenant: tenant?.name })
+						);
+					case 'property':
+						return related('property', lease.properties);
+					case 'tenant':
+						return related(lease.contacts ? 'contact' : 'company', tenant);
+					// The stored half of a tenancy's shape. Whether it is
+					// RUNNING is a question about the viewer's date, so it is
+					// not a column here — see the catalog.
+					case 'term':
+						return status(
+							lease.ends_on === null ? 'month-to-month' : 'fixed term',
+							LEASE_TERM_TONE[lease.ends_on === null ? 'month-to-month' : 'fixed term']
+						);
+					case 'starts_on':
+						return date(lease.starts_on);
+					case 'ends_on':
+						return date(lease.ends_on);
+					case 'rent_amount':
+						return money(lease.rent_amount, lease.currency);
+					case 'rent_due_day':
+						return number(lease.rent_due_day);
+					case 'security_deposit':
+						return money(lease.security_deposit, lease.currency);
+					case 'created_at':
+						return datetime(lease.created_at);
+				}
+			});
 		case 'product':
 			return describe(result.kind, result.rows, (product, key) => {
 				switch (key) {
@@ -270,9 +359,9 @@ export function describeListRows(
 					case 'name':
 						return link('deal', deal.id, deal.title);
 					case 'company':
-						return party('company', deal.companies);
+						return related('company', deal.companies);
 					case 'contact':
-						return party('contact', deal.contacts);
+						return related('contact', deal.contacts);
 					case 'stage':
 						return status(
 							deal.pipeline_stages.name,
@@ -294,9 +383,9 @@ export function describeListRows(
 					case 'name':
 						return link('ticket', ticket.id, ticket.subject);
 					case 'company':
-						return party('company', ticket.companies);
+						return related('company', ticket.companies);
 					case 'contact':
-						return party('contact', ticket.contacts);
+						return related('contact', ticket.contacts);
 					case 'status':
 						return status(ticket.status, TICKET_STATUS_TONE[ticket.status]);
 					case 'priority':
@@ -311,9 +400,9 @@ export function describeListRows(
 					case 'name':
 						return link('invoice', invoice.id, invoice.number);
 					case 'company':
-						return party('company', invoice.companies);
+						return related('company', invoice.companies);
 					case 'contact':
-						return party('contact', invoice.contacts);
+						return related('contact', invoice.contacts);
 					case 'status':
 						return status(invoice.status, INVOICE_STATUS_TONE[invoice.status]);
 					case 'payment':
