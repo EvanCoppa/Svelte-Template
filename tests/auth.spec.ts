@@ -166,7 +166,8 @@ test.describe('the app shell', () => {
 		// and the library pages at read). Tasks is switched off by the org,
 		// and Deals and Products carry no grant for Support, so none of the
 		// three may appear. Settings is not here either: it is a shell of its
-		// own, entered from the user menu (see $lib/navigation).
+		// own, entered from the user menu — and neither is Staff, which is
+		// filed on that same surface (see $lib/navigation, and the test below).
 		// Vendors is a view (the views migration): its read grant is derived
 		// from companies', and a CRM org calls the suppliers view "Vendors".
 		for (const label of [
@@ -175,7 +176,6 @@ test.describe('the app shell', () => {
 			'Contacts',
 			'Vendors',
 			'Tickets',
-			'Staff',
 			'Components',
 			'Best Practices'
 		]) {
@@ -184,6 +184,25 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('button', { name: 'Tasks' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Products' })).toHaveCount(0);
+	});
+
+	test('reaches Staff from the user menu, directly under Settings', async ({ page }) => {
+		// Staff is filed under `workspace`, the one category whose section
+		// renders in the user menu instead of the sidebar ($lib/navigation):
+		// the sidebar lists the places you work, this menu is where the
+		// workspace itself is administered.
+		await expect(page.getByRole('button', { name: 'Staff' })).toHaveCount(0);
+
+		const trigger = page.locator('[data-slot="sidebar-footer"]').getByRole('button').first();
+		await clickWhenLive(trigger, () => expect(page.getByRole('menu')).toBeVisible());
+
+		// Settings first, then the features on this surface, then Log out.
+		const items = page.getByRole('menu').getByRole('menuitem');
+		await expect(items.nth(0)).toHaveText('Settings');
+		await expect(items.nth(1)).toHaveText('Staff');
+
+		await items.nth(1).click();
+		await expect(page).toHaveURL('/staff');
 	});
 
 	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
