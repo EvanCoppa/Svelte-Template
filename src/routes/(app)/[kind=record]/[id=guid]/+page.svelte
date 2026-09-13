@@ -3,6 +3,7 @@
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
@@ -22,6 +23,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { recordListHref, recordTerms } from '$lib/crm/records';
@@ -36,10 +38,6 @@
 
 	// What this kind is called, as the org's industry says it — "Quote", "All quotes".
 	const terms = $derived(recordTerms(page.data.terms, data.record.kind));
-	// The record wears its feature's icon — the one its sidebar entry carries,
-	// found the way the breadcrumb trail finds it.
-	const KindIcon = $derived(iconFor(iconForPath(page.url.pathname, page.data.nav ?? [])));
-
 	/**
 	 * The record's initials, for the avatar beside its name — the first letter
 	 * of its first two words, the way the thread names a message's author.
@@ -104,10 +102,15 @@
 	const datetime = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
 	const queryKey = $derived(QUERY.record(data.record.kind, data.record.id));
+
+	// The rail's two sections, open until this reader folds one away. Which is
+	// open is this view's own business — nothing worth a preference or a cookie.
+	let detailsOpen = $state(true);
+	let notesOpen = $state(true);
 </script>
 
 <div class="space-y-6">
-	<!-- The record: the way back, then who it is and its lifecycle. -->
+	<!-- The record: the way back, then who it is and how to reach it. -->
 	<div class="flex min-w-0 items-start gap-3">
 		<Tooltip.Root>
 			<Tooltip.Trigger>
@@ -119,7 +122,7 @@
 						href={recordListHref(data.record.kind)}
 						variant="ghost"
 						size="icon"
-						class="mt-1"
+						class="mt-0.5"
 					>
 						<ArrowLeftIcon />
 						<span class="sr-only">All {terms.plural}</span>
@@ -129,23 +132,24 @@
 			<Tooltip.Content>All {terms.plural}</Tooltip.Content>
 		</Tooltip.Root>
 
-		<div class="flex min-w-0 items-start gap-4">
-			<Avatar.Root class="size-14 sm:size-16">
-				<Avatar.Fallback
-					class="{Avatar.avatarTint(data.record.id)} text-lg font-semibold sm:text-xl"
-				>
-					{initials}
-				</Avatar.Fallback>
-			</Avatar.Root>
-			<div class="min-w-0 space-y-1.5">
-				<p class="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
-					<KindIcon class="size-4" />
-					{capitalize(terms.noun)}
-				</p>
-				<div class="flex flex-wrap items-center gap-3">
+		<div class="flex min-w-0 items-start gap-3">
+			<!-- A record's tile is square, the way an app or a company mark is;
+			     a round one would read as a person even for a product. -->
+			<div
+				class="{Avatar.avatarTint(
+					data.record.id
+				)} flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold"
+			>
+				{initials}
+			</div>
+			<div class="min-w-0 space-y-1">
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 					<h1 class="text-2xl font-bold tracking-tight">{data.record.name}</h1>
 					{#each data.record.pills as pill (pill.label)}
 						<StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
+					{/each}
+					{#each data.tags as tag (tag.id)}
+						<TagBadge tone={tag.tone}>{tag.name}</TagBadge>
 					{/each}
 				</div>
 				{#if facts.length > 0}
@@ -161,13 +165,6 @@
 						{/each}
 					</ul>
 				{/if}
-				{#if data.tags.length > 0}
-					<div class="flex flex-wrap gap-1.5">
-						{#each data.tags as tag (tag.id)}
-							<TagBadge tone={tag.tone}>{tag.name}</TagBadge>
-						{/each}
-					</div>
-				{/if}
 			</div>
 		</div>
 	</div>
@@ -177,8 +174,8 @@
 	<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
 		<!-- Everything else about the record, one section at a time. Only the
 		     active panel is drawn, so a form or a thread exists once. -->
-		<Tabs.Root bind:value={tab} class="gap-4">
-			<Tabs.List class="h-auto max-w-full flex-wrap">
+		<Tabs.Root bind:value={tab} variant="underline" class="gap-5">
+			<Tabs.List>
 				<Tabs.Trigger value="overview"><LayoutDashboardIcon />Overview</Tabs.Trigger>
 				<Tabs.Trigger value="activity">
 					<ActivityIcon />Activity
@@ -348,26 +345,36 @@
 			{/each}
 		</Tabs.Root>
 
-		<aside class="space-y-6">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Record details</Card.Title>
+		<!-- What the record IS, beside the tabs and unchanged by them: a panel
+		     on a hairline rather than a card, so the page has one frame. -->
+		<aside class="space-y-6 xl:sticky xl:top-4 xl:border-l xl:pl-6">
+			<Collapsible.Root bind:open={detailsOpen} class="space-y-3">
+				<div class="flex items-center justify-between gap-2">
+					<Collapsible.Trigger
+						class="text-foreground -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-semibold"
+					>
+						<ChevronDownIcon
+							class="text-muted-foreground size-4 transition-transform duration-200 {detailsOpen
+								? ''
+								: '-rotate-90'}"
+						/>
+						{capitalize(terms.noun)} details
+					</Collapsible.Trigger>
 					<!-- Editing is the generic form the list page creates with, so the
 					     fields, their validation and their words are described once —
 					     drawn only for a kind it can write and a reader who may. -->
 					{#if data.edit?.canEdit}
-						<Card.Action>
-							<EditRecord
-								compact
-								type={data.edit.type}
-								recordId={data.record.id}
-								form={data.edit.editForm}
-								pickers={data.edit.editPickers}
-							/>
-						</Card.Action>
+						<EditRecord
+							compact
+							type={data.edit.type}
+							recordId={data.record.id}
+							form={data.edit.editForm}
+							pickers={data.edit.editPickers}
+						/>
 					{/if}
-				</Card.Header>
-				<Card.Content class="space-y-5">
+				</div>
+
+				<Collapsible.Content class="space-y-5">
 					<dl class="space-y-3">
 						{#each details as field (field.label)}
 							<Detail.Field label={field.label} value={field.value} people={data.people} />
@@ -376,7 +383,9 @@
 
 					{#if data.customFields.length > 0}
 						<div class="space-y-3 border-t pt-5">
-							<p class="text-sm font-medium">Custom fields</p>
+							<p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+								Custom fields
+							</p>
 							<dl class="space-y-3">
 								{#each data.customFields as field (field.key)}
 									<Detail.Field label={field.label} value={field.value} />
@@ -409,19 +418,28 @@
 							</dd>
 						</div>
 					</dl>
-				</Card.Content>
-			</Card.Root>
+				</Collapsible.Content>
+			</Collapsible.Root>
+
 			{#if data.notes}
 				{@const notes = data.notes}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Notes</Card.Title>
-						<Card.Description>
+				<Collapsible.Root bind:open={notesOpen} class="space-y-3 border-t pt-6">
+					<Collapsible.Trigger
+						class="text-foreground -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-semibold"
+					>
+						<ChevronDownIcon
+							class="text-muted-foreground size-4 transition-transform duration-200 {notesOpen
+								? ''
+								: '-rotate-90'}"
+						/>
+						Notes
+					</Collapsible.Trigger>
+
+					<Collapsible.Content class="space-y-3">
+						<p class="text-muted-foreground text-sm">
 							Written down about this {terms.noun}. Only visible to you — they don't show up on the
 							dock or the notes page.
-						</Card.Description>
-					</Card.Header>
-					<Card.Content class="space-y-3">
+						</p>
 						{#each notes.open as note (note.id)}
 							<Note.Card color={note.color} class="h-40">
 								<Note.Editor
@@ -462,8 +480,8 @@
 								Nothing written down about this {terms.noun}.
 							</p>
 						{/if}
-					</Card.Content>
-				</Card.Root>
+					</Collapsible.Content>
+				</Collapsible.Root>
 			{/if}
 		</aside>
 	</div>
