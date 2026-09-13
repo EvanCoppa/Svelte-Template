@@ -3405,7 +3405,9 @@
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
-				<code>pageSize</code>.
+				<code>pageSize</code>. A table wider than its screen scrolls sideways;
+				<code>&lt;DataTable.Content pinFirstColumn /&gt;</code> keeps the first column (and the checkbox
+				in front of it) in place while the rest scroll — narrow the window to see it.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
@@ -3417,7 +3419,7 @@
 					<DataTable.Filters />
 					<DataTable.ViewOptions class="ms-auto" />
 				</DataTable.Toolbar>
-				<DataTable.Content />
+				<DataTable.Content pinFirstColumn />
 				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>
 		</Card.Content>
