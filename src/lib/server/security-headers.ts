@@ -18,11 +18,37 @@ export interface SecurityHeaderOptions {
 	 * in connect-src as well as img-src; its worker is a blob, already admitted.
 	 */
 	mapOrigins?: readonly string[];
+	/**
+	 * Where record imagery is served from, beyond Supabase Storage — a
+	 * product's `image_url` may name any host at all (a storefront CDN, an
+	 * importer's bucket), and `img-src` would block it. Derived from
+	 * `PUBLIC_IMAGE_ORIGINS` by `imageOrigins()` below, the way the map's
+	 * origins are derived from its style URLs. Images only: never
+	 * `connect-src`, and never a wildcard.
+	 */
+	imageOrigins?: readonly string[];
+}
+
+/**
+ * The distinct origins a comma-separated `PUBLIC_IMAGE_ORIGINS` names. Each
+ * entry is a URL — `https://cdn.example.com` — and anything unparseable is
+ * dropped rather than thrown: a typo in a deployment's env should cost one
+ * broken thumbnail, not every response's headers. Unset means no external
+ * image host, which is the default and the safe one.
+ */
+export function imageOrigins(value: string | undefined): string[] {
+	const origins = (value ?? '')
+		.split(',')
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== '')
+		.map((entry) => URL.parse(entry)?.origin)
+		.filter((origin): origin is string => origin !== undefined && origin !== 'null');
+	return [...new Set(origins)];
 }
 
 export function buildContentSecurityPolicy(
 	supabaseUrl: string,
-	{ dev = false, mapOrigins = [] }: SecurityHeaderOptions = {}
+	{ dev = false, mapOrigins = [], imageOrigins: images = [] }: SecurityHeaderOptions = {}
 ): string {
 	const supabase = new URL(supabaseUrl).origin;
 	// Supabase Realtime connects over a websocket on the same host.
@@ -40,7 +66,8 @@ export function buildContentSecurityPolicy(
 		// avatar demo — remove them along with it.
 		'https://github.com',
 		'https://avatars.githubusercontent.com',
-		...mapOrigins
+		...mapOrigins,
+		...images
 	];
 
 	return [

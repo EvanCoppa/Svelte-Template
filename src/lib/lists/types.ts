@@ -43,9 +43,20 @@ export type ListKind = (typeof LIST_KINDS)[number];
  * filter is a multi-select of values, so only a field whose cell is a value
  * worth picking from a list can be filtered: text, an enum, a yes/no, another
  * record, a payment state. An amount or a date cannot (`FILTERABLE_TYPES`).
+ * An `image` is a picture rather than a value at all: it cannot be filtered,
+ * searched or sorted, and the toolbar leaves it alone.
  */
 export type FieldType =
-	'text' | 'number' | 'money' | 'boolean' | 'date' | 'datetime' | 'enum' | 'record' | 'payment';
+	| 'text'
+	| 'number'
+	| 'money'
+	| 'boolean'
+	| 'date'
+	| 'datetime'
+	| 'enum'
+	| 'record'
+	| 'payment'
+	| 'image';
 
 export const FILTERABLE_TYPES = [
 	'text',
@@ -97,6 +108,12 @@ export type ListCell =
 	| { type: 'record'; text: string; href: string | null }
 	/** Plain text; blank when the column is empty (the page prints a dash). */
 	| { type: 'text'; text: string }
+	/**
+	 * The record's picture, as a thumbnail. `url` is null when it has none,
+	 * which the page draws as a placeholder tile rather than a dash — a row of
+	 * broken frames reads worse than a row of empty ones.
+	 */
+	| { type: 'image'; url: string | null }
 	| { type: 'number'; value: number | null }
 	| { type: 'money'; value: number | null; currency: string; unit: string | null }
 	| { type: 'boolean'; value: boolean | null }
