@@ -2,9 +2,15 @@ import { fail, redirect } from '@sveltejs/kit';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { memberName } from '$lib/components/staff/member.js';
+import { recordListHref, type RecordKind } from '$lib/crm/records';
+import { passesFeatureGate } from '$lib/features/gate';
 import { QUERY } from '$lib/queries';
+import { parseRecordRef, type LinkableRecord } from '$lib/schemas/record-ref';
+import { listCompanies } from '$lib/server/crm/companies';
+import { listContacts } from '$lib/server/crm/contacts';
 import {
 	assignTask,
+	createTask,
 	endTaskAssignment,
 	listAssigneesByTask,
 	listTasks,
@@ -12,11 +18,12 @@ import {
 	updateTask
 } from '$lib/server/crm/tasks';
 import { countTaskComments } from '$lib/server/crm/task-comments';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
-import { can, requirePermission } from '$lib/server/roles';
+import { instant } from '$lib/server/records';
+import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { listStaff } from '$lib/server/staff';
 import {
 	assignTaskSchema,
+	createTaskSchema,
 	moveTaskSchema,
 	prioritizeTaskSchema,
 	scheduleTaskSchema,
@@ -25,10 +32,16 @@ import {
 import type { Actions, PageServerLoad } from './$types';
 
 /**
- * The tasks page: the same rows drawn as a board or as a grouped list, and the
- * four small writes a card offers in place — moving it, giving it a day,
- * saying how urgent it is, putting somebody on it. Everything else about a
- * task is the record page's.
+ * The tasks page: the same rows drawn as a board or as a grouped list, the
+ * task modal that adds one, and the four small writes a card offers in place
+ * — moving it, giving it a day, saying how urgent it is, putting somebody on
+ * it. Everything else about a task is the record page's.
+ *
+ * Creating is this page's own form rather than the generic `CreateRecord`
+ * (schema.ts, `createTaskSchema` says why): the modal writes the row and its
+ * `assigned_to` relationships in one post, and links the task to a party
+ * from one picker. The pickers exist for writers only, and offer only the
+ * kinds the reader may open — the calendar's booking form's rule.
  *
  * Gated by the hook on the `tasks` feature + read grant; see companies. The
  * two views are a device preference and never reach the server, so this load
@@ -42,6 +55,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 /** Explicit form ids, shared by the load, the actions and the page's `superForm`s. */
 const FORM_ID = {
+	create: 'create-task',
 	move: 'move-task',
 	schedule: 'schedule-task',
 	prioritize: 'prioritize-task',
@@ -50,8 +64,8 @@ const FORM_ID = {
 } as const;
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
-	const { org, activeOrgId } = locals;
-	if (!org || !activeOrgId) throw redirect(303, '/login');
+	const { org, activeOrgId, user } = locals;
+	if (!org || !activeOrgId || !user) throw redirect(303, '/login');
 	depends(QUERY.tasks);
 
 	const tasks = await listTasks(locals.supabase, activeOrgId);
@@ -62,13 +76,28 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	// drag that would come back a 403.
 	const canManage = can(org.access, 'tasks', 'manage');
 
-	const [assignees, comments, staff] = await Promise.all([
+	// Whether the reader may open a record of another kind: the same decision
+	// the hook makes for that kind's routes, so the modal's record picker
+	// offers only the kinds they can see.
+	const canRead = (featureId: string) => hasGrant(org.access, featureId);
+	const canOpen = (kind: RecordKind) =>
+		passesFeatureGate(recordListHref(kind), org.features, canRead);
+
+	const [assignees, comments, staff, companies, contacts] = await Promise.all([
 		listAssigneesByTask(locals.supabase, activeOrgId, ids),
 		countTaskComments(locals.supabase, activeOrgId, ids),
-		// The menu of people to put on a card. Only worth reading when there is
-		// a menu to open — a reader who cannot manage a task cannot assign one.
-		canManage ? listStaff(locals.supabase, activeOrgId) : Promise.resolve([])
+		// The menu of people to put on a card, and the modal's assignees. Only
+		// worth reading when there is a menu to open — a reader who cannot
+		// manage a task cannot assign one.
+		canManage ? listStaff(locals.supabase, activeOrgId) : Promise.resolve([]),
+		canManage && canOpen('company') ? listCompanies(locals.supabase, activeOrgId) : [],
+		canManage && canOpen('contact') ? listContacts(locals.supabase, activeOrgId) : []
 	]);
+
+	const records: LinkableRecord[] = [
+		...companies.map((row): LinkableRecord => ({ kind: 'company', id: row.id, name: row.name })),
+		...contacts.map((row): LinkableRecord => ({ kind: 'contact', id: row.id, name: row.name }))
+	];
 
 	return {
 		tasks,
@@ -81,19 +110,67 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		// has no use for a roster row's roles, email or avatar.
 		members: staff.map((member) => ({ userId: member.userId, name: memberName(member) })),
 		canMove: canManage,
+		canCreate: canManage,
+		records,
+		// Who the modal assigns a new task to unless told otherwise: the person
+		// writing it, the way most tasks start.
+		currentUserId: user.id,
+		createForm: await superValidate(zod4(createTaskSchema), { id: FORM_ID.create }),
 		moveForm: await superValidate(zod4(moveTaskSchema), { id: FORM_ID.move }),
 		scheduleForm: await superValidate(zod4(scheduleTaskSchema), { id: FORM_ID.schedule }),
 		prioritizeForm: await superValidate(zod4(prioritizeTaskSchema), { id: FORM_ID.prioritize }),
 		assignForm: await superValidate(zod4(assignTaskSchema), { id: FORM_ID.assign }),
-		unassignForm: await superValidate(zod4(unassignTaskSchema), { id: FORM_ID.unassign }),
-		...(await loadCreateRecord(locals, 'task'))
+		unassignForm: await superValidate(zod4(unassignTaskSchema), { id: FORM_ID.unassign })
 	};
 };
 
+/**
+ * A task for a record the caller may not open would be one they can never
+ * follow — and asking whether the insert succeeds would say whether that id
+ * exists. The gate answers first, as it does on a page.
+ */
+function refusesRecord(org: NonNullable<App.Locals['org']>, record: string): boolean {
+	const ref = record === '' ? null : parseRecordRef(record);
+	if (!ref) return false;
+	const canRead = (featureId: string) => hasGrant(org.access, featureId);
+	return !passesFeatureGate(recordListHref(ref.kind), org.features, canRead);
+}
+
 export const actions: Actions = {
-	// Creating goes through the generic record form ($lib/server/records.ts), which
-	// opens with requirePermission(locals.org.access, 'tasks', 'manage').
-	create: (event) => createRecord(event, 'task'),
+	/**
+	 * The modal's post: the row, then one `assigned_to` relationship per
+	 * person named. The party is the one the picker chose — a company or a
+	 * contact, never both — and it is only accepted when the caller may open
+	 * that kind. A task can be about a deal or an asset too, but not from
+	 * here: those are relationships, added on the record page.
+	 */
+	create: async ({ request, locals }) => {
+		const { org, activeOrgId } = locals;
+		if (!org || !activeOrgId) throw redirect(303, '/login');
+		requirePermission(org.access, 'tasks', 'manage');
+
+		const form = await superValidate(request, zod4(createTaskSchema), { id: FORM_ID.create });
+		if (!form.valid) return fail(400, { form });
+		if (refusesRecord(org, form.data.record)) {
+			return message(form, 'You cannot link a task to that record.', { status: 403 });
+		}
+
+		const ref = form.data.record === '' ? null : parseRecordRef(form.data.record);
+		try {
+			const task = await createTask(locals.supabase, activeOrgId, {
+				title: form.data.title,
+				due_at: instant(form.data.due_at),
+				company_id: ref?.kind === 'company' ? ref.id : null,
+				contact_id: ref?.kind === 'contact' ? ref.id : null
+			});
+			for (const userId of new Set(form.data.assignees)) {
+				await assignTask(locals.supabase, activeOrgId, task.id, userId);
+			}
+		} catch (cause) {
+			return message(form, reason(cause, 'Could not create the task.'), { status: 400 });
+		}
+		return { form };
+	},
 
 	/**
 	 * A card was dropped on another status, carried there with the arrow keys,

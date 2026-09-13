@@ -11,7 +11,6 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
-	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as GroupList from '$lib/components/group-list/index.js';
 	import * as Kanban from '$lib/components/kanban/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
@@ -54,6 +53,7 @@
 	import { QUERY } from '$lib/queries';
 	import type { TaskAssignee, Task } from '$lib/server/crm/tasks';
 	import type { Enums } from '$lib/database.types';
+	import CreateTask from './create-task.svelte';
 
 	let { data } = $props();
 
@@ -267,7 +267,12 @@
 		<PageHeader.Title />
 		{#if data.canCreate}
 			<PageHeader.Actions>
-				<CreateRecord type="task" form={data.createForm} />
+				<CreateTask
+					form={data.createForm}
+					members={data.members}
+					records={data.records}
+					currentUserId={data.currentUserId}
+				/>
 			</PageHeader.Actions>
 		{/if}
 	</PageHeader.Root>
@@ -284,7 +289,12 @@
 			</Empty.Header>
 			{#if data.canCreate}
 				<Empty.Content>
-					<CreateRecord type="task" form={data.createForm} />
+					<CreateTask
+						form={data.createForm}
+						members={data.members}
+						records={data.records}
+						currentUserId={data.currentUserId}
+					/>
 				</Empty.Content>
 			{/if}
 		</Empty.Root>

@@ -653,7 +653,9 @@ builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
 plans page, whose one field is a multi-select; the calendar, whose booking form is
 two instants behind wall-clock inputs, an all-day switch that changes what they mean,
-a colour and a record — docs/calendar.md) keeps its own form and says why.
+a colour and a record — docs/calendar.md; the task modal at `(app)/tasks/`, which
+writes the row and its `assigned_to` relationships in one post and links a party
+from one picker — docs/tasks.md, "The task modal") keeps its own form and says why.
 
 ## Data loading & invalidation
 
