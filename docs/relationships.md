@@ -127,20 +127,25 @@ the result in its Relationships card (`Detail.Relationship`).
 
 `/graph` (feature `graph`, the relationship_graph migration; `src/lib/server/crm/graph.ts`,
 `src/lib/crm/graph.ts`, `src/lib/components/relationship-graph/`, `src/routes/(app)/graph/`)
-reads the graph whole: every record that stands in at least one relationship is a node,
-every row an edge, laid out by a force simulation on a canvas the reader can pan, zoom
-and pull nodes around on — the Obsidian-style map of the org's records. Resting on a
+reads the graph whole: **every record the reader may open is a node** — related or not,
+so a record with no relationship yet is a dot of its own that still opens its page and
+the map is a way into the data rather than a picture of the lines alone — and every
+`relationships` row is an edge, laid out by a force simulation on a canvas the reader can
+pan, zoom and pull nodes around on — the Obsidian-style map of the org's records. A
+member joins the map only where a relationship names one: the roster, not this page, is
+where people who work here are read. Resting on a
 node lights up its neighbourhood and puts on each edge the words that read from that
 node ("owns" from the owner, "owned by" from the asset); a click opens the record. A
 record's Relationships card links to the map opened on it (`?focus=<kind>:<id>`).
 
 Three rules keep it one page for every industry:
 
-- **Naming is the record page's.** `describeGraph()` names nodes through the same two
-  namers `getRelationships()` uses — `recordLinks()` (hence `getRecord()`, hence the
-  feature gate: a kind the reader may not open is not fetched and not drawn, and every
-  edge touching it goes with it) and `getDisplayNames()` for members. Nothing about a
-  record the reader cannot open reaches the browser.
+- **Naming is the record page's.** `describeGraph()` names nodes through the kinds' own
+  list modules (`listRecordNames()` — the same strings `getRecord()` puts at the top of a
+  record) and `getDisplayNames()` for members, one query per kind rather than one per
+  node. The feature gate decides the kinds: a kind the reader may not open is not fetched
+  and not drawn, and every edge touching it goes with it. Nothing about a record the
+  reader cannot open reaches the browser.
 - **Every word is the industry's.** The legend names each kind of record through its
   feature's terms (`recordTerms()`: "Patients", "Merchants") and the member kind through
   the `graph_member` term ("Staff", "Crew", "Agents"); an edge is labelled by its

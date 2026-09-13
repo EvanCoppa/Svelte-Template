@@ -398,9 +398,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   existing only while the membership does), distinct from a contact and an auth user.
   **The graph is also drawn whole**: `/graph` (feature `graph`, `src/lib/server/crm/graph.ts`
   - `src/lib/components/relationship-graph/`; docs/relationships.md, "The graph page") is
-    an Obsidian-style force-directed map of every record that stands in a relationship,
-    named through the same namers as the card (so the gate applies node by node), its
-    legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
+    an Obsidian-style force-directed map of every record the reader may open — one in no
+    relationship yet is a dot of its own that still opens its page — over the
+    relationships between them, named through each kind's own list module (so the gate
+    applies kind by kind, and a member is on the map only where a relationship names
+    one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
     people who work here) and its edges labelled by their types. Nothing per industry is
     stored for it; a kind or a type joins the map by existing.
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):

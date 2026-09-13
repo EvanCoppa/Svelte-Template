@@ -8,14 +8,16 @@ import { hasGrant } from '$lib/server/roles';
 import type { PageServerLoad } from './$types';
 
 /**
- * The graph — every record that stands in a relationship and every
- * relationship between them, drawn as one map. Gated by the hook on the
+ * The graph — every record the reader may open and every relationship
+ * between them, drawn as one map. A record with no relationship yet is a
+ * dot of its own that still opens its page, so the map is a way into the
+ * data and not only a picture of the lines. Gated by the hook on the
  * `graph` feature + read grant; there is nothing to post, because a
  * relationship is drawn and removed where its record is.
  *
- * What is on the map is decided record by record, the way every link in
- * the app is: a kind the reader may not open is not fetched, so the map
- * shows exactly the records the reader could reach by clicking through.
+ * What is on the map is decided kind by kind, the way every link in the
+ * app is: a kind the reader may not open is not fetched, so the map shows
+ * exactly the records the reader could reach by clicking through.
  * `?focus=<kind>:<id>` opens the map on one record — the link a record's
  * Relationships card carries — and is honoured only when that record is
  * on the map.

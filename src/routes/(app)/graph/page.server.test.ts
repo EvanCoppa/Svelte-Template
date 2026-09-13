@@ -87,21 +87,33 @@ async function runLoad(supabase: SupabaseClient<Database>, search = '') {
 	return data;
 }
 
+const wayne = {
+	id: WAYNE_ID,
+	name: 'Wayne Enterprises',
+	status: 'active',
+	relationship: 'customer',
+	contacts: []
+};
+
+/**
+ * The org's records, the way each kind's list module reads them. Only
+ * companies have any; every other table answers the empty list a real
+ * select would, so the map is the two companies and the row between them.
+ */
 function mock() {
-	// `getRecord()` reads each company once; the table mock answers the same
-	// row to both, so the names are told apart below by id only.
 	return supabaseTablesMock({
 		terms: TERMS,
 		relationships: { data: [wayneOwnsStark] },
-		companies: {
-			data: {
-				id: WAYNE_ID,
-				name: 'Wayne Enterprises',
-				status: 'active',
-				relationship: 'customer',
-				contacts: []
-			}
-		}
+		companies: { data: [wayne, { ...wayne, id: STARK_ID, name: 'Stark Industries' }] },
+		assets: { data: [] },
+		billables: { data: [] },
+		contacts: { data: [] },
+		products: { data: [] },
+		deals: { data: [] },
+		proposals: { data: [] },
+		invoices: { data: [] },
+		tasks: { data: [] },
+		support_tickets: { data: [] }
 	});
 }
 
