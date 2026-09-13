@@ -407,7 +407,10 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   "Estimator" / "Project manager" on a roof), the `(app)` layout ships the resolved
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
-  a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+  a `terms` row and an id in `TERM_IDS`; nothing is settable per org. Both, plus the
+  entity link below, also draw as edges on `/graph`, computed at read time from these
+  columns rather than stored as `relationships` rows (see the graph bullet below and
+  `proposal_graph_edges` migration).
 - **Relationships are one table, not a junction table per pair of kinds**
   (`relationships` migration + `src/lib/server/crm/relationships.ts`; docs/relationships.md).
   A `relationships` row names two records through the shared entity link
@@ -435,7 +438,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
     applies kind by kind, and a member is on the map only where a relationship names
     one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
     people who work here) and its edges labelled by their types. Nothing per industry is
-    stored for it; a kind or a type joins the map by existing.
+    stored for it; a kind or a type joins the map by existing. A proposal's presenter,
+    responsible member and parent link are drawn too, even though they stay plain
+    columns on `proposals` — `describeGraph()` reads them directly and synthesizes
+    edges at request time, never writing a `relationships` row (they are genuinely
+    single-valued per proposal, and that table's uniqueness index cannot enforce
+    that, so a real row could drift from the column with no way back).
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
   name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
   a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).

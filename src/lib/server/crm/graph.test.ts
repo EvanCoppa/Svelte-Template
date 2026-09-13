@@ -104,7 +104,8 @@ const vocabulary = {
 /** The industry's words, the way the (app) layout ships them. */
 const terms: TermsMap = {
 	companies: { name: 'Merchants', noun: 'merchant' },
-	assets: { name: 'Terminals', noun: 'terminal' }
+	assets: { name: 'Terminals', noun: 'terminal' },
+	proposals: { name: 'Proposals', noun: 'proposal' }
 };
 
 /** The two kinds this org's reader may open; the rest are never fetched. */
@@ -118,6 +119,144 @@ function mock() {
 		profiles: { data: [devRow] }
 	});
 }
+
+const PROPOSAL_ID = 'f3000000-0000-0000-0000-000000000001';
+const PRESENTS = 'f0000000-0000-0000-0000-000000000031';
+const RESPONSIBLE_FOR = 'f0000000-0000-0000-0000-000000000013';
+const PROPOSED_TO = 'f0000000-0000-0000-0000-000000000032';
+
+const presents = {
+	id: PRESENTS,
+	org_id: null,
+	key: 'presents',
+	forward_label: 'presents',
+	inverse_label: 'presented by',
+	source_type: 'member' as const,
+	target_type: 'proposal' as const,
+	is_system: true,
+	created_at: '2026-09-01T09:00:00Z',
+	updated_at: '2026-09-01T09:00:00Z'
+};
+const responsibleFor = {
+	...presents,
+	id: RESPONSIBLE_FOR,
+	key: 'responsible_for',
+	forward_label: 'responsible for',
+	inverse_label: 'responsibility of',
+	target_type: null
+};
+const proposedTo = {
+	...presents,
+	id: PROPOSED_TO,
+	key: 'proposed_to',
+	forward_label: 'proposed to',
+	inverse_label: 'has proposal',
+	source_type: 'proposal' as const,
+	target_type: null
+};
+
+const proposalRow = {
+	id: PROPOSAL_ID,
+	org_id: ORG_ID,
+	title: 'Roofing package',
+	presenter_id: DEV_ID,
+	responsible_id: DEV_ID,
+	entity_type: 'company' as const,
+	entity_id: WAYNE_ID
+};
+
+describe('describeGraph — a proposal’s presenter, responsible and parent link', () => {
+	const canOpenProposal = (kind: RecordKind) => kind === 'company' || kind === 'proposal';
+
+	function mockWithProposal() {
+		return supabaseTablesMock({
+			relationships: { data: [] },
+			companies: { data: [wayneRow] },
+			proposals: { data: [proposalRow] },
+			relationship_types: { data: [presents, responsibleFor, proposedTo] },
+			profiles: { data: [devRow] }
+		});
+	}
+
+	it('draws them as edges computed from the proposal’s columns, never from relationships', async () => {
+		const { supabase } = mockWithProposal();
+
+		const graph = await describeGraph(supabase, ORG_ID, canOpenProposal, vocabulary, {
+			companies: terms.companies,
+			proposals: terms.proposals
+		});
+
+		expect(graph.nodes).toEqual([
+			{
+				id: `company:${WAYNE_ID}`,
+				kind: 'company',
+				name: 'Wayne Enterprises',
+				href: `/companies/${WAYNE_ID}`
+			},
+			{
+				id: `proposal:${PROPOSAL_ID}`,
+				kind: 'proposal',
+				name: 'Roofing package',
+				href: `/proposals/${PROPOSAL_ID}`
+			},
+			{ id: `member:${DEV_ID}`, kind: 'member', name: 'Dev User', href: null }
+		]);
+		expect(graph.edges).toEqual([
+			{
+				id: `proposal-presenter:${PROPOSAL_ID}`,
+				source: `member:${DEV_ID}`,
+				target: `proposal:${PROPOSAL_ID}`,
+				typeId: PRESENTS,
+				label: 'presents',
+				inverseLabel: 'presented by',
+				ended: false
+			},
+			{
+				id: `proposal-responsible:${PROPOSAL_ID}`,
+				source: `member:${DEV_ID}`,
+				target: `proposal:${PROPOSAL_ID}`,
+				typeId: RESPONSIBLE_FOR,
+				label: 'responsible for',
+				inverseLabel: 'responsibility of',
+				ended: false
+			},
+			{
+				id: `proposal-entity:${PROPOSAL_ID}`,
+				source: `proposal:${PROPOSAL_ID}`,
+				target: `company:${WAYNE_ID}`,
+				typeId: PROPOSED_TO,
+				label: 'proposed to',
+				inverseLabel: 'has proposal',
+				ended: false
+			}
+		]);
+	});
+
+	it('drops the parent-link edge, but keeps presenter/responsible, when the parent kind is not readable', async () => {
+		const { supabase, from } = mockWithProposal();
+
+		const graph = await describeGraph(supabase, ORG_ID, (kind) => kind === 'proposal', vocabulary, {
+			proposals: terms.proposals
+		});
+
+		expect(graph.edges.map((edge) => edge.typeId).sort()).toEqual(
+			[PRESENTS, RESPONSIBLE_FOR].sort()
+		);
+		// A company the reader may not open is never fetched.
+		expect(from).not.toHaveBeenCalledWith('companies');
+	});
+
+	it('never queries proposal facts or relationship types when the reader may not open a proposal', async () => {
+		const { supabase, from } = mockWithProposal();
+
+		await describeGraph(supabase, ORG_ID, (kind) => kind === 'company', vocabulary, {
+			companies: terms.companies
+		});
+
+		expect(from).not.toHaveBeenCalledWith('proposals');
+		expect(from).not.toHaveBeenCalledWith('relationship_types');
+	});
+});
 
 describe('describeGraph', () => {
 	it('draws every record of every kind the reader may open, related or not', async () => {
