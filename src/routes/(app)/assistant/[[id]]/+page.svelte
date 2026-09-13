@@ -22,7 +22,7 @@
 	/** The thread on screen, or null while a new one has not been sent yet. */
 	const activeId = $derived(page.params.id ?? null);
 
-	/** Openers for the empty thread — each is just a message sent for the user. */
+	/** Openers, offered by the composer's `+` — each is just a prompt to edit and send. */
 	const SUGGESTIONS = [
 		'Which companies are still leads?',
 		'What is open in the ticket queue?',
@@ -195,27 +195,11 @@
 							status={chat.status}
 							disabled={!data.configured}
 							history={asked}
+							suggestions={SUGGESTIONS}
 							class="w-full"
 							onSend={(text) => chat.sendMessage({ text, metadata: { createdAt: Date.now() } })}
 							onStop={() => chat.stop()}
 						/>
-
-						{#if !started}
-							<div class="fade-in-up mt-6 flex flex-wrap justify-center gap-2">
-								{#each SUGGESTIONS as suggestion (suggestion)}
-									<Button
-										variant="outline"
-										size="sm"
-										class="rounded-full font-normal"
-										disabled={!data.configured}
-										onclick={() =>
-											chat.sendMessage({ text: suggestion, metadata: { createdAt: Date.now() } })}
-									>
-										{suggestion}
-									</Button>
-								{/each}
-							</div>
-						{/if}
 					</div>
 				</div>
 			{/snippet}

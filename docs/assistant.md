@@ -50,10 +50,22 @@ threads themselves off `page.data.conversations`, like every shell sidebar reads
 The chat surface itself is one column with two states, and it **moves between them
 rather than being two screens**: with no messages the composer sits a third of the way
 down under "How can I help you today?", over a faint pool of the theme's primary
-(`Assistant.Root`'s aura), with the openers below it; once the thread has started, the
-aura fades, the thread appears, and the composer travels to the foot of the page on a
-700ms ease. The thread's own foot dissolves rather than ending on an edge, because the
-composer floats over it.
+(`Assistant.Root`'s aura); once the thread has started, the aura fades, the thread
+appears, and the composer travels to the foot of the page on a 700ms ease. The thread's
+own foot dissolves rather than ending on an edge, because the composer floats over it.
+
+The composer is a rounded card with three controls. **`+` opens the openers** — the
+page's own list, passed in as `suggestions` — and picking one puts it **in the box**
+rather than sending it, so it can be edited first; that is why there are no opener
+chips on the empty screen, and why they stay reachable once a thread is underway. **The
+microphone is dictation**, and it is drawn only where the browser has a speech engine
+at all (`$lib/speech`, which is the one place that knows the API is still prefixed):
+while it listens the icon becomes a level meter and the settled transcript lands in the
+draft, so nothing reaches a server that the reader has not read first. **Send becomes
+Stop** while an answer streams. The controls sit beside the field while the draft still
+fits on one line and drop to their own row under it when it does not — measured off a
+hidden copy of the text, because asking "has it wrapped" would wrap, widen, unwrap and
+oscillate.
 
 A message is the reader's turn as a bubble on the end side and the assistant's as the
 page's own text — full width, no avatar, nothing framing it. Its tool calls land in one

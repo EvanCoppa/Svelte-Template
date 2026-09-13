@@ -94,6 +94,16 @@ declare global {
 			message: string;
 			code?: string;
 		}
+	}
+
+	/**
+	 * The Web Speech API is still prefixed in most engines and absent from
+	 * some, so TypeScript's DOM lib does not declare it. Declared optional on
+	 * purpose: `$lib/speech` has to check for it either way.
+	 */
+	interface Window {
+		SpeechRecognition?: new () => import('$lib/speech').Recognition;
+		webkitSpeechRecognition?: new () => import('$lib/speech').Recognition;
 		// interface PageState {}
 		// interface Platform {}
 	}
