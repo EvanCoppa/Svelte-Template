@@ -1,68 +1,21 @@
 <script lang="ts">
-	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { STAGE_OUTCOME_TONE } from '$lib/crm/tones';
-	import type { DealWithParties } from '$lib/server/crm/deals';
-	import { capitalize } from '$lib/utils.js';
+	import { recordTerms } from '$lib/crm/records';
+	import { createListTable } from '$lib/lists/table';
 
 	let { data } = $props();
 
 	const terms = $derived(recordTerms(page.data.terms, 'deal'));
 
-	const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-	// A `date` column has no time zone: read it as the day it names, not
-	// shifted into the viewer's zone.
-	const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
-
-	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, DealWithParties>();
-	const columns = columnHelper.columns([
-		DataTable.selectColumn(columnHelper),
-		columnHelper.accessor('title', {
-			header: ({ column }) =>
-				renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) }),
-			cell: ({ getValue, row }) =>
-				DataTable.linkCell(getValue(), recordHref('deal', row.original.id))
-		}),
-		// A deal names a company, a person, or neither — an opportunity nobody is
-		// attached to yet is a legitimate row.
-		columnHelper.accessor((row) => row.companies?.name ?? row.contacts?.name ?? '—', {
-			id: 'party',
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'With' })
-		}),
-		columnHelper.accessor((row) => row.pipeline_stages.name, {
-			id: 'stage',
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Stage' }),
-			cell: ({ row, getValue }) =>
-				DataTable.statusCell(getValue(), STAGE_OUTCOME_TONE[row.original.pipeline_stages.outcome])
-		}),
-		columnHelper.accessor('amount', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Amount' }),
-			cell: ({ getValue }) => {
-				const amount = getValue();
-				return amount === null ? '—' : usd.format(amount);
-			}
-		}),
-		columnHelper.accessor('expected_close_date', {
-			header: ({ column }) =>
-				renderComponent(DataTable.ColumnHeader, { column, title: 'Expected close' }),
-			cell: ({ getValue }) => {
-				const value = getValue();
-				return value ? date.format(new Date(value)) : '—';
-			}
-		})
-	]);
-
-	const table = createTable({
-		features: DataTable.features,
-		get data() {
-			return data.deals;
-		},
-		columns
-	});
+	// The columns, the search and the filters are the list's fields as the
+	// org's industry has them (docs/lists.md); the page only composes the parts.
+	const table = createListTable(
+		() => data.list,
+		() => page.data.terms
+	);
 </script>
 
 <div class="space-y-6">
@@ -76,7 +29,12 @@
 	</PageHeader.Root>
 
 	<DataTable.Root {table}>
-		<DataTable.Content />
+		<DataTable.Toolbar>
+			<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+			<DataTable.Filters />
+			<DataTable.ViewOptions class="ms-auto" />
+		</DataTable.Toolbar>
+		<DataTable.Content emptyMessage="No {terms.plural} match." />
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>

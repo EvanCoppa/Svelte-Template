@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { listDeals } from '$lib/server/crm/deals';
 import { createRecord, loadCreateRecord } from '$lib/server/records';
+import { loadRecordList } from '$lib/server/lists';
 import type { Actions, PageServerLoad } from './$types';
 
 // Gated by the hook on the `deals` feature + read grant; see companies.
@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	depends(QUERY.deals);
 
 	return {
-		deals: await listDeals(locals.supabase, locals.activeOrgId),
+		...(await loadRecordList(locals, 'deal')),
 		...(await loadCreateRecord(locals, 'deal'))
 	};
 };

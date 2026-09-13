@@ -6,6 +6,7 @@
 	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 	import * as Detail from '$lib/components/detail/index.js';
+	import EditRecord from '$lib/components/edit-record.svelte';
 	import * as Note from '$lib/components/note/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
 	import { StatusBadge, TagBadge } from '$lib/components/ui/badge/index.js';
@@ -70,6 +71,18 @@
 		</div>
 
 		<div class="flex flex-wrap items-center gap-2">
+			<!-- Editing is the generic form the list page creates with, so the
+			     fields, their validation and their words are described once —
+			     drawn only for a kind it can write and a reader who may. -->
+			{#if data.edit?.canEdit}
+				<EditRecord
+					type={data.edit.type}
+					recordId={data.record.id}
+					form={data.edit.editForm}
+					pickers={data.edit.editPickers}
+				/>
+			{/if}
+
 			<!-- The breadcrumb trail is the way back on a wide screen; this is the
 			     way back everywhere else. -->
 			<Button href={recordListHref(data.record.kind)} variant="outline">

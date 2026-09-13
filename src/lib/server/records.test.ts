@@ -2,9 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './crm/test-support';
-import { CREATE_FORM_ID, createRecord, loadCreateRecord } from './records';
+import {
+	CREATE_FORM_ID,
+	EDIT_FORM_ID,
+	createRecord,
+	isEditableRecordType,
+	loadCreateRecord,
+	loadEditRecord,
+	updateRecord
+} from './records';
 import type { UserAccess } from './roles';
 import type { RecordType } from '$lib/schemas/records';
+import type { EditableRecordType } from './records';
 
 /**
  * The generic create action, from the outside: what it refuses, what it
@@ -41,6 +50,21 @@ function submit(
 	fields: Record<string, string>
 ) {
 	return createRecord({ request: post(fields), locals: localsFor(supabase, access) }, type);
+}
+
+const RECORD_ID = '40000000-0000-0000-0000-000000000001';
+
+function save(
+	supabase: SupabaseClient<Database>,
+	access: UserAccess,
+	type: EditableRecordType,
+	fields: Record<string, string>
+) {
+	return updateRecord(
+		{ request: post(fields), locals: localsFor(supabase, access) },
+		type,
+		RECORD_ID
+	);
 }
 
 describe('loadCreateRecord', () => {
@@ -111,7 +135,7 @@ describe('createRecord', () => {
 		});
 	});
 
-	it('writes a deal as a number, leaving an unpriced one to the column default', async () => {
+	it('writes a deal as a number, and an unpriced one as no amount at all', async () => {
 		const board = { id: 'pipeline-1', pipeline_stages: [{ id: 'stage-1' }] };
 		const priced = supabaseMockSequence([{ data: board }, { data: { id: 'deal' } }]);
 
@@ -124,10 +148,13 @@ describe('createRecord', () => {
 			expect.objectContaining({ amount: 1200.5, expected_close_date: '2026-09-30' })
 		);
 
+		// Explicitly null rather than left out: the same mapping serves the edit
+		// action, where an omitted column would mean "keep what was there" and a
+		// cleared amount would silently not clear.
 		const bare = supabaseMockSequence([{ data: board }, { data: { id: 'deal' } }]);
 		await submit(bare.supabase, OWNER, 'deal', { title: 'Annual renewal' });
 		expect(bare.builder.insert).toHaveBeenCalledWith(
-			expect.objectContaining({ amount: undefined, expected_close_date: null })
+			expect.objectContaining({ amount: null, expected_close_date: null })
 		);
 	});
 
@@ -174,10 +201,12 @@ describe('createRecord', () => {
 			org_id: ORG_ID
 		});
 
+		// A blank price on a `not null default 0` column is the zero that default
+		// would have given it — written out, so clearing one on an edit clears it.
 		const typed = supabaseMock({ data: { id: 'billable' } });
 		await submit(typed.supabase, OWNER, 'billable', { name: 'Porcelain crown' });
 		expect(typed.builder.insert).toHaveBeenCalledWith(
-			expect.objectContaining({ unit_choices: null, is_featured: false, unit_price: undefined })
+			expect.objectContaining({ unit_choices: null, is_featured: false, unit_price: 0 })
 		);
 	});
 
@@ -269,5 +298,200 @@ describe('createRecord', () => {
 		const result = await submit(supabase, OWNER, 'product', { name: 'Standard install' });
 		expect(result).toMatchObject({ status: 400 });
 		expect(result).toHaveProperty('data.form.message', 'duplicate key value');
+	});
+});
+
+/**
+ * The edit half: the same registry, the same schema and the same column
+ * mapping as creating, so what is worth pinning here is the difference —
+ * a form that opens filled in, an update rather than an insert, and a deal's
+ * stage, which is the reason a record page has a form at all.
+ */
+describe('isEditableRecordType', () => {
+	it('accepts the kinds the generic form writes', () => {
+		expect(isEditableRecordType('deal')).toBe(true);
+		expect(isEditableRecordType('company')).toBe(true);
+	});
+
+	it('refuses an invoice, which has its own lifecycle actions, and a proposal, which has a builder', () => {
+		expect(isEditableRecordType('invoice')).toBe(false);
+		expect(isEditableRecordType('proposal')).toBe(false);
+	});
+});
+
+describe('loadEditRecord', () => {
+	it('opens the form on what the record says now, under the edit id', async () => {
+		const { supabase } = supabaseMock({
+			data: {
+				id: RECORD_ID,
+				name: 'Sunrise Smoothie Bar',
+				relationship: 'customer',
+				status: 'active',
+				email: null,
+				phone: '+1 555 010 0100',
+				website: null
+			}
+		});
+
+		const { editForm, canEdit } = await loadEditRecord(
+			localsFor(supabase, OWNER),
+			'company',
+			RECORD_ID
+		);
+		expect(canEdit).toBe(true);
+		expect(editForm.id).toBe(EDIT_FORM_ID);
+		// A null column is the blank string the form holds, never "null".
+		expect(editForm.data).toMatchObject({
+			name: 'Sunrise Smoothie Bar',
+			phone: '+1 555 010 0100',
+			email: '',
+			website: ''
+		});
+		// What the record already says is not a list of mistakes.
+		expect(editForm.errors).toEqual({});
+	});
+
+	it('reads nothing on behalf of a member who could not save it anyway', async () => {
+		const { supabase, from } = supabaseMock({ data: {} });
+
+		const { canEdit, editForm } = await loadEditRecord(
+			localsFor(supabase, MEMBER),
+			'company',
+			RECORD_ID
+		);
+		expect(canEdit).toBe(false);
+		expect(editForm.data).toMatchObject({ name: '' });
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('carries a deal to the form as the stage it sits in', async () => {
+		const { supabase } = supabaseMockSequence([
+			{
+				data: {
+					id: RECORD_ID,
+					title: 'Sunrise Smoothie Bar — retail IC+',
+					stage_id: '50000000-0000-0000-0000-000000000007',
+					amount: 1800,
+					expected_close_date: '2026-10-31'
+				}
+			},
+			{ data: [] }
+		]);
+
+		const { editForm } = await loadEditRecord(localsFor(supabase, OWNER), 'deal', RECORD_ID);
+		expect(editForm.data).toMatchObject({
+			title: 'Sunrise Smoothie Bar — retail IC+',
+			stage_id: '50000000-0000-0000-0000-000000000007',
+			// Every field the form holds is a string, money included.
+			amount: '1800',
+			expected_close_date: '2026-10-31'
+		});
+	});
+});
+
+describe('updateRecord', () => {
+	it('refuses a member without manage on the feature', async () => {
+		const { supabase, from } = supabaseMock({ data: {} });
+
+		await expect(save(supabase, MEMBER, 'company', { name: 'Acme' })).rejects.toMatchObject({
+			status: 403
+		});
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('fails a bad post with the form, and writes nothing', async () => {
+		const { supabase, from } = supabaseMock({ data: {} });
+
+		const result = await save(supabase, OWNER, 'company', { name: '   ' });
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty('data.form.valid', false);
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('updates the row rather than inserting one, and clears what was emptied', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await save(supabase, OWNER, 'company', {
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'active',
+			email: '',
+			phone: '+1 555 010 0100',
+			website: ''
+		});
+		expect(from).toHaveBeenCalledWith('companies');
+		expect(builder.insert).not.toHaveBeenCalled();
+		expect(builder.update).toHaveBeenCalledWith({
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'active',
+			email: null,
+			phone: '+1 555 010 0100',
+			website: null
+		});
+		expect(builder.eq).toHaveBeenCalledWith('id', RECORD_ID);
+	});
+
+	it('moves a deal by writing the stage AND the board it belongs to', async () => {
+		const boards = [
+			{
+				id: '60000000-0000-0000-0000-000000000001',
+				name: 'Merchant boarding',
+				pipeline_stages: [{ id: '50000000-0000-0000-0000-000000000008' }]
+			}
+		];
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: boards },
+			{ data: { id: RECORD_ID } }
+		]);
+
+		await save(supabase, OWNER, 'deal', {
+			title: 'Sunrise Smoothie Bar — retail IC+',
+			stage_id: '50000000-0000-0000-0000-000000000008'
+		});
+		// A stage only means something inside its own pipeline, so the pair
+		// moves together — never the stage alone.
+		expect(builder.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				stage_id: '50000000-0000-0000-0000-000000000008',
+				pipeline_id: '60000000-0000-0000-0000-000000000001'
+			})
+		);
+	});
+
+	it('leaves a deal where it is when no stage is picked', async () => {
+		const { supabase, builder } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await save(supabase, OWNER, 'deal', { title: 'Renamed, not moved' });
+		const [values] = builder.update.mock.calls[0];
+		expect(values).not.toHaveProperty('stage_id');
+		expect(values).not.toHaveProperty('pipeline_id');
+	});
+
+	it('refuses a stage on none of this org\u2019s boards, and writes nothing', async () => {
+		// RLS is what makes this a refusal rather than a check: another org's
+		// board simply is not in the list this org can read.
+		const { supabase, builder } = supabaseMockSequence([{ data: [] }]);
+
+		const result = await save(supabase, OWNER, 'deal', {
+			title: 'Sunrise Smoothie Bar — retail IC+',
+			stage_id: '99999999-0000-0000-0000-000000000009'
+		});
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty(
+			'data.form.message',
+			'That stage is not on any board in this organization.'
+		);
+		expect(builder.update).not.toHaveBeenCalled();
+	});
+
+	it('hands a database refusal back as a form message, not a 500', async () => {
+		const { supabase } = supabaseMock({
+			error: { message: 'new row violates row-level security' }
+		});
+
+		const result = await save(supabase, OWNER, 'ticket', { subject: 'Terminal offline' });
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty('data.form.message', 'new row violates row-level security');
 	});
 });

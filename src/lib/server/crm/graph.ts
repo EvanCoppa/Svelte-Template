@@ -8,28 +8,31 @@ import {
 	type GraphNode,
 	type GraphNodeKind
 } from '$lib/crm/graph';
-import { RECORD_KINDS, recordTerms, type RecordKind } from '$lib/crm/records';
+import { RECORD_KINDS, recordHref, recordTerms } from '$lib/crm/records';
 import type { Database } from '$lib/database.types';
 import type { TermsMap } from '$lib/features/terms';
 import { term, type Vocabulary } from '$lib/features/vocabulary';
 import { getDisplayNames } from '../profiles';
-import type { CrmEntityRef, CrmEntityType } from './entity';
-import { recordLinks } from './links';
-import type { CanOpen } from './records';
+import { listRecordNames, type CanOpen } from './records';
 import { listOrgRelationships } from './relationships';
 
 /**
  * The relationship graph, read whole — what the graph page draws.
  *
- * The Relationships card reads the graph one record at a time
- * (`getRelationships()`); this reads every relationship in the org and
- * folds the endpoints into nodes and the rows into edges. Naming follows
- * the same two namers that card uses, so a node is named and linked
- * exactly as the record page would name it: records through
- * `recordLinks()` (hence `getRecord()`, the app's one namer, which is also
- * where the feature gate applies — a kind the reader may not open is not
- * fetched and not on the map, and nothing is leaked about it), members
- * through `getDisplayNames()`. An edge whose either end went unnamed goes
+ * The map is **every record the reader may open**, not only the ones that
+ * stand in a relationship: an unrelated record is a dot on its own that
+ * still opens its page, so the graph is a way into the data rather than a
+ * picture of the relationships alone, and a record joins the map by
+ * existing. The `relationships` rows are the lines between those dots.
+ *
+ * Naming follows the same two namers the Relationships card uses, so a node
+ * is named and linked exactly as the record page would name it: records
+ * through `listRecordNames()` (their own list modules, the same strings
+ * `getRecord()` puts at the top of a record), members through
+ * `getDisplayNames()`. A kind the reader may not open is not fetched at all
+ * and nothing about it is leaked; a member is on the map only where a
+ * relationship names one, because the roster — not this page — is where
+ * people who work here are read. An edge whose either end went unnamed goes
  * with it; the map never shows a line to nothing.
  *
  * The legend is folded here too, because its words are the server's to
@@ -47,53 +50,35 @@ export async function describeGraph(
 	vocabulary: Vocabulary,
 	terms: TermsMap
 ): Promise<GraphData> {
-	const rows = await listOrgRelationships(supabase, orgId);
-
-	// Every endpoint once, keyed as the node will be.
-	const endpoints = new Map<string, CrmEntityRef>();
-	for (const row of rows) {
-		endpoints.set(graphNodeId(row.from_type, row.from_id), {
-			entityType: row.from_type,
-			entityId: row.from_id
-		});
-		endpoints.set(graphNodeId(row.to_type, row.to_id), {
-			entityType: row.to_type,
-			entityId: row.to_id
-		});
-	}
-
-	const [links, people] = await Promise.all([
-		recordLinks(
-			supabase,
-			orgId,
-			[...endpoints].map(([id, ref]) => ({
-				id,
-				entity_type: ref.entityType,
-				entity_id: ref.entityId
-			})),
-			canOpen,
-			vocabulary
-		),
-		getDisplayNames(
-			supabase,
-			[...endpoints.values()].flatMap((ref) => (ref.entityType === 'member' ? [ref.entityId] : []))
-		)
+	const kinds = RECORD_KINDS.filter((kind) => canOpen(kind));
+	const [rows, ...listed] = await Promise.all([
+		listOrgRelationships(supabase, orgId),
+		...kinds.map((kind) => listRecordNames(supabase, orgId, kind))
 	]);
 
-	const nodes: GraphNode[] = [];
-	for (const [id, ref] of endpoints) {
-		const kind = nodeKindOf(ref.entityType);
-		if (!kind) continue;
-		if (kind === 'member') {
-			const name = people.get(ref.entityId);
-			if (name) nodes.push({ id, kind, name, href: null });
-			continue;
-		}
-		// `recordLinks()` already dropped kinds with no page and kinds the
-		// reader may not open, so no link means no node.
-		const link = links[id];
-		if (link) nodes.push({ id, kind, name: link.label, href: link.href });
+	// Every record of every kind on the map, in the order the kinds are
+	// registered — so the legend and the map read the same way on every load.
+	const nodes: GraphNode[] = kinds.flatMap((kind, index) =>
+		(listed[index] ?? []).map((record): GraphNode => ({
+			id: graphNodeId(kind, record.id),
+			kind,
+			name: record.name,
+			href: recordHref(kind, record.id)
+		}))
+	);
+
+	// Members join the map only where a relationship names one.
+	const memberIds = new Set(
+		rows.flatMap((row) => [
+			...(row.from_type === 'member' ? [row.from_id] : []),
+			...(row.to_type === 'member' ? [row.to_id] : [])
+		])
+	);
+	const people = await getDisplayNames(supabase, [...memberIds]);
+	for (const [id, name] of people) {
+		nodes.push({ id: graphNodeId('member', id), kind: 'member', name, href: null });
 	}
+
 	const drawn = new Set(nodes.map((node) => node.id));
 
 	const edges: GraphEdge[] = rows.flatMap((row): GraphEdge[] => {
@@ -119,12 +104,6 @@ export async function describeGraph(
 		kinds: describeKinds(nodes, vocabulary, terms),
 		types: describeTypes(edges)
 	};
-}
-
-/** The kinds that can be a node: the record kinds with a page, and a member. */
-function nodeKindOf(entityType: CrmEntityType): GraphNodeKind | null {
-	if (entityType === 'member') return 'member';
-	return RECORD_KINDS.find((kind): kind is RecordKind => kind === entityType) ?? null;
 }
 
 /**
