@@ -87,8 +87,9 @@
 	}
 
 	/**
-	 * The tabs below the details, in the order they are drawn: the overview
-	 * and the timeline every kind has, then the sections only some kinds have
+	 * The tabs, which are most of the page: the overview (what the record is —
+	 * its details and its notes — then its highlights, relationships and the
+	 * latest activity) and the timeline every kind has, then the sections only some kinds have
 	 * (a party's addresses, an invoice's money, an asset's photos, a task's
 	 * conversation), then one tab per group of records pointing at this one.
 	 * A related group's tab is keyed by its kind, so the overview can jump to it.
@@ -176,104 +177,6 @@
 				All {terms.plural}
 			</Button>
 		</div>
-	</div>
-
-	<!-- Details on the start side, the notes about it in a column beside them. -->
-	<div class={['grid items-start gap-6', data.notes && 'xl:grid-cols-[minmax(0,1fr)_22rem]']}>
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Details</Card.Title>
-			</Card.Header>
-			<Card.Content class="space-y-6">
-				<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each details as field (field.label)}
-						<Detail.Field label={field.label} value={field.value} people={data.people} />
-					{/each}
-				</dl>
-
-				{#if data.customFields.length > 0}
-					<div class="space-y-3 border-t pt-6">
-						<p class="text-sm font-medium">Custom fields</p>
-						<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-							{#each data.customFields as field (field.key)}
-								<Detail.Field label={field.label} value={field.value} />
-							{/each}
-						</dl>
-					</div>
-				{/if}
-			</Card.Content>
-			<Card.Footer class="border-t">
-				<dl class="flex flex-wrap items-center gap-x-6 gap-y-2">
-					{@render stamp('Created', { type: 'datetime', value: data.record.createdAt })}
-					{#if data.record.createdBy}
-						{@render stamp('By', { type: 'person', userId: data.record.createdBy })}
-					{/if}
-					{@render stamp('Updated', { type: 'datetime', value: data.record.updatedAt })}
-					<div class="flex items-center gap-2">
-						<dt class="text-muted-foreground text-xs">ID</dt>
-						<dd class="flex items-center gap-1">
-							<code class="font-mono text-xs">{data.record.id.slice(0, 8)}…</code>
-							<CopyButton value={data.record.id} label="Copy" copiedLabel="Copied" class="h-7" />
-						</dd>
-					</div>
-				</dl>
-			</Card.Footer>
-		</Card.Root>
-
-		{#if data.notes}
-			{@const notes = data.notes}
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Notes</Card.Title>
-					<Card.Description>
-						Written down about this {terms.noun}. Only visible to you — they don't show up on the
-						dock or the notes page.
-					</Card.Description>
-				</Card.Header>
-				<Card.Content class="space-y-3">
-					{#each notes.open as note (note.id)}
-						<Note.Card color={note.color} class="h-40">
-							<Note.Editor
-								{note}
-								editable={canEditNote(note, notes)}
-								autofocus={note.id === addedNoteId}
-								bodyClass="flex-1 field-sizing-fixed"
-								onsave={(patch) => noteCommands.save(note.id, patch)}
-							/>
-							{#if canArchiveNote(note, notes)}
-								<Note.Actions>
-									<Note.Palette
-										value={note.color}
-										onpick={(color) => noteCommands.save(note.id, { color })}
-									/>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-7"
-										title="Archive"
-										onclick={() => noteCommands.archive(note.id, true)}
-									>
-										<ArchiveIcon class="size-4" />
-										<span class="sr-only">Archive note</span>
-									</Button>
-								</Note.Actions>
-							{/if}
-						</Note.Card>
-					{/each}
-
-					{#if notes.canManage}
-						<Button variant="outline" class="w-full" onclick={addNote}>
-							<PlusIcon />
-							New note
-						</Button>
-					{:else if notes.open.length === 0}
-						<p class="text-muted-foreground text-sm">
-							Nothing written down about this {terms.noun}.
-						</p>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-		{/if}
 	</div>
 
 	<!-- Everything else about the record, one section at a time. Only the
@@ -492,6 +395,104 @@
 -->
 {#snippet overview()}
 	<div class="space-y-6">
+		<!-- What the record IS: its fields, and the notes kept about it beside them. -->
+		<div class={['grid items-start gap-6', data.notes && 'xl:grid-cols-[minmax(0,1fr)_22rem]']}>
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>Details</Card.Title>
+				</Card.Header>
+				<Card.Content class="space-y-6">
+					<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+						{#each details as field (field.label)}
+							<Detail.Field label={field.label} value={field.value} people={data.people} />
+						{/each}
+					</dl>
+
+					{#if data.customFields.length > 0}
+						<div class="space-y-3 border-t pt-6">
+							<p class="text-sm font-medium">Custom fields</p>
+							<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+								{#each data.customFields as field (field.key)}
+									<Detail.Field label={field.label} value={field.value} />
+								{/each}
+							</dl>
+						</div>
+					{/if}
+				</Card.Content>
+				<Card.Footer class="border-t">
+					<dl class="flex flex-wrap items-center gap-x-6 gap-y-2">
+						{@render stamp('Created', { type: 'datetime', value: data.record.createdAt })}
+						{#if data.record.createdBy}
+							{@render stamp('By', { type: 'person', userId: data.record.createdBy })}
+						{/if}
+						{@render stamp('Updated', { type: 'datetime', value: data.record.updatedAt })}
+						<div class="flex items-center gap-2">
+							<dt class="text-muted-foreground text-xs">ID</dt>
+							<dd class="flex items-center gap-1">
+								<code class="font-mono text-xs">{data.record.id.slice(0, 8)}…</code>
+								<CopyButton value={data.record.id} label="Copy" copiedLabel="Copied" class="h-7" />
+							</dd>
+						</div>
+					</dl>
+				</Card.Footer>
+			</Card.Root>
+
+			{#if data.notes}
+				{@const notes = data.notes}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>Notes</Card.Title>
+						<Card.Description>
+							Written down about this {terms.noun}. Only visible to you — they don't show up on the
+							dock or the notes page.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-3">
+						{#each notes.open as note (note.id)}
+							<Note.Card color={note.color} class="h-40">
+								<Note.Editor
+									{note}
+									editable={canEditNote(note, notes)}
+									autofocus={note.id === addedNoteId}
+									bodyClass="flex-1 field-sizing-fixed"
+									onsave={(patch) => noteCommands.save(note.id, patch)}
+								/>
+								{#if canArchiveNote(note, notes)}
+									<Note.Actions>
+										<Note.Palette
+											value={note.color}
+											onpick={(color) => noteCommands.save(note.id, { color })}
+										/>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-7"
+											title="Archive"
+											onclick={() => noteCommands.archive(note.id, true)}
+										>
+											<ArchiveIcon class="size-4" />
+											<span class="sr-only">Archive note</span>
+										</Button>
+									</Note.Actions>
+								{/if}
+							</Note.Card>
+						{/each}
+
+						{#if notes.canManage}
+							<Button variant="outline" class="w-full" onclick={addNote}>
+								<PlusIcon />
+								New note
+							</Button>
+						{:else if notes.open.length === 0}
+							<p class="text-muted-foreground text-sm">
+								Nothing written down about this {terms.noun}.
+							</p>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/if}
+		</div>
+
 		<section class="space-y-3">
 			<h2 class="text-sm font-medium">Highlights</h2>
 			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
