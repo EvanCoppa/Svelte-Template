@@ -30,14 +30,9 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { recordTerms, type RecordKind } from '$lib/crm/records';
 	import { motionCollapse } from '$lib/motion.js';
+	import { recordRef, type LinkableRecord } from '$lib/schemas/record-ref';
 	import { cn } from '$lib/utils.js';
-	import {
-		createEventSchema,
-		recordRef,
-		type Assignee,
-		type EventFormValues,
-		type LinkableRecord
-	} from './schema';
+	import { createEventSchema, type Assignee, type EventFormValues } from './schema';
 
 	/**
 	 * The one event form, worn twice: as the booking popover a click on the

@@ -4005,7 +4005,7 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
-      task_status: "todo" | "in_progress" | "blocked" | "done"
+      task_status: "todo" | "in_progress" | "blocked" | "in_review" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -4245,7 +4245,7 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
-      task_status: ["todo", "in_progress", "blocked", "done"],
+      task_status: ["todo", "in_progress", "blocked", "in_review", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
   },

@@ -459,22 +459,26 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   is named by the industry ("Schedule" / "appointment" in a practice).
 - **A task has a column AND a finishing time, and a trigger holds them together**
   (`task_board` migration + `src/lib/crm/tasks.ts` + `src/routes/(app)/tasks/`).
-  `tasks.status` (`task_status`: todo / in_progress / blocked / done) says WHERE the
-  task sits; `completed_at` says WHEN it was finished. They are not two ways to say
-  the same thing, and `private.tasks_sync_completion()` keeps the one relationship
-  between them — `status = 'done'` exactly when the timestamp is set — so the board
-  writes `status`, the checkbox writes `completed_at`, and neither knows the other
-  column exists. An enum rather than rows, unlike `pipeline_stages`: "not started,
-  underway, stuck, finished" is the same four states in every vertical, and what a
-  task is CALLED is already the industry's through the feature's terms. There is no
-  `cancelled` state on purpose — it would be a second closed state and the timestamp
-  can only be honest about one. **The board groups those statuses rather than adding
-  to them**: `TASK_STATUS_GROUPS` (`src/lib/crm/tones.ts`) is the columns — To do,
-  In progress (holding `in_progress` AND `blocked`), Done — and a group is a way of
-  reading the wall, never a value written to a row, so a drop on a grouped column
-  asks which status it meant and a card wears its own status on its eyebrow. Adding
-  a column means grouping differently; adding a _status_ is a migration and a change
-  to the four states above. **The page is not a table**: a `Kanban` board by status
+  `tasks.status` (`task_status`: todo / in_progress / blocked / in_review / done)
+  says WHERE the task sits; `completed_at` says WHEN it was finished. They are not
+  two ways to say the same thing, and `private.tasks_sync_completion()` keeps the one
+  relationship between them — `status = 'done'` exactly when the timestamp is set —
+  so the board writes `status`, the checkbox writes `completed_at`, and neither knows
+  the other column exists. An enum rather than rows, unlike `pipeline_stages`: "not
+  started, underway, stuck, waiting on a reader, finished" is the same shape of day
+  in every vertical, and what a task is CALLED is already the industry's through the
+  feature's terms. There is no `cancelled` state on purpose — it would be a second
+  closed state and the timestamp can only be honest about one. **The board groups
+  those statuses rather than adding to them**: `TASK_STATUS_GROUPS`
+  (`src/lib/crm/tones.ts`) is the columns — To do, In progress (holding
+  `in_progress` AND `blocked`), In review, Done — and a group is a way of reading the
+  wall, never a value written to a row, so a drop on a grouped column asks which
+  status it meant and a card wears its own status on its eyebrow. Adding a column
+  means grouping differently; adding a _status_ is a migration and a change to the
+  states above — `in_review` is the one that earned it (`task_in_review` migration):
+  a task nobody is working on and nobody has finished had been parked in `blocked`,
+  which says it is stuck when it is only waiting. **The page is not a table**: a
+  `Kanban` board by status
   group and a `GroupList` by due-date bucket, the choice remembered per device
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
   and the checkbox alike, and `schedule` / `prioritize` / `assign` / `unassign`
@@ -649,7 +653,9 @@ builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
 plans page, whose one field is a multi-select; the calendar, whose booking form is
 two instants behind wall-clock inputs, an all-day switch that changes what they mean,
-a colour and a record — docs/calendar.md) keeps its own form and says why.
+a colour and a record — docs/calendar.md; the task modal at `(app)/tasks/`, which
+writes the row and its `assigned_to` relationships in one post and links a party
+from one picker — docs/tasks.md, "The task modal") keeps its own form and says why.
 
 ## Data loading & invalidation
 

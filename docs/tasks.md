@@ -19,7 +19,8 @@ Nothing outside those two modules and the record page knows how any of it is sto
 
 ## Where it sits, when it finished, how urgent it is
 
-`status` (`public.task_status`: `todo` / `in_progress` / `blocked` / `done`) says
+`status` (`public.task_status`: `todo` / `in_progress` / `blocked` / `in_review` /
+`done`) says
 WHERE a task sits; `completed_at` says WHEN it was finished. They are not two ways
 to say the same thing, and `private.tasks_sync_completion()` (the task board
 migration) keeps the one relationship between them — `status = 'done'` exactly when
@@ -90,6 +91,7 @@ it are what a task is actually in:
 | ----------- | ------------------------ |
 | To do       | `todo`                   |
 | In progress | `in_progress`, `blocked` |
+| In review   | `in_review`              |
 | Done        | `done`                   |
 
 Nobody scanning a wall wants a separate column to find the one piece of work that is
@@ -99,12 +101,21 @@ things to know about a card. So they share a column, the card says which it is
 under "In progress" is news rather than the same word twice), and dragging onto that
 column splits it into a drop zone per status and asks.
 
+`in_review` does **not** share that column, for the same reason `blocked` does: the
+question a column answers is whose the work is. Everything under In progress is the
+doer's; a task in review is the reader's, and work waiting on somebody who is not
+looking at the board is exactly what a board exists to show. It is not `done` either
+— `done` is pinned to `completed_at`, so parking a task there would claim a
+finishing time for work that can still come back.
+
 **A group is never a state.** `TASK_STATUS_GROUPS[1].id` is `doing`, and nothing is
 ever stored as `doing`: `onmove` is called with a status, the `move` action's schema
 is `z.enum(TASK_STATUSES)`, and a group id would be rejected there. Regrouping the
 columns is an edit to one array in `src/lib/crm/tones.ts`; adding a _status_ is a
-migration and a change to the four states the enum deliberately holds (CLAUDE.md,
-"A task has a column AND a finishing time" — there is no `cancelled`).
+migration and a change to the states the enum deliberately holds — what `in_review`
+took (the task in-review migration), and what a `cancelled` state is still refused
+(CLAUDE.md, "A task has a column AND a finishing time": `completed_at` can only be
+honest about one closed state).
 
 A test in `src/lib/crm/tasks.test.ts` pins the invariant that ties the two axes
 together: every status appears in exactly one group, in workflow order. A status
@@ -144,9 +155,41 @@ record gets. If a task ever earns its own screen, it goes at `(app)/tasks/[id]/`
 a static segment outranks the `[kind=record]` matcher — and composes the same
 `RecordDetail` and `detail/` parts rather than a second renderer.
 
-The list is `(app)/tasks/`, creation is the generic `CreateRecord` form
-(`RECORD_FORMS.task`), and freshness is `QUERY.tasks` for the list and
-`QUERY.record('task', id)` for one task, including after a message is posted.
+The list is `(app)/tasks/`, creation is the task modal below, and freshness is
+`QUERY.tasks` for the list and `QUERY.record('task', id)` for one task, including
+after a message is posted.
+
+## The task modal
+
+A task is the one kind of record that is **not** created through the generic
+`CreateRecord` form. `(app)/tasks/create-task.svelte` is its own modal, and it earns
+that the way the calendar's booking form does — by writing more than a row of
+strings:
+
+- **who is on it is a relationship**, so the post writes the task AND one
+  `assigned_to` row per person named, in the one action (`?/create`,
+  `createTaskSchema` in `schema.ts`). Several people at once, because that is what
+  the graph allows and a column never did. A new task starts assigned to the writer.
+- **what it is about is a party** — a company or a person — chosen from one picker
+  over both kinds rather than two fields, posted as the shared `<kind>:<id>` ref
+  (`$lib/schemas/record-ref`, the calendar's spelling) and accepted only when the
+  caller may open that kind (the same `passesFeatureGate()` the hook applies).
+- **when is a calendar with the days that get picked most as one-click choices** —
+  today, tomorrow, next week, no date — stored as the end of that day in the
+  writer's zone so "today" is not late the moment it is written. The chip reads
+  the day in the same words a card does (`dueLabel()`).
+
+The three are chips under the title rather than fields beside it, because they are
+set far more often than they are typed. **Create more** keeps the modal open after
+a save and clears the title only: five tasks in a row are usually five things for
+the same person about the same account. Details and priority are not in the modal
+on purpose — they are edited on the record page through the generic form
+(`RECORD_FORMS.task`, which is why `task` stays an `EditableRecordType`), where
+every other kind's fields live.
+
+The page's load reads the modal's pickers for writers only (the roster it already
+had for the cards, plus the companies and contacts the reader may open), and
+`page.server.test.ts` pins what the action writes and refuses.
 
 ## Adding this to another kind
 

@@ -29,7 +29,10 @@ import { QUERY } from '$lib/queries';
  * A proposal is not here on purpose: it is a title plus one to five priced
  * options made of catalog lines — more than one row of strings — so it has
  * the builder page at `src/routes/(app)/proposals/new/` instead, the one
- * kind whose creation is a screen rather than this modal.
+ * kind whose creation is a screen rather than this modal. A task is listed
+ * but created elsewhere too: the tasks page's own modal writes the row and
+ * its `assigned_to` relationships in one post (docs/tasks.md), and its entry
+ * here is what the record page EDITS a task with.
  */
 
 /** Kinds of record the generic form can create. */
