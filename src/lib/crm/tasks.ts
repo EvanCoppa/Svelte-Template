@@ -1,4 +1,4 @@
-import { daysBetween, startOfDay } from '$lib/calendar';
+import { daysBetween, relativeDayLabel, startOfDay, WEEK_AHEAD } from '$lib/calendar';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import type { Enums, Tables } from '$lib/database.types';
 
@@ -24,9 +24,6 @@ export type TaskLike = Pick<Tables<'tasks'>, 'due_at' | 'status'>;
 export const TASK_BUCKETS = ['overdue', 'today', 'week', 'later', 'someday', 'done'] as const;
 
 export type TaskBucket = (typeof TASK_BUCKETS)[number];
-
-/** How many days ahead still counts as "this week" rather than "later". */
-const WEEK_AHEAD = 7;
 
 export const TASK_BUCKET_LABEL = {
 	overdue: 'Overdue',
@@ -93,26 +90,15 @@ export function groupTasksByStatus<T extends Pick<Tables<'tasks'>, 'status'>>(
 	return columns;
 }
 
-const dayMonth = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
-
 /**
- * When a task is due, in as few words as carry the meaning: the days near
- * today are named rather than dated, because "Tomorrow" is read faster than a
- * date the reader has to work out. Null when there is no due date — the row
- * says nothing rather than "—", since the heading it sits under already did.
+ * When a task is due, worded by `relativeDayLabel()` — the one place a date
+ * becomes "Tomorrow", which the deal board's expected close reads too. Null
+ * when there is no due date: the row says nothing rather than "—", since the
+ * heading it sits under already did.
  */
 export function dueLabel(task: TaskLike, now: Date): string | null {
 	if (!task.due_at) return null;
-	const due = new Date(task.due_at);
-	const days = daysBetween(startOfDay(now), startOfDay(due));
-	if (days === 0) return 'Today';
-	if (days === 1) return 'Tomorrow';
-	if (days === -1) return 'Yesterday';
-	if (days < 0) return `${String(-days)} days ago`;
-	// Inside the coming week a weekday is unambiguous and needs no date.
-	if (days <= WEEK_AHEAD) return weekday.format(due);
-	return dayMonth.format(due);
+	return relativeDayLabel(new Date(task.due_at), now);
 }
 
 /** True when the task is late — the one thing a row says in red. */

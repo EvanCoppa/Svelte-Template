@@ -372,7 +372,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   roofer do not run the same board — a deal's `stage_id` is pinned to its own
   pipeline by a composite foreign key, every org gets a default board by trigger, and
   an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
-  board has exactly those three. Custom fields follow the same rule and now apply to
+  board has exactly those three. A board is therefore also a screen: `/deals` draws
+  the stages as a `Kanban` funnel beside its table, and a card dropped on a stage
+  posts the page's `move` action, which writes the pair through `dealPlacement()` —
+  the one place that says which board a stage is on, and so the one place that proves
+  it is this org's (docs/deals.md). Custom fields follow the same rule and now apply to
   **any** kind of record — a definition declares its `entity_type` and values
   reference `(field_definition_id, entity_type)`, so a contact's field cannot be
   filled in on a product. That is where industry specifics belong: a column if two
@@ -862,7 +866,14 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
+  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
+  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
+  for a column that groups several states, not for every board. It draws one pipeline at a
+  time (a stage only means something inside its own board, so which one is in the query
+  string like the ledger's account filter), the stage's `probability` as the ring's fill,
+  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
+  `$lib/crm/tasks.ts` does for the task board.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and
