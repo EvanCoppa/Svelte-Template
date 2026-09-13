@@ -12,7 +12,7 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger
 		data-slot="data-table-view-options"
-		class={buttonVariants({ variant: 'outline', size: 'sm', class: className })}
+		class={buttonVariants({ variant: 'outline', size: 'default', class: className })}
 	>
 		<Settings2Icon />
 		View
