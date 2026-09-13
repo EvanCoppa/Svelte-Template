@@ -1,6 +1,7 @@
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import type { RecordKind } from '$lib/crm/records';
 import type { Enums } from '$lib/database.types';
+import type { TermId } from '$lib/features/vocabulary';
 
 /**
  * Lists — a list is its fields, and the industry chooses them.
@@ -54,8 +55,12 @@ export const FILTERABLE_TYPES = [
 	'payment'
 ] as const satisfies readonly FieldType[];
 
-/** Fixed text, or the word for a kind of record as the industry says it. */
-export type FieldLabel = { text: string } | { kind: RecordKind };
+/**
+ * Fixed text, the word for a kind of record as the industry says it, or a
+ * word that belongs to no feature (a proposal's presenter, its owner) as the
+ * vocabulary resolver has it.
+ */
+export type FieldLabel = { text: string } | { kind: RecordKind } | { term: TermId };
 
 /** One value a filter offers; `tone` when the value is drawn as a pill. */
 export type FilterOption = { value: string; label: string; tone?: BadgeTone };
