@@ -121,7 +121,13 @@ export function listColumns(
 					enableGlobalFilter: field.searchable,
 					enableColumnFilter: field.filterable,
 					filterFn: 'oneOf',
-					meta: { title, filter: field.filterable ? { options: field.options } : null }
+					meta: {
+						title,
+						filter: field.filterable ? { options: field.options } : null,
+						// Companies carry more columns than most lists; a name rarely
+						// needs the room a full-width column gives it.
+						class: spec.kind === 'company' && field.key === 'name' ? 'max-w-48 truncate' : undefined
+					}
 				}
 			);
 		})
