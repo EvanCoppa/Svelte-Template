@@ -9,7 +9,11 @@ const CONTACT_ID = '30000000-0000-0000-0000-000000000011';
 const CONTEXT = {
 	orgName: 'Bright Smile Dental',
 	noun: 'treatment plan',
-	vocabulary: { proposal_presenter: 'Presenter', proposal_responsible: 'Provider' }
+	vocabulary: {
+		proposal_presenter: 'Presenter',
+		proposal_responsible: 'Provider',
+		graph_member: 'Team member'
+	}
 };
 
 const deck = {

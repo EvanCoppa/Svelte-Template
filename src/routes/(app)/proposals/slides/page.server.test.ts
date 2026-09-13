@@ -59,6 +59,11 @@ const TERMS = [
 		id: 'proposal_responsible',
 		label: 'Responsible',
 		industry_terms: [{ industry_id: 'dentistry', label: 'Provider' }]
+	},
+	{
+		id: 'graph_member',
+		label: 'Team member',
+		industry_terms: [{ industry_id: 'dentistry', label: 'Team member' }]
 	}
 ];
 
