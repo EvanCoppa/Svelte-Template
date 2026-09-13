@@ -219,6 +219,24 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+  **The page is a header, then tabs with a record rail beside them**, never a
+  wall of cards: the header is the way back (one `←` icon button, since the
+  breadcrumb trail is the way back on a wide screen), a **square** record tile
+  of initials (round reads as a person, and a product is not one), the name
+  with its pills and tags, and the `link` fields as a row of quick facts. Under
+  it, `ui/tabs` in the `underline` variant — the strip is the page's own
+  navigation, not a control inside a card — are the page — Overview (highlights that jump to a tab,
+  relationships, the latest activity), Activity, the sections only some kinds
+  have (Addresses, Billing, Photos, Conversation) and one tab per
+  related-records group — with the rail on the end side holding what the
+  record IS whichever tab is open: a panel on a hairline rather than a card,
+  carrying two `ui/collapsible` sections — "<Kind> details" (its fields as
+  label-and-value rows, then its custom fields, then created / updated / id),
+  with `EditRecord compact` beside that heading, and Notes. A value that names
+  another record or a member wears a chip (`Detail.Value`), so a rail row reads
+  as a thing rather than a sentence. A new section is a tab, drawn only while
+  active; a new fact about the record is a row in the rail; never a card
+  outside the two.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by

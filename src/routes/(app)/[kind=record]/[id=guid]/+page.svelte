@@ -1,17 +1,31 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import ImageIcon from '@lucide/svelte/icons/image';
+	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
+	import PhoneIcon from '@lucide/svelte/icons/phone';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import ReceiptIcon from '@lucide/svelte/icons/receipt';
 	import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 	import * as Detail from '$lib/components/detail/index.js';
 	import EditRecord from '$lib/components/edit-record.svelte';
 	import * as Note from '$lib/components/note/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { StatusBadge, TagBadge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { recordListHref, recordTerms } from '$lib/crm/records';
 	import { canArchiveNote, canEditNote } from '$lib/notes';
 	import { noteCommands } from '$lib/notes-api';
@@ -24,9 +38,33 @@
 
 	// What this kind is called, as the org's industry says it — "Quote", "All quotes".
 	const terms = $derived(recordTerms(page.data.terms, data.record.kind));
-	// The record wears its feature's icon — the one its sidebar entry carries,
-	// found the way the breadcrumb trail finds it.
-	const KindIcon = $derived(iconFor(iconForPath(page.url.pathname, page.data.nav ?? [])));
+	/**
+	 * The record's initials, for the avatar beside its name — the first letter
+	 * of its first two words, the way the thread names a message's author.
+	 */
+	const initials = $derived(
+		data.record.name
+			.split(/\s+/)
+			.filter((word) => word !== '')
+			.slice(0, 2)
+			.map((word) => word.charAt(0).toUpperCase())
+			.join('')
+	);
+
+	/**
+	 * The ways to reach the record — its email, phone and website — sit under
+	 * its name as a row of quick facts, as a contact card would put them; the
+	 * rest of the fields fill the Details grid. A `link` value already says it
+	 * leads outside the app; the icon says by which door.
+	 */
+	const facts = $derived(data.record.fields.filter((field) => field.value.type === 'link'));
+	const details = $derived(data.record.fields.filter((field) => field.value.type !== 'link'));
+
+	function factIcon(href: string) {
+		if (href.startsWith('mailto:')) return MailIcon;
+		if (href.startsWith('tel:')) return PhoneIcon;
+		return GlobeIcon;
+	}
 
 	/** Who logged an activity, or null when nobody can be named. */
 	function author(userId: string | null): string | null {
@@ -45,226 +83,363 @@
 		});
 		if (note) addedNoteId = note.id;
 	}
+
+	/**
+	 * The tabs, which are most of the page: the overview (highlights,
+	 * relationships and the latest activity) and the timeline every kind has,
+	 * then the sections only some kinds have
+	 * (a party's addresses, an invoice's money, an asset's photos, a task's
+	 * conversation), then one tab per group of records pointing at this one.
+	 * A related group's tab is keyed by its kind, so the overview can jump to it.
+	 */
+	let tab = $state('overview');
+
+	// The overview's peek at the timeline; the Activity tab has all of it.
+	const RECENT = 3;
+	const recentActivities = $derived(data.activities.slice(0, RECENT));
+
+	// Fixed locale, like every date on a page — see the staff page.
+	const datetime = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+	const queryKey = $derived(QUERY.record(data.record.kind, data.record.id));
+
+	// The rail's two sections, open until this reader folds one away. Which is
+	// open is this view's own business — nothing worth a preference or a cookie.
+	let detailsOpen = $state(true);
+	let notesOpen = $state(true);
 </script>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-4">
-		<div class="space-y-2">
-			<p class="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
-				<KindIcon class="size-4" />
-				{capitalize(terms.noun)}
-			</p>
-			<div class="flex flex-wrap items-center gap-3">
-				<h1 class="text-2xl font-bold tracking-tight">{data.record.name}</h1>
-				{#each data.record.pills as pill (pill.label)}
-					<StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
-				{/each}
+	<!-- The record: the way back, then who it is and how to reach it. -->
+	<div class="flex min-w-0 items-start gap-3">
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<!-- The breadcrumb trail is the way back on a wide screen; this is
+					     the way back everywhere else. -->
+					<Button
+						{...props}
+						href={recordListHref(data.record.kind)}
+						variant="ghost"
+						size="icon"
+						class="mt-0.5"
+					>
+						<ArrowLeftIcon />
+						<span class="sr-only">All {terms.plural}</span>
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>All {terms.plural}</Tooltip.Content>
+		</Tooltip.Root>
+
+		<div class="flex min-w-0 items-start gap-3">
+			<!-- A record's tile is square, the way an app or a company mark is;
+			     a round one would read as a person even for a product. -->
+			<div
+				class="{Avatar.avatarTint(
+					data.record.id
+				)} flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold"
+			>
+				{initials}
 			</div>
-			{#if data.tags.length > 0}
-				<div class="flex flex-wrap gap-1.5">
+			<div class="min-w-0 space-y-1">
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+					<h1 class="text-2xl font-bold tracking-tight">{data.record.name}</h1>
+					{#each data.record.pills as pill (pill.label)}
+						<StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
+					{/each}
 					{#each data.tags as tag (tag.id)}
 						<TagBadge tone={tag.tone}>{tag.name}</TagBadge>
 					{/each}
 				</div>
-			{/if}
-		</div>
-
-		<div class="flex flex-wrap items-center gap-2">
-			<!-- Editing is the generic form the list page creates with, so the
-			     fields, their validation and their words are described once —
-			     drawn only for a kind it can write and a reader who may. -->
-			{#if data.edit?.canEdit}
-				<EditRecord
-					type={data.edit.type}
-					recordId={data.record.id}
-					form={data.edit.editForm}
-					pickers={data.edit.editPickers}
-				/>
-			{/if}
-
-			<!-- The breadcrumb trail is the way back on a wide screen; this is the
-			     way back everywhere else. -->
-			<Button href={recordListHref(data.record.kind)} variant="outline">
-				<ArrowLeftIcon />
-				All {terms.plural}
-			</Button>
+				{#if facts.length > 0}
+					<ul class="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+						{#each facts as field (field.label)}
+							{#if field.value.type === 'link'}
+								{@const Icon = factIcon(field.value.href)}
+								<li class="flex min-w-0 items-center gap-1.5">
+									<Icon class="size-4 shrink-0" />
+									<span class="truncate"><Detail.Value value={field.value} /></span>
+								</li>
+							{/if}
+						{/each}
+					</ul>
+				{/if}
+			</div>
 		</div>
 	</div>
 
+	<!-- The tabs are the page; the rail beside them says what the record is and
+	     holds the notes kept about it, whichever tab is open. -->
 	<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-		<div class="space-y-6">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Details</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-						{#each data.record.fields as field (field.label)}
+		<!-- Everything else about the record, one section at a time. Only the
+		     active panel is drawn, so a form or a thread exists once. -->
+		<Tabs.Root bind:value={tab} variant="underline" class="gap-5">
+			<Tabs.List>
+				<Tabs.Trigger value="overview"><LayoutDashboardIcon />Overview</Tabs.Trigger>
+				<Tabs.Trigger value="activity">
+					<ActivityIcon />Activity
+					{@render count(data.activities.length)}
+				</Tabs.Trigger>
+				{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+					<Tabs.Trigger value="addresses">
+						<MapPinIcon />Addresses
+						{@render count(data.addresses.length)}
+					</Tabs.Trigger>
+				{/if}
+				{#if data.billing}
+					<Tabs.Trigger value="billing"><ReceiptIcon />Billing</Tabs.Trigger>
+				{/if}
+				{#if data.record.kind === 'asset'}
+					<Tabs.Trigger value="photos">
+						<ImageIcon />Photos
+						{@render count(data.images.length)}
+					</Tabs.Trigger>
+				{/if}
+				{#if data.thread}
+					<Tabs.Trigger value="conversation">
+						<MessagesSquareIcon />Conversation
+						{@render count(data.thread.messages.length)}
+					</Tabs.Trigger>
+				{/if}
+				{#each data.related as group (group.kind)}
+					{@const GroupIcon = iconFor(iconForPath(recordListHref(group.kind), page.data.nav ?? []))}
+					<Tabs.Trigger value={group.kind}>
+						<GroupIcon />{recordTerms(page.data.terms, group.kind).name}
+						{@render count(group.records.length)}
+					</Tabs.Trigger>
+				{/each}
+			</Tabs.List>
+
+			<Tabs.Content value="overview">
+				{#if tab === 'overview'}{@render overview()}{/if}
+			</Tabs.Content>
+			<Tabs.Content value="activity">
+				{#if tab === 'activity'}
+					<Card.Root>
+						<Card.Header>
+							<Card.Title>Activity</Card.Title>
+							<Card.Description>
+								Calls, emails, meetings and notes logged against this {terms.noun}, newest first.
+							</Card.Description>
+						</Card.Header>
+						<Card.Content>{@render timeline(data.activities)}</Card.Content>
+					</Card.Root>
+				{/if}
+			</Tabs.Content>
+			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+				<Tabs.Content value="addresses">
+					{#if tab === 'addresses'}
+						<Detail.Addresses
+							addresses={data.addresses}
+							form={data.addressForm}
+							removeForm={data.removeAddressForm}
+							canManage={data.canManageAddresses}
+							noun={terms.noun}
+							{queryKey}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/if}
+			{#if data.billing}
+				{@const billing = data.billing}
+				<Tabs.Content value="billing" class="space-y-6">
+					{#if tab === 'billing'}
+						<Detail.InvoiceLines
+							invoiceId={data.record.id}
+							status={billing.status}
+							currency={billing.currency}
+							totals={{
+								subtotal: billing.subtotal,
+								tax: billing.tax,
+								shipping: billing.shipping,
+								discount: billing.discount,
+								total: billing.total,
+								amountPaid: billing.amountPaid,
+								balanceDue: billing.balanceDue
+							}}
+							lines={billing.lines}
+							products={billing.products}
+							lineForm={billing.forms.line}
+							removeLineForm={billing.forms.removeLine}
+							detailsForm={billing.forms.details}
+							issueForm={billing.forms.issue}
+							voidForm={billing.forms.void}
+							removeForm={billing.forms.remove}
+							canManage={billing.canManage}
+							canDelete={billing.canDelete}
+							noun={terms.noun}
+							{queryKey}
+						/>
+						<Detail.InvoicePayments
+							status={billing.status}
+							currency={billing.currency}
+							balanceDue={billing.balanceDue}
+							payments={billing.payments}
+							unapplied={billing.unapplied}
+							paymentForm={billing.forms.payment}
+							applyForm={billing.forms.applyPayment}
+							removePaymentForm={billing.forms.removePayment}
+							canRecord={billing.canRecordPayments}
+							canRemove={billing.canRemovePayments}
+							noun={terms.noun}
+							{queryKey}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/if}
+			{#if data.record.kind === 'asset'}
+				<Tabs.Content value="photos">
+					{#if tab === 'photos'}
+						<Detail.Images
+							images={data.images}
+							form={data.imageForm}
+							removeForm={data.removeImageForm}
+							canManage={data.canManageImages}
+							noun={terms.noun}
+							{queryKey}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/if}
+			{#if data.thread}
+				{@const thread = data.thread}
+				<Tabs.Content value="conversation">
+					{#if tab === 'conversation'}
+						<Detail.Thread
+							messages={thread.messages}
+							form={thread.form}
+							removeForm={thread.removeForm}
+							userId={thread.userId}
+							canModerate={thread.canModerate}
+							noun={terms.noun}
+							{queryKey}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/if}
+			{#each data.related as group (group.kind)}
+				{@const groupTerms = recordTerms(page.data.terms, group.kind)}
+				<Tabs.Content value={group.kind}>
+					{#if tab === group.kind}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{groupTerms.name}</Card.Title>
+								<Card.Description>
+									{group.records.length === 1
+										? `One ${groupTerms.noun}`
+										: `${String(group.records.length)} ${groupTerms.plural}`}
+									linked to this {terms.noun}.
+								</Card.Description>
+							</Card.Header>
+							<Card.Content>
+								<ul class="divide-border divide-y">
+									{#each group.records as record (record.id)}
+										<Detail.Related {record} />
+									{/each}
+								</ul>
+							</Card.Content>
+						</Card.Root>
+					{/if}
+				</Tabs.Content>
+			{/each}
+		</Tabs.Root>
+
+		<!-- What the record IS, beside the tabs and unchanged by them: a panel
+		     on a hairline rather than a card, so the page has one frame. -->
+		<aside class="space-y-6 xl:sticky xl:top-4 xl:border-l xl:pl-6">
+			<Collapsible.Root bind:open={detailsOpen} class="space-y-3">
+				<div class="flex items-center justify-between gap-2">
+					<Collapsible.Trigger
+						class="text-foreground -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-semibold"
+					>
+						<ChevronDownIcon
+							class="text-muted-foreground size-4 transition-transform duration-200 {detailsOpen
+								? ''
+								: '-rotate-90'}"
+						/>
+						{capitalize(terms.noun)} details
+					</Collapsible.Trigger>
+					<!-- Editing is the generic form the list page creates with, so the
+					     fields, their validation and their words are described once —
+					     drawn only for a kind it can write and a reader who may. -->
+					{#if data.edit?.canEdit}
+						<EditRecord
+							compact
+							type={data.edit.type}
+							recordId={data.record.id}
+							form={data.edit.editForm}
+							pickers={data.edit.editPickers}
+						/>
+					{/if}
+				</div>
+
+				<Collapsible.Content class="space-y-5">
+					<dl class="space-y-3">
+						{#each details as field (field.label)}
 							<Detail.Field label={field.label} value={field.value} people={data.people} />
 						{/each}
 					</dl>
-				</Card.Content>
-			</Card.Root>
 
-			{#if data.customFields.length > 0}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Custom fields</Card.Title>
-						<Card.Description>
-							What this organization records about its {terms.plural} beyond the built-in columns.
-						</Card.Description>
-					</Card.Header>
-					<Card.Content>
-						<dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-							{#each data.customFields as field (field.key)}
-								<Detail.Field label={field.label} value={field.value} />
-							{/each}
-						</dl>
-					</Card.Content>
-				</Card.Root>
-			{/if}
+					{#if data.customFields.length > 0}
+						<div class="space-y-3 border-t pt-5">
+							<p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+								Custom fields
+							</p>
+							<dl class="space-y-3">
+								{#each data.customFields as field (field.key)}
+									<Detail.Field label={field.label} value={field.value} />
+								{/each}
+							</dl>
+						</div>
+					{/if}
 
-			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
-				<Detail.Addresses
-					addresses={data.addresses}
-					form={data.addressForm}
-					removeForm={data.removeAddressForm}
-					canManage={data.canManageAddresses}
-					noun={terms.noun}
-					queryKey={QUERY.record(data.record.kind, data.record.id)}
-				/>
-			{/if}
-
-			{#if data.billing}
-				{@const billing = data.billing}
-				<Detail.InvoiceLines
-					invoiceId={data.record.id}
-					status={billing.status}
-					currency={billing.currency}
-					totals={{
-						subtotal: billing.subtotal,
-						tax: billing.tax,
-						shipping: billing.shipping,
-						discount: billing.discount,
-						total: billing.total,
-						amountPaid: billing.amountPaid,
-						balanceDue: billing.balanceDue
-					}}
-					lines={billing.lines}
-					products={billing.products}
-					lineForm={billing.forms.line}
-					removeLineForm={billing.forms.removeLine}
-					detailsForm={billing.forms.details}
-					issueForm={billing.forms.issue}
-					voidForm={billing.forms.void}
-					removeForm={billing.forms.remove}
-					canManage={billing.canManage}
-					canDelete={billing.canDelete}
-					noun={terms.noun}
-					queryKey={QUERY.record(data.record.kind, data.record.id)}
-				/>
-				<Detail.InvoicePayments
-					status={billing.status}
-					currency={billing.currency}
-					balanceDue={billing.balanceDue}
-					payments={billing.payments}
-					unapplied={billing.unapplied}
-					paymentForm={billing.forms.payment}
-					applyForm={billing.forms.applyPayment}
-					removePaymentForm={billing.forms.removePayment}
-					canRecord={billing.canRecordPayments}
-					canRemove={billing.canRemovePayments}
-					noun={terms.noun}
-					queryKey={QUERY.record(data.record.kind, data.record.id)}
-				/>
-			{/if}
-
-			{#if data.record.kind === 'asset'}
-				<Detail.Images
-					images={data.images}
-					form={data.imageForm}
-					removeForm={data.removeImageForm}
-					canManage={data.canManageImages}
-					noun={terms.noun}
-					queryKey={QUERY.record(data.record.kind, data.record.id)}
-				/>
-			{/if}
-
-			{#if data.relationships.length > 0}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Relationships</Card.Title>
-						<Card.Description>
-							The records this {terms.noun} is linked to — who holds it, where it came from, who it refers
-							to.
-						</Card.Description>
-						{#if data.graphHref}
-							<Card.Action>
-								<Button variant="outline" size="sm" href={data.graphHref}>
-									<WaypointsIcon />
-									Open in graph
-								</Button>
-							</Card.Action>
+					<dl class="space-y-3 border-t pt-5">
+						<Detail.Field
+							label="Created"
+							value={{ type: 'datetime', value: data.record.createdAt }}
+						/>
+						{#if data.record.createdBy}
+							<Detail.Field
+								label="Created by"
+								value={{ type: 'person', userId: data.record.createdBy }}
+								people={data.people}
+							/>
 						{/if}
-					</Card.Header>
-					<Card.Content>
-						<ul class="divide-border divide-y">
-							{#each data.relationships as relationship (relationship.id)}
-								<Detail.Relationship {relationship} />
-							{/each}
-						</ul>
-					</Card.Content>
-				</Card.Root>
-			{/if}
+						<Detail.Field
+							label="Updated"
+							value={{ type: 'datetime', value: data.record.updatedAt }}
+						/>
+						<div class="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)] items-center gap-3">
+							<dt class="text-muted-foreground truncate text-sm">ID</dt>
+							<dd class="flex items-center gap-1">
+								<code class="font-mono text-xs">{data.record.id.slice(0, 8)}…</code>
+								<CopyButton value={data.record.id} label="Copy" copiedLabel="Copied" class="h-7" />
+							</dd>
+						</div>
+					</dl>
+				</Collapsible.Content>
+			</Collapsible.Root>
 
-			{#if data.thread}
-				{@const thread = data.thread}
-				<Detail.Thread
-					messages={thread.messages}
-					form={thread.form}
-					removeForm={thread.removeForm}
-					userId={thread.userId}
-					canModerate={thread.canModerate}
-					noun={terms.noun}
-					queryKey={QUERY.record(data.record.kind, data.record.id)}
-				/>
-			{/if}
-
-			{#each data.related as group (group.kind)}
-				{@const related = recordTerms(page.data.terms, group.kind)}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>{related.name}</Card.Title>
-						<Card.Description>
-							{group.records.length === 1
-								? `One ${related.noun}`
-								: `${String(group.records.length)} ${related.plural}`}
-							linked to this {terms.noun}.
-						</Card.Description>
-					</Card.Header>
-					<Card.Content>
-						<ul class="divide-border divide-y">
-							{#each group.records as record (record.id)}
-								<Detail.Related {record} />
-							{/each}
-						</ul>
-					</Card.Content>
-				</Card.Root>
-			{/each}
-		</div>
-
-		<aside class="space-y-6">
 			{#if data.notes}
 				{@const notes = data.notes}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Notes</Card.Title>
-						<Card.Description>
+				<Collapsible.Root bind:open={notesOpen} class="space-y-3 border-t pt-6">
+					<Collapsible.Trigger
+						class="text-foreground -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-semibold"
+					>
+						<ChevronDownIcon
+							class="text-muted-foreground size-4 transition-transform duration-200 {notesOpen
+								? ''
+								: '-rotate-90'}"
+						/>
+						Notes
+					</Collapsible.Trigger>
+
+					<Collapsible.Content class="space-y-3">
+						<p class="text-muted-foreground text-sm">
 							Written down about this {terms.noun}. Only visible to you — they don't show up on the
 							dock or the notes page.
-						</Card.Description>
-					</Card.Header>
-					<Card.Content class="space-y-3">
+						</p>
 						{#each notes.open as note (note.id)}
 							<Note.Card color={note.color} class="h-40">
 								<Note.Editor
@@ -305,68 +480,142 @@
 								Nothing written down about this {terms.noun}.
 							</p>
 						{/if}
-					</Card.Content>
-				</Card.Root>
+					</Collapsible.Content>
+				</Collapsible.Root>
 			{/if}
-
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Activity</Card.Title>
-					<Card.Description>
-						Calls, emails, meetings and notes logged against this {terms.noun}, newest first.
-					</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					{#if data.activities.length > 0}
-						<ol class="space-y-5">
-							{#each data.activities as activity (activity.id)}
-								<Detail.Activity {activity} author={author(activity.author_id)} />
-							{/each}
-						</ol>
-					{:else}
-						<Empty.Root class="p-6">
-							<Empty.Header>
-								<Empty.Title class="text-base">Nothing logged yet</Empty.Title>
-								<Empty.Description>
-									Interactions with this {terms.noun} will show up here.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Record</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					<dl class="space-y-4">
-						<Detail.Field
-							label="Created"
-							value={{ type: 'datetime', value: data.record.createdAt }}
-						/>
-						<Detail.Field
-							label="Created by"
-							value={data.record.createdBy
-								? { type: 'person', userId: data.record.createdBy }
-								: { type: 'empty' }}
-							people={data.people}
-						/>
-						<Detail.Field
-							label="Last updated"
-							value={{ type: 'datetime', value: data.record.updatedAt }}
-						/>
-						<div class="space-y-1">
-							<dt class="text-muted-foreground text-sm">ID</dt>
-							<dd class="flex items-center justify-between gap-2">
-								<code class="font-mono text-xs break-all">{data.record.id}</code>
-								<CopyButton value={data.record.id} label="Copy" copiedLabel="Copied" class="h-8" />
-							</dd>
-						</div>
-					</dl>
-				</Card.Content>
-			</Card.Root>
 		</aside>
 	</div>
 </div>
+
+<!-- How many a tab holds, after its name. -->
+{#snippet count(n: number)}
+	{#if n > 0}
+		<span class="text-muted-foreground tabular-nums">{n}</span>
+	{/if}
+{/snippet}
+
+<!-- The timeline, whole or its first few entries. -->
+{#snippet timeline(activities: typeof data.activities)}
+	{#if activities.length > 0}
+		<ol class="space-y-5">
+			{#each activities as item (item.id)}
+				<Detail.Activity activity={item} author={author(item.author_id)} />
+			{/each}
+		</ol>
+	{:else}
+		<Empty.Root class="p-6">
+			<Empty.Header>
+				<Empty.Title class="text-base">Nothing logged yet</Empty.Title>
+				<Empty.Description>
+					Interactions with this {terms.noun} will show up here.
+				</Empty.Description>
+			</Empty.Header>
+		</Empty.Root>
+	{/if}
+{/snippet}
+
+<!--
+	The summary: the highlights — the last thing that happened and how many
+	records of each kind point here, each a door to its tab — then the
+	relationships and the latest of the timeline.
+-->
+{#snippet overview()}
+	<div class="space-y-6">
+		<section class="space-y-3">
+			<h2 class="text-sm font-medium">Highlights</h2>
+			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+				<button
+					type="button"
+					class="bg-card hover:bg-accent/50 rounded-xl border p-4 text-left transition-colors"
+					onclick={() => (tab = 'activity')}
+				>
+					<p class="text-muted-foreground flex items-center gap-1.5 text-xs">
+						<ActivityIcon class="size-3.5" />
+						Last activity
+					</p>
+					{#if data.activities[0]}
+						{@const latest = data.activities[0]}
+						<p class="mt-1.5 truncate text-sm font-medium">
+							{latest.subject ?? capitalize(latest.type)}
+						</p>
+						<p class="text-muted-foreground text-xs">
+							{datetime.format(new Date(latest.occurred_at))}
+						</p>
+					{:else}
+						<p class="text-muted-foreground mt-1.5 text-sm">Nothing logged yet</p>
+					{/if}
+				</button>
+				{#each data.related as group (group.kind)}
+					{@const groupTerms = recordTerms(page.data.terms, group.kind)}
+					{@const GroupIcon = iconFor(iconForPath(recordListHref(group.kind), page.data.nav ?? []))}
+					{@const first = group.records[0]}
+					<button
+						type="button"
+						class="bg-card hover:bg-accent/50 rounded-xl border p-4 text-left transition-colors"
+						onclick={() => (tab = group.kind)}
+					>
+						<p class="text-muted-foreground flex items-center gap-1.5 text-xs">
+							<GroupIcon class="size-3.5" />
+							{groupTerms.name}
+						</p>
+						<p class="mt-1.5 truncate text-sm font-medium">
+							{#if first}{first.name}{/if}
+							{#if group.records.length > 1}
+								<span class="text-muted-foreground font-normal">
+									+{group.records.length - 1}
+								</span>
+							{/if}
+						</p>
+						<p class="text-muted-foreground text-xs">
+							{group.records.length === 1
+								? `One ${groupTerms.noun}`
+								: `${String(group.records.length)} ${groupTerms.plural}`}
+						</p>
+					</button>
+				{/each}
+			</div>
+		</section>
+
+		{#if data.relationships.length > 0}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>Relationships</Card.Title>
+					<Card.Description>
+						The records this {terms.noun} is linked to — who holds it, where it came from, who it refers
+						to.
+					</Card.Description>
+					{#if data.graphHref}
+						<Card.Action>
+							<Button variant="outline" size="sm" href={data.graphHref}>
+								<WaypointsIcon />
+								Open in graph
+							</Button>
+						</Card.Action>
+					{/if}
+				</Card.Header>
+				<Card.Content>
+					<ul class="divide-border divide-y">
+						{#each data.relationships as relationship (relationship.id)}
+							<Detail.Relationship {relationship} />
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Recent activity</Card.Title>
+				<Card.Description>
+					The latest logged against this {terms.noun}.
+				</Card.Description>
+				{#if data.activities.length > RECENT}
+					<Card.Action>
+						<Button variant="ghost" size="sm" onclick={() => (tab = 'activity')}>View all</Button>
+					</Card.Action>
+				{/if}
+			</Card.Header>
+			<Card.Content>{@render timeline(recentActivities)}</Card.Content>
+		</Card.Root>
+	</div>
+{/snippet}
