@@ -12,27 +12,22 @@
 		class: className,
 		emptyMessage = 'No results.',
 		empty,
-		pinFirstColumn = false,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		/** Text for the placeholder row shown when no rows survive filtering. */
 		emptyMessage?: string;
 		/** Replaces `emptyMessage` with custom placeholder-row content. */
 		empty?: Snippet;
-		/**
-		 * Keeps the first column in place while the rest scroll sideways, for a
-		 * table with more columns than the screen has room for. When the first
-		 * column is the selection checkbox, it and the column after it are
-		 * pinned together — the checkbox belongs to the row, not to the column
-		 * a reader holds onto.
-		 */
-		pinFirstColumn?: boolean;
 	} = $props();
 
 	const dataTable = useDataTable();
 
+	// The first column stays put while the rest scroll sideways when the table's
+	// pin choice (`DataTable.Root`'s default, toggled from `ViewOptions`) says so.
+	// When that column is the selection checkbox, the column after it is pinned
+	// too — the checkbox belongs to the row, not to the column a reader holds onto.
 	const pinnedCount = $derived(
-		pinFirstColumn
+		dataTable.pinFirstColumn
 			? pinnedColumnCount(dataTable.table.getVisibleLeafColumns().map((column) => column.id))
 			: 0
 	);
@@ -70,7 +65,7 @@
 	data-slot="data-table-content"
 	class={cn('border-border/60 overflow-hidden rounded-2xl border-2', className)}
 	{...restProps}
-	{@attach pinFirstColumn ? trackPinned((state) => (pinned = state)) : undefined}
+	{@attach dataTable.pinFirstColumn ? trackPinned((state) => (pinned = state)) : undefined}
 >
 	<Table.Root>
 		<Table.Header>

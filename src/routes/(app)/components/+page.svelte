@@ -3413,13 +3413,13 @@
 		<Card.Content>
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
-			<DataTable.Root table={paymentsTable} pageSize={5}>
+			<DataTable.Root table={paymentsTable} pageSize={5} pinFirstColumn>
 				<DataTable.Toolbar>
 					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
 					<DataTable.Filters />
 					<DataTable.ViewOptions class="ms-auto" />
 				</DataTable.Toolbar>
-				<DataTable.Content pinFirstColumn />
+				<DataTable.Content />
 				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>
 		</Card.Content>

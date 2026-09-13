@@ -961,9 +961,11 @@ page size — no `initialState.pagination` — and the one screen that wants a f
 card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
 That prop is the only way to set a page size; never reintroduce a picker or a second knob.
 A table with more columns than the screen has room for scrolls sideways inside its frame, and
-`<DataTable.Content pinFirstColumn />` keeps the first column (with the selection checkbox in
-front of it) in place while the rest scroll — the one way to pin a column; never a second
-sticky-cell class in a page.
+"Pin first column" in `ViewOptions` keeps the first column (with the selection checkbox in
+front of it) in place while the rest scroll — a per-device choice remembered per page in
+`localStorage` (`$lib/list-view.svelte`, the device axis of docs/user-preferences.md);
+`<DataTable.Root pinFirstColumn>` only sets the default a fresh device opens on. That is the
+one way to pin a column; never a second sticky-cell class or a second switch in a page.
 `DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
 holding **page of pages** and the four controls (first, previous, next, last).
 
