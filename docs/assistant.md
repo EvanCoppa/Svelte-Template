@@ -24,8 +24,44 @@ installed version exactly. Read those before the website when working here.
    response's message ids come from `createIdGenerator`, message metadata from the
    `messageMetadata` callback, and the whole thread is saved from `onEnd`.
 4. In the page, `Assistant.Message` renders each message part on `part.type`: `text` as
-   markdown, `reasoning` folded, `tool-<name>` as a card that shows the SDK's tool states,
-   including `approval-requested` with Approve and Deny.
+   markdown, `reasoning` folded, and `tool-<name>` in one of two places — see "The
+   screen" below.
+
+## The screen
+
+The assistant is **its own shell**, the way settings is: while the pathname is under
+`/assistant` the `(app)` layout swaps `AppSidebar` for `AssistantSidebar`
+(`src/lib/components/assistant-sidebar.svelte`), because in a conversation the thing to
+navigate is your threads, not the app nav. Its anatomy is the other two sidebars' on
+purpose — the workspace switcher and the collapse trigger in the header, the `NavUser`
+footer card — so nothing moves when the shell swaps; between them sit **New chat**,
+**Back to app**, and the threads. The section's "Chats" label gives way to a search
+field that grows out of the magnifier at the end of the row, filtering the list as you
+type, so the section costs one row either way. A thread's own menu renames or deletes
+it.
+
+Those two acts are **forms on the page** — the actions are on `/assistant` — while the
+rows that open them are the sidebar's, so which thread a dialog is about travels through
+`$lib/assistant.svelte` (`renameThread()`, `deleteThread()`), the third use of the
+module-rune pattern `showUpgrade()` and `showSearch()` established. The sidebar reads the
+threads themselves off `page.data.conversations`, like every shell sidebar reads
+`page.data`.
+
+The chat surface itself is one column with two states, and it **moves between them
+rather than being two screens**: with no messages the composer sits a third of the way
+down under "How can I help you today?", over a faint pool of the theme's primary
+(`Assistant.Root`'s aura), with the openers below it; once the thread has started, the
+aura fades, the thread appears, and the composer travels to the foot of the page on a
+700ms ease. The thread's own foot dissolves rather than ending on an edge, because the
+composer floats over it.
+
+A message is the reader's turn as a bubble on the end side and the assistant's as the
+page's own text — full width, no avatar, nothing framing it. Its tool calls land in one
+of two places, and which one is not a matter of taste: a call **waiting on the reader**
+is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; every
+other call is activity, and they collapse into the one `Assistant.Activity` line above
+the answer — the newest tool named while they run, a count to unfold once they are
+done. `Assistant.Shimmer` is the wait before the first word.
 
 ## The agent
 

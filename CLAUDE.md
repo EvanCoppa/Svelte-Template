@@ -745,7 +745,16 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
-- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+- **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
+  swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
+  (`page.data.conversations`) with New chat, Back to app and a "Chats" label that gives
+  way to a search field. The chat surface is one column with two states — the composer
+  centred under "How can I help you today?" over `Assistant.Root`'s aura, then travelling
+  to the foot of the page once the thread starts. A tool call the reader must answer keeps
+  its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
+  line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
+  opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
   the real agent with `MockLanguageModelV4` from `ai/test`.
 
@@ -810,6 +819,14 @@ read, because these pages exist for every org and are exempt from the feature ga
 route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
+**The assistant is the second shell of that kind**, and the last one a screen gets for
+free: under `/assistant` the same layout swaps in `AssistantSidebar`, whose nav is the
+member's own threads rather than a list of pages (docs/assistant.md, "The screen"). It
+stays a nav entry, because the feature registry is what puts it there. A third such shell
+needs a reason as good — a screen whose navigation is genuinely its own content — and it
+copies these two: the same header row, the same `NavUser` footer, `breadcrumbs.startAt()`
+paired with every jump.
 
 The header carries a **breadcrumb trail**: how deep this tab has gone since it last
 jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth

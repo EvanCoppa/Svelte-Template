@@ -5,19 +5,17 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import { threadDialogs } from '$lib/assistant.svelte';
 	import * as Assistant from '$lib/components/assistant/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { QUERY } from '$lib/queries';
-	import type { ConversationSummary } from '$lib/server/ai/conversations';
-	import { renameConversationSchema } from './schema';
+	import { renameConversationSchema } from '$lib/schemas/assistant';
 
 	let { data } = $props();
 
@@ -34,7 +32,7 @@
 	/**
 	 * After every turn: a new thread has just been created under the id the
 	 * load minted, so move to its URL — the same page, the same Chat (the id
-	 * has not changed), now resumable on refresh, with the rail refreshed by
+	 * has not changed), now resumable on refresh, with the sidebar refreshed by
 	 * the load. A stored thread only needs the rail re-ordered.
 	 */
 	function afterTurn({ isError, isAbort }: { isError: boolean; isAbort: boolean }) {
@@ -49,9 +47,14 @@
 		}
 	}
 
-	/** The two rail dialogs address a thread by id, not by a copied row (see the staff page). */
-	let renaming = $state<ConversationSummary | null>(null);
-	let deleting = $state<ConversationSummary | null>(null);
+	/**
+	 * The two thread dialogs. Their forms are the page's — the actions are on
+	 * this route — while the rows that open them are the sidebar's, so which
+	 * thread a dialog is about arrives through `$lib/assistant.svelte`, the way
+	 * a locked nav entry reaches the upgrade prompt.
+	 */
+	const renaming = $derived(threadDialogs.renaming);
+	const deleting = $derived(threadDialogs.deleting);
 
 	const {
 		form: renameData,
@@ -59,6 +62,7 @@
 		message: renameMessage,
 		constraints: renameConstraints,
 		submitting: renameSubmitting,
+		reset: renameReset,
 		enhance: renameEnhance
 	} = superForm(data.renameForm, {
 		id: 'rename-conversation',
@@ -66,7 +70,7 @@
 		onUpdated({ form }) {
 			// House convention: successes toast, failures render inline.
 			if (!form.valid) return;
-			renaming = null;
+			threadDialogs.closeRename();
 			toast.success('Conversation renamed');
 		}
 	});
@@ -79,21 +83,32 @@
 		id: 'delete-conversation',
 		onUpdated({ form }) {
 			if (!form.valid) return;
-			deleting = null;
+			threadDialogs.closeDelete();
 			toast.success('Conversation deleted');
 		}
 	});
 
-	function openRename(conversation: ConversationSummary) {
-		$renameData.conversation_id = conversation.id;
-		$renameData.title = conversation.title ?? '';
-		renaming = conversation;
-	}
+	// Opening the dialog is what fills the form in, so the field starts on the
+	// thread's current name — superforms' own `reset` rather than a write into
+	// `$renameData`, which would fight the store it belongs to.
+	$effect(() => {
+		if (!renaming) return;
+		renameReset({ data: { conversation_id: renaming.id, title: renaming.title ?? '' } });
+	});
 </script>
 
-<div class="flex h-[calc(100dvh-var(--header-height)-72px)] min-h-[32rem] flex-col gap-4">
+<!--
+	The chat fills the panel rather than scrolling the document, so the height is
+	the viewport less everything the shell has already spent on it: the content
+	panel's gap top and bottom, the header, and `.app-content`'s own 24px + 48px
+	(all three in the (app) layout). Get this wrong and the composer, which
+	floats at the foot, sits below the fold.
+-->
+<div
+	class="flex h-[calc(100dvh_-_2_*_var(--shell-gap)_-_var(--header-height)_-_72px)] min-h-[32rem] flex-col gap-4"
+>
 	<PageHeader.Root>
-		<PageHeader.Title>Assistant</PageHeader.Title>
+		<PageHeader.Title />
 	</PageHeader.Root>
 
 	<!-- Keyed on the conversation: another thread is another Chat. -->
@@ -107,88 +122,112 @@
 			class="min-h-0 flex-1"
 		>
 			{#snippet children(chat)}
-				<Assistant.History
-					conversations={data.conversations}
-					{activeId}
-					onRename={openRename}
-					onDelete={(conversation) => (deleting = conversation)}
-					class="max-h-48 lg:max-h-none"
-				/>
+				{@const started = chat.messages.length > 0}
+				{@const asked = chat.messages
+					.filter((message) => message.role === 'user')
+					.map((message) =>
+						message.parts
+							.filter((part) => part.type === 'text')
+							.map((part) => part.text)
+							.join('')
+					)
+					.filter((text) => text.trim().length > 0)}
 
-				<div class="flex min-h-0 flex-col gap-3">
-					{#if !data.configured}
-						<FormAlert
-							variant="default"
-							class="mb-0"
-							message="The assistant is not configured on this server. Set ANTHROPIC_API_KEY to turn it on."
+				<Assistant.Thread
+					messages={chat.messages}
+					status={chat.status}
+					class="relative z-10 {started ? '' : 'pointer-events-none opacity-0'}"
+				>
+					{#each chat.messages as message, index (message.id)}
+						<Assistant.Message
+							{message}
+							status={chat.status}
+							last={index === chat.messages.length - 1}
+							onApprove={(id) => chat.addToolApprovalResponse({ id, approved: true })}
+							onDeny={(id) => chat.addToolApprovalResponse({ id, approved: false })}
 						/>
+					{/each}
+
+					<!-- The wait between sending and the first word of the answer. -->
+					{#if chat.status === 'submitted' && chat.messages.at(-1)?.role === 'user'}
+						<Assistant.Shimmer />
 					{/if}
 
-					<Assistant.Thread messages={chat.messages} status={chat.status}>
-						{#if chat.messages.length === 0}
-							<Empty.Root class="py-16">
-								<Empty.Header>
-									<Empty.Media variant="icon"><SparklesIcon /></Empty.Media>
-									<Empty.Title>Ask about {data.activeOrg.name}</Empty.Title>
-									<Empty.Description>
-										Questions are answered from the records you can see, and the assistant asks
-										before it deletes anything.
-									</Empty.Description>
-								</Empty.Header>
-								<Empty.Content>
-									<div class="flex flex-wrap justify-center gap-2">
-										{#each SUGGESTIONS as suggestion (suggestion)}
-											<Button
-												variant="outline"
-												size="sm"
-												disabled={!data.configured}
-												onclick={() =>
-													chat.sendMessage({
-														text: suggestion,
-														metadata: { createdAt: Date.now() }
-													})}
-											>
-												{suggestion}
-											</Button>
-										{/each}
-									</div>
-								</Empty.Content>
-							</Empty.Root>
-						{:else}
-							{#each chat.messages as message (message.id)}
-								<Assistant.Message
-									{message}
-									onApprove={(id) => chat.addToolApprovalResponse({ id, approved: true })}
-									onDeny={(id) => chat.addToolApprovalResponse({ id, approved: false })}
-								/>
-							{/each}
+					{#if chat.error}
+						<div class="flex flex-wrap items-center gap-3">
+							<FormAlert class="mb-0 flex-1" message={chat.error.message} />
+							<Button variant="outline" size="sm" onclick={() => chat.regenerate()}>Retry</Button>
+						</div>
+					{/if}
+				</Assistant.Thread>
+
+				<!--
+					The composer: the middle of an empty screen, under the opening
+					question, and the foot of the page once there is a conversation to
+					read. It moves between the two rather than being two boxes.
+				-->
+				<div
+					class={[
+						'absolute left-0 z-10 w-full px-4 transition-all duration-700 ease-in-out motion-reduce:transition-none',
+						started
+							? 'from-background via-background bottom-0 bg-gradient-to-t to-transparent pt-10 pb-6'
+							: 'top-1/3 -translate-y-1/2'
+					]}
+				>
+					<div class="mx-auto flex w-full max-w-3xl flex-col items-center xl:max-w-4xl">
+						{#if !started}
+							<h2
+								class="fade-in-up text-foreground mb-10 text-center text-4xl font-normal tracking-tight md:text-5xl"
+							>
+								How can I help you today?
+							</h2>
 						{/if}
 
-						{#if chat.error}
-							<div class="flex flex-wrap items-center gap-3">
-								<FormAlert class="mb-0 flex-1" message={chat.error.message} />
-								<Button variant="outline" size="sm" onclick={() => chat.regenerate()}>Retry</Button>
+						{#if !data.configured}
+							<FormAlert
+								variant="default"
+								class="w-full"
+								message="The assistant is not configured on this server. Set ANTHROPIC_API_KEY to turn it on."
+							/>
+						{/if}
+
+						<Assistant.Composer
+							status={chat.status}
+							disabled={!data.configured}
+							history={asked}
+							class="w-full"
+							onSend={(text) => chat.sendMessage({ text, metadata: { createdAt: Date.now() } })}
+							onStop={() => chat.stop()}
+						/>
+
+						{#if !started}
+							<div class="fade-in-up flex flex-wrap justify-center gap-2">
+								{#each SUGGESTIONS as suggestion (suggestion)}
+									<Button
+										variant="outline"
+										size="sm"
+										class="rounded-full font-normal"
+										disabled={!data.configured}
+										onclick={() =>
+											chat.sendMessage({ text: suggestion, metadata: { createdAt: Date.now() } })}
+									>
+										{suggestion}
+									</Button>
+								{/each}
 							</div>
 						{/if}
-					</Assistant.Thread>
-
-					<Assistant.Composer
-						status={chat.status}
-						disabled={!data.configured}
-						onSend={(text) => chat.sendMessage({ text, metadata: { createdAt: Date.now() } })}
-						onStop={() => chat.stop()}
-					/>
+					</div>
 				</div>
 			{/snippet}
 		</Assistant.Root>
 	{/key}
 </div>
 
-<!-- Rename — the rail menu's first action. -->
+<!-- Rename — the row menu's first action. -->
 <Modal.Root
 	open={renaming !== null}
 	onOpenChange={(open) => {
-		if (!open) renaming = null;
+		if (!open) threadDialogs.closeRename();
 	}}
 >
 	<Modal.Content>
@@ -227,11 +266,11 @@
 	</Modal.Content>
 </Modal.Root>
 
-<!-- Delete — the one destructive act the rail offers. -->
+<!-- Delete — the one destructive act the sidebar offers. -->
 <Modal.Root
 	open={deleting !== null}
 	onOpenChange={(open) => {
-		if (!open) deleting = null;
+		if (!open) threadDialogs.closeDelete();
 	}}
 >
 	<Modal.Content>
@@ -260,3 +299,22 @@
 		{/if}
 	</Modal.Content>
 </Modal.Root>
+
+<style>
+	.fade-in-up {
+		animation: fade-in-up 0.5s ease-out forwards;
+	}
+
+	@keyframes fade-in-up {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.fade-in-up {
+			animation: none;
+		}
+	}
+</style>
