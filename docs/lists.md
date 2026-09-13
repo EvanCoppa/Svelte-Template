@@ -40,6 +40,33 @@ box; `filterable` gives it a multi-select in the toolbar. `sort_order` is multip
 field between two others without renumbering. `name` is every list's first column and
 the link into the record whatever the rows say.
 
+## A picture is a field, not a second table
+
+The products list shows each product's `image_url` as a thumbnail, and that is a **row
+like any other** (`('products', 'image', …, 150)`) rather than a column hand-written into
+`/products` or a second data table beside `DataTable`. It cost one field **type**:
+`image`, whose cell is `{ type: 'image'; url: string | null }` and whose column is drawn
+by `DataTable.imageCell()`. A catalog is the one list where the picture is the
+identifying fact — a reader scanning aligners or fittings recognises the thing before
+reading its name — so it sits immediately after the name, at `sort_order` 150.
+
+An `image` is a picture rather than a value, which decides everything the toolbar does
+with it: it is not in `FILTERABLE_TYPES` (the resolver throws on a row that asks), it
+holds no text for the search box (`cellText()` reads it as blank) and nothing to order
+rows by, so its header is the label alone rather than a sort button. It is still a
+column: `ViewOptions` toggles it, and an industry that sells hours rather than objects
+hides it with one `industry_list_fields` row. A record with no picture draws a
+placeholder tile of the same size, not a dash, so the column keeps a straight edge.
+
+**A URL is not automatically loadable.** `img-src` admits `'self'`, Supabase and nothing
+else, so imagery hosted anywhere else needs its origin in `PUBLIC_IMAGE_ORIGINS`
+(`imageOrigins()` in `src/lib/server/security-headers.ts`, fed to the CSP from
+`hooks.server.ts` exactly as the map's origins are). Unset — the default — means Supabase
+Storage only.
+
+Another kind joins by adding `image` to its catalog entry, a branch in
+`describeListRows()`, and its own `list_fields` row. Nothing else.
+
 ## Custom fields: the industry ships them, and each one says how it sits
 
 A custom field is never named in `list_fields`. Instead (`industry_custom_fields`
@@ -87,8 +114,9 @@ a 500.
 
 The server describes; the page draws. `describeListRows()`
 (`src/lib/server/crm/lists.ts`) turns each row into a `ListRow` of cells **typed by
-how they render** — `link`, `status`, `record`, `text`, `number`, `money`, `boolean`,
-`date`, `datetime`, `payment` — the rule `RecordDetail` follows on the record page. A
+how they render** — `link`, `status`, `record`, `text`, `image`, `number`, `money`,
+`boolean`, `date`, `datetime`, `payment` — the rule `RecordDetail` follows on the record
+page. A
 built-in field is a switch on the kind's catalog key (so a key the catalog has and the
 describer cannot fill is a `check` error); a custom field is read from the values
 fetched for the rows, in the column its definition's type names. A name or a party

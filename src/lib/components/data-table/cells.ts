@@ -1,6 +1,7 @@
 import { createRawSnippet } from 'svelte';
 import { renderComponent } from '@tanstack/svelte-table';
 import { StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
+import ImageCell from './data-table-image-cell.svelte';
 import LinkCell from './data-table-link-cell.svelte';
 
 /**
@@ -24,4 +25,12 @@ export function statusCell(value: string, tone: BadgeTone) {
  */
 export function linkCell(label: string, href: string) {
 	return renderComponent(LinkCell, { label, href });
+}
+
+/**
+ * A row's picture as a thumbnail — an `image` field's cell. `url` is null
+ * for a record with none, which draws a placeholder tile of the same size.
+ */
+export function imageCell(url: string | null) {
+	return renderComponent(ImageCell, { url });
 }

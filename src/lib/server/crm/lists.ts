@@ -141,6 +141,8 @@ const money = (value: number | null, currency: string, unit: string | null = nul
 	unit
 });
 const date = (value: string | null): ListCell => ({ type: 'date', value });
+/** A picture, blank when the record has none: the page draws a placeholder tile. */
+const image = (url: string | null): ListCell => ({ type: 'image', url: url?.trim() || null });
 const datetime = (value: string | null): ListCell => ({ type: 'datetime', value });
 const number = (value: number | null): ListCell => ({ type: 'number', value });
 
@@ -272,6 +274,8 @@ export function describeListRows(
 				switch (key) {
 					case 'name':
 						return link('product', product.id, product.name);
+					case 'image':
+						return image(product.image_url);
 					case 'kind':
 						return status(product.kind, PRODUCT_KIND_TONE[product.kind]);
 					case 'category':

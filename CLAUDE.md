@@ -78,7 +78,11 @@ npm run format         # prettier (svelte + tailwind plugins)
 - Every response carries the security headers from
   `src/lib/server/security-headers.ts`. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
-  as a parameter or documented constant, never a hardcoded project ref.
+  as a parameter or documented constant, never a hardcoded project ref. Hosts
+  that only serve **images** (a product's `image_url` on a storefront CDN) are the
+  one deployment-configured set: `PUBLIC_IMAGE_ORIGINS`, parsed by
+  `imageOrigins()` and added to `img-src` alone — never `connect-src`, never a
+  wildcard, and unset by default.
 - The auth surface has unit tests (`src/routes/auth/confirm/server.test.ts`,
   `src/routes/reset-password/page.server.test.ts`, `src/routes/login/page.server.test.ts`,
   plus `src/lib/server/*.test.ts`). Changes to those routes must keep the tests
@@ -277,6 +281,11 @@ application data is scoped to an organization, never to a bare user. The
   (throwing with the list's id on a key the catalog lacks or a filter on an amount or
   a date — only text, enum, boolean, record and payment fields filter);
   `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);
+  a picture is one of those types — `image`, the products list's thumbnail, drawn by
+  `DataTable.imageCell()` and never searched, filtered or sorted, because a picture is
+  not a value (docs/lists.md, "A picture is a field, not a second table"); a kind that
+  wants one adds `image` to its catalog entry, a describer branch and a `list_fields`
+  row, never a second table component;
   `loadRecordList(locals, kind)` is a list page's whole load and
   `createListTable(() => data.list, () => page.data.terms)` its whole script. The
   toolbar is `DataTable.Toolbar` holding `DataTable.Search` (the table's global
