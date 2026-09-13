@@ -4,6 +4,7 @@ import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
+import type { RecordKind } from '$lib/crm/records';
 import {
 	assetRecordSchema,
 	billableRecordSchema,
@@ -19,36 +20,43 @@ import {
 	RECORD_FORMS,
 	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
+	RECORD_TYPES,
 	type RecordFieldOption,
 	type RecordFormValues,
 	type RecordPickerKind,
 	type RecordPickers,
 	type RecordType
 } from '$lib/schemas/records';
-import { createAsset } from './crm/assets';
-import { createBillable } from './crm/billables';
-import { createCompany, getCompany, listCompanies } from './crm/companies';
-import { createContact, listContacts } from './crm/contacts';
-import { createDeal } from './crm/deals';
+import { createAsset, getAsset, updateAsset } from './crm/assets';
+import { createBillable, getBillable, updateBillable } from './crm/billables';
+import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
+import { createContact, getContact, listContacts, updateContact } from './crm/contacts';
+import { createDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
-import { createLease } from './crm/leases';
-import { createProduct } from './crm/products';
-import { createProperty, listProperties } from './crm/properties';
-import { createTask } from './crm/tasks';
-import { createTicket } from './crm/tickets';
+import { createLease, getLease, updateLease } from './crm/leases';
+import { listPipelines } from './crm/pipelines';
+import { createProduct, getProduct, updateProduct } from './crm/products';
+import { createProperty, getProperty, listProperties, updateProperty } from './crm/properties';
+import { createTask, getTask, updateTask } from './crm/tasks';
+import { createTicket, getTicket, updateTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
 
 /**
- * The server half of the generic create form (`$lib/schemas/records.ts` is the
- * registry; `CreateRecord` is the component). Every list page's `+page.server.ts`
- * is the same two lines:
+ * The server half of the generic record form (`$lib/schemas/records.ts` is the
+ * registry; `CreateRecord` and `EditRecord` are the components). Every list
+ * page's `+page.server.ts` is the same two lines:
  *
  *   export const load = … ({ ...(await loadCreateRecord(locals, 'company')) })
  *   export const actions = { create: (event) => createRecord(event, 'company') };
  *
- * so one implementation validates, authorises and inserts for every kind of
- * record. The hook has already gated the route on the feature and the read
- * grant; creating needs `manage`, checked here and backed by RLS.
+ * and the generic record page pairs them with the same two for editing
+ * (`loadEditRecord` / `updateRecord`), so one implementation validates,
+ * authorises and writes for every kind of record. Adding a kind of record is
+ * a schema, a `RECORD_FORMS` entry and one `case` in `writeRecord()` — plus,
+ * so the form can open filled in, its mirror in `recordFormValues()`.
+ *
+ * The hook has already gated the route on the feature and the read grant;
+ * writing needs `manage`, checked here and backed by RLS.
  */
 
 /**
@@ -128,6 +136,17 @@ async function pickerOptions(
 				label: contact.name,
 				sublabel: contact.companies?.name ?? contact.email ?? undefined
 			}));
+		case 'stage':
+			// Every board's stages, in board order then stage order, each
+			// labelled with the board it belongs to — an org may run more than
+			// one funnel, and "Approved" can sit on both.
+			return (await listPipelines(supabase, orgId)).flatMap((pipeline) =>
+				pipeline.pipeline_stages.map((stage) => ({
+					value: stage.id,
+					label: stage.name,
+					sublabel: pipeline.name
+				}))
+			);
 		case 'property': {
 			// Buildings and units in one list, because they are one table — and
 			// a unit is shown under the building it belongs to, so two
@@ -146,6 +165,27 @@ async function pickerOptions(
 	}
 }
 
+/**
+ * The board a stage belongs to, as the pair `deals` stores. A stage only
+ * means something inside its own pipeline, so the two ids always move
+ * together — and looking the pair up here is also what proves the stage is
+ * this org's: `listPipelines` reads through RLS, so a forged id simply is not
+ * in the list.
+ */
+async function placementFor(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	stageId: string
+): Promise<{ pipeline_id: string; stage_id: string }> {
+	const boards = await listPipelines(supabase, orgId);
+	for (const board of boards) {
+		if (board.pipeline_stages.some((stage) => stage.id === stageId)) {
+			return { pipeline_id: board.id, stage_id: stageId };
+		}
+	}
+	throw new Error('That stage is not on any board in this organization.');
+}
+
 /** The `create` action every list page delegates to. */
 export async function createRecord(
 	event: Pick<RequestEvent, 'request' | 'locals'>,
@@ -161,7 +201,7 @@ export async function createRecord(
 	if (!form.valid) return fail(400, { form });
 
 	try {
-		await insertRecord(supabase, activeOrgId, type, form.data);
+		await writeRecord(supabase, activeOrgId, type, form.data);
 	} catch (cause) {
 		// The crm modules throw the PostgREST message (see crm/unwrap.ts) — a
 		// duplicate SKU or a policy refusal belongs in the form, not a 500.
@@ -173,82 +213,352 @@ export async function createRecord(
 	return { form };
 }
 
+// ---------------------------------------------------------------------------
+// Editing one — the same registry, the same form, the same switch
+// ---------------------------------------------------------------------------
+
 /**
- * The one place a record type becomes columns. Re-parsing with the concrete
- * schema is what narrows the form's strings back to the enum unions the
- * insert wants — the generic form erased them, and a cast here would only
- * hide a mismatch between the schema and the table.
+ * The kinds the generic form also EDITS: every creatable kind but an invoice.
+ * An invoice is a document with a lifecycle rather than a row of fields —
+ * draft, issued, void — and its record page already owns that (the
+ * `billing.server.ts` actions, including a header form of its own). A second
+ * way to edit the same row is the one thing this registry exists to prevent.
  */
-async function insertRecord(
+export type EditableRecordType = Exclude<RecordType, 'invoice'>;
+
+/** Whether a record page should offer the edit form for this kind. */
+export function isEditableRecordType(kind: RecordKind): kind is EditableRecordType {
+	return kind !== 'invoice' && RECORD_TYPES.some((type) => type === kind);
+}
+
+/**
+ * One id for every edit form, distinct from the create form's: a page may
+ * hold both (a list page's "Add …" beside a record's "Edit"), and superforms
+ * routes a post to the form whose id it names.
+ */
+export const EDIT_FORM_ID = 'edit-record';
+
+/**
+ * What a record page adds for its "Edit" button: the form filled in with what
+ * the record says now, whether this user may save it, and the options behind
+ * any picker. Only a writer's form is filled — a reader never sees the button
+ * and the action refuses them anyway, so nothing is read on their behalf.
+ */
+export async function loadEditRecord(
+	locals: App.Locals,
+	type: EditableRecordType,
+	id: string
+): Promise<{
+	editForm: SuperValidated<RecordFormValues>;
+	canEdit: boolean;
+	editPickers: RecordPickers;
+}> {
+	const { supabase, activeOrgId, org } = locals;
+	if (!org || !activeOrgId) throw redirect(303, '/login');
+
+	const canEdit = can(org.access, RECORD_FORMS[type].feature, 'manage');
+	const [values, editPickers] = await Promise.all([
+		canEdit ? recordFormValues(supabase, activeOrgId, type, id) : {},
+		canEdit ? loadPickers(supabase, activeOrgId, type) : {}
+	]);
+	// A prefilled form opens clean: what the record already says is not a list
+	// of mistakes (the superforms convention for an edit form).
+	const editForm = await superValidate(values, zod4(RECORD_SCHEMAS[type]), {
+		id: EDIT_FORM_ID,
+		errors: false
+	});
+	return { editForm, canEdit, editPickers };
+}
+
+/** The `edit` action a record page delegates to. */
+export async function updateRecord(
+	event: Pick<RequestEvent, 'request' | 'locals'>,
+	type: EditableRecordType,
+	id: string
+) {
+	const { request, locals } = event;
+	const { supabase, activeOrgId, org } = locals;
+	if (!activeOrgId || !org) throw redirect(303, '/login');
+
+	requirePermission(org.access, RECORD_FORMS[type].feature, 'manage');
+
+	const form = await superValidate(request, zod4(RECORD_SCHEMAS[type]), { id: EDIT_FORM_ID });
+	if (!form.valid) return fail(400, { form });
+
+	try {
+		await writeRecord(supabase, activeOrgId, type, form.data, id);
+	} catch (cause) {
+		return message(form, cause instanceof Error ? cause.message : 'Could not save the record.', {
+			status: 400
+		});
+	}
+
+	return { form };
+}
+
+/**
+ * The mirror of the switch below: one place a row becomes the strings the
+ * form holds. Only the fields the form asks for — a column the registry does
+ * not list is not the form's to carry back, let alone to write.
+ *
+ * An instant (a task's due date) goes out as the instant it is; turning it
+ * into the wall clock a `datetime-local` shows is the browser's job, because
+ * only the browser knows the zone (the calendar's rule, docs/calendar.md).
+ */
+async function recordFormValues(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: EditableRecordType,
+	id: string
+): Promise<Partial<RecordFormValues>> {
+	switch (type) {
+		case 'company': {
+			const row = await getCompany(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						relationship: row.relationship,
+						status: row.status,
+						email: str(row.email),
+						phone: str(row.phone),
+						website: str(row.website)
+					}
+				: {};
+		}
+		case 'contact': {
+			const row = await getContact(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						title: str(row.title),
+						email: str(row.email),
+						phone: str(row.phone),
+						status: row.status
+					}
+				: {};
+		}
+		case 'deal': {
+			const row = await getDeal(supabase, orgId, id);
+			return row
+				? {
+						title: row.title,
+						stage_id: row.stage_id,
+						amount: str(row.amount),
+						expected_close_date: str(row.expected_close_date)
+					}
+				: {};
+		}
+		case 'product': {
+			const row = await getProduct(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						kind: row.kind,
+						sku: str(row.sku),
+						unit_price: str(row.unit_price),
+						unit_cost: str(row.unit_cost),
+						unit: str(row.unit),
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'billable': {
+			const row = await getBillable(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						code: str(row.code),
+						unit_price: str(row.unit_price),
+						unit: str(row.unit),
+						unit_choices: (row.unit_choices ?? []).join(', '),
+						is_featured: row.is_featured ? 'true' : 'false',
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'asset': {
+			const row = await getAsset(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						asset_type: str(row.asset_type),
+						identifier: str(row.identifier),
+						status: row.status,
+						acquired_on: str(row.acquired_on),
+						purchase_price: str(row.purchase_price),
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						parent_id: str(row.parent_id),
+						property_type: str(row.property_type),
+						identifier: str(row.identifier),
+						status: row.status,
+						bedrooms: str(row.bedrooms),
+						bathrooms: str(row.bathrooms),
+						square_feet: str(row.square_feet),
+						market_rent: str(row.market_rent),
+						acquired_on: str(row.acquired_on),
+						purchase_price: str(row.purchase_price),
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row
+				? {
+						property_id: row.property_id,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						starts_on: row.starts_on,
+						// Blank for a month-to-month tenancy, which is what a
+						// null end date means.
+						ends_on: str(row.ends_on),
+						rent_amount: str(row.rent_amount),
+						rent_due_day: str(row.rent_due_day),
+						security_deposit: str(row.security_deposit),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'task': {
+			const row = await getTask(supabase, orgId, id);
+			return row
+				? {
+						title: row.title,
+						priority: row.priority,
+						due_at: str(row.due_at),
+						details: str(row.details)
+					}
+				: {};
+		}
+		case 'ticket': {
+			const row = await getTicket(supabase, orgId, id);
+			return row
+				? {
+						subject: row.subject,
+						priority: row.priority,
+						description: str(row.description)
+					}
+				: {};
+		}
+	}
+}
+
+/**
+ * The one place a record type becomes columns — for a create and for an edit
+ * alike, because the mapping is the same one and two copies of it is how a
+ * field starts saving on one path and not the other. Re-parsing with the
+ * concrete schema is what narrows the form's strings back to the enum unions
+ * the write wants — the generic form erased them, and a cast here would only
+ * hide a mismatch between the schema and the table.
+ *
+ * `id` is what makes it an edit. A blank field means the same thing on both
+ * paths: the column's empty value (null, or the zero a not-null money column
+ * defaults to), never "leave it as it was" — otherwise clearing a field would
+ * silently do nothing.
+ */
+async function writeRecord(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType,
-	values: RecordFormValues
+	values: RecordFormValues,
+	id?: string
 ): Promise<void> {
 	switch (type) {
 		case 'company': {
 			const data = companyRecordSchema.parse(values);
-			await createCompany(supabase, orgId, {
+			const columns = {
 				name: data.name,
 				relationship: data.relationship,
 				status: data.status,
 				email: text(data.email),
 				phone: text(data.phone),
 				website: text(data.website)
-			});
+			};
+			await (id
+				? updateCompany(supabase, orgId, id, columns)
+				: createCompany(supabase, orgId, columns));
 			return;
 		}
 		case 'contact': {
 			const data = contactRecordSchema.parse(values);
-			await createContact(supabase, orgId, {
+			const columns = {
 				name: data.name,
 				title: text(data.title),
 				email: text(data.email),
 				phone: text(data.phone),
 				status: data.status
-			});
+			};
+			await (id
+				? updateContact(supabase, orgId, id, columns)
+				: createContact(supabase, orgId, columns));
 			return;
 		}
 		case 'deal': {
 			const data = dealRecordSchema.parse(values);
-			// No pipeline or stage: the deal lands in the org's default board at
-			// its first stage (see crm/deals.ts).
-			await createDeal(supabase, orgId, {
+			const columns = {
 				title: data.title,
 				amount: amount(data.amount),
 				expected_close_date: text(data.expected_close_date)
-			});
+			};
+			// The board and the stage move together or not at all. No stage
+			// picked means the org's default board at its first stage on a
+			// create (see crm/deals.ts), and on an edit it means the deal stays
+			// where it is — a stage is the one field the form cannot clear,
+			// because every deal is somewhere.
+			const placement =
+				data.stage_id === '' ? null : await placementFor(supabase, orgId, data.stage_id);
+			if (id) {
+				await updateDeal(supabase, orgId, id, placement ? { ...columns, ...placement } : columns);
+			} else if (placement) {
+				await createDeal(supabase, orgId, { ...columns, ...placement });
+			} else {
+				await createDeal(supabase, orgId, columns);
+			}
 			return;
 		}
 		case 'product': {
 			const data = productRecordSchema.parse(values);
-			await createProduct(supabase, orgId, {
+			const columns = {
 				name: data.name,
 				kind: data.kind,
 				sku: text(data.sku),
-				unit_price: amount(data.unit_price),
+				unit_price: price(data.unit_price),
 				unit_cost: amount(data.unit_cost),
 				unit: text(data.unit),
 				description: text(data.description)
-			});
+			};
+			await (id
+				? updateProduct(supabase, orgId, id, columns)
+				: createProduct(supabase, orgId, columns));
 			return;
 		}
 		case 'billable': {
 			const data = billableRecordSchema.parse(values);
-			await createBillable(supabase, orgId, {
+			const columns = {
 				name: data.name,
 				code: text(data.code),
-				unit_price: amount(data.unit_price),
+				unit_price: price(data.unit_price),
 				unit: text(data.unit),
 				unit_choices: list(data.unit_choices),
 				is_featured: data.is_featured === 'true',
 				description: text(data.description)
-			});
+			};
+			await (id
+				? updateBillable(supabase, orgId, id, columns)
+				: createBillable(supabase, orgId, columns));
 			return;
 		}
 		case 'asset': {
 			const data = assetRecordSchema.parse(values);
-			await createAsset(supabase, orgId, {
+			const columns = {
 				name: data.name,
 				asset_type: text(data.asset_type),
 				identifier: text(data.identifier),
@@ -256,15 +566,19 @@ async function insertRecord(
 				acquired_on: text(data.acquired_on),
 				purchase_price: amount(data.purchase_price),
 				description: text(data.description)
-			});
+			};
+			await (id
+				? updateAsset(supabase, orgId, id, columns)
+				: createAsset(supabase, orgId, columns));
 			return;
 		}
 		case 'property': {
 			const data = propertyRecordSchema.parse(values);
 			// A blank parent is a building (or a single-family, which is its
 			// own unit); a picked one makes this a unit inside it. The
-			// database refuses a unit of a unit, so this cannot go deeper.
-			await createProperty(supabase, orgId, {
+			// database refuses a unit of a unit on either path, so neither
+			// creating nor re-parenting can build a deeper tree.
+			const columns = {
 				name: data.name,
 				parent_id: text(data.parent_id),
 				property_type: text(data.property_type),
@@ -277,29 +591,41 @@ async function insertRecord(
 				acquired_on: text(data.acquired_on),
 				purchase_price: amount(data.purchase_price),
 				description: text(data.description)
-			});
+			};
+			await (id
+				? updateProperty(supabase, orgId, id, columns)
+				: createProperty(supabase, orgId, columns));
 			return;
 		}
 		case 'lease': {
 			const data = leaseRecordSchema.parse(values);
 			// A blank end date is month-to-month, so it stays null rather than
-			// being invented; rent_due_day falls back to the column default.
-			await createLease(supabase, orgId, {
+			// being invented — and ending a lease early is moving this date,
+			// not a status change, because there is no status column.
+			const columns = {
 				property_id: data.property_id,
 				company_id: text(data.company_id),
 				contact_id: text(data.contact_id),
 				starts_on: data.starts_on,
 				ends_on: text(data.ends_on),
 				rent_amount: Number(data.rent_amount),
-				// Left out when blank, so the column's own default (the 1st)
-				// applies — the same way `amount()` omits a blank amount.
-				rent_due_day: data.rent_due_day === '' ? undefined : Number(data.rent_due_day),
+				// Blank is the column's own default (the 1st), written out
+				// rather than omitted: on an edit, leaving it out would mean
+				// "as it was", and a blank field means the empty value on both
+				// paths.
+				rent_due_day: data.rent_due_day === '' ? 1 : Number(data.rent_due_day),
 				security_deposit: amount(data.security_deposit),
 				notes: text(data.notes)
-			});
+			};
+			await (id
+				? updateLease(supabase, orgId, id, columns)
+				: createLease(supabase, orgId, columns));
 			return;
 		}
 		case 'invoice': {
+			// Create only — an invoice is edited through its own lifecycle
+			// actions on the record page, which is why it is not an
+			// EditableRecordType.
 			const data = invoiceRecordSchema.parse(values);
 			// A draft: the number is the database's, the lines come next on the
 			// invoice's own page, and nothing is owed until it is issued. Terms
@@ -318,21 +644,25 @@ async function insertRecord(
 		}
 		case 'task': {
 			const data = taskRecordSchema.parse(values);
-			await createTask(supabase, orgId, {
+			const columns = {
 				title: data.title,
 				priority: data.priority,
 				due_at: instant(data.due_at),
 				details: text(data.details)
-			});
+			};
+			await (id ? updateTask(supabase, orgId, id, columns) : createTask(supabase, orgId, columns));
 			return;
 		}
 		case 'ticket': {
 			const data = ticketRecordSchema.parse(values);
-			await createTicket(supabase, orgId, {
+			const columns = {
 				subject: data.subject,
 				priority: data.priority,
 				description: text(data.description)
-			});
+			};
+			await (id
+				? updateTicket(supabase, orgId, id, columns)
+				: createTicket(supabase, orgId, columns));
 			return;
 		}
 	}
@@ -358,12 +688,27 @@ function integer(value: string): number | null {
 }
 
 /**
- * A blank amount is left out of the insert entirely, so the column's own
- * default decides: null for a deal that has no figure yet, zero for a
- * product's price.
+ * A blank amount is no amount: null, for the money columns that allow it — a
+ * deal with no figure yet, an asset nobody paid for. Explicit rather than
+ * left out, because leaving it out of an UPDATE means "keep what was there",
+ * and a field the writer cleared has to clear.
  */
-function amount(value: string): number | undefined {
-	return value === '' ? undefined : Number(value);
+function amount(value: string): number | null {
+	return value === '' ? null : Number(value);
+}
+
+/**
+ * The same, for a money column that is `not null default 0` (a product's or a
+ * billable's price): blank is zero — which is what the default gave an insert
+ * anyway, so nothing about creating changes.
+ */
+function price(value: string): number {
+	return value === '' ? 0 : Number(value);
+}
+
+/** A column on its way back to the form: every field the form holds is a string. */
+function str(value: string | number | null): string {
+	return value === null ? '' : String(value);
 }
 
 /**

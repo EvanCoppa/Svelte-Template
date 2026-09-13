@@ -6,24 +6,18 @@
 	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Modal from '$lib/components/modal/index.js';
+	import RecordFields from '$lib/components/record-fields.svelte';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Combobox } from '$lib/components/ui/combobox/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { recordTerms } from '$lib/crm/records';
 	import {
 		RECORD_FORMS,
-		RECORD_PICKER_KINDS,
 		RECORD_SCHEMAS,
-		type RecordField,
 		type RecordFormValues,
-		type RecordPickerKind,
 		type RecordPickers,
 		type RecordType
 	} from '$lib/schemas/records';
-	import { capitalize, cn } from '$lib/utils.js';
+	import { capitalize } from '$lib/utils.js';
 
 	/**
 	 * The one "Add …" button, and the one form behind it.
@@ -39,8 +33,12 @@
 	 *
 	 * `type` is fixed for the lifetime of the component: a page creates one kind
 	 * of record, and superForm is wired once at init. A form that points the
-	 * record at another row (an invoice's customer, a lease's property) gets
-	 * the org's rows for each picker from the same load (`createPickers`).
+	 * record at another row (an invoice's customer, a deal's stage, a lease's
+	 * property) gets the org's rows for each picker from the same load
+	 * (`createPickers`).
+	 *
+	 * `EditRecord` is the same form with a different frame; the inputs
+	 * themselves are `RecordFields`, once, for both.
 	 */
 	let {
 		type,
@@ -61,7 +59,7 @@
 
 	let open = $state(false);
 
-	const { form, errors, message, constraints, submitting, enhance } = superForm(data, {
+	const superform = superForm(data, {
 		validators: zod4Client(RECORD_SCHEMAS[type]),
 		// Only the list this adds a row to is stale (docs/data-invalidation.md).
 		invalidateAll: false,
@@ -84,49 +82,7 @@
 			invalidate(definition.query);
 		}
 	});
-
-	function fieldId(field: RecordField): string {
-		return `create-${type}-${field.name}`;
-	}
-
-	/**
-	 * A `type="number"` input hands the binding a number, or null once cleared;
-	 * every field here is a string (the schema's rule), so the setter puts the
-	 * text back — the way the proposal builder's function bindings do.
-	 */
-	function asText(value: string | number | null | undefined): string {
-		return value === null || value === undefined ? '' : String(value);
-	}
-
-	/**
-	 * A field that picks one of the org's own rows — its options came with the
-	 * form. Derived from `RECORD_PICKER_KINDS` rather than listed, so a kind
-	 * added to the registry renders here without a second edit.
-	 */
-	function isPicker(field: RecordField): field is RecordField & { type: RecordPickerKind } {
-		// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` so
-		// `includes` accepts the broader field-type union. Widening only, and
-		// the predicate's narrowing is what the return type asserts.
-		return (RECORD_PICKER_KINDS as readonly string[]).includes(field.type);
-	}
-
-	function inputType(field: RecordField) {
-		switch (field.type) {
-			case 'datetime':
-				return 'datetime-local' as const;
-			case 'email':
-				return 'email' as const;
-			case 'tel':
-				return 'tel' as const;
-			case 'number':
-			case 'integer':
-				return 'number' as const;
-			case 'date':
-				return 'date' as const;
-			default:
-				return 'text' as const;
-		}
-	}
+	const { message, submitting, enhance } = superform;
 </script>
 
 <Modal.Root bind:open>
@@ -149,67 +105,7 @@
 				</Modal.Header>
 				<Modal.Body class="grid gap-5 pt-1 sm:grid-cols-2">
 					<FormAlert message={$message} class="mb-0 sm:col-span-2" />
-
-					{#each definition.fields as field (field.name)}
-						{@const id = fieldId(field)}
-						{@const invalid = ($errors[field.name]?.length ?? 0) > 0}
-						<div class={cn('grid gap-2', field.wide && 'sm:col-span-2')}>
-							<Label for={id}>{field.label}</Label>
-
-							{#if field.type === 'select'}
-								<Combobox
-									{id}
-									name={field.name}
-									bind:value={$form[field.name]}
-									options={field.options ?? []}
-									{invalid}
-								/>
-							{:else if isPicker(field)}
-								<Combobox
-									{id}
-									name={field.name}
-									bind:value={$form[field.name]}
-									options={pickers[field.type] ?? []}
-									placeholder="None"
-									searchPlaceholder="Search by name…"
-									clearable
-									{invalid}
-								/>
-							{:else if field.type === 'textarea'}
-								<Textarea
-									{id}
-									name={field.name}
-									placeholder={field.placeholder}
-									aria-invalid={invalid ? 'true' : undefined}
-									aria-describedby={invalid ? `${id}-error` : undefined}
-									bind:value={$form[field.name]}
-									{...$constraints[field.name] ?? {}}
-								/>
-							{:else}
-								<Input
-									{id}
-									name={field.name}
-									type={inputType(field)}
-									placeholder={field.placeholder}
-									step={field.type === 'number'
-										? '0.01'
-										: field.type === 'integer'
-											? '1'
-											: undefined}
-									aria-invalid={invalid ? 'true' : undefined}
-									aria-describedby={invalid ? `${id}-error` : undefined}
-									bind:value={
-										() => $form[field.name], (value) => ($form[field.name] = asText(value))
-									}
-									{...$constraints[field.name] ?? {}}
-								/>
-							{/if}
-
-							{#if invalid}
-								<p id="{id}-error" class="text-destructive text-sm">{$errors[field.name]}</p>
-							{/if}
-						</div>
-					{/each}
+					<RecordFields {type} {superform} {pickers} idPrefix="create" />
 				</Modal.Body>
 			</Modal.Card>
 			<Modal.Footer>

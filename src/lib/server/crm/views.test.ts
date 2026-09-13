@@ -2,20 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { ViewDefinition } from '$lib/views/resolve';
 import type { Address } from './addresses';
 import type { Company } from './companies';
-import type { ContactWithCompany } from './contacts';
 import { ORG_ID, supabaseMockSequence, supabaseTablesMock } from './test-support';
-import { describeViewRows, pinsFor, resultIds, runView } from './views';
+import { resultIds } from './lists';
+import { pinsFor, runView } from './views';
 
 const STEEL = '20000000-0000-0000-0000-000000000003';
 const WAYNE = '20000000-0000-0000-0000-000000000001';
-const BRUCE = '30000000-0000-0000-0000-000000000003';
 
 const suppliers: ViewDefinition = {
 	id: 'suppliers',
 	href: '/views/suppliers',
 	source: 'company',
 	filter: { where: [{ field: 'relationship', op: 'in', values: ['supplier'] }] },
-	columns: ['name', 'relationship', 'city', 'created_at'],
 	layouts: ['table', 'map'],
 	defaultLayout: 'table'
 };
@@ -35,22 +33,6 @@ const steel: Company = {
 	created_by: null,
 	created_at: '2026-01-01T00:00:00Z',
 	updated_at: '2026-01-01T00:00:00Z'
-};
-
-const bruce: ContactWithCompany = {
-	id: BRUCE,
-	org_id: ORG_ID,
-	company_id: null,
-	companies: null,
-	name: 'Bruce Wayne',
-	title: null,
-	email: null,
-	phone: null,
-	is_primary: false,
-	status: 'active',
-	created_by: null,
-	created_at: '',
-	updated_at: ''
 };
 
 const address = (overrides: Partial<Address>): Address =>
@@ -90,7 +72,7 @@ describe('runView', () => {
 				sort: { field: 'created_at', direction: 'desc' }
 			}
 		});
-		expect(result).toEqual({ source: 'company', rows: [steel] });
+		expect(result).toEqual({ kind: 'company', rows: [steel] });
 		expect(from).toHaveBeenCalledTimes(1);
 		const companies = builders.companies;
 		expect(companies?.in).toHaveBeenCalledWith('relationship', ['supplier']);
@@ -117,7 +99,7 @@ describe('runView', () => {
 				...suppliers,
 				filter: { where: [{ field: 'tag', op: 'has', value: 'preferred' }] }
 			})
-		).resolves.toEqual({ source: 'company', rows: [] });
+		).resolves.toEqual({ kind: 'company', rows: [] });
 		expect(untagged.from).toHaveBeenCalledTimes(1);
 	});
 
@@ -132,7 +114,6 @@ describe('runView', () => {
 					{ field: 'has_company', op: 'eq', value: true }
 				]
 			},
-			columns: ['name', 'company'],
 			layouts: ['table'],
 			defaultLayout: 'table'
 		};
@@ -149,60 +130,16 @@ describe('runView', () => {
 
 		const none = supabaseMockSequence([{ data: [] }]);
 		await expect(runView(none.supabase, ORG_ID, view)).resolves.toEqual({
-			source: 'contact',
+			kind: 'contact',
 			rows: []
 		});
 		expect(none.from).toHaveBeenCalledTimes(1);
 	});
 });
 
-describe('describeViewRows', () => {
-	it('describes each row in the view’s column order, typed by how it renders', () => {
-		const rows = describeViewRows({ source: 'company', rows: [steel] }, suppliers, () => true, [
-			address({})
-		]);
-		expect(rows).toEqual([
-			{
-				id: STEEL,
-				cells: [
-					{ type: 'link', text: 'Gotham Steel Supply', href: `/companies/${STEEL}` },
-					{ type: 'status', text: 'supplier', tone: 'cyan' },
-					{ type: 'text', text: 'Jersey City' },
-					{ type: 'datetime', text: '2026-01-01T00:00:00Z' }
-				]
-			}
-		]);
-	});
-
-	it('drops the link when the reader may not open the kind, and blanks what is missing', () => {
-		const [row] = describeViewRows(
-			{
-				source: 'contact',
-				rows: [bruce]
-			},
-			{
-				id: 'patient-map',
-				href: '/views/patient-map',
-				source: 'contact',
-				filter: { where: [] },
-				columns: ['name', 'company', 'city'],
-				layouts: ['map'],
-				defaultLayout: 'map'
-			},
-			() => false,
-			[]
-		);
-		expect(row?.cells).toEqual([
-			{ type: 'link', text: 'Bruce Wayne', href: null },
-			{ type: 'text', text: '' },
-			{ type: 'text', text: '' }
-		]);
-	});
-});
-
 describe('pinsFor', () => {
 	it('pins every address with coordinates, named after its record, and skips the rest', () => {
-		const pins = pinsFor({ source: 'company', rows: [steel] }, () => true, [
+		const pins = pinsFor({ kind: 'company', rows: [steel] }, () => true, [
 			address({}),
 			address({ id: 'a2', latitude: null }),
 			address({ id: 'a3', entity_id: WAYNE })
@@ -218,7 +155,7 @@ describe('pinsFor', () => {
 			}
 		]);
 		expect(
-			pinsFor({ source: 'company', rows: [steel] }, () => false, [address({})])[0]?.href
+			pinsFor({ kind: 'company', rows: [steel] }, () => false, [address({})])[0]?.href
 		).toBeNull();
 	});
 });

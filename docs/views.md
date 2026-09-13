@@ -4,7 +4,8 @@ A vendors page is the companies page with a filter. A patient map is the contact
 drawn as pins. Every vertical wants a dozen of these — the suppliers a roofer buys from,
 the people at a partner, the patients within reach of a practice — and none of them is
 worth a route, a load, a column list and a nav entry of its own. So a **view** is a row:
-which kind of record, which of them, which columns, table or map or both. One page
+which kind of record, which of them, table or map or both — and its columns are its
+list fields, like any list page's (docs/lists.md). One page
 renders every row, and an industry gets a new page by inserting rows in a migration.
 
 The `views` migration (`supabase/migrations/20260910100000_views.sql`) is the
@@ -17,7 +18,8 @@ Reference data, all of it, written by migrations and only read by the browser.
 
 | table               | one row means                                                                   | new here |
 | ------------------- | ------------------------------------------------------------------------------- | -------- |
-| `views`             | the definition: `source`, `filter`, `columns`, `layouts`, `default_layout`      | yes      |
+| `views`             | the definition: `source`, `filter`, `layouts`, `default_layout`                 | yes      |
+| `list_fields`       | its columns, search and filters, keyed by the view's id (docs/lists.md)         | no       |
 | `features`          | the view as a navigable capability, at `route = '/views/<id>'`                  | no       |
 | `industry_features` | which industries have the view, and what each calls it ("Vendors", "Suppliers") | no       |
 | `tier_features`     | which plans unlock it (every plan, today)                                       | no       |
@@ -74,22 +76,20 @@ The three shipped views:
 
 ## Rule 3 — the page never learns the source
 
-The page draws what the server described. `describeViewRows()` turns each row into a
-`ViewRow`: cells in the view's column order, each typed by how it renders — `link`,
-`status`, `text`, `datetime` — the rule `RecordDetail` follows on the record page. The
-column catalog (`src/lib/views/columns.ts`) says what each key is called; a column that
-names another kind is labelled through the terms the layout shipped, never a constant.
-`name` is always the first column and always the link into the record, and it links only
-when `passesFeatureGate()` says the reader may open that kind — so a view of vendors
-still renders when the org switched Companies off, with plain names.
+A view's page is a list page. Its columns, which of them the search box scans and
+which get a filter are its own `list_fields` rows, keyed by the view's id, resolved
+and drawn exactly as `/companies` is (docs/lists.md): the load hands the rows
+`runView()` read to `loadList(locals, view.id, result)`, `describeListRows()` types
+every cell by how it renders, and the page composes `createListTable()` into
+`DataTable` with the same toolbar. `name` is always the first column and always the
+link into the record, and it links only when `passesFeatureGate()` says the reader may
+open that kind — so a view of vendors still renders when the org switched Companies
+off, with plain names.
 
-`viewColumns()` (`src/lib/views/table.ts`) turns those cells into TanStack columns that
-sort by the cell's text, and the page composes them into `DataTable` exactly as a list
-page composes its hand-written ones. The "Add …" button is the generic `CreateRecord` for
-the source kind, pre-filled with every enum column the filter pins to one value
-(`defaultsFor()`), so a company added from Vendors is a supplier and appears in the list
-it was added from. Creating stays the source feature's `manage`; a view's own grant is
-`read` only.
+The "Add …" button is the generic `CreateRecord` for the source kind, pre-filled with
+every enum column the filter pins to one value (`defaultsFor()`), so a company added
+from Vendors is a supplier and appears in the list it was added from. Creating stays
+the source feature's `manage`; a view's own grant is `read` only.
 
 ## The map
 
@@ -100,14 +100,14 @@ record, coloured from the `app.css` tokens and framed to the pins. The library i
 inside the attachment — it touches `window` on import, so a top-level import would break
 the server render — and lands in its own chunk.
 
-The map is a style URL, `PUBLIC_MAP_STYLE_URL` (and `_DARK` for the dark theme), read by
-`mapConfig()` in `src/lib/map.ts` through `$env/dynamic/public` so an unset value is a
-null config rather than a build error. `mapOrigins()` derives the origins from the same
-URLs and `hooks.server.ts` hands them to the CSP — `connect-src` and `img-src`, since
-MapLibre fetches the style, tiles, glyphs and sprite — the way the Supabase origin is
-derived there; no tile host is ever hardcoded. The style's tiles, glyphs and sprite must
-therefore come from the style URL's origin (true of the MapLibre demo style and of
-OpenFreeMap). Without a URL the map layout says it is not configured.
+The map is a style URL, and a second one for the dark theme: both are constants in
+`mapConfig()` (`src/lib/map.ts`) — OpenFreeMap's Liberty and Dark styles, which need no
+key and no account, so a clone draws a map with nothing to configure. `mapOrigins()`
+derives the origins from the same URLs and `hooks.server.ts` hands them to the CSP —
+`connect-src` and `img-src`, since MapLibre fetches the style, tiles, glyphs and sprite —
+the way the Supabase origin is derived there, so changing the style is those two lines and
+the CSP follows. The style's tiles, glyphs and sprite must come from the style URL's own
+origin (true of OpenFreeMap and of the MapLibre demo style).
 
 ## Geocoding
 
@@ -123,6 +123,6 @@ The seed carries coordinates for its fixtures so the maps have pins with no prov
 
 Attio-style views a member creates are a deliberate next step, not built. They will be a
 tenant table in the canonical shape (`org_id`, RLS through `private.org_role()`) carrying
-the same `source`, `filter`, `columns` and `layouts` columns, parsed by the same
+the same `source`, `filter` and `layouts` columns, parsed by the same
 `VIEW_FILTER_SCHEMAS` and drawn by the same page — resolved after the reference registry.
 Nothing here needs to change for that.

@@ -44,3 +44,13 @@ export function coversDay(lease: LeaseTerm, day: string): boolean {
 	const state = leaseStateOn(lease, day);
 	return state === 'current' || state === 'rolling';
 }
+
+/**
+ * What a lease is called. It has no name column, because neither half of
+ * the answer is the lease's to own — it is named for what is rented and by
+ * whom. One function, so the record page's heading, the graph's node and a
+ * related-records row never disagree.
+ */
+export function leaseName(lease: { property?: string | null; tenant?: string | null }): string {
+	return [lease.property, lease.tenant].filter(Boolean).join(' — ') || 'Lease';
+}

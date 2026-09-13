@@ -111,7 +111,9 @@ Both are Q7. A word that is not a feature's name is never a constant in `src/` �
 ## Roles
 
 The ladder mirrors medical-supplies' six, which is the closest existing shape (a sales org
-with a support desk and a coordinator):
+with a support desk and a coordinator) — plus a seventh, the Prospector, added once a real
+brief showed that every office in this vertical has someone who works the list and never
+closes (the merchant_services_terminology migration):
 
 | id suffix | role                   | holds                                                                                                               |
 | --------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -121,6 +123,7 @@ with a support desk and a coordinator):
 | `…0004`   | Onboarding Coordinator | `manage` applications, tasks, terminals, equipment; `read` the rest                                                 |
 | `…0005`   | Sales Manager          | `manage` everything                                                                                                 |
 | `…0006`   | Principal              | `manage` + `delete` everything                                                                                      |
+| `…0007`   | Prospector             | `manage` merchants, contacts, tasks, schedule; `read` deals — the phone list, not the close                         |
 
 **And this is where the design stops being free.** See Gap 1 immediately below: a role
 grants a level on a _feature_, for the whole org. There is no role in this catalog, or any
@@ -325,3 +328,25 @@ behaviour at all.
 Everything under "What has to be built" is still ahead, and should be scoped and
 priced as one piece of work — starting with gap 1, which is a platform decision
 rather than a customer one.
+
+## A real brief has since answered most of this
+
+Gold Standard Processing — an ISO with five people — sent a seventeen-module build
+brief, and `docs/discovery/gsp-brief-gap-analysis.md` reads it against everything
+above. It settles most of the ⚠️ words and, more usefully, moves two of the rankings
+on this page:
+
+- **Gap 1 (row-scoped visibility) is not their blocker.** Five users, full visibility
+  for the owner, and the brief's own instruction is not to build permissions strict
+  enough to stop a rep creating a deal. It stays the right platform answer for the
+  office of forty 1099 agents; it is not the first sentence of this engagement.
+- **Gap 3 (residuals) is explicitly deferred by the customer** — they keep their
+  spreadsheet and ask us for the commission fields and a clean export instead. The
+  import-and-split engine is not day-one work, which is the single largest change to
+  the shape of the build.
+
+What their brief adds that this page never anticipated is a **training and resource
+centre** with AI search grounded strictly in their own approved material, a
+**cadence engine**, and **call transcript storage** — and, ahead of all of them, four
+columns on `deals` (next action, its due date, last activity, source) without which
+their one non-negotiable rule cannot be expressed at all.

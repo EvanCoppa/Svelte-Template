@@ -126,6 +126,26 @@ export async function listRelationships(
 }
 
 /**
+ * Every relationship in the organization, with its type embedded — the
+ * whole graph in one query, for the page that draws it whole
+ * (`describeGraph()` in `./graph`). Oldest first, so a map keeps the same
+ * order between loads and a node added last is drawn last.
+ */
+export async function listOrgRelationships(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	filter: { openOnly?: boolean } = {}
+): Promise<RelationshipWithType[]> {
+	let query = supabase
+		.from('relationships')
+		.select('*, relationship_types(*)')
+		.eq('org_id', orgId)
+		.order('created_at', { ascending: true });
+	if (filter.openOnly) query = query.is('ended_on', null);
+	return unwrap(await query);
+}
+
+/**
  * Every relationship running FROM a set of records of one kind — one query for
  * a page of them, where `listRelationships()` would be one query per row. Only
  * the `from` side, because that is what it is for: a board of tasks asking who

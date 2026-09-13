@@ -475,7 +475,7 @@ and the nav, the ⌘K palette, the page titles, the gate, the record pages and t
 all follow from them. Three tiers, and the boundaries are not where they look.
 
 > **This tier analysis is kept as written, and it is the route the build actually took
-> first** — `20260912090000_real_estate_industry.sql` is exactly the Tier 0 migration
+> first** — `20260912095000_real_estate_industry.sql` is exactly the Tier 0 migration
 > below. It was then superseded by the decision to make properties and leases real tables,
 > which is Tier 2 work. Both halves are on the branch, in that order, because the cheap
 > version is what proved the words and the shape before anything schema-shaped was
@@ -550,7 +550,7 @@ happened to define. The transactions table is fifty lines of SQL; the hack costs
 
 Four migrations, in the order they were built, and the order matters:
 
-1. **`20260912090000_real_estate_industry.sql`** — the industry, its feature map with this
+1. **`20260912095000_real_estate_industry.sql`** — the industry, its feature map with this
    vertical's words and order, the six-rung role ladder. **Config only**: no table, no
    column, no enum value, and not one line of `src/`. This is the Tier 0 migration above,
    and it is what proved the words and the shape before anything schema-shaped was

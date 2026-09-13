@@ -222,21 +222,52 @@ application data is scoped to an organization, never to a bare user. The
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
-  `VIEW_FILTER_SCHEMAS`, its columns and its layouts (`table`, `map`), and its id
-  is a `features` row at `/views/<id>` — so the nav, the gate, the title, the
-  industry's name for it and the role grants need nothing new; adding a view for
+  `VIEW_FILTER_SCHEMAS` and its layouts (`table`, `map`), and its id is a
+  `features` row at `/views/<id>` — so the nav, the gate, the title, the
+  industry's name for it and the role grants need nothing new; its columns are its
+  `list_fields` rows like any list page's (next bullet). Adding a view for
   an industry is one migration inserting rows (that file's closing comment is the
   checklist), never a route. Filters compile through `listCompanies()` /
   `listContacts()` (`conditions`, `ids`, `sort`), the hops (a tag, a contact's
   company's relationship) resolving to an id list first — never a second query
-  builder. The page draws `ViewRow`s and `MapPin`s the server described
-  (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
+  builder. The page draws the list the server described (`loadList()`) and the
+  `MapPin`s (`pinsFor()`), never a source's columns; "Add …" is the
   generic `CreateRecord` pre-filled from the filter. The map is `MapView`
-  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
-  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  (`src/lib/components/map-view/`, MapLibre GL) over the style URLs hardcoded in
+  `src/lib/map.ts` (the CSP derives their origins like Supabase's), and coordinates
   come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
   record page's address form saves. Per-org saved views are a later phase and
   reuse the same filter shape.
+- **A list is its fields, and the industry chooses them** (`list_fields` migration +
+  `src/lib/lists/` + `src/lib/server/crm/lists.ts` + `src/lib/server/lists.ts`;
+  docs/lists.md). Every list page — a kind's own and every view — is the heading, a
+  toolbar and a table, and which columns it has, which of them the search box scans
+  and which get a filter are **rows**, never column definitions in a page file:
+  `list_fields` (the defaults, keyed by the feature that owns the page) and
+  `industry_list_fields` (an industry's own say, null inheriting column by column
+  exactly as `industry_features` does, and a row for a field the defaults do not
+  list adding it) — the **built-in** columns, each a key from the kind's catalog
+  (`LIST_FIELD_CATALOG`, which says what each renders as). **Custom fields are
+  never named there: the industry ships them, and each one says how it sits**
+  (`industry_custom_fields` migration) — `industry_custom_fields` is what a
+  vertical's records carry (a beverage asset's location and serial number, a
+  merchant's MID and MCC), copied into every org in the industry as its own
+  `custom_field_definitions` by trigger on creation and by backfill, and every
+  definition — shipped or the org's own — carries `list_shown`,
+  `list_searchable`, `list_filterable`, so every custom field of a kind is a column
+  of its list, after the built-ins, drawn as its flags say. `resolveList()` folds them into a `ListSpec`
+  (throwing with the list's id on a key the catalog lacks or a filter on an amount or
+  a date — only text, enum, boolean, record and payment fields filter);
+  `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);
+  `loadRecordList(locals, kind)` is a list page's whole load and
+  `createListTable(() => data.list, () => page.data.terms)` its whole script. The
+  toolbar is `DataTable.Toolbar` holding `DataTable.Search` (the table's global
+  filter, over the columns that opt in with `enableGlobalFilter`) and
+  `DataTable.Filters` (a multi-select per column with `meta.filter`, its values fixed
+  or read off the rows), then `ViewOptions` — the one toolbar, on every list. Never
+  hand-write a list page's columns, a second search box or a filter of your own;
+  a column that is genuinely special (the staff roster's) still opts into the same
+  toolbar through `enableGlobalFilter` and `meta.filter`.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -396,6 +427,15 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   that would have to pick a kind (`owner_id`: a contact or a company?).
   `'member'` is the kind for someone who works here (keyed by `organization_members.user_id`,
   existing only while the membership does), distinct from a contact and an auth user.
+  **The graph is also drawn whole**: `/graph` (feature `graph`, `src/lib/server/crm/graph.ts`
+  - `src/lib/components/relationship-graph/`; docs/relationships.md, "The graph page") is
+    an Obsidian-style force-directed map of every record the reader may open — one in no
+    relationship yet is a dot of its own that still opens its page — over the
+    relationships between them, named through each kind's own list module (so the gate
+    applies kind by kind, and a member is on the map only where a relationship names
+    one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
+    people who work here) and its edges labelled by their types. Nothing per industry is
+    stored for it; a kind or a type joins the map by existing.
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
   name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
   a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).
@@ -566,7 +606,7 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
 /settings/profile are the reference implementations.
 
-### Creating a record is one form, not one per page
+### Creating and editing a record is one form, not one per page
 
 Adding a row of any kind goes through the **generic record form**: the registry in
 `src/lib/schemas/records.ts` (the feature that owns each kind of object — whose terms
@@ -582,15 +622,28 @@ return { companies: …, ...(await loadCreateRecord(locals, 'company')) };
 export const actions: Actions = { create: (event) => createRecord(event, 'company') };
 ```
 
+**The record page edits with the same form.** `loadEditRecord()` fills it in from the
+row and `updateRecord()` saves it, behind the `EditRecord` button on the generic record
+page — so a kind is described once and is creatable, editable and validated the same
+way, and `writeRecord()` is one switch for both (a blank field therefore means the
+column's empty value on both paths, never "leave it as it was", or clearing one would
+silently do nothing). **A deal's stage is a field in that list**, which is how a deal
+moves down the funnel. An invoice is the exception and says why: it is a document with
+a lifecycle — draft, issue, void — that its own record-page actions own
+(`billing.server.ts`), so it is not an `EditableRecordType`.
+
 Every field posts a **string** — that is what lets one component render them all — and
-the server's insert switch is the one place strings become columns (blank → null, an
+`writeRecord()` is the one place strings become columns (blank → null, an
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
-schema so the enum unions come back without a cast). A record that points at a party
-(an invoice's customer) uses the `company` / `contact` **picker field types**: still a
+schema so the enum unions come back without a cast), with `recordFormValues()` its
+mirror on the way back into the form. A record that points at another row — an
+invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
+field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
-one `case` in that switch; never a second create modal, action or field-rendering loop. A screen whose creation is genuinely special
+one `case` in each of those two functions; never a second create or edit modal, action
+or field-rendering loop (the inputs are `RecordFields`, once, for both frames). A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
@@ -846,8 +899,10 @@ rendered only when the load says `canCreate`. See "Creating a record is one form
 
 `DataTable.Content` already draws its own bordered, rounded frame around the rows, so wrapping
 one in `ui/card` stacks two borders around the same table and buys nothing. **A list page is the
-page heading, then the toolbar, then the table** — `/clients`, `/deals`, `/tickets`, `/tasks` and
-`/staff` are all built that way, and a new one copies them. (The `/components` showcase is not an
+page heading, then the toolbar, then the table** — `/companies`, `/deals`, `/tickets` and
+`/staff` are all built that way, and a new one copies them. The toolbar is `DataTable.Toolbar`
+(`Search`, `Filters`, `ViewOptions`), and on a list of records its contents come from the
+list's fields (docs/lists.md); never a bare `<div class="flex">` with an `Input` in it. (The `/components` showcase is not an
 exception to fix: there the card is the demo frame around a primitive, not a page layout.)
 
 Cards still earn their place around everything that is _not_ the table: a form, and the summary

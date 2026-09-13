@@ -55,15 +55,17 @@ export type RecordFormValues = Record<string, string>;
 export type RecordFieldOption = { value: string; label: string; sublabel?: string };
 
 /**
- * The kinds of record a form can point a new record at — each a picker over
- * the org's own rows. Two are parties; `property` is the third because a
- * lease has to name what is rented, and a unit is a row like any other.
+ * The kinds of row a record form can point at — each a picker whose options
+ * are the org's own rows rather than a vocabulary the registry can hold: the
+ * two parties, the stage a deal sits in (its board is `pipelines` rows, so
+ * the choices differ per org and per industry), and the property a lease is
+ * over (a unit is a row like any other).
  */
-export const RECORD_PICKER_KINDS = ['company', 'contact', 'property'] as const;
+export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage', 'property'] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
-/** The options behind each party picker on a form, loaded per request by `loadCreateRecord()`. */
+/** The options behind each picker on a form, loaded per request by `loadCreateRecord()`. */
 export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFieldOption[]>>;
 
 /**
@@ -207,6 +209,13 @@ export const contactRecordSchema = z.object({
 
 export const dealRecordSchema = z.object({
 	title: requiredText('Title'),
+	/**
+	 * Where the deal sits on a board. Blank on create means "the org's default
+	 * board, first stage" (`crm/deals.ts` places it); blank on edit means the
+	 * same, which is why nothing here is required — a deal always has a stage,
+	 * but the form never has to know which one.
+	 */
+	stage_id: optionalPick,
 	amount: optionalAmount,
 	expected_close_date: optionalDate
 });
@@ -411,8 +420,11 @@ export const RECORD_FORMS: RecordFormRegistry = {
 	deal: {
 		feature: 'deals',
 		query: QUERY.deals,
+		// Stage is second because moving one is the commonest edit a deal ever
+		// gets — the funnel is the reason the record exists.
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual renewal' },
+			{ name: 'stage_id', label: 'Stage', type: 'stage' },
 			{ name: 'amount', label: 'Amount', type: 'number', placeholder: '12000' },
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]

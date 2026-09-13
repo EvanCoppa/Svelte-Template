@@ -37,9 +37,7 @@ describe('loadViewRegistry', () => {
 
 		await expect(loadViewRegistry(supabase)).resolves.toBe(rows);
 		expect(from).toHaveBeenCalledWith('views');
-		expect(builder.select).toHaveBeenCalledWith(
-			'id, source, filter, columns, layouts, default_layout'
-		);
+		expect(builder.select).toHaveBeenCalledWith('id, source, filter, layouts, default_layout');
 		expect(builder.order).toHaveBeenCalledWith('id');
 	});
 });
@@ -63,13 +61,19 @@ describe('loadTermRegistry', () => {
 					label: 'Presenter',
 					industry_terms: [{ industry_id: 'roofing', label: 'Estimator' }]
 				},
-				{ id: 'proposal_responsible', label: 'Responsible', industry_terms: [] }
+				{ id: 'proposal_responsible', label: 'Responsible', industry_terms: [] },
+				{
+					id: 'graph_member',
+					label: 'Staff',
+					industry_terms: [{ industry_id: 'roofing', label: 'Crew' }]
+				}
 			]
 		});
 
 		await expect(loadVocabulary(supabase, 'roofing')).resolves.toEqual({
 			proposal_presenter: 'Estimator',
-			proposal_responsible: 'Responsible'
+			proposal_responsible: 'Responsible',
+			graph_member: 'Crew'
 		});
 	});
 });

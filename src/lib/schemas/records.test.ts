@@ -11,6 +11,10 @@ import {
 	type RecordField
 } from './records';
 
+function isPickerKind(type: RecordField['type']): type is (typeof RECORD_PICKER_KINDS)[number] {
+	return RECORD_PICKER_KINDS.some((kind) => kind === type);
+}
+
 function messagesOf(result: { error?: { issues: { message: string }[] } }) {
 	return result.error?.issues.map((issue) => issue.message).join(' ') ?? '';
 }
@@ -63,11 +67,24 @@ describe('the record registry', () => {
 		}
 	});
 
-	it('names a picker kind only on the fields that pick a party', () => {
+	it('names a picker field after the kind of row it picks', () => {
 		for (const type of RECORD_TYPES) {
 			for (const field of RECORD_FORMS[type].fields) {
-				if (field.type !== 'company' && field.type !== 'contact') continue;
-				// The picker's column is the party's id, named after the kind it picks.
+				if (!isPickerKind(field.type)) continue;
+				// The picker's column is the id of the row it points at, named
+				// after the kind: `company_id`, `contact_id`, `stage_id`.
+				//
+				// A form that picks its OWN kind is the exception, and the
+				// column says the ROLE instead: a property's `parent_id` is
+				// the building it is a unit of. Calling that `property_id` on
+				// a property form would name the record itself rather than
+				// the one it points at — so the rule there is only that it is
+				// an id column, and the schema test above already proves it
+				// matches the schema key.
+				if (field.type === type) {
+					expect(field.name).toMatch(/_id$/);
+					continue;
+				}
 				expect(field.name).toBe(`${field.type}_id`);
 			}
 		}

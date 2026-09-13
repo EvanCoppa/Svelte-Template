@@ -123,6 +123,45 @@ the reader may not open (`canOpen`, the feature gate) is omitted rather than sho
 unlinked, the record page's rule for a related group. The generic record page draws
 the result in its Relationships card (`Detail.Relationship`).
 
+## The graph page
+
+`/graph` (feature `graph`, the relationship_graph migration; `src/lib/server/crm/graph.ts`,
+`src/lib/crm/graph.ts`, `src/lib/components/relationship-graph/`, `src/routes/(app)/graph/`)
+reads the graph whole: **every record the reader may open is a node** — related or not,
+so a record with no relationship yet is a dot of its own that still opens its page and
+the map is a way into the data rather than a picture of the lines alone — and every
+`relationships` row is an edge, laid out by a force simulation on a canvas the reader can
+pan, zoom and pull nodes around on — the Obsidian-style map of the org's records. A
+member joins the map only where a relationship names one: the roster, not this page, is
+where people who work here are read. Resting on a
+node lights up its neighbourhood and puts on each edge the words that read from that
+node ("owns" from the owner, "owned by" from the asset); a click opens the record. A
+record's Relationships card links to the map opened on it (`?focus=<kind>:<id>`).
+
+Three rules keep it one page for every industry:
+
+- **Naming is the record page's.** `describeGraph()` names nodes through the kinds' own
+  list modules (`listRecordNames()` — the same strings `getRecord()` puts at the top of a
+  record) and `getDisplayNames()` for members, one query per kind rather than one per
+  node. The feature gate decides the kinds: a kind the reader may not open is not fetched
+  and not drawn, and every edge touching it goes with it. Nothing about a record the
+  reader cannot open reaches the browser.
+- **Every word is the industry's.** The legend names each kind of record through its
+  feature's terms (`recordTerms()`: "Patients", "Merchants") and the member kind through
+  the `graph_member` term ("Staff", "Crew", "Agents"); an edge is labelled by its
+  relationship type, system or the org's own. There is no per-industry table for the
+  graph: whatever kinds an industry's features draw, and whatever types its orgs use,
+  is what appears.
+- **The page owns the map; the component lays it out.** `GraphData` (nodes, edges, and
+  the legend's kinds and types with counts) is described server-side; the page keeps
+  which kinds and types are shown and whether ended relationships are drawn, folds them
+  with the pure `filterGraph()`, and hands `RelationshipGraph.Root` the result and a
+  swatch per kind (`swatchAt()`, the `--chart-*` tokens). The component decides nothing
+  about where a node leads (`onopen`) or what it is called.
+
+`d3-force` is the one dependency, for the layout only; the drawing, the pointer and the
+sr-only list of nodes (the map's accessibility rule) are the component's.
+
 ## Assets
 
 `assets` holds only what every asset has: `name`, `asset_type` (free text, the org's
@@ -171,7 +210,8 @@ than overwritten. Two consequences worth copying:
 ## Not built yet
 
 - A general UI to draw a relationship (a type picker plus a record picker across
-  kinds) and to remove one. The read side is complete everywhere, and the write
+  kinds) and to remove one. The read side is complete everywhere (the record page's
+  card and the graph page), and the write
   side now has one real caller in the task helpers above; the rest is called from
   tests only.
 - A settings page for an org's own relationship types (RLS already allows
