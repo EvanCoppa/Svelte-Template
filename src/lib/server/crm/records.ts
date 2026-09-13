@@ -19,9 +19,9 @@ import {
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
-import { getAsset, type Asset } from './assets';
-import { getBillable, type Billable } from './billables';
-import { getCompany, type CompanyWithContacts } from './companies';
+import { getAsset, listAssets, type Asset } from './assets';
+import { getBillable, listBillables, type Billable } from './billables';
+import { getCompany, listCompanies, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
@@ -31,7 +31,7 @@ import {
 	type InvoiceWithDetails,
 	type InvoiceWithParties
 } from './invoices';
-import { getProduct, type ProductWithCategory } from './products';
+import { getProduct, listProducts, type ProductWithCategory } from './products';
 import {
 	getProposal,
 	listProposals,
@@ -581,6 +581,50 @@ export async function getRecord(
 			const row = await getTicket(supabase, orgId, id);
 			return row && describeTicket(row, canOpen);
 		}
+	}
+}
+
+/** A record by id and the one word for it: what a map or a picker needs. */
+export type RecordName = { id: string; name: string };
+
+/**
+ * Every record of one kind, named the way `getRecord()` names it and
+ * nothing else — the cheap half of a record, for a surface that draws all
+ * of them at once (the graph page).
+ *
+ * One branch per kind like `getRecord()`, each going through that kind's
+ * own list module, so the name a row carries here is the same string the
+ * record page puts at the top of it. RLS decides what is in the list, so a
+ * reader sees exactly the records they could open by clicking through — the
+ * caller still asks `canOpen()` first, because a kind the feature gate
+ * hides is not fetched at all.
+ */
+export async function listRecordNames(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	kind: RecordKind
+): Promise<RecordName[]> {
+	switch (kind) {
+		case 'asset':
+			return (await listAssets(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'billable':
+			return (await listBillables(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'company':
+			return (await listCompanies(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'contact':
+			return (await listContacts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'product':
+			return (await listProducts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'deal':
+			return (await listDeals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'proposal':
+			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'invoice':
+			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'task':
+			return (await listTasks(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'ticket':
+			return (await listTickets(supabase, orgId)).map((row) => ({ id: row.id, name: row.subject }));
 	}
 }
 

@@ -137,24 +137,31 @@ page branch and a create form, to arrive at a table whose columns are `deals`' c
 is the wrong trade unless a job needs to coexist with a deal in the same org, which in
 roofing it does not: the deal **is** the job, before and after the signature.
 
-### The custom fields decision
+### The custom fields decision — settled on `main`, not here
 
-**Recommendation: add the industry axis, as a new `industry_custom_fields` table of
-templates copied into an org on creation — not as a lookup consulted at read time.**
+This page originally argued for adding an industry axis to custom fields, and recommended
+templates copied into an org rather than resolved at read time. **`main` shipped exactly
+that** while this branch was open (`20260913090000_industry_custom_fields.sql`): an
+`industry_custom_fields` table, a SECURITY DEFINER copy into the org's own
+`custom_field_definitions` on creation and on an industry change, idempotent on
+`(org, kind, key)`, plus a backfill. Two implementations converged on the same shape,
+which is reassuring about the shape and means this branch's version was deleted rather
+than merged — one established way per problem.
 
-Three options, and the middle one is right:
+`main`'s is the better of the two, and it is worth saying how: instead of the
+`sort_order` column this branch added to `custom_field_definitions`, every definition
+carries `list_shown`, `list_searchable` and `list_filterable`, so the field itself says
+how it sits on its kind's list (docs/lists.md) and custom fields draw after the built-in
+columns in label order. That answers more than ordering did, so the `sort_order` column
+went with the rest.
 
-| option                             | what it is                                                                                                                          | why not / why                                                                                                                                                                                                                                                                                                                                          |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A — seed only                      | put the roofing definitions in `seed.sql` against Ridgeline and Northwind                                                           | they exist only on the local stack; a real roofing org still starts blank. Fine as a fixture, not as an answer                                                                                                                                                                                                                                         |
-| **B — templates, copied** (chosen) | `industry_custom_fields` reference rows, copied into `custom_field_definitions` by a trigger on org creation and on industry change | follows the `tiers`/`features` precedent: reference data by migration, readable by all, written by migrations only. The org **owns** its copies — it can rename, reorder, add and delete them, which is what an org will want on day two. `custom_field_values` keeps pointing at a real `custom_field_definitions` row, so nothing downstream changes |
-| C — resolved at read               | definitions resolve industry rows + org rows at query time, null inheriting                                                         | matches the names/order precedent most literally, but a value has to reference a definition id, and an industry row is not an org's row. It would need the value table to carry a nullable pair, which is a real complication for no benefit an org would notice                                                                                       |
+The one thing it did not answer is the objection that motivated `sort_order`: roofing's
+eleven insurance fields read as a form, and in label order ACV, Adjuster and Appealing
+sit apart from the claim they belong to. That is a real cost and it is now a known one —
+worth revisiting as grouping on the panel rather than as a second ordering column.
 
-B is one migration (the table, its RLS, the copy in `handle_new_organization`, and a
-back-fill for existing orgs) and no app change at all: by the time any load runs, the rows
-are ordinary `custom_field_definitions`.
-
----
+What remains roofing's is the rows, and they are the migration beside this branch's
+other one.
 
 ## The custom fields roofing needs
 
@@ -337,15 +344,11 @@ renames; roofing's re-numbered nav order. Proven by `npm run db:reset`.
 industry-aware `create_default_pipeline()` with a roofing board, the seed comment on
 Globex's override rewritten, and the job custom fields.
 
-**Phase 3 — industry custom fields. Shipped** (`20260911160000_industry_custom_fields.sql`).
-The `industry_custom_fields` table, `apply_industry_custom_fields()`, a trigger on org
-creation **and** on an org's industry changing, the back-fill, and all 52 roofing rows
-above. `custom_field_definitions` gained a nullable `sort_order` so a shipped set keeps the
-order it was shipped in — `listCustomFields()` orders by it and falls back to label, which
-is the only app change. Two things worth knowing: there is **no `date` value type** (the
-enum is text / numeric / boolean / select), so the date fields above ship as `text` until a
-`date` type earns its own change; and a copy an org deletes comes back the next time a
-migration runs the back-fill, which the migration's closing comment explains and bounds.
+**Phase 3 — industry custom fields. Shipped, half of it by `main`.** The mechanism is
+`main`'s (`industry_custom_fields`, above); this branch contributes the 52 roofing rows
+(`20260913110100_roofing_custom_fields.sql`) and the list flags each one carries. There
+is no `date` value type — the enum is text / numeric / boolean / select — so the date
+fields ship as `text` until a `date` type earns its own change.
 
 **Phase 4 — the material chain.** `purchases` and `shipments` as features: rows, routes,
 data modules, list pages, record-page branches.

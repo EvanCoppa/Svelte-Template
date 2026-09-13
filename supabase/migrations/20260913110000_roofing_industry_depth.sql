@@ -19,9 +19,10 @@
 --   4. roofing's words for two features, and its whole sidebar section
 --      re-numbered around the newcomer
 --
--- Everything is idempotent, so a re-apply is a no-op. See docs/roofing.md for
--- the gaps this deliberately does NOT close (Jobs, industry custom fields, the
--- material chain) and why each waits for its own migration.
+-- Everything is idempotent, so a re-apply is a no-op. The vertical's custom
+-- fields are the migration beside this one, on the mechanism `main` shipped
+-- (industry_custom_fields); see docs/roofing.md for the gaps neither closes
+-- (Jobs, the material chain) and why each waits for its own migration.
 
 -- ---------------------------------------------------------------------------
 -- 1. The Estimator
@@ -88,11 +89,23 @@ insert into public.features (id, name, noun, description, route, icon, category,
 		'/views/homeowner-map', 'map-pin', 'crm', 19)
 on conflict (id) do nothing;
 
-insert into public.views (id, source, filter, columns, layouts, default_layout) values
+insert into public.views (id, source, filter, layouts, default_layout) values
 	('homeowner-map', 'contact',
 		'{"where": [{"field": "has_company", "op": "eq", "value": false}]}',
-		'{name,phone,email,status,city}', '{map,table}', 'map')
+		'{map,table}', 'map')
 on conflict (id) do nothing;
+
+-- A view's columns are list_fields rows keyed by the view's id (the
+-- list_fields migration took them off `views.columns`, which is gone). The
+-- same five patient-map draws: a roofer reads the same things about a
+-- homeowner that a practice reads about a patient.
+insert into public.list_fields (feature_id, field, shown, searchable, filterable, sort_order) values
+	('homeowner-map', 'name', true, true, false, 100),
+	('homeowner-map', 'phone', true, true, false, 200),
+	('homeowner-map', 'email', true, true, false, 300),
+	('homeowner-map', 'status', true, false, true, 400),
+	('homeowner-map', 'city', true, true, true, 500)
+on conflict (feature_id, field) do nothing;
 
 -- No title of its own: named by the feature, as the org's industry says it.
 insert into public.pages (id, feature_id, path, title) values

@@ -46,6 +46,14 @@ describe('which pile a task falls in', () => {
 		expect(taskIsOverdue(due(-1), NOW)).toBe(true);
 	});
 
+	it('keeps a task in review on the timeline — it is waiting, not finished', () => {
+		// The one state that could be mistaken for done: the work is out of the
+		// doer's hands, and until somebody says so it is still late if it is late.
+		expect(taskBucket(due(-1, 'in_review'), NOW)).toBe('overdue');
+		expect(taskBucket(due(3, 'in_review'), NOW)).toBe('week');
+		expect(taskIsOverdue(due(-1, 'in_review'), NOW)).toBe(true);
+	});
+
 	it('groups into every bucket, so the page renders a stable set of headings', () => {
 		const piles = groupTasksByBucket(
 			[due(-1), due(0), due(3), due(20), { due_at: null, status: 'todo' }, due(-2, 'done')],

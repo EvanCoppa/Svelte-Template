@@ -24,11 +24,13 @@
 			{#each dataTable.table
 				.getAllColumns()
 				.filter((col) => typeof col.accessorFn !== 'undefined' && col.getCanHide()) as column (column.id)}
+				<!-- A column's `meta.title` is the heading it was drawn with; a column
+				     without one (a hand-written page's) reads as its id. -->
 				<DropdownMenu.CheckboxItem
-					class="capitalize"
+					class={column.columnDef.meta?.title ? undefined : 'capitalize'}
 					bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
 				>
-					{column.id}
+					{column.columnDef.meta?.title ?? column.id}
 				</DropdownMenu.CheckboxItem>
 			{/each}
 		</DropdownMenu.Group>

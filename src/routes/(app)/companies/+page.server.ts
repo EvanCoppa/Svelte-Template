@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { listCompanies } from '$lib/server/crm/companies';
 import { createRecord, loadCreateRecord } from '$lib/server/records';
+import { loadRecordList } from '$lib/server/lists';
 import type { Actions, PageServerLoad } from './$types';
 
 // The hook already gated this route on the `companies` feature and the read
@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	depends(QUERY.companies);
 
 	return {
-		companies: await listCompanies(locals.supabase, locals.activeOrgId),
+		...(await loadRecordList(locals, 'company')),
 		...(await loadCreateRecord(locals, 'company'))
 	};
 };

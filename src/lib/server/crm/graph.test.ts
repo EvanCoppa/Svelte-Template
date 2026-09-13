@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import type { RecordKind } from '$lib/crm/records';
 import type { TermsMap } from '$lib/features/terms';
 import { describeGraph } from './graph';
 import type { RelationshipWithType } from './relationships';
 import { ORG_ID, supabaseTablesMock } from './test-support';
 
 /**
- * The whole graph, folded: which endpoints become nodes (named as the
- * record page would name them, and only the kinds the reader may open),
- * which rows become edges, and the legend — each kind in the industry's
- * words, each type by its label, with its count.
+ * The whole graph, folded: which records become nodes (every one of a kind
+ * the reader may open, related or not, named as the record page would name
+ * them), which rows become edges, and the legend — each kind in the
+ * industry's words, each type by its label, with its count.
  */
 
 const WAYNE_ID = '20000000-0000-0000-0000-000000000001';
+const STARK_ID = '20000000-0000-0000-0000-000000000002';
 const TRUCK_ID = 'f1000000-0000-0000-0000-000000000002';
 const DEV_ID = '00000000-0000-0000-0000-000000000001';
 const OWNS = 'f0000000-0000-0000-0000-000000000011';
@@ -74,6 +76,8 @@ const wayneRow = {
 	relationship: 'customer',
 	contacts: []
 };
+/** A company in no relationship at all: a dot of its own on the map. */
+const starkRow = { ...wayneRow, id: STARK_ID, name: 'Stark Industries' };
 const truckRow = {
 	id: TRUCK_ID,
 	org_id: ORG_ID,
@@ -103,29 +107,40 @@ const terms: TermsMap = {
 	assets: { name: 'Terminals', noun: 'terminal' }
 };
 
+/** The two kinds this org's reader may open; the rest are never fetched. */
+const canOpen = (kind: RecordKind) => kind === 'company' || kind === 'asset';
+
 function mock() {
 	return supabaseTablesMock({
 		relationships: { data: [wayneOwnsTruck, truckAssignedToDev] },
-		companies: { data: wayneRow },
-		assets: { data: truckRow },
+		companies: { data: [wayneRow, starkRow] },
+		assets: { data: [truckRow] },
 		profiles: { data: [devRow] }
 	});
 }
 
 describe('describeGraph', () => {
-	it('folds every endpoint into a named node and every row into an edge', async () => {
+	it('draws every record of every kind the reader may open, related or not', async () => {
 		const { supabase } = mock();
 
-		const graph = await describeGraph(supabase, ORG_ID, () => true, vocabulary, terms);
+		const graph = await describeGraph(supabase, ORG_ID, canOpen, vocabulary, terms);
 
+		// In the order the kinds are registered, members last; Stark stands in
+		// no relationship and is on the map all the same.
 		expect(graph.nodes).toEqual([
+			{ id: `asset:${TRUCK_ID}`, kind: 'asset', name: 'Box truck', href: `/assets/${TRUCK_ID}` },
 			{
 				id: `company:${WAYNE_ID}`,
 				kind: 'company',
 				name: 'Wayne Enterprises',
 				href: `/companies/${WAYNE_ID}`
 			},
-			{ id: `asset:${TRUCK_ID}`, kind: 'asset', name: 'Box truck', href: `/assets/${TRUCK_ID}` },
+			{
+				id: `company:${STARK_ID}`,
+				kind: 'company',
+				name: 'Stark Industries',
+				href: `/companies/${STARK_ID}`
+			},
 			{ id: `member:${DEV_ID}`, kind: 'member', name: 'Dev User', href: null }
 		]);
 		expect(graph.edges).toEqual([
@@ -153,11 +168,11 @@ describe('describeGraph', () => {
 	it("names the legend in the industry's words, by the record kinds' order with members last", async () => {
 		const { supabase } = mock();
 
-		const graph = await describeGraph(supabase, ORG_ID, () => true, vocabulary, terms);
+		const graph = await describeGraph(supabase, ORG_ID, canOpen, vocabulary, terms);
 
 		expect(graph.kinds).toEqual([
 			{ kind: 'asset', label: 'Terminals', count: 1 },
-			{ kind: 'company', label: 'Merchants', count: 1 },
+			{ kind: 'company', label: 'Merchants', count: 2 },
 			{ kind: 'member', label: 'Crew', count: 1 }
 		]);
 		expect(graph.types).toEqual([
@@ -169,11 +184,11 @@ describe('describeGraph', () => {
 	it('leaves a kind the reader may not open off the map, with every edge that touched it', async () => {
 		const { supabase, from } = mock();
 
-		const graph = await describeGraph(supabase, ORG_ID, (kind) => kind !== 'asset', vocabulary, {
+		const graph = await describeGraph(supabase, ORG_ID, (kind) => kind === 'company', vocabulary, {
 			companies: terms.companies
 		});
 
-		expect(graph.nodes.map((node) => node.kind)).toEqual(['company', 'member']);
+		expect(graph.nodes.map((node) => node.kind)).toEqual(['company', 'company', 'member']);
 		expect(graph.edges).toEqual([]);
 		expect(graph.kinds.map((kind) => kind.kind)).toEqual(['company', 'member']);
 		expect(graph.types).toEqual([]);
@@ -181,15 +196,18 @@ describe('describeGraph', () => {
 		expect(from).not.toHaveBeenCalledWith('assets');
 	});
 
-	it('is an empty map for an org with no relationships', async () => {
-		const { supabase, from } = supabaseTablesMock({ relationships: { data: [] } });
+	it('is an empty map for an org with no records', async () => {
+		const { supabase } = supabaseTablesMock({
+			relationships: { data: [] },
+			companies: { data: [] },
+			assets: { data: [] }
+		});
 
-		await expect(describeGraph(supabase, ORG_ID, () => true, vocabulary, terms)).resolves.toEqual({
+		await expect(describeGraph(supabase, ORG_ID, canOpen, vocabulary, terms)).resolves.toEqual({
 			nodes: [],
 			edges: [],
 			kinds: [],
 			types: []
 		});
-		expect(from).toHaveBeenCalledTimes(1);
 	});
 });

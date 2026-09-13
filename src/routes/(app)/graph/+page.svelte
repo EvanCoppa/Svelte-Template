@@ -91,7 +91,7 @@
 			<Empty.Header>
 				<Empty.Title>Nothing to draw yet</Empty.Title>
 				<Empty.Description>
-					Records that are related to one another appear here, joined by how they relate.
+					Every record appears here as soon as there is one, joined to the records it relates to.
 				</Empty.Description>
 			</Empty.Header>
 		</Empty.Root>

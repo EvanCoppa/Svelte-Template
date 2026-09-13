@@ -222,21 +222,52 @@ application data is scoped to an organization, never to a bare user. The
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
-  `VIEW_FILTER_SCHEMAS`, its columns and its layouts (`table`, `map`), and its id
-  is a `features` row at `/views/<id>` — so the nav, the gate, the title, the
-  industry's name for it and the role grants need nothing new; adding a view for
+  `VIEW_FILTER_SCHEMAS` and its layouts (`table`, `map`), and its id is a
+  `features` row at `/views/<id>` — so the nav, the gate, the title, the
+  industry's name for it and the role grants need nothing new; its columns are its
+  `list_fields` rows like any list page's (next bullet). Adding a view for
   an industry is one migration inserting rows (that file's closing comment is the
   checklist), never a route. Filters compile through `listCompanies()` /
   `listContacts()` (`conditions`, `ids`, `sort`), the hops (a tag, a contact's
   company's relationship) resolving to an id list first — never a second query
-  builder. The page draws `ViewRow`s and `MapPin`s the server described
-  (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
+  builder. The page draws the list the server described (`loadList()`) and the
+  `MapPin`s (`pinsFor()`), never a source's columns; "Add …" is the
   generic `CreateRecord` pre-filled from the filter. The map is `MapView`
   (`src/lib/components/map-view/`, MapLibre GL) over the style URLs hardcoded in
   `src/lib/map.ts` (the CSP derives their origins like Supabase's), and coordinates
   come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
   record page's address form saves. Per-org saved views are a later phase and
   reuse the same filter shape.
+- **A list is its fields, and the industry chooses them** (`list_fields` migration +
+  `src/lib/lists/` + `src/lib/server/crm/lists.ts` + `src/lib/server/lists.ts`;
+  docs/lists.md). Every list page — a kind's own and every view — is the heading, a
+  toolbar and a table, and which columns it has, which of them the search box scans
+  and which get a filter are **rows**, never column definitions in a page file:
+  `list_fields` (the defaults, keyed by the feature that owns the page) and
+  `industry_list_fields` (an industry's own say, null inheriting column by column
+  exactly as `industry_features` does, and a row for a field the defaults do not
+  list adding it) — the **built-in** columns, each a key from the kind's catalog
+  (`LIST_FIELD_CATALOG`, which says what each renders as). **Custom fields are
+  never named there: the industry ships them, and each one says how it sits**
+  (`industry_custom_fields` migration) — `industry_custom_fields` is what a
+  vertical's records carry (a beverage asset's location and serial number, a
+  merchant's MID and MCC), copied into every org in the industry as its own
+  `custom_field_definitions` by trigger on creation and by backfill, and every
+  definition — shipped or the org's own — carries `list_shown`,
+  `list_searchable`, `list_filterable`, so every custom field of a kind is a column
+  of its list, after the built-ins, drawn as its flags say. `resolveList()` folds them into a `ListSpec`
+  (throwing with the list's id on a key the catalog lacks or a filter on an amount or
+  a date — only text, enum, boolean, record and payment fields filter);
+  `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);
+  `loadRecordList(locals, kind)` is a list page's whole load and
+  `createListTable(() => data.list, () => page.data.terms)` its whole script. The
+  toolbar is `DataTable.Toolbar` holding `DataTable.Search` (the table's global
+  filter, over the columns that opt in with `enableGlobalFilter`) and
+  `DataTable.Filters` (a multi-select per column with `meta.filter`, its values fixed
+  or read off the rows), then `ViewOptions` — the one toolbar, on every list. Never
+  hand-write a list page's columns, a second search box or a filter of your own;
+  a column that is genuinely special (the staff roster's) still opts into the same
+  toolbar through `enableGlobalFilter` and `meta.filter`.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -398,9 +429,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   existing only while the membership does), distinct from a contact and an auth user.
   **The graph is also drawn whole**: `/graph` (feature `graph`, `src/lib/server/crm/graph.ts`
   - `src/lib/components/relationship-graph/`; docs/relationships.md, "The graph page") is
-    an Obsidian-style force-directed map of every record that stands in a relationship,
-    named through the same namers as the card (so the gate applies node by node), its
-    legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
+    an Obsidian-style force-directed map of every record the reader may open — one in no
+    relationship yet is a dot of its own that still opens its page — over the
+    relationships between them, named through each kind's own list module (so the gate
+    applies kind by kind, and a member is on the map only where a relationship names
+    one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
     people who work here) and its edges labelled by their types. Nothing per industry is
     stored for it; a kind or a type joins the map by existing.
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
@@ -426,22 +459,26 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   is named by the industry ("Schedule" / "appointment" in a practice).
 - **A task has a column AND a finishing time, and a trigger holds them together**
   (`task_board` migration + `src/lib/crm/tasks.ts` + `src/routes/(app)/tasks/`).
-  `tasks.status` (`task_status`: todo / in_progress / blocked / done) says WHERE the
-  task sits; `completed_at` says WHEN it was finished. They are not two ways to say
-  the same thing, and `private.tasks_sync_completion()` keeps the one relationship
-  between them — `status = 'done'` exactly when the timestamp is set — so the board
-  writes `status`, the checkbox writes `completed_at`, and neither knows the other
-  column exists. An enum rather than rows, unlike `pipeline_stages`: "not started,
-  underway, stuck, finished" is the same four states in every vertical, and what a
-  task is CALLED is already the industry's through the feature's terms. There is no
-  `cancelled` state on purpose — it would be a second closed state and the timestamp
-  can only be honest about one. **The board groups those statuses rather than adding
-  to them**: `TASK_STATUS_GROUPS` (`src/lib/crm/tones.ts`) is the columns — To do,
-  In progress (holding `in_progress` AND `blocked`), Done — and a group is a way of
-  reading the wall, never a value written to a row, so a drop on a grouped column
-  asks which status it meant and a card wears its own status on its eyebrow. Adding
-  a column means grouping differently; adding a _status_ is a migration and a change
-  to the four states above. **The page is not a table**: a `Kanban` board by status
+  `tasks.status` (`task_status`: todo / in_progress / blocked / in_review / done)
+  says WHERE the task sits; `completed_at` says WHEN it was finished. They are not
+  two ways to say the same thing, and `private.tasks_sync_completion()` keeps the one
+  relationship between them — `status = 'done'` exactly when the timestamp is set —
+  so the board writes `status`, the checkbox writes `completed_at`, and neither knows
+  the other column exists. An enum rather than rows, unlike `pipeline_stages`: "not
+  started, underway, stuck, waiting on a reader, finished" is the same shape of day
+  in every vertical, and what a task is CALLED is already the industry's through the
+  feature's terms. There is no `cancelled` state on purpose — it would be a second
+  closed state and the timestamp can only be honest about one. **The board groups
+  those statuses rather than adding to them**: `TASK_STATUS_GROUPS`
+  (`src/lib/crm/tones.ts`) is the columns — To do, In progress (holding
+  `in_progress` AND `blocked`), In review, Done — and a group is a way of reading the
+  wall, never a value written to a row, so a drop on a grouped column asks which
+  status it meant and a card wears its own status on its eyebrow. Adding a column
+  means grouping differently; adding a _status_ is a migration and a change to the
+  states above — `in_review` is the one that earned it (`task_in_review` migration):
+  a task nobody is working on and nobody has finished had been parked in `blocked`,
+  which says it is stuck when it is only waiting. **The page is not a table**: a
+  `Kanban` board by status
   group and a `GroupList` by due-date bucket, the choice remembered per device
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
   and the checkbox alike, and `schedule` / `prioritize` / `assign` / `unassign`
@@ -616,7 +653,9 @@ builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
 plans page, whose one field is a multi-select; the calendar, whose booking form is
 two instants behind wall-clock inputs, an all-day switch that changes what they mean,
-a colour and a record — docs/calendar.md) keeps its own form and says why.
+a colour and a record — docs/calendar.md; the task modal at `(app)/tasks/`, which
+writes the row and its `assigned_to` relationships in one post and links a party
+from one picker — docs/tasks.md, "The task modal") keeps its own form and says why.
 
 ## Data loading & invalidation
 
@@ -866,8 +905,10 @@ rendered only when the load says `canCreate`. See "Creating a record is one form
 
 `DataTable.Content` already draws its own bordered, rounded frame around the rows, so wrapping
 one in `ui/card` stacks two borders around the same table and buys nothing. **A list page is the
-page heading, then the toolbar, then the table** — `/clients`, `/deals`, `/tickets`, `/tasks` and
-`/staff` are all built that way, and a new one copies them. (The `/components` showcase is not an
+page heading, then the toolbar, then the table** — `/companies`, `/deals`, `/tickets` and
+`/staff` are all built that way, and a new one copies them. The toolbar is `DataTable.Toolbar`
+(`Search`, `Filters`, `ViewOptions`), and on a list of records its contents come from the
+list's fields (docs/lists.md); never a bare `<div class="flex">` with an `Input` in it. (The `/components` showcase is not an
 exception to fix: there the card is the demo frame around a primitive, not a page layout.)
 
 Cards still earn their place around everything that is _not_ the table: a form, and the summary
