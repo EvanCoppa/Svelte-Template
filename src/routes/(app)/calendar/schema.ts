@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BADGE_TONES } from '$lib/components/ui/badge/badge-tones.js';
-import { RECORD_KINDS, type RecordKind } from '$lib/crm/records';
+import { recordRefField } from '$lib/schemas/record-ref';
 
 /**
  * The calendar page's four forms. An event is not a row of strings the
@@ -43,30 +43,10 @@ const description = z
 const memberId = z.guid().or(z.literal('')).default('');
 
 /**
- * The record an event is for, as the picker posts it: `<kind>:<id>`, or
- * blank for none. One field rather than two so a half-set pair can never
- * reach the database's `entity_link_complete` check.
+ * The record an event is for, as the picker posts it: `<kind>:<id>` or blank
+ * (`$lib/schemas/record-ref`, shared with the task modal).
  */
-const record = z
-	.string()
-	.trim()
-	.default('')
-	.refine((value) => value === '' || parseRecordRef(value) !== null, {
-		error: 'Pick a record from the list.'
-	});
-
-/** The two halves of a posted `record`, or null when it is not one. */
-export function parseRecordRef(value: string): { kind: RecordKind; id: string } | null {
-	const [kind, id, ...rest] = value.split(':');
-	if (rest.length > 0 || !id) return null;
-	const known = RECORD_KINDS.find((candidate) => candidate === kind);
-	return known && z.guid().safeParse(id).success ? { kind: known, id } : null;
-}
-
-/** What the picker posts for a record: the inverse of `parseRecordRef()`. */
-export function recordRef(kind: RecordKind, id: string): string {
-	return `${kind}:${id}`;
-}
+const record = recordRefField;
 
 const fields = {
 	/** Blank on a booking; the event being edited otherwise. One value type for both forms. */
@@ -105,9 +85,6 @@ export const moveEventSchema = z
 export const deleteEventSchema = z.object({ id: z.guid() });
 
 export type EventFormValues = z.infer<typeof createEventSchema>;
-
-/** A record the picker offers: what it is, which one, and what it is called. */
-export type LinkableRecord = { kind: RecordKind; id: string; name: string };
 
 /** One member the assignee picker offers. */
 export type Assignee = { userId: string; name: string };
