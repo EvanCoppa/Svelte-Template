@@ -3,6 +3,7 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 	import * as Detail from '$lib/components/detail/index.js';
 	import * as Note from '$lib/components/note/index.js';
 	import { CopyButton } from '$lib/components/enhanced/index.js';
@@ -182,6 +183,14 @@
 							The records this {terms.noun} is linked to — who holds it, where it came from, who it refers
 							to.
 						</Card.Description>
+						{#if data.graphHref}
+							<Card.Action>
+								<Button variant="outline" size="sm" href={data.graphHref}>
+									<WaypointsIcon />
+									Open in graph
+								</Button>
+							</Card.Action>
+						{/if}
 					</Card.Header>
 					<Card.Content>
 						<ul class="divide-border divide-y">
