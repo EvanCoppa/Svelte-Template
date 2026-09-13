@@ -32,7 +32,8 @@ const MEMBER_ID = '00000000-0000-0000-0000-000000000001';
 const TERMS = {
 	data: [
 		{ id: 'proposal_presenter', label: 'Presenter', industry_terms: [] },
-		{ id: 'proposal_responsible', label: 'Responsible', industry_terms: [] }
+		{ id: 'proposal_responsible', label: 'Responsible', industry_terms: [] },
+		{ id: 'graph_member', label: 'Staff', industry_terms: [] }
 	]
 };
 

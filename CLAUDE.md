@@ -232,8 +232,8 @@ application data is scoped to an organization, never to a bare user. The
   builder. The page draws `ViewRow`s and `MapPin`s the server described
   (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
   generic `CreateRecord` pre-filled from the filter. The map is `MapView`
-  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
-  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  (`src/lib/components/map-view/`, MapLibre GL) over the style URLs hardcoded in
+  `src/lib/map.ts` (the CSP derives their origins like Supabase's), and coordinates
   come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
   record page's address form saves. Per-org saved views are a later phase and
   reuse the same filter shape.
@@ -396,6 +396,13 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   that would have to pick a kind (`owner_id`: a contact or a company?).
   `'member'` is the kind for someone who works here (keyed by `organization_members.user_id`,
   existing only while the membership does), distinct from a contact and an auth user.
+  **The graph is also drawn whole**: `/graph` (feature `graph`, `src/lib/server/crm/graph.ts`
+  - `src/lib/components/relationship-graph/`; docs/relationships.md, "The graph page") is
+    an Obsidian-style force-directed map of every record that stands in a relationship,
+    named through the same namers as the card (so the gate applies node by node), its
+    legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
+    people who work here) and its edges labelled by their types. Nothing per industry is
+    stored for it; a kind or a type joins the map by existing.
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
   name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
   a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).
@@ -428,11 +435,20 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   underway, stuck, finished" is the same four states in every vertical, and what a
   task is CALLED is already the industry's through the feature's terms. There is no
   `cancelled` state on purpose — it would be a second closed state and the timestamp
-  can only be honest about one. **The page is not a table**: a `Kanban` board by
-  status and a `GroupList` by due-date bucket, the choice remembered per device
+  can only be honest about one. **The board groups those statuses rather than adding
+  to them**: `TASK_STATUS_GROUPS` (`src/lib/crm/tones.ts`) is the columns — To do,
+  In progress (holding `in_progress` AND `blocked`), Done — and a group is a way of
+  reading the wall, never a value written to a row, so a drop on a grouped column
+  asks which status it meant and a card wears its own status on its eyebrow. Adding
+  a column means grouping differently; adding a _status_ is a migration and a change
+  to the four states above. **The page is not a table**: a `Kanban` board by status
+  group and a `GroupList` by due-date bucket, the choice remembered per device
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
-  and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
-  for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
+  and the checkbox alike, and `schedule` / `prioritize` / `assign` / `unassign`
+  behind the chips and the menus a card carries — every one a form action posted
+  through a hidden form, never a `fetch`. Bucketing is pure and local
+  (`taskBucket()`, `dueLabel()`) for the reason the calendar's dates are: "overdue"
+  and "today" are wall-clock words.
 - **An invoice is a document and the ledger is the account it lands on** (`ledger`
   migration + `src/lib/server/crm/invoices.ts`, `payments.ts`, `ledger.ts` + the pure
   fold in `src/lib/crm/ledger.ts` + `src/routes/(app)/invoices/`, `(app)/ledger/`;
@@ -557,7 +573,7 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
 /settings/profile are the reference implementations.
 
-### Creating a record is one form, not one per page
+### Creating and editing a record is one form, not one per page
 
 Adding a row of any kind goes through the **generic record form**: the registry in
 `src/lib/schemas/records.ts` (the feature that owns each kind of object — whose terms
@@ -573,15 +589,28 @@ return { companies: …, ...(await loadCreateRecord(locals, 'company')) };
 export const actions: Actions = { create: (event) => createRecord(event, 'company') };
 ```
 
+**The record page edits with the same form.** `loadEditRecord()` fills it in from the
+row and `updateRecord()` saves it, behind the `EditRecord` button on the generic record
+page — so a kind is described once and is creatable, editable and validated the same
+way, and `writeRecord()` is one switch for both (a blank field therefore means the
+column's empty value on both paths, never "leave it as it was", or clearing one would
+silently do nothing). **A deal's stage is a field in that list**, which is how a deal
+moves down the funnel. An invoice is the exception and says why: it is a document with
+a lifecycle — draft, issue, void — that its own record-page actions own
+(`billing.server.ts`), so it is not an `EditableRecordType`.
+
 Every field posts a **string** — that is what lets one component render them all — and
-the server's insert switch is the one place strings become columns (blank → null, an
+`writeRecord()` is the one place strings become columns (blank → null, an
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
-schema so the enum unions come back without a cast). A record that points at a party
-(an invoice's customer) uses the `company` / `contact` **picker field types**: still a
+schema so the enum unions come back without a cast), with `recordFormValues()` its
+mirror on the way back into the form. A record that points at another row — an
+invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
+field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
-one `case` in that switch; never a second create modal, action or field-rendering loop. A screen whose creation is genuinely special
+one `case` in each of those two functions; never a second create or edit modal, action
+or field-rendering loop (the inputs are `RecordFields`, once, for both frames). A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
@@ -785,12 +814,22 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
   the reference.
 - **A board is `Kanban`** (`src/lib/components/kanban/`), the app-level compound for "cards in
-  columns you can move one between": `Kanban.Root` owns the drag state, `Kanban.Column` registers
-  its own drop zone, `Kanban.Card` is the draggable shell with a real handle button on it. The page
-  owns the columns, the cards and what a move means — the board hands back a card id and the
-  column it was released over, and nothing else. Moving works from the keyboard as well as under a
-  pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
-  `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
+  columns you can move one between", and it has **two axes**: a `Kanban.Column` is a **status
+  group** — the coarse state a reader scans for — and the `statuses` it declares are the states a
+  record is actually in. A column holding one status takes a release straight away; a column
+  holding several shows `Kanban.Zones` (a `Kanban.DropZone` each) in place of its `Kanban.Cards`
+  while a card is over it, and asks which. **A group is never a state**: `onmove` is always called
+  with a status, because a group is a way of reading the board and not something a record can be
+  stored as. `Kanban.Root` owns the drag state and draws the card under the pointer (from the
+  lifted card's own snippet, so a column that splits cannot unmount what you are carrying) and
+  freezes the board's height for the length of the drag; `Kanban.Card` is the draggable shell with
+  a real handle button on it, and `Kanban.CardHeader` / `CardTitle` / `CardFooter` / `Ring` are
+  the regions every card has. The page owns the groups, the statuses, the cards and what a move
+  means — the board hands back a card id and the status it was released over, and nothing else.
+  Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
+  status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
+  and never leave a status the arrows cannot reach. `/tasks` is the worked example and
+  `/components` → Boards & grouped lists the reference.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and

@@ -9,6 +9,7 @@ import {
 	type RecordKind,
 	type RecordSegment
 } from '$lib/crm/records';
+import { graphNodeId } from '$lib/crm/graph';
 import { passesFeatureGate } from '$lib/features/gate';
 import { visibleTerms } from '$lib/features/terms';
 import { QUERY } from '$lib/queries';
@@ -35,6 +36,7 @@ import {
 	updateTaskComment
 } from '$lib/server/crm/task-comments';
 import { noteAccess } from '$lib/server/notes';
+import { isEditableRecordType, loadEditRecord, updateRecord } from '$lib/server/records';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
 import { geocode } from '$lib/server/geocode';
@@ -63,11 +65,14 @@ import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-co
  * `src/routes/(app)/<kind>/[id]/`; a static segment outranks `[kind=record]`,
  * so the specific page takes over and this one stays the default for the rest.
  *
- * The one thing edited here is a party's addresses — the form below, whose
- * action geocodes what it saves so the record can sit on a view's map. An
- * invoice's lines and payments are the other: `billing.server.ts` keeps
- * that block's reads and actions, and the page draws it whenever the load
- * supplies `billing` — a data-presence check like the thread's.
+ * The record's own fields are edited here, through the generic form the list
+ * pages create with — the registry describes a kind once and `EditRecord`
+ * renders it, so a deal's stage moves from the same place a deal is named
+ * (`$lib/server/records.ts`). Everything hanging off the record has its own
+ * form beside it: a party's addresses, whose action geocodes what it saves so
+ * the record can sit on a view's map, and an invoice's lines and payments,
+ * which `billing.server.ts` keeps — the page draws that block whenever the
+ * load supplies `billing`, a data-presence check like the thread's.
  */
 
 /** Explicit form ids, shared by the load, the actions and the page's `superForm`s. */
@@ -179,9 +184,16 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		].filter((userId): userId is string => userId !== null)
 	);
 
-	// The address, image and comment forms, for a record the reader may
-	// manage; the actions refuse everyone else anyway.
+	// The record's own edit form, filled in from the row — for the kinds the
+	// registry can write. An invoice is not one of them: its record page
+	// already edits it through its own lifecycle actions.
+	// The record's own edit form and the address, image and comment forms, in
+	// one round trip — all of them for a reader who may manage the record; the
+	// actions refuse everyone else anyway. `type` travels with the edit form so
+	// the page never has to narrow the kind again: the load is where "this kind
+	// is editable" was decided.
 	const [
+		edit,
 		addressForm,
 		removeAddressForm,
 		imageForm,
@@ -189,6 +201,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		commentForm,
 		removeCommentForm
 	] = await Promise.all([
+		isEditableRecordType(kind)
+			? loadEditRecord(locals, kind, id).then((loaded) => ({ type: kind, ...loaded }))
+			: null,
 		superValidate(zod4(addressSchema), { id: FORM_IDS.address }),
 		superValidate(zod4(removeAddressSchema), { id: FORM_IDS.removeAddress }),
 		superValidate(zod4(imageUploadSchema), { id: FORM_IDS.image }),
@@ -199,6 +214,10 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 
 	return {
 		record,
+		// Null for a kind the generic form cannot write; the page draws the
+		// button on the same data-presence rule the thread and the invoice
+		// block follow.
+		edit,
 		activities,
 		tags,
 		addresses,
@@ -227,6 +246,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// The same shape the shell ships to the dock, so a note behaves the
 		// same here as it does there.
 		notes: notesShown ? { open: notes, ...noteAccess(org, user.id) } : null,
+		// Where this record's relationships are drawn whole — when the graph is
+		// a page this session may open (the same gate the hook applies to /graph).
+		graphHref: passesFeatureGate('/graph', features, canRead)
+			? `/graph?focus=${graphNodeId(kind, id)}`
+			: null,
 		// An invoice's lines and money, with the forms that change them.
 		billing,
 		people,
@@ -273,6 +297,19 @@ function assetOf(locals: App.Locals, params: { kind: RecordSegment; id: string }
 export const actions: Actions = {
 	// The invoice block's nine actions — lines, header, lifecycle, money.
 	...billingActions,
+
+	/**
+	 * The record's own fields, through the same registry, schema and switch
+	 * that create it. Refuses a kind the generic form does not write rather
+	 * than half-saving one, and `updateRecord()` re-checks `manage` itself.
+	 */
+	edit: async (event) => {
+		const kind = recordKindForSegment(event.params.kind);
+		if (!isEditableRecordType(kind)) {
+			throw error(400, 'This kind of record is not edited from this form.');
+		}
+		return updateRecord(event, kind, event.params.id);
+	},
 
 	saveAddress: async ({ request, locals, params }) => {
 		const { supabase, orgId, entity } = partyOf(locals, params);

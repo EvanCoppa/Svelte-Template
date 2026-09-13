@@ -1195,3 +1195,296 @@ insert into public.payments (id, org_id, company_id, contact_id, invoice_id, kin
 		null, now() - interval '8 days', 'Deposit taken at the desk.',
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Merchant services: two orgs in the payment-processor vertical
+-- ---------------------------------------------------------------------------
+-- The merchant_services_industry migration is config only, so this is where
+-- the vertical becomes something you can look at: a pro org with a book, and
+-- a free one so the tier axis has a fixture here too (on `free`, Applications,
+-- Equipment and the Assistant resolve `locked_visible` — an upgrade tease
+-- rather than a missing page).
+--
+-- Keystone is the odd-numbered org, so Evan owns it and dev is a plain member,
+-- matching every other industry pair above.
+
+insert into public.organizations (id, name, tier_id, industry_id) values
+	('10000000-0000-0000-0000-000000000015', 'Keystone Payments', 'pro', 'merchant-services'),
+	('10000000-0000-0000-0000-000000000016', 'Cobalt Merchant Services', 'free', 'merchant-services')
+on conflict (id) do nothing;
+
+insert into public.organization_members (org_id, user_id, role) values
+	-- Keystone Payments (merchant-services)
+	('10000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000003', 'owner'),
+	('10000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000001', 'member'),
+	('10000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000002', 'member'),
+	-- Cobalt Merchant Services (merchant-services)
+	('10000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000001', 'owner'),
+	('10000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000003', 'admin'),
+	('10000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000002', 'member')
+on conflict (org_id, user_id) do nothing;
+
+--   Keystone Payments:         dev = Sales Rep; e2e = Merchant Support
+--   Cobalt Merchant Services:  e2e = Viewer
+-- Sales Rep is the interesting one to sign in as: it manages merchants,
+-- applications and rate proposals but only reads the fee schedule, so
+-- /billables opens read-only and its "Add fee" button is not rendered.
+insert into public.member_roles (org_id, user_id, role_id) values
+	('10000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000001',
+		'b0000000-0000-0000-0007-000000000002'),
+	('10000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0007-000000000003'),
+	('10000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000002',
+		'b0000000-0000-0000-0007-000000000001')
+on conflict (org_id, user_id, role_id) do nothing;
+
+-- The boarding funnel — the ten stages a real ISO named in its build brief
+-- (docs/discovery/gsp-brief-gap-analysis.md), not a funnel we invented. Every
+-- org is born with the generic "Sales" board (`create_default_pipeline`,
+-- called by a trigger), which is the wrong six words for this vertical, so
+-- the board is renamed and its stages replaced with the walk from a cold call
+-- to a merchant's first batch. This is the point of pipelines being rows: the
+-- funnel is data, and it is the customer's — but it is per-ORG data, which is
+-- why it lives here rather than in the industry's migration, and why a real
+-- org onboarded tomorrow still starts on the generic board.
+update public.pipelines
+set name = 'Merchant boarding',
+	description = 'Cold lead to first batch.'
+where org_id in ('10000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000016')
+	and is_default;
+
+--
+-- An UPSERT, not an insert: the trigger's board already contains 'Lost', so
+-- conflict-skipping would leave it wherever the generic board put it — at 60,
+-- colliding with 'Approved'. The stage's position and outcome are what this
+-- fixture is asserting, so they are what the conflict updates.
+insert into public.pipeline_stages (org_id, pipeline_id, name, sort_order, outcome, probability)
+select p.org_id, p.id, s.name, s.sort_order, s.outcome::public.stage_outcome, s.probability
+from (values
+	('10000000-0000-0000-0000-000000000015'::uuid), ('10000000-0000-0000-0000-000000000016')
+) as o (org_id)
+join public.pipelines p on p.org_id = o.org_id and p.is_default
+cross join (values
+	('Prospect', 10, 'open', 5),
+	('Contacted', 20, 'open', 10),
+	('Waiting on Statements', 30, 'open', 20),
+	('Presentation Scheduled', 40, 'open', 35),
+	('Proposal Sent', 50, 'open', 50),
+	('Application Sent', 60, 'open', 70),
+	('Underwriting', 70, 'open', 80),
+	('Approved', 80, 'open', 90),
+	('Installed / Live', 90, 'won', 100),
+	('Lost', 100, 'lost', 0)
+) as s (name, sort_order, outcome, probability)
+on conflict (pipeline_id, name) do update
+	set sort_order = excluded.sort_order,
+		outcome = excluded.outcome,
+		probability = excluded.probability;
+
+-- The six stages the trigger made, now that the ten above have replaced
+-- them. Guarded on nothing referencing them, so a re-run (where the deals
+-- below already point at the new stages) deletes nothing and errors on
+-- nothing.
+delete from public.pipeline_stages s
+where s.org_id in ('10000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000016')
+	and s.name not in ('Prospect', 'Contacted', 'Waiting on Statements',
+		'Presentation Scheduled', 'Proposal Sent', 'Application Sent', 'Underwriting',
+		'Approved', 'Installed / Live', 'Lost')
+	and not exists (select 1 from public.deals d where d.stage_id = s.id);
+
+-- MID, MCC, average ticket and current processor — the four things a rep
+-- looks up about a merchant, as custom fields on `company`. They are per-org
+-- working data, not reference data, so every org in the vertical needs its
+-- own set; the migration's closing comment says what it would take to hand
+-- them to a new org automatically.
+--
+-- `mid` and `mcc` are text, not numeric, because both are identifiers whose
+-- leading zeros matter. And `mid` holds ONE value, which is honest only
+-- while a merchant has one MID — a business with three locations wants
+-- merchant accounts as a record kind of their own.
+insert into public.custom_field_definitions (id, org_id, entity_type, key, label, value_type) values
+	('a9000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'company', 'mid', 'MID', 'text'),
+	('a9000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'company', 'mcc', 'MCC', 'text'),
+	('a9000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015',
+		'company', 'average_ticket', 'Average ticket', 'numeric'),
+	('a9000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015',
+		'company', 'current_processor', 'Current processor', 'text'),
+	('a9000000-0000-0000-0007-000000000011', '10000000-0000-0000-0000-000000000016',
+		'company', 'mid', 'MID', 'text'),
+	('a9000000-0000-0000-0007-000000000012', '10000000-0000-0000-0000-000000000016',
+		'company', 'mcc', 'MCC', 'text'),
+	('a9000000-0000-0000-0007-000000000013', '10000000-0000-0000-0000-000000000016',
+		'company', 'average_ticket', 'Average ticket', 'numeric'),
+	('a9000000-0000-0000-0007-000000000014', '10000000-0000-0000-0000-000000000016',
+		'company', 'current_processor', 'Current processor', 'text')
+on conflict (org_id, entity_type, key) do nothing;
+
+-- The book. Deliberately unalike — a smoothie bar, a liquor store, a barber,
+-- a dental group — because "any business that takes money" is the whole
+-- proposition, and a bank that sends referrals is a `partner`, which is what
+-- the Referral partners view reads.
+insert into public.companies (id, org_id, name, email, phone, website, status, relationship, created_by) values
+	('20000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'Sunrise Smoothie Bar', 'maya@sunrisesmoothie.example.com', '+1 555 030 0101',
+		'https://sunrisesmoothie.example.com', 'active', 'customer', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'Harbor Liquor & Fine Wine', 'orders@harborliquor.example.com', '+1 555 030 0102',
+		null, 'active', 'customer', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015',
+		'Cedar Street Barbers', 'hello@cedarbarbers.example.com', '+1 555 030 0103',
+		null, 'prospect', 'customer', '00000000-0000-0000-0000-000000000001'),
+	('20000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015',
+		'Ironwood Dental Group', 'office@ironwooddental.example.com', null,
+		null, 'lead', 'customer', '00000000-0000-0000-0000-000000000001'),
+	('20000000-0000-0000-0007-000000000005', '10000000-0000-0000-0000-000000000015',
+		'Gulfshore Community Bank', 'referrals@gulfshorebank.example.com', '+1 555 030 0105',
+		'https://gulfshorebank.example.com', 'active', 'partner', '00000000-0000-0000-0000-000000000003'),
+	('20000000-0000-0000-0007-000000000006', '10000000-0000-0000-0000-000000000016',
+		'Lakefront Deli', 'deli@lakefront.example.com', '+1 555 030 0106',
+		null, 'active', 'customer', '00000000-0000-0000-0000-000000000001'),
+	('20000000-0000-0000-0007-000000000007', '10000000-0000-0000-0000-000000000016',
+		'Northgate Auto Spa', null, '+1 555 030 0107',
+		null, 'lead', 'customer', '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+-- Two boarded merchants carry all four fields; the prospect carries only the
+-- processor it is being taken from, because it has no MID yet. That asymmetry
+-- is the fixture: it is what the top of the funnel actually looks like.
+insert into public.custom_field_values (org_id, entity_type, entity_id, field_definition_id, value_text, value_numeric)
+values
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
+		'a9000000-0000-0000-0007-000000000001', '519000012345678', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
+		'a9000000-0000-0000-0007-000000000002', '5812', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
+		'a9000000-0000-0000-0007-000000000003', null, 9.40),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000001',
+		'a9000000-0000-0000-0007-000000000004', 'Square', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
+		'a9000000-0000-0000-0007-000000000001', '519000098765432', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
+		'a9000000-0000-0000-0007-000000000002', '5921', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
+		'a9000000-0000-0000-0007-000000000003', null, 42.15),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000002',
+		'a9000000-0000-0000-0007-000000000004', 'Heartland', null),
+	('10000000-0000-0000-0000-000000000015', 'company', '20000000-0000-0000-0007-000000000003',
+		'a9000000-0000-0000-0007-000000000004', 'Toast', null),
+	('10000000-0000-0000-0000-000000000016', 'company', '20000000-0000-0000-0007-000000000006',
+		'a9000000-0000-0000-0007-000000000011', '442000011223344', null),
+	('10000000-0000-0000-0000-000000000016', 'company', '20000000-0000-0000-0007-000000000006',
+		'a9000000-0000-0000-0007-000000000013', null, 16.80)
+on conflict (entity_type, entity_id, field_definition_id) do nothing;
+
+-- Where they are, so the Merchant map opens on pins rather than an empty map
+-- (the same shape Bright Smile's patient map uses).
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
+	('32000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015', 'company',
+		'20000000-0000-0000-0007-000000000001', 'primary', '418 Bayshore Blvd', 'Tampa', 'FL', '33606', 'US', 27.9284, -82.4847, true),
+	('32000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015', 'company',
+		'20000000-0000-0000-0007-000000000002', 'primary', '1207 E 7th Ave', 'Tampa', 'FL', '33605', 'US', 27.9601, -82.4407, true),
+	('32000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015', 'company',
+		'20000000-0000-0000-0007-000000000003', 'primary', '3310 S Dale Mabry Hwy', 'Tampa', 'FL', '33629', 'US', 27.9126, -82.5062, true),
+	('32000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015', 'company',
+		'20000000-0000-0000-0007-000000000004', 'primary', '705 W Kennedy Blvd', 'Tampa', 'FL', '33606', 'US', 27.9450, -82.4703, true),
+	('32000000-0000-0000-0007-000000000005', '10000000-0000-0000-0000-000000000015', 'company',
+		'20000000-0000-0000-0007-000000000005', 'primary', '100 N Ashley Dr', 'Tampa', 'FL', '33602', 'US', 27.9481, -82.4590, true)
+on conflict (id) do nothing;
+
+insert into public.contacts (id, org_id, company_id, name, email, phone, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'20000000-0000-0000-0007-000000000001', 'Maya Ortiz', 'maya@sunrisesmoothie.example.com',
+		'+1 555 030 0201', 'Owner', true, 'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'20000000-0000-0000-0007-000000000002', 'Dev Rao', 'dev@harborliquor.example.com',
+		'+1 555 030 0202', 'Owner', true, 'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015',
+		'20000000-0000-0000-0007-000000000005', 'Rachel Kim', 'rachel.kim@gulfshorebank.example.com',
+		null, 'VP, Business Banking', true, 'active', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- The fee schedule. Every row here is a FIXED price per unit, which is what
+-- `billables.unit_price` holds — so the monthly, per-item and incident fees
+-- fit exactly. The discount rate itself (25 basis points over interchange)
+-- does NOT: it is a percentage of volume, and there is no column for that.
+-- A rate proposal built from these prices is therefore the fixed half of the
+-- quote today, which is worth knowing before it is demoed.
+insert into public.billables (id, org_id, code, name, unit_price, unit, unit_choices, is_featured, created_by) values
+	('c1000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'AUTH', 'Authorization fee', 0.10, 'transaction', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'STMT', 'Monthly service fee', 9.95, 'month', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015',
+		'PCI', 'PCI compliance', 99.00, 'year', null, true, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015',
+		'GTWY', 'Gateway access', 14.95, 'month', null, false, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0007-000000000005', '10000000-0000-0000-0000-000000000015',
+		'CHGB', 'Chargeback fee', 25.00, 'chargeback', null, false, '00000000-0000-0000-0000-000000000003'),
+	('c1000000-0000-0000-0007-000000000006', '10000000-0000-0000-0000-000000000015',
+		'BATCH', 'Batch settlement', 0.15, 'batch', null, false, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- "Quick options": the bundles a rep picks from instead of assembling a
+-- proposal fee by fee.
+insert into public.quick_plans (id, org_id, name, sort_order, created_by) values
+	('c2000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'Retail — interchange plus', 10, '00000000-0000-0000-0000-000000000003'),
+	('c2000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'E-commerce — gateway included', 20, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.quick_plan_billables (quick_plan_id, billable_id, org_id, sort_order) values
+	('c2000000-0000-0000-0007-000000000001', 'c1000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015', 10),
+	('c2000000-0000-0000-0007-000000000001', 'c1000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015', 20),
+	('c2000000-0000-0000-0007-000000000001', 'c1000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015', 30),
+	('c2000000-0000-0000-0007-000000000001', 'c1000000-0000-0000-0007-000000000006', '10000000-0000-0000-0000-000000000015', 40),
+	('c2000000-0000-0000-0007-000000000002', 'c1000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015', 10),
+	('c2000000-0000-0000-0007-000000000002', 'c1000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015', 20),
+	('c2000000-0000-0000-0007-000000000002', 'c1000000-0000-0000-0007-000000000003', '10000000-0000-0000-0000-000000000015', 30),
+	('c2000000-0000-0000-0007-000000000002', 'c1000000-0000-0000-0007-000000000004', '10000000-0000-0000-0000-000000000015', 40),
+	('c2000000-0000-0000-0007-000000000002', 'c1000000-0000-0000-0007-000000000005', '10000000-0000-0000-0000-000000000015', 50)
+on conflict (quick_plan_id, billable_id) do nothing;
+
+-- Two applications in flight, at different stages of the board above.
+insert into public.deals (id, org_id, company_id, contact_id, title, amount, pipeline_id, stage_id, assigned_to, created_by)
+select
+	d.id::uuid, d.org_id::uuid, d.company_id::uuid, d.contact_id::uuid, d.title, d.amount::numeric,
+	p.id, s.id, d.assigned_to::uuid, d.created_by::uuid
+from (values
+	('40000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'20000000-0000-0000-0007-000000000001', '30000000-0000-0000-0007-000000000001',
+		'Sunrise Smoothie Bar — retail IC+', 1800.00, 'Underwriting',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003'),
+	('40000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'20000000-0000-0000-0007-000000000003', null,
+		'Cedar Street Barbers — flat rate', 640.00, 'Proposal Sent',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001')
+) as d (id, org_id, company_id, contact_id, title, amount, stage_name, assigned_to, created_by)
+join public.pipelines p on p.org_id = d.org_id::uuid and p.is_default
+join public.pipeline_stages s on s.pipeline_id = p.id and s.name = d.stage_name
+on conflict (id) do nothing;
+
+-- Terminals: the specific unit on a specific counter. What it IS lives here;
+-- where it is is a relationship, never a column on the asset (the assets
+-- migration's rule).
+insert into public.assets (id, org_id, name, asset_type, identifier, status, acquired_on, purchase_price, created_by) values
+	('f1000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'PAX A920 Pro', 'terminal', 'SN-A920-44817', 'active', current_date - 90, 299.00,
+		'00000000-0000-0000-0000-000000000003'),
+	('f1000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'Dejavoo QD3', 'terminal', 'SN-QD3-10229', 'active', current_date - 30, 219.00,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	('f4000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015',
+		'f0000000-0000-0000-0000-000000000018', 'asset', 'f1000000-0000-0000-0007-000000000001',
+		'company', '20000000-0000-0000-0007-000000000001', current_date - 88,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0007-000000000002', '10000000-0000-0000-0000-000000000015',
+		'f0000000-0000-0000-0000-000000000018', 'asset', 'f1000000-0000-0000-0007-000000000002',
+		'company', '20000000-0000-0000-0007-000000000002', current_date - 28,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;

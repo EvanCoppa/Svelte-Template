@@ -60,17 +60,7 @@
 	</PageHeader.Root>
 
 	{#if layout === 'map'}
-		{#if data.map === null}
-			<Empty.Root class="border">
-				<Empty.Header>
-					<Empty.Title>The map is not configured</Empty.Title>
-					<Empty.Description>
-						Set PUBLIC_MAP_STYLE_URL to a MapLibre style and the {terms.plural} with an address will be
-						drawn here.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{:else if data.pins.length === 0}
+		{#if data.pins.length === 0}
 			<Empty.Root class="border">
 				<Empty.Header>
 					<Empty.Title>No addresses to map yet</Empty.Title>

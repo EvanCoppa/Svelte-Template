@@ -39,7 +39,11 @@ const STAMPS = {
 const openAll = () => true;
 const openNone = () => false;
 /** A dental practice's words for the two people on a proposal. */
-const VOCABULARY = { proposal_presenter: 'Presenter', proposal_responsible: 'Provider' };
+const VOCABULARY = {
+	proposal_presenter: 'Presenter',
+	proposal_responsible: 'Provider',
+	graph_member: 'Staff'
+};
 
 const wayne: CompanyWithContacts = {
 	id: COMPANY_ID,

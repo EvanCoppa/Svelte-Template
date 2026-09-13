@@ -118,20 +118,28 @@ on conflict (tier_id, feature_id) do nothing;
 -- Two derivations in earlier migrations state an invariant rather than a list:
 -- whoever may read a view's source may read the view, and whoever may keep the
 -- catalog may keep the register. Both ran before the Estimator and before
--- homeowner-map existed, so both are re-run here — the same statements,
--- verbatim — rather than hand-listing what they would have produced. That is
--- what keeps "a role added later cannot silently miss it" true of a role and a
--- view added later.
+-- homeowner-map existed, so both are re-run here rather than hand-listing what
+-- they would have produced. That is what keeps "a role added later cannot
+-- silently miss it" true of a role and a view added later.
+--
+-- Joined to `roles` on this industry, which the originals had no need to do:
+-- they ran when they were the newest thing in the file. Re-running them
+-- unscoped now would hand every other vertical's specialists grants on views
+-- outside their industry — inert, since the resolver hides a feature before
+-- any grant is consulted, but not this migration's business. Both new rows
+-- (the Estimator, homeowner-map) are roofing's, so roofing is the whole scope.
 insert into public.role_permissions (role_id, feature_id, level)
 select rp.role_id, v.id, 'read'::public.permission_level
 from public.views v
 join public.role_permissions rp
 	on rp.feature_id = case v.source when 'company' then 'companies' when 'contact' then 'contacts' end
+join public.roles r on r.id = rp.role_id and r.industry_id = 'roofing'
 on conflict (role_id, feature_id) do nothing;
 
 insert into public.role_permissions (role_id, feature_id, level)
 select rp.role_id, 'assets', rp.level
 from public.role_permissions rp
+join public.roles r on r.id = rp.role_id and r.industry_id = 'roofing'
 where rp.feature_id = 'products'
 on conflict (role_id, feature_id) do nothing;
 
