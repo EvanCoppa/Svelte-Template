@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	RECORD_FORMS,
+	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
 	RECORD_TYPES,
 	companyRecordSchema,
@@ -9,6 +10,10 @@ import {
 	taskRecordSchema,
 	type RecordField
 } from './records';
+
+function isPickerKind(type: RecordField['type']): type is (typeof RECORD_PICKER_KINDS)[number] {
+	return RECORD_PICKER_KINDS.some((kind) => kind === type);
+}
 
 function messagesOf(result: { error?: { issues: { message: string }[] } }) {
 	return result.error?.issues.map((issue) => issue.message).join(' ') ?? '';
@@ -27,6 +32,7 @@ function sampleFor(field: RecordField): string {
 			return '30';
 		case 'company':
 		case 'contact':
+		case 'stage':
 			return '20000000-0000-0000-0000-000000000001';
 		case 'date':
 			return '2026-09-10';
@@ -56,11 +62,12 @@ describe('the record registry', () => {
 		}
 	});
 
-	it('names a picker kind only on the fields that pick a party', () => {
+	it('names a picker field after the kind of row it picks', () => {
 		for (const type of RECORD_TYPES) {
 			for (const field of RECORD_FORMS[type].fields) {
-				if (field.type !== 'company' && field.type !== 'contact') continue;
-				// The picker's column is the party's id, named after the kind it picks.
+				if (!isPickerKind(field.type)) continue;
+				// The picker's column is the id of the row it points at, named
+				// after the kind: `company_id`, `contact_id`, `stage_id`.
 				expect(field.name).toBe(`${field.type}_id`);
 			}
 		}
