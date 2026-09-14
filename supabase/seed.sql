@@ -460,13 +460,63 @@ insert into public.ticket_comments (id, org_id, ticket_id, author_id, body, is_i
 		'Reproduced on staging; looks like the PDF service credential expired.', true)
 on conflict (id) do nothing;
 
-insert into public.notifications (id, org_id, user_id, type, title, body, link) values
+-- The bell's inbox (notification_inbox migration). One stream each for all
+-- three Acme members, so the panel has something to draw whoever you sign in
+-- as, and between them every state it can render: an ask with a button, a
+-- plain unread, a read row, an actor-less system notice, the General stream
+-- and one already put away. Times are relative to the reset, which is what
+-- makes "36 minutes ago" read as it will in the app.
+insert into public.notifications
+	(id, org_id, user_id, actor_id, channel, type, title, body, context, link,
+		action_label, created_at, read_at, archived_at) values
+	-- e2e@example.com
 	('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
-		'00000000-0000-0000-0000-000000000002', 'ticket_assigned', 'Ticket assigned to you',
-		'Cannot export invoices (high priority)', '/tickets'),
+		'00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003',
+		'inbox', 'ticket_assigned', 'assigned you a ticket',
+		'Cannot export invoices (high priority)', 'Support', '/tickets',
+		'Review', now() - interval '36 minutes', null, null),
+	('90000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001',
+		'inbox', 'mention', 'mentioned you on Acme Inc', null, 'Companies',
+		'/companies', null, now() - interval '3 hours', null, null),
+	('90000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000002', null,
+		'general', 'feature_changed', 'Proposals were switched on for this organization',
+		null, 'Features', '/settings/features', null,
+		now() - interval '2 days', now() - interval '2 days', null),
+	-- dev@example.com
 	('90000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
-		'00000000-0000-0000-0000-000000000001', 'task_assigned', 'New task from Evan Coppa',
-		'Send renewal quote', '/tasks')
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003',
+		'inbox', 'task_assigned', 'assigned you a task', 'Send renewal quote', 'Tasks',
+		'/tasks', 'Open', now() - interval '2 hours', null, null),
+	('90000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002',
+		'general', 'deal_won', 'moved Website redesign to Won', null, 'Deals',
+		'/deals', null, now() - interval '5 hours', null, null),
+	('90000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001', null,
+		'inbox', 'invoice_overdue', 'Invoice INV-1002 is past its due date', null,
+		'Ledger', '/ledger', null, now() - interval '4 days',
+		now() - interval '3 days', now() - interval '3 days'),
+	-- evancoppa@gmail.com
+	('90000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'inbox', 'approval_requested', 'asked you to approve a $12,500 discount',
+		'Northwind roof replacement', 'Proposals', '/proposals', 'Review',
+		now() - interval '22 minutes', null, null),
+	('90000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002',
+		'inbox', 'comment', 'commented on Cannot export invoices', null, 'Support',
+		'/tickets', null, now() - interval '90 minutes', null, null),
+	('90000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001',
+		'general', 'event_booked', 'booked Quarterly review for Thursday', null,
+		'Calendar', '/calendar', null, now() - interval '6 hours', null, null),
+	('90000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000003', null,
+		'general', 'seat_limit', 'This organization is one seat from its plan limit',
+		null, 'Billing', '/settings/features', null,
+		now() - interval '3 days', now() - interval '3 days', null)
 on conflict (id) do nothing;
 
 -- Catalog fixtures: a two-level category tree, a stocked good and a service,

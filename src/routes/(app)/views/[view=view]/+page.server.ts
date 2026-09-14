@@ -8,7 +8,12 @@ import { resultIds } from '$lib/server/crm/lists';
 import { pinsFor, runView } from '$lib/server/crm/views';
 import { loadViewRegistry } from '$lib/server/features';
 import { loadList } from '$lib/server/lists';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
 import { hasGrant } from '$lib/server/roles';
 import { defaultsFor, resolveView, type ViewDefinition } from '$lib/views/resolve';
 import type { Actions, PageServerLoad } from './$types';
@@ -65,14 +70,17 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		pins: pinsFor(result, canOpen, addresses),
 		// Null when there is no map configured; the map layout says so.
 		map: mapConfig(),
-		...(await loadCreateRecord(locals, view.source, { defaults: defaultsFor(view) }))
+		...(await loadCreateRecord(locals, view.source, { defaults: defaultsFor(view) })),
+		...(await loadDeleteRecord(locals, view.source))
 	};
 };
 
-// The generic create action, for the kind the view lists — re-resolved from
-// the registry, never read from the post. It opens with
-// requirePermission(locals.org.access, <source feature>, 'manage').
+// The generic create and delete actions, for the kind the view lists —
+// re-resolved from the registry, never read from the post. Each opens with
+// requirePermission(locals.org.access, <source feature>, <level>).
 export const actions: Actions = {
 	create: async (event) =>
-		createRecord(event, (await viewFor(event.locals, event.params.view)).source)
+		createRecord(event, (await viewFor(event.locals, event.params.view)).source),
+	deleteRecord: async (event) =>
+		deleteRecord(event, (await viewFor(event.locals, event.params.view)).source)
 };

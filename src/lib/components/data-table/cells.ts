@@ -3,6 +3,7 @@ import { renderComponent } from '@tanstack/svelte-table';
 import { StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
 import ImageCell from './data-table-image-cell.svelte';
 import LinkCell from './data-table-link-cell.svelte';
+import RecordRowActions from './record-row-actions.svelte';
 
 /**
  * Cell renderers shared by list pages, so an enum value looks the same in
@@ -33,4 +34,17 @@ export function linkCell(label: string, href: string) {
  */
 export function imageCell(url: string | null) {
 	return renderComponent(ImageCell, { url });
+}
+
+/**
+ * The row menu a generic list page's `actionsColumn` renders: Open (when
+ * `href` is not null) and Delete (when `canDelete`).
+ */
+export function recordActionsCell(
+	name: string,
+	href: string | null,
+	canDelete: boolean,
+	onDelete: () => void
+) {
+	return renderComponent(RecordRowActions, { name, href, canDelete, onDelete });
 }
