@@ -27,7 +27,7 @@
  * https://docs.cloud.google.com/pubsub/docs/authenticate-push-subscriptions
  * https://developers.google.com/workspace/gmail/api/guides/push
  */
-import { createPublicKey, verify as verifySignature, type JsonWebKey } from 'node:crypto';
+import { createPublicKey, verify as verifySignature, type webcrypto } from 'node:crypto';
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
 import type { Json } from '$lib/database.types';
@@ -74,13 +74,18 @@ export function pushConfig(source: PushEnv = env): PushConfig | null {
 
 export type PushVerification = { ok: true; email: string } | { ok: false; error: string };
 
+/** A public JWK that can be picked out of a set: a JSON Web Key with the `kid` a token names. */
+export interface SigningJwk extends webcrypto.JsonWebKey {
+	kid: string;
+}
+
 export interface PushVerifyDeps {
 	/** Override the fetch used for Google's certificates (tests). */
 	fetchImpl?: typeof fetch;
 	/** Override the clock `exp` is checked against (tests). */
 	now?: () => Date;
 	/** Signing keys to use instead of fetching Google's (tests). */
-	jwks?: readonly JsonWebKey[];
+	jwks?: readonly SigningJwk[];
 }
 
 const jwtHeaderSchema = z.object({ alg: z.string(), kid: z.string().optional() });
@@ -143,7 +148,7 @@ async function signingKey(
 	kid: string,
 	deps: PushVerifyDeps,
 	now: number
-): Promise<JsonWebKey | null> {
+): Promise<SigningJwk | null> {
 	if (deps.jwks) return deps.jwks.find((key) => key.kid === kid) ?? null;
 	const cached = certCache !== null && certCache.expiresAt > now ? certCache : null;
 	const hit = cached?.keys.get(kid);
@@ -155,7 +160,7 @@ async function signingKey(
 	return fetched.keys.get(kid) ?? null;
 }
 
-function signatureValid(signingInput: string, signature: string, jwk: JsonWebKey): boolean {
+function signatureValid(signingInput: string, signature: string, jwk: SigningJwk): boolean {
 	try {
 		const key = createPublicKey({ key: jwk, format: 'jwk' });
 		return verifySignature(

@@ -251,11 +251,13 @@ describe('buildRawMessage', () => {
 		date: new Date('2026-09-14T12:34:56Z')
 	};
 
-	function decoded(raw: string): { head: string[]; body: string } {
+	/** The message a `raw` blob holds: its header lines as sent, unfolded, and its decoded body. */
+	function decoded(raw: string) {
 		const message = Buffer.from(raw, 'base64url').toString('utf8');
 		const [head = '', ...rest] = message.split('\r\n\r\n');
 		return {
-			head: head.split('\r\n'),
+			lines: head.split('\r\n'),
+			head: head.replace(/\r\n /g, ' ').split('\r\n'),
 			body: Buffer.from(rest.join('\r\n\r\n').replace(/\r\n/g, ''), 'base64').toString('utf8')
 		};
 	}
@@ -266,14 +268,12 @@ describe('buildRawMessage', () => {
 		const { head, body } = decoded(raw);
 		expect(head).toEqual([
 			'From: Ada Lovelace <ada@example.com>',
-			'To: Bob <bob@example.com>,',
-			' carol@example.com',
+			'To: Bob <bob@example.com>, carol@example.com',
 			'Cc: "Dan, D" <dan@example.com>',
 			'Subject: =?UTF-8?B?UmU6IENhZsOpIHBsYW5z?=',
 			'Date: Mon, 14 Sep 2026 12:34:56 +0000',
 			'In-Reply-To: <msg-0@example.com>',
-			'References: <msg-a@example.com>',
-			' <msg-0@example.com>',
+			'References: <msg-a@example.com> <msg-0@example.com>',
 			'MIME-Version: 1.0',
 			'Content-Type: text/plain; charset=utf-8',
 			'Content-Transfer-Encoding: base64'
@@ -303,15 +303,26 @@ describe('buildRawMessage', () => {
 		expect(body).toBe('');
 	});
 
-	it('wraps the body at 76 columns and splits a long subject into words a decoder rejoins', () => {
+	it('folds long headers at 76 columns and wraps the body there too', () => {
 		const subject = 'Ü'.repeat(60);
-		const { head, body } = decoded(buildRawMessage({ ...input, subject, text: 'x'.repeat(200) }));
-		const subjectLines = head.filter(
-			(line) => line.startsWith('Subject:') || line.startsWith(' =?')
+		const to = [
+			{ address: 'bob@example.com', name: 'Bob Builder' },
+			{ address: 'carol@example.com', name: 'Carol Danvers' },
+			{ address: 'dan.dawson@example.com', name: 'Dan, D' },
+			{ address: 'erin@example.com', name: null }
+		];
+		const raw = buildRawMessage({ ...input, to, subject, text: 'x'.repeat(200) });
+		const { lines, head, body } = decoded(raw);
+		for (const line of lines) expect(line.length).toBeLessThanOrEqual(76);
+		expect(lines.length).toBeGreaterThan(head.length);
+		expect(head).toContain(
+			'To: Bob Builder <bob@example.com>, Carol Danvers <carol@example.com>, "Dan, D" <dan.dawson@example.com>, erin@example.com'
 		);
-		expect(subjectLines.length).toBeGreaterThan(1);
-		for (const line of subjectLines) expect(line.length).toBeLessThanOrEqual(76);
-		expect(decodeEncodedWords(subjectLines.join('\r\n').replace(/^Subject: /, ''))).toBe(subject);
+		const subjectLine = head.find((line) => line.startsWith('Subject: ')) ?? '';
+		expect(subjectLine.split(' ').length).toBeGreaterThan(2);
+		expect(decodeEncodedWords(subjectLine.replace(/^Subject: /, ''))).toBe(subject);
+		const message = Buffer.from(raw, 'base64url').toString('utf8');
+		for (const line of message.split('\r\n')) expect(line.length).toBeLessThanOrEqual(76);
 		expect(body).toBe('x'.repeat(200));
 	});
 });

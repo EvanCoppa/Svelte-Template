@@ -71,6 +71,13 @@ export const GMAIL_SCOPES = [
 	'https://www.googleapis.com/auth/gmail.send'
 ] as const;
 
+export interface PkcePair {
+	/** Kept server-side for the length of the attempt; never sent to Google until the exchange. */
+	verifier: string;
+	/** Goes into the authorization URL. */
+	challenge: string;
+}
+
 /**
  * A fresh PKCE pair for one authorization attempt: the verifier is kept
  * server-side (in the connect flow's cookie or row) and the S256 challenge
@@ -78,7 +85,7 @@ export const GMAIL_SCOPES = [
  * useless without the verifier. 32 random bytes make a 43-character
  * base64url verifier, inside RFC 7636's 43–128 range.
  */
-export function pkcePair(): { verifier: string; challenge: string } {
+export function pkcePair(): PkcePair {
 	const verifier = randomBytes(32).toString('base64url');
 	const challenge = createHash('sha256').update(verifier).digest('base64url');
 	return { verifier, challenge };

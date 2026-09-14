@@ -1,17 +1,18 @@
-import { generateKeyPairSync, sign, type JsonWebKey, type KeyObject } from 'node:crypto';
+import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	parsePushBody,
 	pushConfig,
 	verifyPushToken,
 	type PushConfig,
-	type PushEnv
+	type PushEnv,
+	type SigningJwk
 } from './pubsub';
 
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const { privateKey: strangerKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const KID = 'test-key-1';
-const jwk: JsonWebKey = { ...publicKey.export({ format: 'jwk' }), kid: KID };
+const jwk: SigningJwk = { ...publicKey.export({ format: 'jwk' }), kid: KID };
 
 const NOW = new Date('2026-09-14T12:00:00Z');
 const config: PushConfig = {

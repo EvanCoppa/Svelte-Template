@@ -26,8 +26,14 @@ export type Address = { address: string; name: string | null };
 const ENCODED_WORD = /=\?([^?\s]+)\?([BbQq])\?([^?\s]*)\?=/g;
 /** Whitespace between two adjacent encoded words is not part of the text (RFC 2047 §6.2). */
 const BETWEEN_ENCODED_WORDS = /(=\?[^?\s]+\?[BbQq]\?[^?\s]*\?=)\s+(?==\?[^?\s]+\?[BbQq]\?)/g;
-/** Bytes an RFC 2047 encoded word may hold and stay inside its 75-character limit. */
-const ENCODED_WORD_BYTES = 45;
+/**
+ * Bytes an RFC 2047 encoded word may hold: 39 make a 64-character word, so
+ * the word stays inside RFC 2047's 75 and `Subject: ` plus one word inside a
+ * 76-character header line.
+ */
+const ENCODED_WORD_BYTES = 39;
+/** RFC 5322 recommends folding header lines longer than this (the hard limit is 998). */
+const HEADER_LINE_MAX = 76;
 /** RFC 5322 specials: a display name holding one has to be quoted. */
 const NAME_SPECIALS = /[()<>[\]:;@\\,."]/;
 const PRINTABLE_ASCII = /^[ -~]*$/;
@@ -72,8 +78,8 @@ export function decodeEncodedWords(text: string): string {
 
 /**
  * Non-ASCII header text as RFC 2047 encoded words, split so no word exceeds
- * 75 characters and no character is cut in half. The words are joined with
- * folding whitespace, which a decoder drops again.
+ * 75 characters and no character is cut in half. The words are separated by
+ * whitespace, which a decoder drops again.
  */
 function encodeWords(text: string): string {
 	const words: string[] = [];
@@ -88,7 +94,7 @@ function encodeWords(text: string): string {
 	if (chunk !== '') words.push(chunk);
 	return words
 		.map((word) => `=?UTF-8?B?${Buffer.from(word, 'utf8').toString('base64')}?=`)
-		.join('\r\n ');
+		.join(' ');
 }
 
 /** A header value with line breaks removed, so a name or a subject can never smuggle a header in. */
@@ -203,7 +209,7 @@ export function formatAddress(a: Address): string {
 }
 
 function formatAddressList(list: readonly Address[]): string {
-	return list.map(formatAddress).join(',\r\n ');
+	return list.map(formatAddress).join(', ');
 }
 
 export type ParsedMessage = {
@@ -371,6 +377,26 @@ export interface RawMessageInput {
 	date?: Date;
 }
 
+/**
+ * A header folded the RFC 5322 way: broken at a space so no line runs past 76
+ * characters where a space allows it, each continuation starting with the
+ * space it broke at. Encoded words and angle-addresses hold no spaces, so a
+ * fold never lands inside one.
+ */
+function foldHeader(line: string): string {
+	const lines: string[] = [];
+	let rest = line;
+	while (rest.length > HEADER_LINE_MAX) {
+		let at = rest.lastIndexOf(' ', HEADER_LINE_MAX);
+		if (at <= 0) at = rest.indexOf(' ', HEADER_LINE_MAX);
+		if (at <= 0) break;
+		lines.push(rest.slice(0, at));
+		rest = rest.slice(at);
+	}
+	lines.push(rest);
+	return lines.join('\r\n');
+}
+
 /** RFC 5322's date form: `Mon, 14 Sep 2026 12:34:56 +0000`. */
 function rfc5322Date(date: Date): string {
 	return date.toUTCString().replace(/GMT$/, '+0000');
@@ -384,23 +410,24 @@ function rfc5322Date(date: Date): string {
  * `threadId` to `sendMessage()` alongside it.
  */
 export function buildRawMessage(input: RawMessageInput): string {
-	const lines = [`From: ${formatAddress(input.from)}`, `To: ${formatAddressList(input.to)}`];
-	if (input.cc?.length) lines.push(`Cc: ${formatAddressList(input.cc)}`);
-	if (input.bcc?.length) lines.push(`Bcc: ${formatAddressList(input.bcc)}`);
-	lines.push(`Subject: ${encodeHeaderText(input.subject)}`);
-	lines.push(`Date: ${rfc5322Date(input.date ?? new Date())}`);
-	if (input.inReplyTo) lines.push(`In-Reply-To: <${stripAngles(input.inReplyTo)}>`);
+	const headers = [`From: ${formatAddress(input.from)}`, `To: ${formatAddressList(input.to)}`];
+	if (input.cc?.length) headers.push(`Cc: ${formatAddressList(input.cc)}`);
+	if (input.bcc?.length) headers.push(`Bcc: ${formatAddressList(input.bcc)}`);
+	headers.push(`Subject: ${encodeHeaderText(input.subject)}`);
+	headers.push(`Date: ${rfc5322Date(input.date ?? new Date())}`);
+	if (input.inReplyTo) headers.push(`In-Reply-To: <${stripAngles(input.inReplyTo)}>`);
 	if (input.references?.length) {
-		lines.push(`References: ${input.references.map((id) => `<${stripAngles(id)}>`).join('\r\n ')}`);
+		headers.push(`References: ${input.references.map((id) => `<${stripAngles(id)}>`).join(' ')}`);
 	}
-	lines.push(
+	headers.push(
 		'MIME-Version: 1.0',
 		'Content-Type: text/plain; charset=utf-8',
-		'Content-Transfer-Encoding: base64',
-		'',
-		...(Buffer.from(input.text, 'utf8')
-			.toString('base64')
-			.match(/.{1,76}/g) ?? [])
+		'Content-Transfer-Encoding: base64'
 	);
-	return Buffer.from(lines.join('\r\n'), 'utf8').toString('base64url');
+	const body =
+		Buffer.from(input.text, 'utf8')
+			.toString('base64')
+			.match(/.{1,76}/g) ?? [];
+	const message = `${headers.map(foldHeader).join('\r\n')}\r\n\r\n${body.join('\r\n')}`;
+	return Buffer.from(message, 'utf8').toString('base64url');
 }
