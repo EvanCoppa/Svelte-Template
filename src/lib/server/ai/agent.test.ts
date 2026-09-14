@@ -64,7 +64,7 @@ describe('createAssistantAgent', () => {
 		expect(system[1]?.content).toContain('Time zone: Europe/Paris');
 	});
 
-	it('asks OpenAI not to store the turn and to cache the prompt per thread', async () => {
+	it('asks OpenAI not to store the turn, to cache per thread, and to summarise its thinking', async () => {
 		const model = streamingModel('Hi');
 		const agent = createAssistantAgent({
 			model,
@@ -76,8 +76,14 @@ describe('createAssistantAgent', () => {
 			await agent.stream({ prompt: 'Hi' })
 		).text;
 
+		// Without `reasoningSummary` the Responses API streams no reasoning text
+		// at all, and the assistant's thinking block has nothing to show.
 		expect(model.doStreamCalls[0]?.providerOptions).toEqual({
-			openai: { store: false, promptCacheKey: 'c0000000-0000-0000-0000-000000000009' }
+			openai: {
+				store: false,
+				promptCacheKey: 'c0000000-0000-0000-0000-000000000009',
+				reasoningSummary: 'auto'
+			}
 		});
 	});
 

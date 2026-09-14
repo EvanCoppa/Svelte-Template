@@ -60,7 +60,8 @@ export function createAssistantAgent({
 		// feature is enabled for the org and whose level the caller holds.
 		activeTools: activeToolNames(context.org),
 		toolApproval: TOOL_APPROVAL,
-		providerOptions: { openai: openaiCallOptions(conversationId) },
+		// The summary is what makes the thinking block have anything to show.
+		providerOptions: { openai: openaiCallOptions({ conversationId, reasoningSummary: true }) },
 		stopWhen: isStepCount(MAX_STEPS),
 		prepareStep: ({ stepNumber }) =>
 			stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : undefined,

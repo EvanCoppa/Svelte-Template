@@ -74,8 +74,28 @@
 	const toolParts = $derived(message.parts.filter(isAssistantToolPart));
 	const activity = $derived(toolParts.filter((part) => !isApproval(part)));
 	const hasText = $derived(message.parts.some((part) => part.type === 'text' && part.text.trim()));
-	/** Nothing written yet, and the turn is still running: the wait has a word. */
-	const waiting = $derived(!isUser && last && status === 'streaming' && !hasText);
+	/** Thinking that is already on screen, saying the same thing a shimmer would. */
+	const hasReasoning = $derived(
+		message.parts.some((part) => part.type === 'reasoning' && part.text.trim())
+	);
+	/**
+	 * Nothing written yet, and the turn is still running: the wait has a word.
+	 * Only when nothing else is already speaking for it — the activity line and
+	 * the thinking block both say what is happening, and two shimmers saying it
+	 * at once is one too many.
+	 */
+	const waiting = $derived(!isUser && last && status === 'streaming' && !hasText && !hasReasoning);
+
+	/**
+	 * Your own message snaps into place; the reply arrives. The 150ms between
+	 * them is doing real work — it is what makes the two read as a question and
+	 * an answer rather than as two rows appearing together.
+	 */
+	const entrance = $derived(
+		isUser
+			? 'animate-[fade-up_300ms_var(--ease-out-strong)_both]'
+			: 'animate-[fade-up_var(--duration-page)_var(--ease-out-strong)_both]'
+	);
 	/** The model stopped without an answer — say so rather than showing a blank turn. */
 	const unfinished = $derived(
 		!isUser && last && status === 'ready' && !hasText && toolParts.length > 0
@@ -87,7 +107,7 @@
 	data-slot="assistant-message"
 	data-role={message.role}
 	align={isUser ? 'end' : 'start'}
-	class={cn(className)}
+	class={cn(entrance, className)}
 	{...restProps}
 >
 	{#if isUser}
@@ -112,11 +132,15 @@
 				{#if part.type === 'text'}
 					<Bubble.Root variant="ghost">
 						<Bubble.Content>
-							<Markdown text={part.text} />
+							<Markdown
+								text={part.text}
+								streamId="{message.id}:{index}"
+								streaming={part.state === 'streaming'}
+							/>
 						</Bubble.Content>
 					</Bubble.Root>
 				{:else if part.type === 'reasoning'}
-					<Reasoning text={part.text} />
+					<Reasoning text={part.text} streaming={part.state === 'streaming'} />
 				{:else if isAssistantToolPart(part) && isApproval(part)}
 					<ToolCall {part} {onApprove} {onDeny} />
 				{/if}

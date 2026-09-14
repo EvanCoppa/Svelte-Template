@@ -70,10 +70,23 @@ export function modelId(source: AiEnv = env): string {
  *   and the SDK carries the model's encrypted reasoning between steps itself.
  * - `promptCacheKey` — the thread id, so the cached prefix (instructions,
  *   tools, the thread so far) is routed to the same cache on every turn.
+ * - `reasoningSummary` — ask a reasoning model to emit a plain-language summary
+ *   of its thinking. **Without it the Responses API streams no reasoning text
+ *   at all**, so the SDK's `reasoning` parts arrive empty and the assistant's
+ *   thinking block has nothing to show. Off by default because it only makes
+ *   sense where reasoning is on: the title call turns reasoning off, and asking
+ *   a model that is not thinking to summarise its thinking is meaningless.
  */
-export function openaiCallOptions(conversationId?: string): OpenAILanguageModelResponsesOptions {
+export function openaiCallOptions({
+	conversationId,
+	reasoningSummary = false
+}: {
+	conversationId?: string | undefined;
+	reasoningSummary?: boolean | undefined;
+} = {}): OpenAILanguageModelResponsesOptions {
 	const options: OpenAILanguageModelResponsesOptions = { store: false };
 	if (conversationId) options.promptCacheKey = conversationId;
+	if (reasoningSummary) options.reasoningSummary = 'auto';
 	return options;
 }
 
