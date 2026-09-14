@@ -18,10 +18,19 @@ describe('the tool registry', () => {
 		expect([...TOOL_NAMES].sort()).toEqual(names);
 	});
 
-	it('asks the user before the destructive tool runs, and before an edit lands', () => {
-		expect(TOOL_APPROVAL).toEqual({ deleteTask: 'user-approval', updateRecord: 'user-approval' });
+	it('asks the user before a destructive tool runs, and before an edit lands', () => {
+		expect(TOOL_APPROVAL).toEqual({
+			deleteTask: 'user-approval',
+			deleteEvent: 'user-approval',
+			updateRecord: 'user-approval'
+		});
 		expect(TOOL_ACCESS.deleteTask.level).toBe('delete');
+		expect(TOOL_ACCESS.deleteEvent.level).toBe('delete');
 		expect(TOOL_ACCESS.updateRecord.level).toBe('manage');
+		// A create adds rather than replaces, so it runs when the model calls
+		// it — the same reason createTask never paused.
+		expect(TOOL_APPROVAL).not.toHaveProperty('createRecord');
+		expect(TOOL_APPROVAL).not.toHaveProperty('createEvent');
 	});
 
 	it('hands every tool the same request context, keyed by tool name', () => {
@@ -149,6 +158,29 @@ describe('activeToolNames — tools are linked to features', () => {
 			'listRelationshipTypes',
 			'listTickets'
 		]);
+	});
+
+	it('walks the calendar’s ladder: reading, booking, then emptying it', () => {
+		const reader = activeToolNames(orgContext({ role: 'member', grants: { calendar: 'read' } }));
+		expect(reader).toContain('listEvents');
+		expect(reader).toContain('findOpenSlots');
+		expect(reader).not.toContain('createEvent');
+
+		const manager = activeToolNames(orgContext({ role: 'member', grants: { calendar: 'manage' } }));
+		expect(manager).toContain('createEvent');
+		expect(manager).toContain('updateEvent');
+		// Managing the calendar is not emptying it: cancelling takes `delete`,
+		// the grant the page's own remove action takes.
+		expect(manager).not.toContain('deleteEvent');
+
+		expect(
+			activeToolNames(orgContext({ role: 'member', grants: { calendar: 'delete' } }))
+		).toContain('deleteEvent');
+
+		// The whole family goes when the org switches the feature off.
+		const off = activeToolNames(orgContext({ modes: { calendar: 'disabled' } }));
+		for (const name of ['listEvents', 'findOpenSlots', 'createEvent', 'updateEvent', 'deleteEvent'])
+			expect(off).not.toContain(name);
 	});
 
 	it('links the graph walk to the graph feature and the calendar tool to the calendar', () => {

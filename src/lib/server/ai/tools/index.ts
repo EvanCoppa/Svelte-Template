@@ -5,8 +5,10 @@ import { isToolActive, type ToolAccess } from './access';
 import { addNote, addNoteAccess } from './add-note';
 import { assignTask, assignTaskAccess } from './assign-task';
 import { completeTask, completeTaskAccess } from './complete-task';
+import { createEvent, createEventAccess } from './create-event';
 import { createRecord, createRecordAccess } from './create-record';
 import { createTask, createTaskAccess } from './create-task';
+import { deleteEvent, deleteEventAccess } from './delete-event';
 import { deleteTask, deleteTaskAccess } from './delete-task';
 import { exploreGraph, exploreGraphAccess } from './explore-graph';
 import { findOpenSlots, findOpenSlotsAccess } from './find-open-slots';
@@ -26,6 +28,7 @@ import { packableLines, packableLinesAccess } from './packable-lines';
 import { searchCompanies, searchCompaniesAccess } from './search-companies';
 import { searchContacts, searchContactsAccess } from './search-contacts';
 import { unassignTask, unassignTaskAccess } from './unassign-task';
+import { updateEvent, updateEventAccess } from './update-event';
 import { updateRecord, updateRecordAccess } from './update-record';
 
 /**
@@ -80,6 +83,9 @@ export const assistantTools = {
 	listDeals,
 	listTickets,
 	listEvents,
+	createEvent,
+	updateEvent,
+	deleteEvent,
 	findRecords,
 	getRecord,
 	listRecordFields,
@@ -111,6 +117,9 @@ export const TOOL_ACCESS = {
 	listDeals: listDealsAccess,
 	listTickets: listTicketsAccess,
 	listEvents: listEventsAccess,
+	createEvent: createEventAccess,
+	updateEvent: updateEventAccess,
+	deleteEvent: deleteEventAccess,
 	findRecords: findRecordsAccess,
 	getRecord: getRecordAccess,
 	listRecordFields: listRecordFieldsAccess,
@@ -140,13 +149,16 @@ export function activeToolNames(org: OrgContext): AssistantToolName[] {
 
 /**
  * Tools that pause for the user's approval in the thread — the SDK's
- * `toolApproval` map. A delete, because it removes data; an edit of a
- * record, because the card can show the change field by field before it
+ * `toolApproval` map. A delete, because it removes data — a task, and a
+ * booking, which vanishes from everyone's calendar with no undo; and an edit
+ * of a record, because the card can show the change field by field before it
  * lands (`Assistant.Diff`), which is what makes a writing assistant one a
- * reader trusts. Everything else runs when the model calls it.
+ * reader trusts. Everything else runs when the model calls it — a create
+ * included: it adds something rather than replacing something.
  */
 export const TOOL_APPROVAL = {
 	deleteTask: 'user-approval',
+	deleteEvent: 'user-approval',
 	updateRecord: 'user-approval'
 } as const;
 

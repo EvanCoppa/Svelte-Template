@@ -56,6 +56,9 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 		case 'tool-listEvents':
 			// An event has no page of its own; the record it is about does.
 			return part.output.events.flatMap((event) => (event.about ? [event.about] : []));
+		case 'tool-createEvent':
+		case 'tool-updateEvent':
+			return part.output.event.about ? [part.output.event.about] : [];
 		case 'tool-findRecords':
 			return part.output.records.map((record) => ({
 				kind: part.output.kind,
@@ -105,6 +108,7 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 		// the tool that found it.
 		case 'tool-addNote':
 		case 'tool-deleteTask':
+		case 'tool-deleteEvent':
 		case 'tool-listRelationshipTypes':
 		case 'tool-linkRecords':
 		case 'tool-findOpenSlots':

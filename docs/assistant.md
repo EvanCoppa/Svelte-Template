@@ -311,6 +311,9 @@ needs there, on the same `read < manage < delete` ladder the rest of the app is 
 | `listDeals`       | deals               | read   |          |
 | `listTickets`     | tickets             | read   |          |
 | `listEvents`      | calendar            | read   |          |
+| `createEvent`     | calendar            | manage |          |
+| `updateEvent`     | calendar            | manage |          |
+| `deleteEvent`     | calendar            | delete | user     |
 | `exploreGraph`    | graph               | read   |          |
 | `listRecords`     | the kind            | read   |          |
 | `findOpenSlots`   | calendar            | read   |          |
@@ -372,6 +375,34 @@ in `TOOL_DISCIPLINE` and answers each where the data model does:
 
 Neither is a second way to say the other: a contact is never an assignee, and a colleague
 is never the company a task is about.
+
+#### The calendar
+
+Planned time is neither an activity nor a task (docs/calendar.md), so it is not a record
+kind and its tools are the calendar feature's, like the task tools: `listEvents` reads a
+window, `createEvent` books a block, `updateEvent` changes one and `deleteEvent` cancels
+it. The grants are the page's own — `manage` to book or change, `delete` to cancel — and
+cancelling pauses for approval, because a booking removed is gone from everyone's
+calendar with no undo.
+
+Three rules carry straight over from the page:
+
+- **Instants, passed through.** Both ends are ISO 8601 with offset, `ends_at` is
+  exclusive, and `all_day` says how to draw an event rather than how to store it. The
+  model resolves "Tuesday at 2" against the session time zone; no tool does date
+  arithmetic, exactly as no server code draws the grid.
+- **Naming only what changes IS the move form.** The page splits `update` from `move` so
+  a drag cannot overwrite a title someone is editing; one tool that writes only the
+  fields it was given has that property already. It reads the event first, because the
+  order check (`calendar_events_ends_after_start`) has to run against what the row will
+  say — a move that names one end only makes sense beside the end it did not name.
+- **An event is assigned and about**, the same two links as a task, with the record end
+  gated by `canOpenFor()`: the page's `refusesRecord` rule, so an event is never booked
+  against a record the caller could not open.
+
+`findOpenSlots` is still the answer to "when am I free?" — it draws a card and the user
+picks; `createEvent` is the answer when they named a time themselves. The instructions
+say both, so the model never books a slot it just offered.
 
 Their `ToolAccess` is the second shape, `anyOf`: the tool is **offered** while any record
 kind's feature is open to the caller at the level, and each call re-checks the one kind it

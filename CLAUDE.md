@@ -538,7 +538,9 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   membership like `deals.assigned_to`. Every Date in `$lib/calendar.ts` is local and
   the server never draws the grid: `fetchWindow()` pads in UTC, the page draws its own
   zone's grid after hydration, and forms carry instants behind wall-clock inputs.
-  Booking, editing and deleting are superforms actions; **a drag posts the `move`
+  Booking, editing and deleting are superforms actions (and the assistant's
+  `createEvent` / `updateEvent` / `deleteEvent` tools take the same three grants
+  through the same module); **a drag posts the `move`
   action from the page's script** (`fetch('?/move')` + `deserialize`, the two changed
   columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
   the road for a JS-born mutation that belongs to the page it lives on. The feature
