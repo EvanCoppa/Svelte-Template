@@ -781,8 +781,13 @@ SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the insta
 version; read them before the website. The full account is `docs/assistant.md`.
 
 - **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
-  unconfigured the page says so and the endpoint answers 503, never a crash.
+  imports a provider package — `@ai-sdk/openai`, over the Responses API. Config is env-only
+  (`OPENAI_API_KEY`, `AI_MODEL`; the default model is `gpt-5.6-luna`); when unconfigured
+  the page says so and the endpoint answers 503, never a crash. What the API is asked for
+  on a call — `store: false`, the per-thread `promptCacheKey` — is the SDK's namespaced
+  `providerOptions`, spelled once in `openaiCallOptions()` (`provider.ts`) and set on the
+  agent and the title call; reasoning is the SDK's portable `reasoning` setting, never a
+  provider option.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.
@@ -982,14 +987,16 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
-  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
-  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
-  for a column that groups several states, not for every board. It draws one pipeline at a
-  time (a stage only means something inside its own board, so which one is in the query
-  string like the ledger's account filter), the stage's `probability` as the ring's fill,
-  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
-  `$lib/crm/tasks.ts` does for the task board.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board, with
+  `pipeline_stages` rows as its columns** (docs/deals.md): an open stage IS the state a deal
+  is in, so it gets a column of its own and a release lands straight away — but every stage
+  whose outcome closes the deal (`won`, `lost`, and any more an org adds) shares one `Closed`
+  column, split into a drop zone per stage exactly like a grouped task column, so the funnel
+  does not grow a column per terminal stage. `buildDealColumns()` (`$lib/crm/deals.ts`) is the
+  one place that groups them. It draws one pipeline at a time (a stage only means something
+  inside its own board, so which one is in the query string like the ledger's account filter),
+  the stage's `probability` as the ring's fill, and `$lib/crm/deals.ts` answers what a column
+  holds and adds up to the way `$lib/crm/tasks.ts` does for the task board.
 - **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
   not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
   `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and

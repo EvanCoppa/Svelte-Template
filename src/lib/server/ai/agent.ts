@@ -1,6 +1,7 @@
 import { isStepCount, ToolLoopAgent, type LanguageModel } from 'ai';
 import type { AssistantToolContext } from './context';
 import { buildInstructions } from './prompts';
+import { openaiCallOptions } from './provider';
 import { activeToolNames, assistantTools, TOOL_APPROVAL, toolsContextFor } from './tools';
 
 /**
@@ -15,6 +16,8 @@ export type AssistantAgentOptions = {
 	model: LanguageModel;
 	/** The request: client, org (feature modes, grants) and caller. */
 	context: AssistantToolContext;
+	/** The thread, so a provider that routes its prompt cache by key keeps one per thread. */
+	conversationId?: string | undefined;
 	/** The caller's IANA time zone, so "today" resolves where the user is. */
 	timeZone?: string | undefined;
 	userName?: string | undefined;
@@ -36,6 +39,7 @@ export type AssistantAgentOptions = {
 export function createAssistantAgent({
 	model,
 	context,
+	conversationId,
 	timeZone,
 	userName
 }: AssistantAgentOptions) {
@@ -56,6 +60,7 @@ export function createAssistantAgent({
 		// feature is enabled for the org and whose level the caller holds.
 		activeTools: activeToolNames(context.org),
 		toolApproval: TOOL_APPROVAL,
+		providerOptions: { openai: openaiCallOptions(conversationId) },
 		stopWhen: isStepCount(MAX_STEPS),
 		prepareStep: ({ stepNumber }) =>
 			stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : undefined,

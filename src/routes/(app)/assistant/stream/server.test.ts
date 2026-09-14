@@ -5,7 +5,7 @@ import { POST } from './+server';
 /**
  * The endpoint's own two answers — before any provider or thread is touched.
  * The turn itself is tested in `src/lib/server/ai/stream.test.ts`. With no
- * ANTHROPIC_API_KEY in the test environment the assistant is unconfigured,
+ * OPENAI_API_KEY in the test environment the assistant is unconfigured,
  * which is the case the first test needs.
  */
 
