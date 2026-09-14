@@ -123,7 +123,7 @@
 	 * for a record — uncapped, because a hub genuinely needs it for its
 	 * spokes — and deliberately not the size the dot is drawn at.
 	 */
-	const radiusOf = (node: SimNode) => 3.5 + Math.sqrt(node.degree) * 1.6;
+	const radiusOf = (node: SimNode) => 5 + Math.sqrt(node.degree) * 2;
 
 	/**
 	 * The dot as it is **drawn**, in screen pixels — the one place the map
@@ -140,8 +140,8 @@
 	 * band either side of a name's own line: a record reads as a word with a
 	 * dot on it at every zoom, which is the whole job.
 	 */
-	const DOT_MIN_RADIUS = 2.75;
-	const DOT_MAX_RADIUS = NAME_LINE - 1;
+	const DOT_MIN_RADIUS = 4.5;
+	const DOT_MAX_RADIUS = NAME_LINE + 6;
 	const screenRadiusOf = (node: SimNode, zoom: number) =>
 		Math.min(DOT_MAX_RADIUS, Math.max(DOT_MIN_RADIUS, radiusOf(node) * Math.sqrt(zoom)));
 
