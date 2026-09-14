@@ -35,7 +35,7 @@ The assistant is **its own shell**, the way settings is: while the pathname is u
 navigate is your threads, not the app nav. Its anatomy is the other two sidebars' on
 purpose — the workspace switcher and the collapse trigger in the header, the `NavUser`
 footer card — so nothing moves when the shell swaps; between them sit **New chat**,
-**Back to app**, and the threads. The section's "Chats" label gives way to a search
+**Home**, and the threads. The section's "Chats" label gives way to a search
 field that grows out of the magnifier at the end of the row, filtering the list as you
 type, so the section costs one row either way. A thread's own menu renames or deletes
 it.
@@ -47,10 +47,28 @@ module-rune pattern `showUpgrade()` and `showSearch()` established. The sidebar 
 threads themselves off `page.data.conversations`, like every shell sidebar reads
 `page.data`.
 
-The chat surface itself is one column with two states, and it **moves between them
+The screen is two panes: the conversation in its own card, and a **context panel**
+docked beside it (`src/lib/components/context-panel/`). Across the top of the
+conversation's card is a **tab strip** (`src/lib/components/tab-strip/`) — one tab per
+thread this browser tab has open, closeable, with a `+` for another. Which threads are
+open is `sessionStorage`, ids only, so a rename renames its tab and a delete drops it
+with nothing to keep in step (`openThreads` in `$lib/assistant.svelte`). The strip is
+the screen's own navigation, so a tab **starts** the breadcrumb trail rather than
+deepening it — and because the strip names the thread on screen, this page has **no
+`PageHeader`**: a page is named once, and here its tab is the name.
+
+The context panel shows **what the answer drew on** — the records the tools actually
+returned, read back out of the message parts by `sourcesOf()` (`$lib/ai/sources`)
+rather than tracked separately, so a stored thread shows the same sources on reload as
+it did while it streamed. A kind is named as the org's industry names it and appears at
+all only when `terms` carries its feature, which is exactly the set this session may
+see: the panel never offers a door that would 404, and it counts what it lists rather
+than what it found.
+
+The conversation pane itself is one column with two states, and it **moves between them
 rather than being two screens**: with no messages the composer sits a third of the way
 down under "How can I help you today?", over a faint pool of the theme's primary
-(`Assistant.Root`'s aura); once the thread has started, the aura fades, the thread
+(`Assistant.Aura`); once the thread has started, the aura fades, the thread
 appears, and the composer travels to the foot of the page on a 700ms ease. The thread's
 own foot dissolves rather than ending on an edge, because the composer floats over it.
 

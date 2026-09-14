@@ -1,4 +1,5 @@
 import Activity from './assistant-activity.svelte';
+import Aura from './assistant-aura.svelte';
 import Composer from './assistant-composer.svelte';
 import Markdown from './assistant-markdown.svelte';
 import Message from './assistant-message.svelte';
@@ -10,7 +11,8 @@ import ToolCall from './assistant-tool-call.svelte';
 
 /**
  * The assistant, as parts the page composes: `Root` owns the SDK `Chat` for
- * one conversation and hands it to its children; `Thread` is the scrolling
+ * one conversation and hands it to its children; `Aura` the pool of light
+ * behind an unstarted one; `Thread` is the scrolling
  * column; `Message` one message rendered on `part.type` (through `Markdown`,
  * `Reasoning`, `Activity` and `ToolCall`); `Shimmer` the wait before the
  * first word; `Composer` the prompt box. The page owns the data — the stored
@@ -20,6 +22,7 @@ import ToolCall from './assistant-tool-call.svelte';
  */
 export {
 	Root,
+	Aura,
 	Thread,
 	Message,
 	Markdown,
@@ -30,6 +33,7 @@ export {
 	Composer,
 	//
 	Root as Assistant,
+	Aura as AssistantAura,
 	Thread as AssistantThread,
 	Message as AssistantMessage,
 	Markdown as AssistantMarkdown,

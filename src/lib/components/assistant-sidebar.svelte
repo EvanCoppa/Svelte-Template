@@ -2,7 +2,7 @@
 	import type { ComponentProps } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import HouseIcon from '@lucide/svelte/icons/house';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
@@ -116,11 +116,11 @@
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton
 						class="nav-hover-effect"
-						tooltipContent="Back to app"
+						tooltipContent="Home"
 						onclick={() => jumpTo('/')}
 					>
-						<ArrowLeftIcon class="h-6 w-6" />
-						<span class="sidebar-text">Back to app</span>
+						<HouseIcon class="h-6 w-6" />
+						<span class="sidebar-text">Home</span>
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 			</Sidebar.Menu>

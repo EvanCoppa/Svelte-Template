@@ -19,9 +19,10 @@
 	 * markup as the `children` snippet's argument — the page still owns every
 	 * handler and every part it renders.
 	 *
-	 * The frame itself is one column with the thread and the composer stacked
-	 * in it, and a pool of light behind them that is there before the first
-	 * question and fades away once the conversation has started.
+	 * The frame itself only holds what the page puts in it — the conversation's
+	 * pane, and whatever else that screen shows beside it — because where the
+	 * thread sits relative to anything else is the page's composition, not the
+	 * Chat's.
 	 *
 	 * The transport sends the last message only (the server owns the thread —
 	 * see the stream endpoint) plus the SDK's trigger, and the client's time
@@ -70,42 +71,8 @@
 		onFinish,
 		onError
 	});
-
-	const started = $derived(chat.messages.length > 0);
 </script>
 
-<div
-	bind:this={ref}
-	data-slot="assistant"
-	class={cn('relative flex min-h-0 flex-col', className)}
-	{...restProps}
->
-	<div
-		class={[
-			'aura pointer-events-none absolute top-1/3 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-700 motion-reduce:transition-none',
-			started ? 'opacity-0' : 'opacity-100'
-		]}
-		aria-hidden="true"
-	></div>
+<div bind:this={ref} data-slot="assistant" class={cn('flex min-h-0', className)} {...restProps}>
 	{@render children(chat)}
 </div>
-
-<style>
-	/* A small, faint pool of the brand colour behind the opening question —
-	   not a wash across the screen, and centred on the composer's own resting
-	   place rather than the panel's, or it reads as a stray blob below it.
-	   `color-mix` keeps it on the theme's own primary, so it reads the same on
-	   a dark ground. */
-	.aura {
-		width: min(46vw, 460px);
-		height: min(40vh, 340px);
-		background: radial-gradient(
-			ellipse 60% 55% at 50% 45%,
-			color-mix(in oklch, var(--primary) 13%, transparent),
-			color-mix(in oklch, var(--primary) 6%, transparent) 45%,
-			transparent 72%
-		);
-		filter: blur(40px);
-		border-radius: 9999px;
-	}
-</style>

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { browser } from '$app/environment';
 import type { ConversationSummary } from '$lib/server/ai/conversations';
 
 /**
@@ -52,3 +54,70 @@ export function renameThread(conversation: ConversationSummary): void {
 export function deleteThread(conversation: ConversationSummary): void {
 	threadDialogs.remove(conversation);
 }
+
+/**
+ * The threads this tab has open, as the strip above the conversation draws
+ * them. **Ids only**: a title is looked up from the thread list the page
+ * already has, so renaming one renames its tab and deleting one drops it
+ * without anything here being told.
+ *
+ * Device state, in `sessionStorage` like the breadcrumb trail and for the
+ * same reasons — this browser tab's own, no cookie on every request — so a
+ * refresh keeps what you had open and a private window simply starts fresh.
+ */
+const OPEN_KEY = 'assistant:open';
+
+/** What the store may find under that key — parsed, like the breadcrumb trail's. */
+const openSchema = z.array(z.string());
+
+function createOpenThreads() {
+	let ids = $state<string[]>(read());
+
+	function read(): string[] {
+		if (!browser) return [];
+		try {
+			const raw = sessionStorage.getItem(OPEN_KEY);
+			const parsed = openSchema.safeParse(raw ? JSON.parse(raw) : []);
+			return parsed.success ? parsed.data : [];
+		} catch {
+			// Cleared, blocked or corrupt storage all read as "nothing open".
+			return [];
+		}
+	}
+
+	function save() {
+		if (!browser) return;
+		try {
+			sessionStorage.setItem(OPEN_KEY, JSON.stringify(ids));
+		} catch {
+			// A private window can refuse to store; the strip still works for this visit.
+		}
+	}
+
+	return {
+		get ids() {
+			return ids;
+		},
+		/** Record a thread as open, newest at the end, without duplicating it. */
+		open(id: string) {
+			if (ids.includes(id)) return;
+			ids = [...ids, id];
+			save();
+		},
+		/** Forget a thread: closed, deleted, or gone from the list the page can see. */
+		close(id: string) {
+			if (!ids.includes(id)) return;
+			ids = ids.filter((open) => open !== id);
+			save();
+		},
+		/** Drop everything the page no longer has a thread for. */
+		keepOnly(known: Set<string>) {
+			const kept = ids.filter((id) => known.has(id));
+			if (kept.length === ids.length) return;
+			ids = kept;
+			save();
+		}
+	};
+}
+
+export const openThreads = createOpenThreads();
