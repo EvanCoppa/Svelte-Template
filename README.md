@@ -404,7 +404,11 @@ OpenAI. Set `OPENAI_API_KEY` (and optionally `AI_MODEL`; the default is `gpt-5.6
 `.env` to turn it on; without a key the page renders but says it is not configured. The assistant's tools are linked to features —
 a tool is available only when its feature is enabled for the org and the signed-in member
 holds the level it needs — and anything destructive asks for approval in the thread. The
-architecture, the tool contract and how to add a tool are in `docs/assistant.md`.
+architecture, the tool contract and how to add a tool are in
+[`docs/assistant.md`](docs/assistant.md). A tool's result can be drawn as an **artifact**
+— a component built for that tool's output rather than a line of activity — and deciding
+which tools earn one is a required step in adding a tool, not an afterthought:
+[`docs/assistant-artifacts.md`](docs/assistant-artifacts.md).
 
 ## Conventions
 
