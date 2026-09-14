@@ -780,7 +780,22 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
-- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+- **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
+  swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
+  (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
+  way to a search field. **The shell carries the screen's furniture, not the page**:
+  `AppHeader` mounts a `TabStrip` of the threads this browser tab has open (so the
+  breadcrumb trail stands down beside it and the page has no `PageHeader`), and the
+  layout docks a `ContextPanel` of what the answer drew on (`sourcesOf()`, filtered to
+  the kinds `terms` says this session may open) beside `Sidebar.Inset`, the same height
+  as the body — never a card inside the page. The thread reaches the rail as a getter
+  `Assistant.Root` publishes through `assistantThread`. The conversation is one column
+  with two states — the composer centred under "How can I help you today?" over
+  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
+  its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
+  line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
+  opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
   the real agent with `MockLanguageModelV4` from `ai/test`.
 
@@ -845,6 +860,14 @@ read, because these pages exist for every org and are exempt from the feature ga
 route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
+**The assistant is the second shell of that kind**, and the last one a screen gets for
+free: under `/assistant` the same layout swaps in `AssistantSidebar`, whose nav is the
+member's own threads rather than a list of pages (docs/assistant.md, "The screen"). It
+stays a nav entry, because the feature registry is what puts it there. A third such shell
+needs a reason as good — a screen whose navigation is genuinely its own content — and it
+copies these two: the same header row, the same `NavUser` footer, `breadcrumbs.startAt()`
+paired with every jump.
 
 The header carries a **breadcrumb trail**: how deep this tab has gone since it last
 jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
@@ -941,6 +964,28 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   string like the ledger's account filter), the stage's `probability` as the ring's fill,
   and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
   `$lib/crm/tasks.ts` does for the task board.
+- **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
+  not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
+  `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and
+  can close, and each is a **link**, so ⌘-click and browser history work and
+  `aria-current` marks the one you are on. The assistant's open conversations are the
+  worked example, and it lives in the app header rather than in a bar of its own: a
+  screen whose open documents are tabs composes them into a component the header mounts
+  on the same pathname branch the layout swaps the sidebar on (`AssistantTabs`), and the
+  breadcrumb trail stands down there, because a page is named once. A strip is its
+  screen's own navigation, so a tab pairs `breadcrumbs.startAt()` with its href the way
+  a sidebar entry does.
+- **A panel of context docked beside the thing it is about is `ContextPanel`**
+  (`src/lib/components/context-panel/`): its own card on its own hairline, a `Header`
+  with a `Title` and its `Actions`, a `Body` that scrolls, and `Section` / `Item` rows.
+  The panel is only the frame — what it shows is the page's, passed in where it renders
+  — and an `Item` is a link when it goes somewhere and plain text when it does not, so a
+  record the reader may not open is still listed without being a door it cannot use.
+  Docked **beside the body, not inside the page**: the `(app)` layout renders it as a
+  sibling of `Sidebar.Inset` on the same pathname branch, `sticky` and the panel's own
+  height, so it stands on the shell's ground like the sidebar on the other side. Data
+  that lives in the page reaches it the way the assistant's thread does — a getter
+  published through a module-rune store, never a copy.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and

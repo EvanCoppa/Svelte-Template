@@ -24,8 +24,93 @@ installed version exactly. Read those before the website when working here.
    response's message ids come from `createIdGenerator`, message metadata from the
    `messageMetadata` callback, and the whole thread is saved from `onEnd`.
 4. In the page, `Assistant.Message` renders each message part on `part.type`: `text` as
-   markdown, `reasoning` folded, `tool-<name>` as a card that shows the SDK's tool states,
-   including `approval-requested` with Approve and Deny.
+   markdown, `reasoning` folded, and `tool-<name>` in one of two places — see "The
+   screen" below.
+
+## The screen
+
+The assistant is **its own shell**, the way settings is: while the pathname is under
+`/assistant` the `(app)` layout swaps `AppSidebar` for `AssistantSidebar`
+(`src/lib/components/assistant-sidebar.svelte`), because in a conversation the thing to
+navigate is your threads, not the app nav. Its anatomy is the other two sidebars' on
+purpose — the workspace switcher and the collapse trigger in the header, the `NavUser`
+footer card — so nothing moves when the shell swaps; between them sit **New chat**,
+**Home**, and the threads. The section's "Chats" label gives way to a search
+field that grows out of the magnifier at the end of the row, filtering the list as you
+type, so the section costs one row either way. A thread's own menu renames or deletes
+it.
+
+Those two acts are **forms on the page** — the actions are on `/assistant` — while the
+rows that open them are the sidebar's, so which thread a dialog is about travels through
+`$lib/assistant.svelte` (`renameThread()`, `deleteThread()`), the third use of the
+module-rune pattern `showUpgrade()` and `showSearch()` established. The sidebar reads the
+threads themselves off `page.data.conversations`, like every shell sidebar reads
+`page.data`.
+
+The shell does two more things for this screen, and both are the shell's rather
+than the page's — a strip of tabs in the app header, and a rail of context docked
+beside the body — so the page below them is only ever the conversation.
+
+The **tab strip** (`src/lib/components/tab-strip/`) goes in the one header that
+every screen already has, composed for this feature by `AssistantTabs`
+(`src/lib/components/assistant-tabs.svelte`), which `AppHeader` mounts while the
+pathname is under `/assistant` — the branch the `(app)` layout makes to swap the
+sidebar, made once more. One tab per thread this browser tab has open, closeable,
+with a `+` for another; which threads are open is `sessionStorage`, ids only, so a
+rename renames its tab and a delete drops it with nothing to keep in step
+(`openThreads` in `$lib/assistant.svelte`). The strip is the screen's own
+navigation, so a tab **starts** the breadcrumb trail rather than deepening it —
+and because the strip names the thread on screen, the breadcrumb trail stands down
+beside it and this page has **no `PageHeader`**: a page is named once, and here its
+tab is the name. The way out of the shell is the sidebar's Home, as it is under
+`/settings`.
+
+The **context rail** (`src/lib/components/context-panel/`, composed by
+`AssistantContext`) is a panel of its own on the end side of the body, mounted by
+the `(app)` layout beside `Sidebar.Inset` and standing the same height as it — not
+a card inside the page, which would sit inside the content panel's padding and
+scroll with it. It hides itself below `lg`, where the conversation needs the width.
+
+Being outside the page is what the thread has to cross: the `Chat` lives in
+`Assistant.Root`, so Root publishes a **getter** for its messages through
+`assistantThread` (`$lib/assistant.svelte`) and the rail reads them from there —
+the mirror of `threadDialogs`, which carries the sidebar's question the other way.
+
+The rail shows **what the answer drew on** — the records the tools actually
+returned, read back out of the message parts by `sourcesOf()` (`$lib/ai/sources`)
+rather than tracked separately, so a stored thread shows the same sources on reload as
+it did while it streamed. A kind is named as the org's industry names it and appears at
+all only when `terms` carries its feature, which is exactly the set this session may
+see: the panel never offers a door that would 404, and it counts what it lists rather
+than what it found.
+
+The conversation pane itself is one column with two states, and it **moves between them
+rather than being two screens**: with no messages the composer sits a third of the way
+down under "How can I help you today?", over a faint pool of the theme's primary
+(`Assistant.Aura`); once the thread has started, the aura fades, the thread
+appears, and the composer travels to the foot of the page on a 700ms ease. The thread's
+own foot dissolves rather than ending on an edge, because the composer floats over it.
+
+The composer is a rounded card with three controls. **`+` opens the openers** — the
+page's own list, passed in as `suggestions` — and picking one puts it **in the box**
+rather than sending it, so it can be edited first; that is why there are no opener
+chips on the empty screen, and why they stay reachable once a thread is underway. **The
+microphone is dictation**, and it is drawn only where the browser has a speech engine
+at all (`$lib/speech`, which is the one place that knows the API is still prefixed):
+while it listens the icon becomes a level meter and the settled transcript lands in the
+draft, so nothing reaches a server that the reader has not read first. **Send becomes
+Stop** while an answer streams. The controls sit beside the field while the draft still
+fits on one line and drop to their own row under it when it does not — measured off a
+hidden copy of the text, because asking "has it wrapped" would wrap, widen, unwrap and
+oscillate.
+
+A message is the reader's turn as a bubble on the end side and the assistant's as the
+page's own text — full width, no avatar, nothing framing it. Its tool calls land in one
+of two places, and which one is not a matter of taste: a call **waiting on the reader**
+is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; every
+other call is activity, and they collapse into the one `Assistant.Activity` line above
+the answer — the newest tool named while they run, a count to unfold once they are
+done. `Assistant.Shimmer` is the wait before the first word.
 
 ## The agent
 

@@ -852,6 +852,34 @@ insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, c
 		'1800 Foothills Parkway', 'Boulder', 'CO', '80301', 'US', 40.019800, -105.216500, true)
 on conflict (id) do nothing;
 
+-- Ridgeline's homeowners, so a roofer's Homeowner map opens on pins the way
+-- Bright Smile's Patient map does (the roofing_industry_depth migration). Both
+-- views are the same query — the people who belong to no company — so the
+-- fixture is the same shape: a standalone contact with a located address.
+insert into public.contacts (id, org_id, company_id, name, email, phone, title, is_primary, status, created_by) values
+	('30000000-0000-0000-0000-000000000053', '10000000-0000-0000-0000-000000000005',
+		null, 'Marcus Hale', 'marcus.hale@example.com', '+1 555 020 0530', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0000-000000000054', '10000000-0000-0000-0000-000000000005',
+		null, 'Priya Raman', 'priya.raman@example.com', '+1 555 020 0540', null, false,
+		'active', '00000000-0000-0000-0000-000000000003'),
+	('30000000-0000-0000-0000-000000000055', '10000000-0000-0000-0000-000000000005',
+		null, 'Dale Whitcomb', null, '+1 555 020 0550', null, false,
+		'lead', '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
+	('32000000-0000-0000-0000-000000000053', '10000000-0000-0000-0000-000000000005',
+		'contact', '30000000-0000-0000-0000-000000000053', 'primary',
+		'2140 Norwood Avenue', 'Boulder', 'CO', '80304', 'US', 40.033100, -105.283900, true),
+	('32000000-0000-0000-0000-000000000054', '10000000-0000-0000-0000-000000000005',
+		'contact', '30000000-0000-0000-0000-000000000054', 'primary',
+		'935 Cherryvale Road', 'Boulder', 'CO', '80303', 'US', 39.996400, -105.216800, true),
+	('32000000-0000-0000-0000-000000000055', '10000000-0000-0000-0000-000000000005',
+		'contact', '30000000-0000-0000-0000-000000000055', 'primary',
+		'6820 Kalua Road', 'Boulder', 'CO', '80301', 'US', 40.058200, -105.192700, true)
+on conflict (id) do nothing;
+
 -- The fee schedule (the billables migration): a dental practice's procedures
 -- with their CDT codes, counted in teeth, quadrants or arches — and a
 -- roofer's services, counted in squares. Featured ones are the builder's
