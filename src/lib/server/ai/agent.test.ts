@@ -58,12 +58,33 @@ describe('createAssistantAgent', () => {
 		const prompt = model.doStreamCalls[0]?.prompt ?? [];
 		const system = prompt.filter((message) => message.role === 'system');
 		expect(system).toHaveLength(2);
-		expect(system[0]?.providerOptions).toEqual({
-			anthropic: { cacheControl: { type: 'ephemeral' } }
-		});
+		expect(system[0]?.content).toContain('You are the assistant built into this workspace');
 		expect(system[1]?.content).toContain('Organization: Acme Inc (Pro plan)');
 		expect(system[1]?.content).toContain('User: evan@example.com (owner)');
 		expect(system[1]?.content).toContain('Time zone: Europe/Paris');
+	});
+
+	it('asks OpenAI not to store the turn, to cache per thread, and to summarise its thinking', async () => {
+		const model = streamingModel('Hi');
+		const agent = createAssistantAgent({
+			model,
+			context: toolContext(),
+			conversationId: 'c0000000-0000-0000-0000-000000000009'
+		});
+
+		await (
+			await agent.stream({ prompt: 'Hi' })
+		).text;
+
+		// Without `reasoningSummary` the Responses API streams no reasoning text
+		// at all, and the assistant's thinking block has nothing to show.
+		expect(model.doStreamCalls[0]?.providerOptions).toEqual({
+			openai: {
+				store: false,
+				promptCacheKey: 'c0000000-0000-0000-0000-000000000009',
+				reasoningSummary: 'auto'
+			}
+		});
 	});
 
 	it('caps the tool loop', () => {

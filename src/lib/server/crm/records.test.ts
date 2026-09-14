@@ -8,6 +8,7 @@ import type { DealWithParties } from './deals';
 import type { InvoiceWithDetails } from './invoices';
 import type { ProductWithCategory } from './products';
 import type { ProposalWithOptions } from './proposals';
+import type { RmaWithParties } from './rmas';
 import {
 	describeAsset,
 	describeBillable,
@@ -210,6 +211,23 @@ const siteWork: InvoiceWithDetails = {
 	invoice_line_items: [],
 	payments: [],
 	...STAMPS
+};
+
+const damagedGloves: RmaWithParties = {
+	id: '80000000-0000-0000-0000-000000000001',
+	org_id: ORG_ID,
+	number: 'RMA-00001',
+	company_id: COMPANY_ID,
+	contact_id: CONTACT_ID,
+	status: 'approved',
+	reason: 'Two cases arrived torn',
+	resolution: null,
+	requested_on: '2026-09-05',
+	created_by: USER_ID,
+	created_at: '2026-09-05T09:00:00Z',
+	updated_at: '2026-09-05T09:00:00Z',
+	companies: { id: COMPANY_ID, name: 'Wayne Enterprises' },
+	contacts: { id: CONTACT_ID, name: 'Lucius Fox' }
 };
 
 const exportBug: TicketThread = {
@@ -736,14 +754,18 @@ describe('getRecord', () => {
 });
 
 describe('listRelatedRecords', () => {
-	it('lists the people, deals, proposals, invoices, tasks and tickets that name a company, in nav order', async () => {
+	it('lists the people, deals, proposals, invoices, tasks, tickets and returns that name a company, in nav order', async () => {
 		const { supabase, from, builders } = supabaseTablesMock({
 			contacts: { data: [lucius] },
 			deals: { data: [contract] },
 			proposals: { data: [{ ...options, entity_type: 'company', entity_id: COMPANY_ID }] },
 			invoices: { data: [siteWork] },
 			tasks: { data: [renewal] },
-			support_tickets: { data: [exportBug] }
+			support_tickets: { data: [exportBug] },
+			rmas: { data: [damagedGloves] },
+			// A company with no tenancies: the group is dropped, so the six
+			// below are unchanged. A tenant's leases have their own test.
+			leases: { data: [] }
 		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);
@@ -754,9 +776,10 @@ describe('listRelatedRecords', () => {
 			'proposal',
 			'invoice',
 			'task',
-			'ticket'
+			'ticket',
+			'rma'
 		]);
-		for (const table of ['contacts', 'deals', 'invoices', 'tasks', 'support_tickets']) {
+		for (const table of ['contacts', 'deals', 'invoices', 'tasks', 'support_tickets', 'rmas']) {
 			expect(from).toHaveBeenCalledWith(table);
 			expect(builders[table].eq).toHaveBeenCalledWith('company_id', COMPANY_ID);
 		}
@@ -799,6 +822,14 @@ describe('listRelatedRecords', () => {
 			pill: { label: 'Open', tone: 'info' },
 			meta: '#1 · high priority'
 		});
+		// A return on the account: its number, how far back it is, and why.
+		expect(groups[6].records[0]).toEqual({
+			id: damagedGloves.id,
+			name: 'RMA-00001',
+			href: `/rmas/${damagedGloves.id}`,
+			pill: { label: 'Approved', tone: 'violet' },
+			meta: 'Two cases arrived torn'
+		});
 	});
 
 	it('never fetches a kind the reader may not open, and drops empty groups', async () => {
@@ -816,6 +847,7 @@ describe('listRelatedRecords', () => {
 		expect(from).not.toHaveBeenCalledWith('proposals');
 		expect(from).not.toHaveBeenCalledWith('invoices');
 		expect(from).not.toHaveBeenCalledWith('support_tickets');
+		expect(from).not.toHaveBeenCalledWith('rmas');
 		expect(from).toHaveBeenCalledWith('deals');
 		// Fetched, empty, omitted.
 		expect(from).toHaveBeenCalledWith('tasks');

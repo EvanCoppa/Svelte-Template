@@ -599,6 +599,62 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          discount_type: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value: number
+          ends_on: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          starts_on: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_field_definitions: {
         Row: {
           allowed_values: Json | null
@@ -903,6 +959,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proposal_options"
             referencedColumns: ["id", "proposal_id"]
+          },
+        ]
+      }
+      featured_group_products: {
+        Row: {
+          created_at: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          featured_group_id?: string
+          org_id?: string
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_group_products_featured_group_id_org_id_fkey"
+            columns: ["featured_group_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "featured_groups"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_product_id_org_id_fkey"
+            columns: ["product_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      featured_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1331,6 +1477,89 @@ export type Database = {
           },
         ]
       }
+      leases: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          ends_on: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day: number
+          security_deposit: number | null
+          starts_on: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          property_id?: string
+          rent_amount?: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leases_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leases_property_id_org_id_fkey"
+            columns: ["property_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       list_fields: {
         Row: {
           created_at: string
@@ -1470,7 +1699,12 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_label: string | null
+          actor_id: string | null
+          archived_at: string | null
           body: string | null
+          channel: Database["public"]["Enums"]["notification_channel"]
+          context: string | null
           created_at: string
           id: string
           link: string | null
@@ -1481,7 +1715,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1492,7 +1731,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1503,6 +1747,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_org_id_fkey"
             columns: ["org_id"]
@@ -1653,7 +1904,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           notes?: string | null
-          number: string
+          number?: string
           org_id: string
           placed_at?: string | null
           ship_to_snapshot?: Json | null
@@ -2298,6 +2549,87 @@ export type Database = {
         }
         Relationships: []
       }
+      properties: {
+        Row: {
+          acquired_on: string | null
+          bathrooms: number | null
+          bedrooms: number | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          disposed_on: string | null
+          id: string
+          identifier: string | null
+          market_rent: number | null
+          name: string
+          org_id: string
+          parent_id: string | null
+          property_type: string | null
+          purchase_price: number | null
+          square_feet: number | null
+          status: Database["public"]["Enums"]["property_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name: string
+          org_id: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name?: string
+          org_id?: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_parent_id_org_id_fkey"
+            columns: ["parent_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       proposal_events: {
         Row: {
           actor: string | null
@@ -2720,7 +3052,7 @@ export type Database = {
           freight?: number
           id?: string
           notes?: string | null
-          number: string
+          number?: string
           ordered_at?: string | null
           org_id: string
           paid_at?: string | null
@@ -2965,6 +3297,73 @@ export type Database = {
             columns: ["relationship_type_id"]
             isOneToOne: false
             referencedRelation: "relationship_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rmas: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          number: string
+          org_id: string
+          reason: string | null
+          requested_on: string
+          resolution: string | null
+          status: Database["public"]["Enums"]["rma_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id?: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rmas_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3775,19 +4174,24 @@ export type Database = {
         | "rose"
         | "indigo"
       company_relationship: "customer" | "supplier" | "partner" | "other"
+      coupon_discount_type: "percent" | "amount"
       crm_entity_type:
         | "asset"
         | "billable"
         | "company"
         | "contact"
+        | "coupon"
         | "deal"
         | "member"
         | "invoice"
+        | "lease"
         | "order"
         | "product"
+        | "property"
         | "proposal"
         | "proposal_option"
         | "purchase"
+        | "rma"
         | "shipment"
         | "task"
         | "ticket"
@@ -3809,6 +4213,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "returned"
+      notification_channel: "inbox" | "general"
       order_status: "draft" | "confirmed" | "cancelled"
       org_role: "owner" | "admin" | "member"
       party_status: "lead" | "prospect" | "active" | "inactive"
@@ -3825,6 +4230,7 @@ export type Database = {
       permission_level: "read" | "manage" | "delete"
       priority: "low" | "normal" | "high" | "urgent"
       product_kind: "good" | "service"
+      property_status: "active" | "inactive" | "sold"
       proposal_event_type:
         | "sent"
         | "viewed"
@@ -3845,6 +4251,7 @@ export type Database = {
         | "partially_received"
         | "received"
         | "cancelled"
+      rma_status: "requested" | "approved" | "received" | "closed" | "rejected"
       shipment_delivery_status:
         | "preparing"
         | "pending"
@@ -4004,19 +4411,24 @@ export const Constants = {
         "indigo",
       ],
       company_relationship: ["customer", "supplier", "partner", "other"],
+      coupon_discount_type: ["percent", "amount"],
       crm_entity_type: [
         "asset",
         "billable",
         "company",
         "contact",
+        "coupon",
         "deal",
         "member",
         "invoice",
+        "lease",
         "order",
         "product",
+        "property",
         "proposal",
         "proposal_option",
         "purchase",
+        "rma",
         "shipment",
         "task",
         "ticket",
@@ -4041,6 +4453,7 @@ export const Constants = {
         "cancelled",
         "returned",
       ],
+      notification_channel: ["inbox", "general"],
       order_status: ["draft", "confirmed", "cancelled"],
       org_role: ["owner", "admin", "member"],
       party_status: ["lead", "prospect", "active", "inactive"],
@@ -4058,6 +4471,7 @@ export const Constants = {
       permission_level: ["read", "manage", "delete"],
       priority: ["low", "normal", "high", "urgent"],
       product_kind: ["good", "service"],
+      property_status: ["active", "inactive", "sold"],
       proposal_event_type: [
         "sent",
         "viewed",
@@ -4081,6 +4495,7 @@ export const Constants = {
         "received",
         "cancelled",
       ],
+      rma_status: ["requested", "approved", "received", "closed", "rejected"],
       shipment_delivery_status: [
         "preparing",
         "pending",

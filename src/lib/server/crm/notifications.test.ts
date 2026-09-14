@@ -4,8 +4,8 @@ import {
 	deleteNotification,
 	listNotifications,
 	markAllNotificationsRead,
-	markNotificationRead,
-	unreadNotificationCount
+	unreadNotificationCount,
+	updateNotification
 } from './notifications';
 import { ORG_ID, supabaseMock } from './test-support';
 
@@ -14,7 +14,7 @@ const USER_ID = '00000000-0000-0000-0000-000000000002';
 
 describe('notifications data access', () => {
 	it('lists the inbox for the active org, newest first, capped', async () => {
-		const rows = [{ id: NOTIFICATION_ID, title: 'Ticket assigned to you' }];
+		const rows = [{ id: NOTIFICATION_ID, title: 'assigned you a ticket' }];
 		const { supabase, from, builder } = supabaseMock({ data: rows });
 
 		await expect(listNotifications(supabase, ORG_ID)).resolves.toEqual(rows);
@@ -22,6 +22,17 @@ describe('notifications data access', () => {
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
 		expect(builder.limit).toHaveBeenCalledWith(50);
+	});
+
+	it('embeds the actor by its foreign key, never by table name', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await listNotifications(supabase, ORG_ID);
+		// A bare `profiles(...)` is ambiguous to PostgREST here — notifications
+		// reaches profiles through organization_members as well.
+		expect(builder.select).toHaveBeenCalledWith(
+			expect.stringContaining('profiles!notifications_actor_id_fkey')
+		);
 	});
 
 	it('narrows to unread rows when asked', async () => {
@@ -32,12 +43,35 @@ describe('notifications data access', () => {
 		expect(builder.limit).toHaveBeenCalledWith(10);
 	});
 
-	it('counts unread without fetching rows', async () => {
+	it('narrows to one channel when asked', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await listNotifications(supabase, ORG_ID, { channel: 'general' });
+		expect(builder.eq).toHaveBeenCalledWith('channel', 'general');
+	});
+
+	it('splits the two archive states, and asks for neither when told nothing', async () => {
+		const open = supabaseMock({ data: [] });
+		await listNotifications(open.supabase, ORG_ID, { archived: false });
+		expect(open.builder.is).toHaveBeenCalledWith('archived_at', null);
+
+		const dismissed = supabaseMock({ data: [] });
+		await listNotifications(dismissed.supabase, ORG_ID, { archived: true });
+		expect(dismissed.builder.not).toHaveBeenCalledWith('archived_at', 'is', null);
+
+		const both = supabaseMock({ data: [] });
+		await listNotifications(both.supabase, ORG_ID);
+		expect(both.builder.is).not.toHaveBeenCalledWith('archived_at', null);
+		expect(both.builder.not).not.toHaveBeenCalled();
+	});
+
+	it('counts unread without fetching rows, and never counts a dismissed one', async () => {
 		const { supabase, builder } = supabaseMock({ count: 3 });
 
 		await expect(unreadNotificationCount(supabase, ORG_ID)).resolves.toBe(3);
 		expect(builder.select).toHaveBeenCalledWith('*', { count: 'exact', head: true });
 		expect(builder.is).toHaveBeenCalledWith('read_at', null);
+		expect(builder.is).toHaveBeenCalledWith('archived_at', null);
 	});
 
 	it('treats a missing count as zero', async () => {
@@ -46,11 +80,11 @@ describe('notifications data access', () => {
 		await expect(unreadNotificationCount(supabase, ORG_ID)).resolves.toBe(0);
 	});
 
-	it('marks one notification read with a timestamp', async () => {
+	it('writes exactly the columns it was handed, to the named row', async () => {
 		const { supabase, builder } = supabaseMock({ data: { id: NOTIFICATION_ID } });
 
-		await markNotificationRead(supabase, NOTIFICATION_ID);
-		expect(builder.update).toHaveBeenCalledWith({ read_at: expect.any(String) });
+		await updateNotification(supabase, NOTIFICATION_ID, { read_at: '2026-09-18T09:00:00.000Z' });
+		expect(builder.update).toHaveBeenCalledWith({ read_at: '2026-09-18T09:00:00.000Z' });
 		expect(builder.eq).toHaveBeenCalledWith('id', NOTIFICATION_ID);
 	});
 
@@ -68,16 +102,24 @@ describe('notifications data access', () => {
 		await createNotification(supabase, {
 			org_id: ORG_ID,
 			user_id: USER_ID,
+			actor_id: '00000000-0000-0000-0000-000000000003',
+			channel: 'inbox',
 			type: 'ticket_assigned',
-			title: 'Ticket assigned to you',
-			link: '/tickets'
+			title: 'assigned you a ticket',
+			context: 'Support',
+			link: '/tickets',
+			action_label: 'Review'
 		});
 		expect(builder.insert).toHaveBeenCalledWith({
 			org_id: ORG_ID,
 			user_id: USER_ID,
+			actor_id: '00000000-0000-0000-0000-000000000003',
+			channel: 'inbox',
 			type: 'ticket_assigned',
-			title: 'Ticket assigned to you',
-			link: '/tickets'
+			title: 'assigned you a ticket',
+			context: 'Support',
+			link: '/tickets',
+			action_label: 'Review'
 		});
 	});
 

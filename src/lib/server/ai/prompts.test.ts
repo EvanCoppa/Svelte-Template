@@ -44,13 +44,8 @@ describe('buildInstructions', () => {
 	it('puts the cached persona first and the session block second', () => {
 		const [persona, session, ...rest] = buildInstructions(ctx);
 		expect(rest).toEqual([]);
-		expect(persona).toMatchObject({
-			role: 'system',
-			content: ASSISTANT_INSTRUCTIONS,
-			providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
-		});
+		expect(persona).toEqual({ role: 'system', content: ASSISTANT_INSTRUCTIONS });
 		expect(session.role).toBe('system');
 		expect(session.content).toContain('Acme Inc');
-		expect(session.providerOptions).toBeUndefined();
 	});
 });

@@ -14,7 +14,6 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import ReceiptIcon from '@lucide/svelte/icons/receipt';
-	import WaypointsIcon from '@lucide/svelte/icons/waypoints';
 	import * as Detail from '$lib/components/detail/index.js';
 	import EditRecord from '$lib/components/edit-record.svelte';
 	import * as Note from '$lib/components/note/index.js';
@@ -190,7 +189,7 @@
 					<ActivityIcon />Activity
 					{@render count(data.activities.length)}
 				</Tabs.Trigger>
-				{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+				{#if data.hasAddresses}
 					<Tabs.Trigger value="addresses">
 						<MapPinIcon />Addresses
 						{@render count(data.addresses.length)}
@@ -199,7 +198,7 @@
 				{#if data.billing}
 					<Tabs.Trigger value="billing"><ReceiptIcon />Billing</Tabs.Trigger>
 				{/if}
-				{#if data.record.kind === 'asset'}
+				{#if data.hasImages}
 					<Tabs.Trigger value="photos">
 						<ImageIcon />Photos
 						{@render count(data.images.length)}
@@ -236,7 +235,7 @@
 					</Card.Root>
 				{/if}
 			</Tabs.Content>
-			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+			{#if data.hasAddresses}
 				<Tabs.Content value="addresses">
 					{#if tab === 'addresses'}
 						<Detail.Addresses
@@ -297,7 +296,7 @@
 					{/if}
 				</Tabs.Content>
 			{/if}
-			{#if data.record.kind === 'asset'}
+			{#if data.hasImages}
 				<Tabs.Content value="photos">
 					{#if tab === 'photos'}
 						<Detail.Images
@@ -585,32 +584,17 @@
 			</div>
 		</section>
 
-		{#if data.relationships.length > 0}
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Relationships</Card.Title>
-					<Card.Description>
-						The records this {terms.noun} is linked to — who holds it, where it came from, who it refers
-						to.
-					</Card.Description>
-					{#if data.graphHref}
-						<Card.Action>
-							<Button variant="outline" size="sm" href={data.graphHref}>
-								<WaypointsIcon />
-								Open in graph
-							</Button>
-						</Card.Action>
-					{/if}
-				</Card.Header>
-				<Card.Content>
-					<ul class="divide-border divide-y">
-						{#each data.relationships as relationship (relationship.id)}
-							<Detail.Relationship {relationship} />
-						{/each}
-					</ul>
-				</Card.Content>
-			</Card.Root>
-		{/if}
+		<Detail.Relationships
+			relationships={data.relationships}
+			typeOptions={data.relationshipTypeOptions}
+			otherKinds={data.relationshipOtherKinds}
+			canManage={data.canManageRelationships}
+			form={data.relationshipForms.add}
+			removeForm={data.relationshipForms.remove}
+			graphHref={data.graphHref}
+			noun={terms.noun}
+			{queryKey}
+		/>
 
 		<Card.Root>
 			<Card.Header>

@@ -1,0 +1,21 @@
+-- Two more kinds of CRM record, shipped alone: Postgres refuses to use an
+-- enum value in the transaction that added it (the party-model migration
+-- explains), so the values land here and the migrations that follow add the
+-- tables and the `private.crm_entity_exists()` branches that make them
+-- resolvable.
+--
+--   coupon  a discount an org publishes — a code, what it takes off, and the
+--           window it is good for (the coupons migration)
+--   rma     a return: goods coming back from a customer, with the state that
+--           says how far back they are (the rmas migration)
+--
+-- Featured groups arrive in the same batch and are deliberately NOT here: a
+-- group is a named bundle of products, the quick_plans shape, and nothing
+-- tags, notes, addresses or relates to one. A kind earns an entity value by
+-- being something the shared polymorphic link needs to name, not by having a
+-- page.
+--
+-- Positioned to keep the enum alphabetical, the order the generated types
+-- list it in.
+alter type public.crm_entity_type add value if not exists 'coupon' after 'contact';
+alter type public.crm_entity_type add value if not exists 'rma' after 'purchase';

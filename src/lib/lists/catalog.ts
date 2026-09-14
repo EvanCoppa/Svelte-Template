@@ -2,12 +2,19 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
 	PRIORITY_TONE,
 	PRODUCT_KIND_TONE,
+	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
+	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { TermId } from '$lib/features/vocabulary';
@@ -56,7 +63,13 @@ const enumOf = (label: string, tones: Record<string, BadgeTone>): FieldMeta => (
 	options: enumOptions(tones)
 });
 /** A field naming another kind of record, labelled by that kind's word. */
-const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, type: 'record' });
+const record = (kind: 'company' | 'contact' | 'property'): FieldMeta => ({
+	label: { kind },
+	type: 'record'
+});
+/** A field naming another record under a label of its own — a role, not a kind. */
+const namedRecord = (label: string): FieldMeta => ({ label: { text: label }, type: 'record' });
+const number = (label: string): FieldMeta => ({ label: { text: label }, type: 'number' });
 /**
  * The record's picture, as a thumbnail beside its name. A column like any
  * other — an industry that does not sell things people look at hides it with
@@ -66,6 +79,17 @@ const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, t
 const image = (label: string): FieldMeta => ({ label: { text: label }, type: 'image' });
 /** A member's name, labelled by a word that belongs to no feature (a proposal's presenter). */
 const person = (id: TermId): FieldMeta => ({ label: { term: id }, type: 'text' });
+
+/**
+ * Whether a tenancy runs to a date or rolls on. A STORED fact (`ends_on` null
+ * or not), and deliberately not "is it running today" — that is a question
+ * about the viewer's date, and a server-described cell would be wrong at
+ * midnight. `leaseStateOn()` is that question, in the browser.
+ */
+export const LEASE_TERM_TONE = {
+	'fixed term': 'neutral',
+	'month-to-month': 'info'
+} as const satisfies Record<string, BadgeTone>;
 
 /** A yes/no field's two values, as `cellText()` reads them. */
 export const BOOLEAN_OPTIONS: readonly FilterOption[] = [
@@ -86,8 +110,12 @@ export const PAYMENT_OPTIONS: readonly FilterOption[] = [
 	{ value: 'overdue', label: 'Overdue', tone: 'error' }
 ];
 
-/** A billable's on/off switch, read as a status so it filters like one. */
-export const BILLABLE_STATUS_TONE = {
+/**
+ * An on/off switch read as a status so it filters like one — a billable's
+ * `is_active`, a coupon's. Not an enum in the database, which is why it is
+ * here beside the catalog rather than in `$lib/crm/tones`.
+ */
+export const ACTIVE_STATUS_TONE = {
 	active: 'success',
 	inactive: 'neutral'
 } as const satisfies Record<string, BadgeTone>;
@@ -123,6 +151,36 @@ export const LIST_FIELD_CATALOG = {
 		purchase_price: money('Purchase price'),
 		created_at: created
 	},
+	property: {
+		name: text('Name'),
+		// The building this row is a unit of. Labelled for the ROLE, not the
+		// kind: "Property" would name the record itself, and what the column
+		// shows is its parent.
+		parent: namedRecord('Part of'),
+		property_type: text('Type'),
+		identifier: text('Identifier'),
+		status: enumOf('Status', PROPERTY_STATUS_TONE),
+		bedrooms: number('Beds'),
+		bathrooms: number('Baths'),
+		square_feet: number('Sq ft'),
+		market_rent: money('Market rent'),
+		acquired_on: date('Acquired'),
+		purchase_price: money('Purchase price'),
+		created_at: created
+	},
+	lease: {
+		name: text('Lease'),
+		property: record('property'),
+		// A contact or a company — the party model — so the label is the role.
+		tenant: namedRecord('Tenant'),
+		term: enumOf('Term', LEASE_TERM_TONE),
+		starts_on: date('Starts'),
+		ends_on: date('Ends'),
+		rent_amount: money('Rent'),
+		rent_due_day: number('Due on'),
+		security_deposit: money('Deposit'),
+		created_at: created
+	},
 	product: {
 		name: text('Name'),
 		image: image('Image'),
@@ -130,7 +188,7 @@ export const LIST_FIELD_CATALOG = {
 		category: text('Category'),
 		sku: text('SKU'),
 		unit_price: money('Price'),
-		quantity_on_hand: { label: { text: 'On hand' }, type: 'number' },
+		quantity_on_hand: number('On hand'),
 		created_at: created
 	},
 	deal: {
@@ -144,7 +202,7 @@ export const LIST_FIELD_CATALOG = {
 		created_at: created
 	},
 	ticket: {
-		number: { label: { text: '#' }, type: 'number' },
+		number: number('#'),
 		name: text('Subject'),
 		company: record('company'),
 		contact: record('contact'),
@@ -168,7 +226,7 @@ export const LIST_FIELD_CATALOG = {
 		// The record it hangs off — a company, a contact, or a deal — whichever
 		// it is (docs/proposals.md, "the record it hangs off"); an unattached
 		// draft reads blank.
-		contact: { label: { text: 'Contact' }, type: 'record' },
+		contact: namedRecord('Contact'),
 		owner: person('proposal_responsible'),
 		presenter: person('proposal_presenter'),
 		status: enumOf('Status', PROPOSAL_STATUS_TONE),
@@ -182,7 +240,74 @@ export const LIST_FIELD_CATALOG = {
 		unit_price: money('Unit price'),
 		unit_choices: text('Units'),
 		is_featured: boolean('Featured'),
-		status: enumOf('Status', BILLABLE_STATUS_TONE),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		created_at: created
+	},
+	coupon: {
+		name: text('Code'),
+		discount_type: enumOf('Type', COUPON_DISCOUNT_TYPE_TONE),
+		/**
+		 * What the coupon takes off, already read against its type — "20%" or
+		 * "$15.00". Text rather than money or a number because the two types
+		 * print in different units, and a cell is typed by how it renders.
+		 */
+		discount: text('Discount'),
+		starts_on: date('Starts'),
+		ends_on: date('Ends'),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		description: text('Description'),
+		created_at: created
+	},
+	order: {
+		name: text('Number'),
+		// Both sides of the party model: an order names the company, and the
+		// person at it who asked when there is one.
+		company: record('company'),
+		contact: record('contact'),
+		// The two axes a fulfillment queue reads together — what a person
+		// committed to, and what the lines have folded into.
+		status: enumOf('Status', ORDER_STATUS_TONE),
+		fulfillment_status: enumOf('Fulfillment', FULFILLMENT_STATE_TONE),
+		customer_po: text('Customer PO'),
+		total: money('Total'),
+		estimated_ship_date: date('Est. ship'),
+		confirmed_at: datetime('Confirmed'),
+		created_at: created
+	},
+	shipment: {
+		// A shipment has no name of its own — the tracking number is what a
+		// row is known by, so the catalog's `name` key is that.
+		name: text('Tracking number'),
+		order: namedRecord('Order'),
+		delivery_status: enumOf('Status', SHIPMENT_DELIVERY_TONE),
+		carrier: text('Carrier'),
+		// Who shipped it, when it was not the org itself.
+		supplier: record('company'),
+		ship_date: date('Shipped'),
+		estimated_delivery_date: date('Due'),
+		delivered_at: datetime('Delivered'),
+		created_at: created
+	},
+	purchase: {
+		name: text('Number'),
+		// The vendor. A purchase names a company and never a person: you buy
+		// from an organisation, and the table's column is not nullable.
+		company: record('company'),
+		status: enumOf('Status', PURCHASE_STATUS_TONE),
+		reference: text('Reference'),
+		total: money('Total'),
+		expected_at: datetime('Expected'),
+		ordered_at: datetime('Ordered'),
+		created_at: created
+	},
+	rma: {
+		name: text('Number'),
+		company: record('company'),
+		contact: record('contact'),
+		status: enumOf('Status', RMA_STATUS_TONE),
+		requested_on: date('Requested'),
+		reason: text('Reason'),
+		resolution: text('Resolution'),
 		created_at: created
 	}
 } as const satisfies Record<ListKind, { name: FieldMeta } & Record<string, FieldMeta>>;

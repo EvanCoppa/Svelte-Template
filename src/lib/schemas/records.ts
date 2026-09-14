@@ -20,11 +20,11 @@ import { QUERY } from '$lib/queries';
  * number, a picked instant into an ISO timestamp) inside that one switch.
  * Client-safe like every schema module — no `$lib/server` imports.
  *
- * The fields are the record's own columns, plus the two that point it at a
- * party: a `company` or `contact` field is a picker whose options
- * `loadCreateRecord()` reads per request (an invoice is a bill to someone,
- * so it cannot be created without one). Still one form — the picker is a
- * field type, not a second modal.
+ * The fields are the record's own columns, plus the ones that point it at
+ * another row: a `company`, `contact` or `property` field is a picker whose
+ * options `loadCreateRecord()` reads per request (an invoice is a bill to
+ * someone and a lease is over something, so neither can be created without
+ * one). Still one form — the picker is a field type, not a second modal.
  *
  * A proposal is not here on purpose: it is a title plus one to five priced
  * options made of catalog lines — more than one row of strings — so it has
@@ -43,7 +43,13 @@ export const RECORD_TYPES = [
 	'product',
 	'billable',
 	'asset',
+	'property',
+	'lease',
 	'invoice',
+	'coupon',
+	'order',
+	'purchase',
+	'rma',
 	'task',
 	'ticket'
 ] as const;
@@ -58,10 +64,11 @@ export type RecordFieldOption = { value: string; label: string; sublabel?: strin
 /**
  * The kinds of row a record form can point at — each a picker whose options
  * are the org's own rows rather than a vocabulary the registry can hold: the
- * two parties, and the stage a deal sits in (its board is `pipelines` rows,
- * so the choices differ per org and per industry).
+ * two parties, the stage a deal sits in (its board is `pipelines` rows, so
+ * the choices differ per org and per industry), and the property a lease is
+ * over (a unit is a row like any other).
  */
-export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage'] as const;
+export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage', 'property'] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
@@ -72,9 +79,9 @@ export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFiel
  * How one field is rendered. `select` is a fixed vocabulary this app owns (an
  * enum column) and renders as a `Combobox`; `number` is money or a measure
  * and `integer` a count (days of terms); `datetime` is a wall-clock pick the
- * browser converts to an instant before posting; `company`, `contact` and
- * `stage` are pickers over the org's own rows, whose options arrive with the
- * form rather than sitting in the registry.
+ * browser converts to an instant before posting; the picker kinds
+ * (`RECORD_PICKER_KINDS`) are choices from the org's own rows, whose options
+ * arrive with the form rather than sitting in the registry.
  */
 export type RecordField = {
 	name: string;
@@ -252,6 +259,67 @@ export const assetRecordSchema = z.object({
 });
 
 /**
+ * A building, or a unit inside one — one form, because they are one table.
+ * Leaving `parent_id` blank makes a building (or a single-family, which is
+ * its own unit); picking one makes a unit inside it. The database refuses a
+ * unit of a unit, so the picker cannot be used to build a deeper tree.
+ */
+export const propertyRecordSchema = z.object({
+	name: requiredText('Name'),
+	parent_id: optionalPick,
+	property_type: optionalText,
+	identifier: optionalText,
+	status: z.enum(['active', 'inactive', 'sold']).default('active'),
+	bedrooms: optionalInteger,
+	// Not `optionalInteger`: half baths are the whole reason this field exists.
+	bathrooms: optionalAmount,
+	square_feet: optionalInteger,
+	market_rent: optionalAmount,
+	acquired_on: optionalDate,
+	purchase_price: optionalAmount,
+	description: optionalLongText
+});
+
+/**
+ * A tenancy. The property and a tenant are both required — a lease over
+ * nothing, or to nobody, is what the table's own checks refuse — and a blank
+ * end date is month-to-month rather than missing, which is why it is not
+ * required here.
+ */
+export const leaseRecordSchema = z
+	.object({
+		property_id: z.guid('Pick the property being rented.'),
+		company_id: optionalPick,
+		contact_id: optionalPick,
+		starts_on: z
+			.string()
+			.trim()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose the date the lease starts.'),
+		ends_on: optionalDate,
+		rent_amount: z
+			.string()
+			.trim()
+			.regex(/^\d{1,12}(\.\d{1,2})?$/, 'Enter a rent like 1200 or 1200.50'),
+		rent_due_day: optionalInteger,
+		security_deposit: optionalAmount,
+		notes: optionalLongText
+	})
+	.refine((data) => data.company_id !== '' || data.contact_id !== '', {
+		error: 'Pick a person or a company as the tenant.',
+		path: ['contact_id']
+	})
+	.refine((data) => data.ends_on === '' || data.ends_on >= data.starts_on, {
+		error: 'The lease cannot end before it starts.',
+		path: ['ends_on']
+	})
+	.refine(
+		(data) =>
+			data.rent_due_day === '' ||
+			(Number(data.rent_due_day) >= 1 && Number(data.rent_due_day) <= 31),
+		{ error: 'Rent is due on a day of the month, 1 to 31.', path: ['rent_due_day'] }
+	);
+
+/**
  * A draft: who it bills and on what terms. The lines come after, on the
  * invoice's own page, and issuing it is a separate act — a bill to nobody
  * is refused here, exactly as the table's check refuses it.
@@ -270,6 +338,98 @@ export const invoiceRecordSchema = z
 		path: ['company_id']
 	});
 
+/**
+ * The offer: a code, what it takes off, and how long for. No redemption
+ * limit — nothing counts one yet, and the coupons migration says why a limit
+ * nothing counts against is worse than none.
+ */
+export const couponRecordSchema = z
+	.object({
+		code: z
+			.string()
+			.trim()
+			.min(2, 'A code is at least 2 characters.')
+			.max(40, 'A code is 40 characters or fewer.')
+			.regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, dashes and underscores only.'),
+		discount_type: z.enum(['percent', 'amount']).default('percent'),
+		discount_value: optionalAmount,
+		starts_on: optionalDate,
+		ends_on: optionalDate,
+		is_active: z.enum(['true', 'false']).default('true'),
+		description: optionalLongText
+	})
+	// The table's own check, said in the form so it lands on the field rather
+	// than coming back as a database message.
+	.refine((data) => data.discount_type !== 'percent' || Number(data.discount_value || 0) <= 100, {
+		error: 'A percentage cannot be over 100.',
+		path: ['discount_value']
+	})
+	.refine(
+		(data) => data.starts_on === '' || data.ends_on === '' || data.ends_on >= data.starts_on,
+		{
+			error: 'The end date is before the start date.',
+			path: ['ends_on']
+		}
+	);
+
+/**
+ * A customer order's header: who asked, their own reference for it, when it
+ * is expected to leave and what rides on top of the lines. The LINES are not
+ * here — they are added on the order's own page, the way an invoice's are —
+ * and neither is either status: confirming and cancelling are acts on that
+ * page, and how much has shipped is folded from the lines.
+ */
+export const orderRecordSchema = z.object({
+	// Not optional: `orders.company_id` is NOT NULL. The CONTACT is, by the
+	// party model — an order can be taken from a company rather than a person.
+	company_id: z.guid({ error: 'Pick the customer this order is for.' }),
+	contact_id: optionalPick,
+	customer_po: optionalText,
+	estimated_ship_date: optionalDate,
+	shipping: optionalAmount,
+	discount: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
+ * A purchase order's header: who it is placed with, what it is called, when
+ * it is wanted and what rides on top of the lines. The LINES are not here —
+ * they are added on the purchase's own page, the way an invoice's are — and
+ * neither is the status: placing and cancelling are acts on that page, and
+ * everything between is derived from what has arrived.
+ */
+export const purchaseRecordSchema = z.object({
+	// Not optional: `purchases.company_id` is NOT NULL — you buy FROM someone.
+	company_id: z.guid({ error: 'Pick the vendor this order goes to.' }),
+	reference: optionalText,
+	expected_at: optionalInstant,
+	due_date: optionalDate,
+	freight: optionalAmount,
+	tax: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
+ * A return: who it is from, why, how far along, and what was decided. The
+ * number is the database's, and which units are coming back waits for
+ * inventory movement (the rmas migration).
+ */
+export const rmaRecordSchema = z
+	.object({
+		company_id: optionalPick,
+		contact_id: optionalPick,
+		status: z
+			.enum(['requested', 'approved', 'received', 'closed', 'rejected'])
+			.default('requested'),
+		requested_on: optionalDate,
+		reason: optionalLongText,
+		resolution: optionalLongText
+	})
+	.refine((data) => data.company_id !== '' || data.contact_id !== '', {
+		error: 'Pick the company or the person the return is from.',
+		path: ['company_id']
+	});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
@@ -282,6 +442,12 @@ export const ticketRecordSchema = z.object({
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
 	description: optionalLongText
 });
+
+/**
+ * Every list page's row menu: the id of the record to delete. One schema for
+ * every kind — deleting needs nothing about the record but which row it is.
+ */
+export const deleteRecordSchema = z.object({ id: z.guid() });
 
 /**
  * The schema behind each record type, as the generic form and its action use
@@ -298,7 +464,13 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	product: productRecordSchema,
 	billable: billableRecordSchema,
 	asset: assetRecordSchema,
+	property: propertyRecordSchema,
+	lease: leaseRecordSchema,
 	invoice: invoiceRecordSchema,
+	coupon: couponRecordSchema,
+	order: orderRecordSchema,
+	purchase: purchaseRecordSchema,
+	rma: rmaRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
@@ -438,6 +610,62 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
 		]
 	},
+	property: {
+		feature: 'properties',
+		query: QUERY.properties,
+		// Who owns it, who manages it and which trade services it are
+		// deliberately not fields: those are relationships, drawn on the record
+		// once it exists.
+		fields: [
+			{ name: 'name', label: 'Name', type: 'text', placeholder: 'Rowan Street — Unit 1' },
+			// Blank makes a building (or a single-family, which is its own
+			// unit); picking one makes a unit inside it. The database refuses a
+			// unit of a unit, so this cannot build a deeper tree.
+			{ name: 'parent_id', label: 'Part of', type: 'property' },
+			{ name: 'property_type', label: 'Type', type: 'text', placeholder: 'duplex' },
+			{ name: 'identifier', label: 'Identifier', type: 'text', placeholder: 'ROWAN-1' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'active', label: 'Active' },
+					{ value: 'inactive', label: 'Inactive' },
+					{ value: 'sold', label: 'Sold' }
+				]
+			},
+			{ name: 'bedrooms', label: 'Bedrooms', type: 'integer', placeholder: '2' },
+			{ name: 'bathrooms', label: 'Bathrooms', type: 'number', placeholder: '1.5' },
+			{ name: 'square_feet', label: 'Square feet', type: 'integer', placeholder: '940' },
+			{ name: 'market_rent', label: 'Market rent', type: 'number', placeholder: '1200.00' },
+			{ name: 'acquired_on', label: 'Acquired', type: 'date' },
+			{ name: 'purchase_price', label: 'Purchase price', type: 'number', placeholder: '268000.00' },
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	lease: {
+		feature: 'leases',
+		query: QUERY.leases,
+		fields: [
+			{ name: 'property_id', label: 'Property', type: 'property' },
+			{ name: 'contact_id', label: 'Tenant', type: 'contact' },
+			// A shop or a corporate let names the company instead — the party
+			// model, same as an invoice's customer.
+			{ name: 'company_id', label: 'Tenant company', type: 'company' },
+			{ name: 'starts_on', label: 'Starts', type: 'date' },
+			// Blank is month-to-month, not missing.
+			{ name: 'ends_on', label: 'Ends', type: 'date' },
+			{ name: 'rent_amount', label: 'Rent', type: 'number', placeholder: '1200.00' },
+			{ name: 'rent_due_day', label: 'Rent due on', type: 'integer', placeholder: '1' },
+			{
+				name: 'security_deposit',
+				label: 'Security deposit',
+				type: 'number',
+				placeholder: '1200.00'
+			},
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
 	invoice: {
 		feature: 'invoices',
 		query: QUERY.invoices,
@@ -454,6 +682,91 @@ export const RECORD_FORMS: RecordFormRegistry = {
 				placeholder: 'Shown on the invoice',
 				wide: true
 			}
+		]
+	},
+	coupon: {
+		feature: 'coupons',
+		query: QUERY.coupons,
+		fields: [
+			{ name: 'code', label: 'Code', type: 'text', placeholder: 'SPRING20' },
+			{
+				name: 'discount_type',
+				label: 'Type',
+				type: 'select',
+				options: [
+					{ value: 'percent', label: 'Percent off' },
+					{ value: 'amount', label: 'Amount off' }
+				]
+			},
+			{ name: 'discount_value', label: 'Discount', type: 'number', placeholder: '20' },
+			{ name: 'starts_on', label: 'Starts', type: 'date' },
+			{ name: 'ends_on', label: 'Ends', type: 'date' },
+			{
+				name: 'is_active',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'true', label: 'Active' },
+					{ value: 'false', label: 'Inactive' }
+				]
+			},
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	order: {
+		feature: 'orders',
+		query: QUERY.orders,
+		// No status field, and no fulfillment either: `draft` is where every
+		// order starts, confirming and cancelling are acts on the record page,
+		// and how much has shipped is the lines' to say.
+		fields: [
+			{ name: 'company_id', label: 'Customer', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'customer_po', label: 'Customer PO', type: 'text', placeholder: 'PO-4471' },
+			{ name: 'estimated_ship_date', label: 'Est. ship', type: 'date' },
+			{ name: 'shipping', label: 'Shipping', type: 'number', placeholder: '25.00' },
+			{ name: 'discount', label: 'Discount', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
+	purchase: {
+		feature: 'purchases',
+		query: QUERY.purchases,
+		// No status field: `draft` is where every purchase starts, and moving
+		// it is an act on the record page, never a picked value.
+		fields: [
+			{ name: 'company_id', label: 'Vendor', type: 'company' },
+			{ name: 'reference', label: 'Reference', type: 'text', placeholder: 'Spring restock' },
+			{ name: 'expected_at', label: 'Expected', type: 'datetime' },
+			{ name: 'due_date', label: 'Payment due', type: 'date' },
+			{ name: 'freight', label: 'Freight', type: 'number', placeholder: '120.00' },
+			{ name: 'tax', label: 'Tax', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
+	rma: {
+		feature: 'rmas',
+		query: QUERY.rmas,
+		// The order the goods came off is deliberately not a field: nothing can
+		// pick an order until the Orders feature has a page (the rmas migration).
+		fields: [
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'requested', label: 'Requested' },
+					{ value: 'approved', label: 'Approved' },
+					{ value: 'received', label: 'Received' },
+					{ value: 'closed', label: 'Closed' },
+					{ value: 'rejected', label: 'Rejected' }
+				]
+			},
+			{ name: 'requested_on', label: 'Requested', type: 'date' },
+			{ name: 'reason', label: 'Reason', type: 'textarea', wide: true },
+			{ name: 'resolution', label: 'Resolution', type: 'textarea', wide: true }
 		]
 	},
 	task: {

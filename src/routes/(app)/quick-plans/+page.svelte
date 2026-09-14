@@ -11,7 +11,7 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import * as QuickPlans from './components/index.js';
+	import RowActions from '$lib/components/row-actions.svelte';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { ComboboxOption } from '$lib/components/ui/combobox/combobox.js';
@@ -78,7 +78,7 @@
 				meta: { title: 'Includes' }
 			}),
 			DataTable.actionsColumn(columnHelper, ({ row }) =>
-				renderComponent(QuickPlans.RowActions, {
+				renderComponent(RowActions, {
 					name: row.original.name,
 					canEdit: data.canManage,
 					canDelete: data.canDelete,

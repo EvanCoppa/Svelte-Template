@@ -47,9 +47,9 @@
 		<!-- Extra top padding lines the workspace switcher and collapse button up
 		     with the main content's page title, which carries its own top padding
 		     from `.app-content` in the `(app)` layout. -->
-		<div class="flex items-center gap-1">
+		<div class="flex items-center justify-between gap-1">
 			{#if activeOrg}
-				<div class="min-w-0 flex-1">
+				<div class="min-w-0">
 					<TeamSwitcher {organizations} {activeOrg} />
 				</div>
 			{/if}

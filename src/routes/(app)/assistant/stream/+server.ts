@@ -24,7 +24,7 @@ export const config = { maxDuration: 120 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!isAiConfigured()) {
-		throw error(503, 'The assistant is not configured. Set ANTHROPIC_API_KEY on the server.');
+		throw error(503, 'The assistant is not configured. Set OPENAI_API_KEY on the server.');
 	}
 	const context = assistantContext(locals);
 

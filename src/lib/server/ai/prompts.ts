@@ -1,11 +1,11 @@
 import type { SystemModelMessage } from 'ai';
 
 /**
- * The assistant's standing instructions. Stable text, so it goes first and
- * carries the provider's cache-control marker: with Anthropic, everything up
- * to and including this block is served from the prompt cache on the second
- * turn. Per-request facts live in `sessionContext()`, after it, so they never
- * invalidate the cached prefix.
+ * The assistant's standing instructions. Stable text, so it goes first:
+ * OpenAI caches the longest stable prefix of a request — routed per thread
+ * by the `promptCacheKey` the agent sets (`provider.ts`) — and everything up to
+ * and including this block is that prefix on the second turn. Per-request
+ * facts live in `sessionContext()`, after it, so they never invalidate it.
  */
 export const ASSISTANT_INSTRUCTIONS = `You are the assistant built into this workspace: a CRM where a team tracks the companies and contacts it works with, its deals, tasks and support tickets.
 
@@ -64,11 +64,7 @@ export function sessionContext(ctx: SessionContext): string {
  */
 export function buildInstructions(ctx: SessionContext): SystemModelMessage[] {
 	return [
-		{
-			role: 'system',
-			content: ASSISTANT_INSTRUCTIONS,
-			providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
-		},
+		{ role: 'system', content: ASSISTANT_INSTRUCTIONS },
 		{ role: 'system', content: sessionContext(ctx) }
 	];
 }

@@ -4,15 +4,23 @@ import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
-import type { RecordKind } from '$lib/crm/records';
+import { RECORD_KIND_META, type RecordKind } from '$lib/crm/records';
+import type { ListKind } from '$lib/lists/types';
 import {
 	assetRecordSchema,
 	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
+	couponRecordSchema,
 	dealRecordSchema,
+	deleteRecordSchema,
 	invoiceRecordSchema,
+	leaseRecordSchema,
 	productRecordSchema,
+	orderRecordSchema,
+	purchaseRecordSchema,
+	rmaRecordSchema,
+	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -25,16 +33,42 @@ import {
 	type RecordPickers,
 	type RecordType
 } from '$lib/schemas/records';
-import { createAsset, getAsset, updateAsset } from './crm/assets';
-import { createBillable, getBillable, updateBillable } from './crm/billables';
-import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
-import { createContact, getContact, listContacts, updateContact } from './crm/contacts';
-import { createDeal, dealPlacement, getDeal, updateDeal } from './crm/deals';
+import { createAsset, deleteAsset, getAsset, updateAsset } from './crm/assets';
+import { createBillable, deleteBillable, getBillable, updateBillable } from './crm/billables';
+import {
+	createCompany,
+	deleteCompany,
+	getCompany,
+	listCompanies,
+	updateCompany
+} from './crm/companies';
+import {
+	createContact,
+	deleteContact,
+	getContact,
+	listContacts,
+	updateContact
+} from './crm/contacts';
+import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
+import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
+import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
-import { createProduct, getProduct, updateProduct } from './crm/products';
+import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
+import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
+import { deleteShipment } from './crm/shipments';
+import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
+import {
+	createProperty,
+	deleteProperty,
+	getProperty,
+	listProperties,
+	updateProperty
+} from './crm/properties';
+import { deleteProposal } from './crm/proposals';
 import { createTask, getTask, updateTask } from './crm/tasks';
-import { createTicket, getTicket, updateTicket } from './crm/tickets';
+import { createTicket, deleteTicket, getTicket, updateTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
 
 /**
@@ -143,6 +177,21 @@ async function pickerOptions(
 					sublabel: pipeline.name
 				}))
 			);
+		case 'property': {
+			// Buildings and units in one list, because they are one table — and
+			// a unit is shown under the building it belongs to, so two
+			// "Unit 1"s tell apart. One pass builds the name index, so the
+			// sublabel costs no extra query.
+			const rows = await listProperties(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id
+					? (names.get(row.parent_id) ?? undefined)
+					: (row.property_type ?? undefined)
+			}));
+		}
 	}
 }
 
@@ -256,6 +305,110 @@ export async function updateRecord(
 	return { form };
 }
 
+// ---------------------------------------------------------------------------
+// Deleting one — every list page's row menu
+// ---------------------------------------------------------------------------
+
+/**
+ * The kinds a list page's row menu may delete: every kind with a list page
+ * but an invoice, which is a document with a lifecycle (draft → issued →
+ * void) rather than a row to discard — voiding is how an issued one goes
+ * away, and a draft is removed from its own page, never a table.
+ */
+export type DeletableListKind = Exclude<ListKind, 'invoice'>;
+
+/** One id for every delete form, distinct from the create and edit forms'. */
+export const DELETE_FORM_ID = 'delete-record';
+
+/** An empty delete form — every list page's load builds one for its row menu. */
+export function deleteRecordForm(): Promise<SuperValidated<{ id: string }>> {
+	return superValidate(zod4(deleteRecordSchema), { id: DELETE_FORM_ID, errors: false });
+}
+
+/** What a list page's load adds for its row menu's Delete: the form, and whether this reader may use it. */
+export async function loadDeleteRecord(
+	locals: App.Locals,
+	kind: DeletableListKind
+): Promise<{ deleteForm: SuperValidated<{ id: string }>; canDelete: boolean }> {
+	const { org } = locals;
+	if (!org) throw redirect(303, '/login');
+	return {
+		deleteForm: await deleteRecordForm(),
+		canDelete: can(org.access, RECORD_KIND_META[kind].feature, 'delete')
+	};
+}
+
+/** The `deleteRecord` action every list page delegates to. */
+export async function deleteRecord(
+	event: Pick<RequestEvent, 'request' | 'locals'>,
+	kind: DeletableListKind
+) {
+	const { request, locals } = event;
+	const { supabase, activeOrgId, org } = locals;
+	if (!activeOrgId || !org) throw redirect(303, '/login');
+
+	requirePermission(org.access, RECORD_KIND_META[kind].feature, 'delete');
+
+	const form = await superValidate(request, zod4(deleteRecordSchema), { id: DELETE_FORM_ID });
+	if (!form.valid) return fail(400, { form });
+
+	try {
+		await removeRecord(supabase, activeOrgId, kind, form.data.id);
+	} catch (cause) {
+		return message(form, cause instanceof Error ? cause.message : 'Could not delete the record.', {
+			status: 400
+		});
+	}
+
+	return { form };
+}
+
+/** The one place a deletable kind becomes the crm module that removes its row. */
+async function removeRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	kind: DeletableListKind,
+	id: string
+): Promise<void> {
+	switch (kind) {
+		case 'company':
+			return deleteCompany(supabase, orgId, id);
+		case 'contact':
+			return deleteContact(supabase, orgId, id);
+		case 'deal':
+			return deleteDeal(supabase, orgId, id);
+		case 'product':
+			return deleteProduct(supabase, orgId, id);
+		case 'billable':
+			return deleteBillable(supabase, orgId, id);
+		case 'asset':
+			return deleteAsset(supabase, orgId, id);
+		case 'property':
+			// A building's units go with it (`parent_id` cascades), which is the
+			// depth cap earning its keep: there is no third level to orphan.
+			return deleteProperty(supabase, orgId, id);
+		case 'lease':
+			return deleteLease(supabase, orgId, id);
+		case 'proposal':
+			return deleteProposal(supabase, orgId, id);
+		case 'ticket':
+			return deleteTicket(supabase, orgId, id);
+		case 'coupon':
+			return deleteCoupon(supabase, orgId, id);
+		case 'order':
+			return deleteOrder(supabase, orgId, id);
+		// A shipment is deletable but not creatable or editable through the
+		// generic form: `order_id` is not null and insert-only, so a box is
+		// packed on the order it ships.
+		case 'shipment':
+			return deleteShipment(supabase, orgId, id);
+		case 'purchase':
+			return deletePurchase(supabase, orgId, id);
+		case 'rma':
+			return deleteRma(supabase, orgId, id);
+	}
+}
+
 /**
  * The mirror of the switch below: one place a row becomes the strings the
  * form holds. Only the fields the form asks for — a column the registry does
@@ -347,6 +500,98 @@ async function recordFormValues(
 						acquired_on: str(row.acquired_on),
 						purchase_price: str(row.purchase_price),
 						description: str(row.description)
+					}
+				: {};
+		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row
+				? {
+						code: row.code,
+						discount_type: row.discount_type,
+						discount_value: str(row.discount_value),
+						starts_on: str(row.starts_on),
+						ends_on: str(row.ends_on),
+						is_active: row.is_active ? 'true' : 'false',
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						parent_id: str(row.parent_id),
+						property_type: str(row.property_type),
+						identifier: str(row.identifier),
+						status: row.status,
+						bedrooms: str(row.bedrooms),
+						bathrooms: str(row.bathrooms),
+						square_feet: str(row.square_feet),
+						market_rent: str(row.market_rent),
+						acquired_on: str(row.acquired_on),
+						purchase_price: str(row.purchase_price),
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						contact_id: str(row.contact_id),
+						customer_po: str(row.customer_po),
+						estimated_ship_date: str(row.estimated_ship_date),
+						shipping: str(row.shipping),
+						discount: str(row.discount),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						reference: str(row.reference),
+						expected_at: str(row.expected_at),
+						due_date: str(row.due_date),
+						freight: str(row.freight),
+						tax: str(row.tax),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row
+				? {
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						status: row.status,
+						requested_on: str(row.requested_on),
+						reason: str(row.reason),
+						resolution: str(row.resolution)
+					}
+				: {};
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row
+				? {
+						property_id: row.property_id,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						starts_on: row.starts_on,
+						// Blank for a month-to-month tenancy, which is what a
+						// null end date means.
+						ends_on: str(row.ends_on),
+						rent_amount: str(row.rent_amount),
+						rent_due_day: str(row.rent_due_day),
+						security_deposit: str(row.security_deposit),
+						notes: str(row.notes)
 					}
 				: {};
 		}
@@ -495,6 +740,56 @@ async function writeRecord(
 				: createAsset(supabase, orgId, columns));
 			return;
 		}
+		case 'property': {
+			const data = propertyRecordSchema.parse(values);
+			// A blank parent is a building (or a single-family, which is its
+			// own unit); a picked one makes this a unit inside it. The
+			// database refuses a unit of a unit on either path, so neither
+			// creating nor re-parenting can build a deeper tree.
+			const columns = {
+				name: data.name,
+				parent_id: text(data.parent_id),
+				property_type: text(data.property_type),
+				identifier: text(data.identifier),
+				status: data.status,
+				bedrooms: integer(data.bedrooms),
+				bathrooms: amount(data.bathrooms),
+				square_feet: integer(data.square_feet),
+				market_rent: amount(data.market_rent),
+				acquired_on: text(data.acquired_on),
+				purchase_price: amount(data.purchase_price),
+				description: text(data.description)
+			};
+			await (id
+				? updateProperty(supabase, orgId, id, columns)
+				: createProperty(supabase, orgId, columns));
+			return;
+		}
+		case 'lease': {
+			const data = leaseRecordSchema.parse(values);
+			// A blank end date is month-to-month, so it stays null rather than
+			// being invented — and ending a lease early is moving this date,
+			// not a status change, because there is no status column.
+			const columns = {
+				property_id: data.property_id,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				starts_on: data.starts_on,
+				ends_on: text(data.ends_on),
+				rent_amount: Number(data.rent_amount),
+				// Blank is the column's own default (the 1st), written out
+				// rather than omitted: on an edit, leaving it out would mean
+				// "as it was", and a blank field means the empty value on both
+				// paths.
+				rent_due_day: data.rent_due_day === '' ? 1 : Number(data.rent_due_day),
+				security_deposit: amount(data.security_deposit),
+				notes: text(data.notes)
+			};
+			await (id
+				? updateLease(supabase, orgId, id, columns)
+				: createLease(supabase, orgId, columns));
+			return;
+		}
 		case 'invoice': {
 			// Create only — an invoice is edited through its own lifecycle
 			// actions on the record page, which is why it is not an
@@ -513,6 +808,74 @@ async function writeRecord(
 				billing_email: text(data.billing_email),
 				memo: text(data.memo)
 			});
+			return;
+		}
+		case 'coupon': {
+			const data = couponRecordSchema.parse(values);
+			const columns = {
+				code: data.code,
+				discount_type: data.discount_type,
+				// A not-null money column: blank is zero, the products rule.
+				discount_value: price(data.discount_value),
+				starts_on: text(data.starts_on),
+				ends_on: text(data.ends_on),
+				is_active: data.is_active === 'true',
+				description: text(data.description)
+			};
+			await (id
+				? updateCoupon(supabase, orgId, id, columns)
+				: createCoupon(supabase, orgId, columns));
+			return;
+		}
+		case 'order': {
+			const data = orderRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				contact_id: text(data.contact_id),
+				customer_po: text(data.customer_po),
+				estimated_ship_date: text(data.estimated_ship_date),
+				// Not-null money columns: blank is zero, the products rule.
+				shipping: price(data.shipping),
+				discount: price(data.discount),
+				notes: text(data.notes)
+			};
+			await (id
+				? updateOrder(supabase, orgId, id, columns)
+				: createOrder(supabase, orgId, columns));
+			return;
+		}
+		case 'purchase': {
+			const data = purchaseRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				reference: text(data.reference),
+				expected_at: instant(data.expected_at),
+				due_date: text(data.due_date),
+				// Not-null money columns: blank is zero, the products rule.
+				freight: price(data.freight),
+				tax: price(data.tax),
+				notes: text(data.notes)
+			};
+			await (id
+				? updatePurchase(supabase, orgId, id, columns)
+				: createPurchase(supabase, orgId, columns));
+			return;
+		}
+		case 'rma': {
+			const data = rmaRecordSchema.parse(values);
+			const columns = {
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				status: data.status,
+				reason: text(data.reason),
+				resolution: text(data.resolution)
+			};
+			// `requested_on` is not null with a default of today, so a blank
+			// field means today rather than a null the column would refuse.
+			const requested = data.requested_on === '' ? {} : { requested_on: data.requested_on };
+			await (id
+				? updateRma(supabase, orgId, id, { ...columns, ...requested })
+				: createRma(supabase, orgId, { ...columns, ...requested }));
 			return;
 		}
 		case 'task': {

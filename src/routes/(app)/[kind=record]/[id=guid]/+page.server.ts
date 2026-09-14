@@ -45,6 +45,7 @@ import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
 import { billingActions, loadBilling } from './billing.server';
+import { loadRelationshipPickers, relationshipActions } from './relationships.server';
 import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
 import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
@@ -69,10 +70,10 @@ import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-co
  * pages create with — the registry describes a kind once and `EditRecord`
  * renders it, so a deal's stage moves from the same place a deal is named
  * (`$lib/server/records.ts`). Everything hanging off the record has its own
- * form beside it: a party's addresses, whose action geocodes what it saves so
- * the record can sit on a view's map, and an invoice's lines and payments,
- * which `billing.server.ts` keeps — the page draws that block whenever the
- * load supplies `billing`, a data-presence check like the thread's.
+ * form beside it: addresses, whose action geocodes what it saves so the
+ * record can sit on a view's map, and an invoice's lines and payments, which
+ * `billing.server.ts` keeps — the page draws that block whenever the load
+ * supplies `billing`, a data-presence check like the thread's.
  */
 
 /** Explicit form ids, shared by the load, the actions and the page's `superForm`s. */
@@ -85,14 +86,19 @@ const FORM_IDS = {
 	removeComment: 'remove-comment'
 } as const;
 
-/** Whether the kind has addresses at all — the database refuses one on anything else. */
-function isParty(kind: RecordKind): kind is 'company' | 'contact' {
-	return kind === 'company' || kind === 'contact';
+/**
+ * Whether the kind has addresses at all — the database refuses one on
+ * anything else, so this mirrors `addresses_entity_is_party_or_property`
+ * exactly. Widen both together or the card silently stops being drawn for a
+ * kind the table would happily accept.
+ */
+function hasAddresses(kind: RecordKind): kind is 'company' | 'contact' | 'property' {
+	return kind === 'company' || kind === 'contact' || kind === 'property';
 }
 
-/** Whether the kind has photos at all — the database refuses one on anything else. */
-function isAsset(kind: RecordKind): kind is 'asset' {
-	return kind === 'asset';
+/** Whether the kind has photos at all — mirrors `entity_images_entity_is_asset_or_property`. */
+function hasImages(kind: RecordKind): kind is 'asset' | 'property' {
+	return kind === 'asset' || kind === 'property';
 }
 
 /**
@@ -124,11 +130,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		passesFeatureGate(recordListHref(other), features, canRead);
 
 	// Everything that attaches to a record hangs off the shared entity link, so
-	// the same handful of reads serve every kind; only a party has addresses
-	// and only an asset has photos.
+	// the same handful of reads serve every kind; what differs is which kinds
+	// the database lets carry an address or a photo.
 	const entity = { entityType: kind, entityId: id };
-	const party = isParty(kind);
-	const asset = isAsset(kind);
+	const addressable = hasAddresses(kind);
+	const imageable = hasImages(kind);
 	const threaded = hasThread(kind);
 	// Notes are the general table, not a CRM one: a record shows the ones
 	// pointed at it, and only when this session has the feature at all.
@@ -147,13 +153,14 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		relationships,
 		notes,
 		messages,
-		billing
+		billing,
+		relationshipPickers
 	] = await Promise.all([
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
 		listTagsFor(supabase, activeOrgId, entity),
-		party ? listAddresses(supabase, activeOrgId, entity) : [],
-		asset ? listEntityImages(supabase, activeOrgId, entity) : [],
+		addressable ? listAddresses(supabase, activeOrgId, entity) : [],
+		imageable ? listEntityImages(supabase, activeOrgId, entity) : [],
 		listCustomFields(supabase, activeOrgId, entity),
 		listRelatedRecords(supabase, activeOrgId, kind, id, canOpen),
 		// The graph: every relationship this record stands in, from either
@@ -163,7 +170,10 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : [],
 		threaded ? listTaskComments(supabase, activeOrgId, id) : [],
 		// Null for every kind but an invoice; the block's own module decides.
-		loadBilling(locals, params)
+		loadBilling(locals, params),
+		// The Relationships card's write side: which type-and-direction
+		// choices fit this record, and whether this reader may draw one.
+		loadRelationshipPickers(locals, kind, canOpen)
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
@@ -223,14 +233,24 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		addresses,
 		addressForm,
 		removeAddressForm,
-		canManageAddresses: party && can(access, RECORD_KIND_META[kind].feature, 'manage'),
+		// Whether this KIND can carry one at all, shipped rather than
+		// re-derived in the page: the rule mirrors a database constraint, and
+		// a second copy in the markup is how a widened constraint silently
+		// fails to reach the screen.
+		hasAddresses: addressable,
+		canManageAddresses: addressable && can(access, RECORD_KIND_META[kind].feature, 'manage'),
 		images,
 		imageForm,
 		removeImageForm,
-		canManageImages: asset && can(access, RECORD_KIND_META[kind].feature, 'manage'),
+		hasImages: imageable,
+		canManageImages: imageable && can(access, RECORD_KIND_META[kind].feature, 'manage'),
 		customFields: customFields.map(describeCustomField),
 		related,
 		relationships,
+		relationshipTypeOptions: relationshipPickers.relationshipTypeOptions,
+		relationshipOtherKinds: relationshipPickers.otherKinds,
+		canManageRelationships: relationshipPickers.canManageRelationships,
+		relationshipForms: relationshipPickers.relationshipForms,
 		// The conversation, for the kinds that have one. `userId` and
 		// `canModerate` are what the thread needs to decide which messages
 		// offer edit and remove — the same two answers RLS gives.
@@ -274,22 +294,23 @@ function threadOf(locals: App.Locals, params: { kind: RecordSegment; id: string 
 	return { supabase, orgId: activeOrgId, taskId: params.id };
 }
 
-/** The org and the party this request edits, or the refusal the hook would give. */
-function partyOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
+/** The org and the record whose addresses this request edits, or the refusal the hook would give. */
+function addressableOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
 	const { supabase, org, activeOrgId } = locals;
 	if (!org || !activeOrgId) throw redirect(303, '/login');
 	const kind = recordKindForSegment(params.kind);
-	if (!isParty(kind)) throw error(400, 'Only a company or a contact has addresses.');
+	if (!hasAddresses(kind))
+		throw error(400, 'Only a company, a contact or a property has addresses.');
 	requirePermission(org.access, RECORD_KIND_META[kind].feature, 'manage');
 	return { supabase, orgId: activeOrgId, entity: { entityType: kind, entityId: params.id } };
 }
 
-/** The org and the asset this request edits, or the refusal the hook would give. */
-function assetOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
+/** The org and the record whose photos this request edits, or the refusal the hook would give. */
+function imageableOf(locals: App.Locals, params: { kind: RecordSegment; id: string }) {
 	const { supabase, org, activeOrgId } = locals;
 	if (!org || !activeOrgId) throw redirect(303, '/login');
 	const kind = recordKindForSegment(params.kind);
-	if (!isAsset(kind)) throw error(400, 'Only an asset has photos.');
+	if (!hasImages(kind)) throw error(400, 'Only an asset or a property has photos.');
 	requirePermission(org.access, RECORD_KIND_META[kind].feature, 'manage');
 	return { supabase, orgId: activeOrgId, entity: { entityType: kind, entityId: params.id } };
 }
@@ -297,6 +318,8 @@ function assetOf(locals: App.Locals, params: { kind: RecordSegment; id: string }
 export const actions: Actions = {
 	// The invoice block's nine actions — lines, header, lifecycle, money.
 	...billingActions,
+	// Drawing and removing a relationship, across any kind.
+	...relationshipActions,
 
 	/**
 	 * The record's own fields, through the same registry, schema and switch
@@ -312,7 +335,7 @@ export const actions: Actions = {
 	},
 
 	saveAddress: async ({ request, locals, params }) => {
-		const { supabase, orgId, entity } = partyOf(locals, params);
+		const { supabase, orgId, entity } = addressableOf(locals, params);
 		const form = await superValidate(request, zod4(addressSchema), { id: FORM_IDS.address });
 		if (!form.valid) return fail(400, { form });
 
@@ -387,7 +410,7 @@ export const actions: Actions = {
 	},
 
 	removeAddress: async ({ request, locals, params }) => {
-		const { supabase, orgId } = partyOf(locals, params);
+		const { supabase, orgId } = addressableOf(locals, params);
 		const form = await superValidate(request, zod4(removeAddressSchema), {
 			id: FORM_IDS.removeAddress
 		});
@@ -406,7 +429,7 @@ export const actions: Actions = {
 	},
 
 	uploadImage: async ({ request, locals, params }) => {
-		const { supabase, orgId, entity } = assetOf(locals, params);
+		const { supabase, orgId, entity } = imageableOf(locals, params);
 		const form = await superValidate(request, zod4(imageUploadSchema), { id: FORM_IDS.image });
 		if (!form.valid) return fail(400, { form });
 
@@ -424,7 +447,7 @@ export const actions: Actions = {
 	},
 
 	removeImage: async ({ request, locals, params }) => {
-		const { supabase, orgId } = assetOf(locals, params);
+		const { supabase, orgId } = imageableOf(locals, params);
 		const form = await superValidate(request, zod4(removeImageSchema), {
 			id: FORM_IDS.removeImage
 		});

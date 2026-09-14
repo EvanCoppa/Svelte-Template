@@ -12,8 +12,8 @@
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import DeleteRecord from '$lib/components/delete-record.svelte';
 	import * as Kanban from '$lib/components/kanban/index.js';
-	import type { KanbanStatus } from '$lib/components/kanban/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { initialsOf } from '$lib/components/staff/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
@@ -23,24 +23,19 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import {
+		buildDealColumns,
 		closeLabel,
 		dealIsSlipping,
 		groupDealsByStage,
-		stageFill,
 		stageTotal
 	} from '$lib/crm/deals';
 	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { STAGE_OUTCOME_TONE } from '$lib/crm/tones';
 	import { createListTable } from '$lib/lists/table';
 	import { createViewPreference } from '$lib/list-view.svelte';
 	import { QUERY } from '$lib/queries';
 	import type { DealWithParties } from '$lib/server/crm/deals';
-	import type { PageData } from './$types';
 
 	let { data } = $props();
-
-	/** One column's stage, as the load ships it. */
-	type BoardStage = PageData['pipelines'][number]['stages'][number];
 
 	const terms = $derived(recordTerms(page.data.terms, 'deal'));
 
@@ -52,13 +47,18 @@
 	 */
 	const view = createViewPreference('deals.view', ['board', 'list'] as const);
 
+	/** The list view's row menu — the board's own cards link to the record instead. */
+	let removing = $state<{ id: string; name: string } | null>(null);
+
 	// The list's columns, its search and its filters are the fields the org's
 	// industry put on it (docs/lists.md); the page only composes the parts. Both
 	// views are the same rows, read once: the list takes them described, the
 	// board takes the columns themselves.
 	const table = createListTable(
 		() => data.list,
-		() => page.data.terms
+		() => page.data.terms,
+		undefined,
+		() => (data.canDelete ? { canDelete: true, onDelete: (row) => (removing = row) } : undefined)
 	);
 
 	/**
@@ -82,18 +82,14 @@
 	}
 
 	/**
-	 * What one column holds: its stage, and the single-status array
-	 * `Kanban.Column` registers — on this board a column IS a stage, so there is
-	 * exactly one. A `$derived` rather than markup the board rebuilds on every
-	 * render, which is what that prop asks for: it changes identity only when the
-	 * stages themselves do, and a column re-registers itself when it does.
+	 * The funnel's columns: an open stage on its own, every closed one folded
+	 * into one `Closed` column split into a drop zone per outcome
+	 * (`buildDealColumns()`, `$lib/crm/deals.ts`). A `$derived` rather than
+	 * markup the board rebuilds on every render, which is what `Kanban.Column`'s
+	 * `statuses` prop asks for: it changes identity only when the stages
+	 * themselves do, and a column re-registers itself when it does.
 	 */
-	const columns: { stage: BoardStage; statuses: KanbanStatus[] }[] = $derived(
-		(board?.stages ?? []).map((stage) => ({
-			stage,
-			statuses: [{ value: stage.id, label: stage.name }]
-		}))
-	);
+	const columns = $derived(buildDealColumns(board?.stages ?? []));
 
 	/**
 	 * Now, for the close-date labels. Read once per render rather than per card
@@ -134,9 +130,14 @@
 	const byStage = $derived(
 		groupDealsByStage(
 			deals,
-			columns.map((column) => column.stage.id)
+			(board?.stages ?? []).map((stage) => stage.id)
 		)
 	);
+
+	/** A column's cards: its statuses' piles, in the order they are shown. */
+	function cardsOf(column: (typeof columns)[number]) {
+		return column.statuses.flatMap((status) => byStage[status.value] ?? []);
+	}
 
 	let moveFormEl = $state<HTMLFormElement | null>(null);
 
@@ -175,7 +176,7 @@
 		// The board hands back the status a release landed on, which on this
 		// board is a stage id — but it is a string to the board, so it is checked
 		// against this board's own stages rather than trusted.
-		if (!columns.some((column) => column.stage.id === stageId)) return;
+		if (!(board?.stages ?? []).some((stage) => stage.id === stageId)) return;
 		pending.set(id, stageId);
 		$moveData = { id, stage_id: stageId };
 		// The hidden inputs take the store's values on the next flush.
@@ -256,9 +257,10 @@
 	<input type="hidden" name="stage_id" value={$moveData.stage_id} />
 </form>
 
-<!-- The funnel: one column per stage of one board. A stage IS the state a deal
-     is in, so every column holds exactly one and a release lands straight away
-     — the task board's drop zones are for columns that group several states. -->
+<!-- The funnel: one board's stages, an open one to its own column and every
+     closed one folded into a single "Closed" column — split into a drop zone
+     per outcome so a card dragged there is asked whether it is won or lost,
+     the same grouped-column pattern the task board uses. -->
 {#snippet funnel()}
 	{#if board === undefined}
 		<Empty.Root class="py-16">
@@ -285,16 +287,14 @@
 			{/if}
 
 			<Kanban.Root onmove={move} disabled={!data.canMove}>
-				{#each columns as column (column.stage.id)}
-					{@const stage = column.stage}
-					{@const cards = byStage[stage.id]}
-					{@const tone = STAGE_OUTCOME_TONE[stage.outcome]}
-					<Kanban.Column value={stage.id} label={stage.name} statuses={column.statuses}>
-						<Kanban.ColumnHeader {tone} count={cards.length}>
+				{#each columns as column (column.id)}
+					{@const cards = cardsOf(column)}
+					<Kanban.Column value={column.id} label={column.label} statuses={column.statuses}>
+						<Kanban.ColumnHeader tone={column.tone} count={cards.length}>
 							{#snippet lead()}
-								<Kanban.Ring {tone} fill={stageFill(stage)} class="size-4" />
+								<Kanban.Ring tone={column.tone} fill={column.fill} class="size-4" />
 							{/snippet}
-							{stage.name}
+							{column.label}
 							{#snippet actions()}
 								<!-- What the stage is worth. The reason a funnel is drawn as one
 								     rather than listed: the shape of the money in it. An empty
@@ -306,6 +306,15 @@
 								{/if}
 							{/snippet}
 						</Kanban.ColumnHeader>
+
+						<Kanban.Zones>
+							{#each column.statuses as status (status.value)}
+								<Kanban.DropZone status={status.value} tone={status.tone}>
+									<Kanban.Ring tone={status.tone} fill={status.fill} class="size-5" />
+									{status.label}
+								</Kanban.DropZone>
+							{/each}
+						</Kanban.Zones>
 
 						<Kanban.Cards>
 							{#each cards as deal (deal.id)}
@@ -396,3 +405,5 @@
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 {/snippet}
+
+<DeleteRecord type="deal" form={data.deleteForm} query={QUERY.deals} bind:removing />

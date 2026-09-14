@@ -373,6 +373,30 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **A notification is addressed to a person, so it is not a feature**
+  (`notification_inbox` migration + `src/lib/server/notifications.ts` +
+  `src/lib/components/notifications/` + `src/routes/api/notifications/`;
+  docs/notifications.md). The bell in the app header is shell chrome like the
+  theme toggle beside it — no `features` row, no `pages` row, no grant, nothing
+  for the gate to answer — and the boundary is the policies, which are all
+  `user_id = auth.uid()` with column grants narrowing an update to `read_at` and
+  `archived_at`. Five columns turn a row into something readable: `actor_id`
+  (who, via `profiles`, so the panel names and pictures them and the `title` is
+  written as the rest of that sentence — "assigned you a ticket"), `channel`
+  (`inbox`, what is addressed to you, vs `general`, what merely happened around
+  you — an enum, not a lookup table), `context` (the word after the timestamp),
+  `action_label` (the button's words, null for a statement, and the database
+  refuses it without a `link`) and `archived_at`. **`read_at` and `archived_at`
+  are not the same fact**: seen is not dealt with, exactly as a task's `status`
+  and `completed_at` are not, and the one rule tying them — dismissing marks it
+  read — lives in `notificationColumns()`. `type` stays the free-text
+  discriminator it always was and **nothing on screen reads it**, so a new kind
+  of notification is neither a migration nor a `switch`. The shell's load owns
+  the rows (`loadInbox()`, two capped queries, `QUERY.notifications`), the
+  writes are a `PATCH` pair under `/api/notifications` — the cross-page
+  exception the note dock takes, since the bell floats over every screen — and
+  the panel is one row component for all three piles, which starts the
+  breadcrumb trail over when it navigates, like every other shell surface.
 - **The party model is two tables, split by what a row IS** (`crm_party_model`
   migration). `companies` are organizations you deal with — `relationship` says
   customer, supplier or partner, so a vendor is not a second table — and `contacts`
@@ -565,6 +589,70 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   whenever the load supplies `data.billing` — the thread's data-presence rule. Every
   payment form carries an idempotency key the load minted, so a double submit collides
   on the table instead of recording money twice.
+- **Commerce is three small features, and each one says what it left out**
+  (`featured_groups`, `coupons` and `rmas` migrations + `src/lib/server/crm/featured-groups.ts`,
+  `coupons.ts`, `rmas.ts`). A **featured group** is a named, ordered set of products put
+  in front of a buyer together — editorial, never a fact about a product — so it is the
+  `quick_plans` shape exactly (a row plus join rows, always read and written together)
+  and keeps its own page for the same reason: its one interesting field is a
+  multi-select the generic record form cannot render. A **coupon** is a code, what it
+  takes off (`percent` or `amount`, read together by `couponDiscountText()` in
+  `$lib/crm/coupons.ts` — the one place, so the list cell and the record page agree) and
+  the window it is good for; it is a record kind, so the generic form creates and edits
+  it. An **RMA** is a numbered return from a party — `company_id` and `contact_id` both
+  nullable with at least one set, the ledger's rule — climbing
+  `requested → approved → received → closed`, with `rejected` as the end that never
+  started; `closed` is the one finished state whatever the outcome was, because WHAT was
+  done is `resolution` in words (the task board's `cancelled` reasoning), and its number
+  comes from a sequence and a trigger like an invoice's, with the column defaulting to
+  `''` so an insert can leave it out. **What each one left out is the point**: a coupon
+  has no `max_redemptions` or `times_redeemed`, and an RMA has no `order_id` and no line
+  items — a limit nothing counts against reads as enforced, a column nothing writes is
+  dead weight, and a return line that claimed to restock would be the defect the orders
+  migration already names about `quantity_reserved`. They arrive with the redemption
+  table and inventory movement respectively; a credit for a return is a `refund`
+  payment on the ledger, never a second copy of an amount. **An RMA's `order_id` stays
+  absent now that Orders exists**, on its own merits rather than for want of a table: a
+  return is a fact about goods, and plenty of them are for goods this org never wrote an
+  order for. It lands when something actually reads it — a restock, or a credit that
+  must find the invoice — not because the target now exists. All three are `hidden` for
+  the verticals that quote work rather than ship goods — a vertical joins with one
+  `industry_features` row.
+- **The supply spine is four documents, and each says what it derives** (the
+  `orders_and_shipments` and `vendors_and_purchasing` migrations + their `*_feature`
+  migrations + `src/lib/server/crm/orders.ts`, `shipments.ts`, `purchases.ts`,
+  `product-categories.ts`). An **order** is what a customer asked for, a **shipment** a
+  box against one order, a **purchase** what the org buys from a vendor, and
+  **categories** the tree the catalog hangs on. Each of the first three is a DOCUMENT,
+  so each takes its own record page under `(app)/<kind>/[id=guid]/` — the list, the
+  header form and the row menu stay generic, and only what the generic page has no
+  frame for is written by hand.
+  **A status is either an act or derived, never both.** Confirming, cancelling and
+  placing are acts, each scoped to the state it is legal from so a second click reports
+  a refusal rather than success over nothing. Everything else falls out:
+  `orders.fulfillment_status` from its lines, a purchase's
+  `ordered → partially_received → received` from what has arrived, and an order line's
+  `shipped` / `delivered` from the carrier status of the box carrying it. So a receive
+  is a line write, and the one write that reaches an order is a shipment's
+  `delivery_status` — never a status typed onto the header.
+  **The carrier owns two of a line's states and a person owns the rest**
+  (`LINE_FULFILLMENT_STATUSES` in `$lib/crm/orders.ts`): a scan never overwrites a
+  `cancelled` or `returned` a person decided, and no form offers `shipped` or
+  `delivered`, because typing one would claim a box moved.
+  **A partial shipment is a line SPLIT.** A packing row carries no quantity — a line is
+  in the box or it is not — so four of ten cases going out is `splitOrderLine()` making
+  a four and a six, each with the original's snapshots. One line lives in one box, so
+  `packableLines()` offers only what is in no box yet rather than what the unique index
+  would refuse, and moving a line is an unpack and a pack.
+  **A shipment is the one kind the generic record form cannot create**: `order_id` is
+  not null and insert-only, so "Ship this order" on the order's page is the one door —
+  taking the `shipments` grant, not the order's. It is a `RECORD_KIND` and a
+  `ListKind` without being a `RecordType`, which is what that distinction is for.
+  A **category tree is not a table**, so `/categories` is indented rows rather than a
+  `DataTable`, with no `list_fields`: PostgREST cannot embed a self-referencing
+  composite foreign key, so the tree is one flat read and a pure fold (`categoryTree()`
+  in `$lib/crm/categories.ts`) that surfaces a cycle or an orphan as a root rather than
+  dropping it.
 
 ## Database
 
@@ -751,8 +839,13 @@ SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the insta
 version; read them before the website. The full account is `docs/assistant.md`.
 
 - **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
-  unconfigured the page says so and the endpoint answers 503, never a crash.
+  imports a provider package — `@ai-sdk/openai`, over the Responses API. Config is env-only
+  (`OPENAI_API_KEY`, `AI_MODEL`; the default model is `gpt-5.6-luna`); when unconfigured
+  the page says so and the endpoint answers 503, never a crash. What the API is asked for
+  on a call — `store: false`, the per-thread `promptCacheKey` — is the SDK's namespaced
+  `providerOptions`, spelled once in `openaiCallOptions()` (`provider.ts`) and set on the
+  agent and the title call; reasoning is the SDK's portable `reasoning` setting, never a
+  provider option.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.
@@ -828,7 +921,10 @@ flickers on load. The full account is `docs/user-preferences.md`; the rules:
 - The notes rail (`notes.dock`) is the worked example, and it hides **chrome, not the
   feature**: the dock component stays mounted with the preference off so `⌥⌘L` still
   opens every note. A preference that quietly takes a shortcut away is how people
-  stop trusting preferences.
+  stop trusting preferences. `notifications.general` is the same rule for a switch
+  that belongs to no feature (the bell is shell chrome, so it is offered to every
+  org): off, the General tab is not drawn and its unread stops counting on the bell,
+  and nothing is deleted or left unfetched.
 
 ## Navigation
 
@@ -949,14 +1045,16 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
-  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
-  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
-  for a column that groups several states, not for every board. It draws one pipeline at a
-  time (a stage only means something inside its own board, so which one is in the query
-  string like the ledger's account filter), the stage's `probability` as the ring's fill,
-  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
-  `$lib/crm/tasks.ts` does for the task board.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board, with
+  `pipeline_stages` rows as its columns** (docs/deals.md): an open stage IS the state a deal
+  is in, so it gets a column of its own and a release lands straight away — but every stage
+  whose outcome closes the deal (`won`, `lost`, and any more an org adds) shares one `Closed`
+  column, split into a drop zone per stage exactly like a grouped task column, so the funnel
+  does not grow a column per terminal stage. `buildDealColumns()` (`$lib/crm/deals.ts`) is the
+  one place that groups them. It draws one pipeline at a time (a stage only means something
+  inside its own board, so which one is in the query string like the ledger's account filter),
+  the stage's `probability` as the ring's fill, and `$lib/crm/deals.ts` answers what a column
+  holds and adds up to the way `$lib/crm/tasks.ts` does for the task board.
 - **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
   not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
   `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and

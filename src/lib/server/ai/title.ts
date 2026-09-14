@@ -1,4 +1,5 @@
 import { generateText, type LanguageModel } from 'ai';
+import { openaiCallOptions } from './provider';
 
 /** Titles fit the history rail; the column has no limit of its own. */
 export const TITLE_MAX_LENGTH = 80;
@@ -8,6 +9,11 @@ export const TITLE_MAX_LENGTH = 80;
  * `generateText` call, before the first answer streams, so the rail shows the
  * title the moment the turn ends without racing the stream. Best-effort: a
  * failure leaves the thread untitled and never touches the answer.
+ *
+ * Reasoning is off for this call through the SDK's portable `reasoning`
+ * setting: six words need no thinking, and on a reasoning model the thinking
+ * would count against the small output budget and could leave no room for
+ * the title itself. A model with no reasoning to switch off is unaffected.
  */
 export async function generateConversationTitle(
 	model: LanguageModel,
@@ -23,7 +29,9 @@ export async function generateConversationTitle(
 				'Write a title of at most six words for a chat that starts with the message below. ' +
 				'Reply with the title only: no quotes, no trailing punctuation.\n\n' +
 				`Message:\n${excerpt}`,
-			maxOutputTokens: 40
+			maxOutputTokens: 40,
+			reasoning: 'none',
+			providerOptions: { openai: openaiCallOptions() }
 		});
 		const title = text
 			.trim()
