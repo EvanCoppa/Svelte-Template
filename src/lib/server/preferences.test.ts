@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultPreferences } from '$lib/preferences';
 import { loadPreferences, savePreference } from './preferences';
 import { supabaseMock } from './crm/test-support';
 
@@ -10,7 +11,12 @@ describe('loadPreferences', () => {
 			data: [{ key: 'notes.dock', value: false }]
 		});
 
-		await expect(loadPreferences(supabase, USER_ID)).resolves.toEqual({ 'notes.dock': false });
+		// Against the registry's own defaults rather than a hand-kept list, so
+		// adding a preference does not break a test about folding rows.
+		await expect(loadPreferences(supabase, USER_ID)).resolves.toEqual({
+			...defaultPreferences(),
+			'notes.dock': false
+		});
 		expect(from).toHaveBeenCalledWith('user_preferences');
 		expect(builder.eq).toHaveBeenCalledWith('user_id', USER_ID);
 	});
@@ -18,7 +24,7 @@ describe('loadPreferences', () => {
 	it('gives a user who has never set one the defaults', async () => {
 		const { supabase } = supabaseMock({ data: [] });
 
-		await expect(loadPreferences(supabase, USER_ID)).resolves.toEqual({ 'notes.dock': true });
+		await expect(loadPreferences(supabase, USER_ID)).resolves.toEqual(defaultPreferences());
 	});
 });
 

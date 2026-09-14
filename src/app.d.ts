@@ -8,6 +8,7 @@ import type { NoteDeck } from '$lib/notes';
 import type { Preferences } from '$lib/preferences';
 import type { OrgMembership } from '$lib/org';
 import type { ConversationSummary } from '$lib/server/ai/conversations';
+import type { InboxNotification } from '$lib/server/crm/notifications';
 import type { OrgContext } from '$lib/server/org-context';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
@@ -56,6 +57,12 @@ declare global {
 			 * no notes feature; absent outside the shell.
 			 */
 			noteDock?: NoteDeck | null;
+			/**
+			 * The active org's notifications for this user, from the (app)
+			 * layout — the open ones then the archived ones, which is what the
+			 * bell in the header opens. Absent outside the shell.
+			 */
+			notifications?: InboxNotification[];
 			/**
 			 * The signed-in user's account preferences, from the (app) layout:
 			 * every key resolved, fallbacks folded in — see
