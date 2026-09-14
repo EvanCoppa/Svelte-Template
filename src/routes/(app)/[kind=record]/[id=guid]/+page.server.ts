@@ -45,6 +45,7 @@ import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
 import { billingActions, loadBilling } from './billing.server';
+import { loadRelationshipPickers, relationshipActions } from './relationships.server';
 import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
 import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
@@ -152,7 +153,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		relationships,
 		notes,
 		messages,
-		billing
+		billing,
+		relationshipPickers
 	] = await Promise.all([
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
@@ -168,7 +170,10 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : [],
 		threaded ? listTaskComments(supabase, activeOrgId, id) : [],
 		// Null for every kind but an invoice; the block's own module decides.
-		loadBilling(locals, params)
+		loadBilling(locals, params),
+		// The Relationships card's write side: which type-and-direction
+		// choices fit this record, and whether this reader may draw one.
+		loadRelationshipPickers(locals, kind, canOpen)
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
@@ -242,6 +247,10 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		customFields: customFields.map(describeCustomField),
 		related,
 		relationships,
+		relationshipTypeOptions: relationshipPickers.relationshipTypeOptions,
+		relationshipOtherKinds: relationshipPickers.otherKinds,
+		canManageRelationships: relationshipPickers.canManageRelationships,
+		relationshipForms: relationshipPickers.relationshipForms,
 		// The conversation, for the kinds that have one. `userId` and
 		// `canModerate` are what the thread needs to decide which messages
 		// offer edit and remove — the same two answers RLS gives.
@@ -309,6 +318,8 @@ function imageableOf(locals: App.Locals, params: { kind: RecordSegment; id: stri
 export const actions: Actions = {
 	// The invoice block's nine actions — lines, header, lifecycle, money.
 	...billingActions,
+	// Drawing and removing a relationship, across any kind.
+	...relationshipActions,
 
 	/**
 	 * The record's own fields, through the same registry, schema and switch

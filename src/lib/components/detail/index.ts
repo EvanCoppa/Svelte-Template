@@ -6,6 +6,7 @@ import InvoiceLines from './detail-invoice-lines.svelte';
 import InvoicePayments from './detail-invoice-payments.svelte';
 import Related from './detail-related.svelte';
 import Relationship from './detail-relationship.svelte';
+import Relationships from './detail-relationships.svelte';
 import Thread from './detail-thread.svelte';
 import Value from './detail-value.svelte';
 
@@ -26,6 +27,7 @@ export {
 	InvoicePayments,
 	Related,
 	Relationship,
+	Relationships,
 	Thread,
 	Value,
 	//
@@ -37,6 +39,7 @@ export {
 	InvoicePayments as DetailInvoicePayments,
 	Related as DetailRelated,
 	Relationship as DetailRelationship,
+	Relationships as DetailRelationships,
 	Thread as DetailThread,
 	Value as DetailValue
 };
