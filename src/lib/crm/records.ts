@@ -27,10 +27,12 @@ export const RECORD_KINDS = [
 	'billable',
 	'company',
 	'contact',
+	'coupon',
 	'product',
 	'deal',
 	'proposal',
 	'invoice',
+	'rma',
 	'task',
 	'ticket'
 ] as const satisfies readonly Enums<'crm_entity_type'>[];
@@ -53,10 +55,12 @@ export const RECORD_KIND_META = {
 	billable: { feature: 'billables', segment: 'billables' },
 	company: { feature: 'companies', segment: 'companies' },
 	contact: { feature: 'contacts', segment: 'contacts' },
+	coupon: { feature: 'coupons', segment: 'coupons' },
 	product: { feature: 'products', segment: 'products' },
 	deal: { feature: 'deals', segment: 'deals' },
 	proposal: { feature: 'proposals', segment: 'proposals' },
 	invoice: { feature: 'invoices', segment: 'invoices' },
+	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },
 	ticket: { feature: 'tickets', segment: 'tickets' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;

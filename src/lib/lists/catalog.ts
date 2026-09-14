@@ -2,12 +2,14 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
 	PRIORITY_TONE,
 	PRODUCT_KIND_TONE,
 	PROPOSAL_STATUS_TONE,
+	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { TermId } from '$lib/features/vocabulary';
@@ -86,8 +88,12 @@ export const PAYMENT_OPTIONS: readonly FilterOption[] = [
 	{ value: 'overdue', label: 'Overdue', tone: 'error' }
 ];
 
-/** A billable's on/off switch, read as a status so it filters like one. */
-export const BILLABLE_STATUS_TONE = {
+/**
+ * An on/off switch read as a status so it filters like one — a billable's
+ * `is_active`, a coupon's. Not an enum in the database, which is why it is
+ * here beside the catalog rather than in `$lib/crm/tones`.
+ */
+export const ACTIVE_STATUS_TONE = {
 	active: 'success',
 	inactive: 'neutral'
 } as const satisfies Record<string, BadgeTone>;
@@ -182,7 +188,32 @@ export const LIST_FIELD_CATALOG = {
 		unit_price: money('Unit price'),
 		unit_choices: text('Units'),
 		is_featured: boolean('Featured'),
-		status: enumOf('Status', BILLABLE_STATUS_TONE),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		created_at: created
+	},
+	coupon: {
+		name: text('Code'),
+		discount_type: enumOf('Type', COUPON_DISCOUNT_TYPE_TONE),
+		/**
+		 * What the coupon takes off, already read against its type — "20%" or
+		 * "$15.00". Text rather than money or a number because the two types
+		 * print in different units, and a cell is typed by how it renders.
+		 */
+		discount: text('Discount'),
+		starts_on: date('Starts'),
+		ends_on: date('Ends'),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		description: text('Description'),
+		created_at: created
+	},
+	rma: {
+		name: text('Number'),
+		company: record('company'),
+		contact: record('contact'),
+		status: enumOf('Status', RMA_STATUS_TONE),
+		requested_on: date('Requested'),
+		reason: text('Reason'),
+		resolution: text('Resolution'),
 		created_at: created
 	}
 } as const satisfies Record<ListKind, { name: FieldMeta } & Record<string, FieldMeta>>;

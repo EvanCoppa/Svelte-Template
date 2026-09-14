@@ -26,6 +26,10 @@ export const FEATURE_IDS = [
 	'quick-plans',
 	'invoices',
 	'ledger',
+	// Commerce: what you shelve, what you knock off it, and what comes back.
+	'featured-groups',
+	'coupons',
+	'rmas',
 	'assets',
 	'notes',
 	'tasks',

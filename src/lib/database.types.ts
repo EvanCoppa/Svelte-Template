@@ -599,6 +599,62 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          discount_type: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value: number
+          ends_on: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          starts_on: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_field_definitions: {
         Row: {
           allowed_values: Json | null
@@ -903,6 +959,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proposal_options"
             referencedColumns: ["id", "proposal_id"]
+          },
+        ]
+      }
+      featured_group_products: {
+        Row: {
+          created_at: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          featured_group_id?: string
+          org_id?: string
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_group_products_featured_group_id_org_id_fkey"
+            columns: ["featured_group_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "featured_groups"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_product_id_org_id_fkey"
+            columns: ["product_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      featured_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2979,6 +3125,73 @@ export type Database = {
           },
         ]
       }
+      rmas: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          number: string
+          org_id: string
+          reason: string | null
+          requested_on: string
+          resolution: string | null
+          status: Database["public"]["Enums"]["rma_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id?: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rmas_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string
@@ -3788,11 +4001,13 @@ export type Database = {
         | "rose"
         | "indigo"
       company_relationship: "customer" | "supplier" | "partner" | "other"
+      coupon_discount_type: "percent" | "amount"
       crm_entity_type:
         | "asset"
         | "billable"
         | "company"
         | "contact"
+        | "coupon"
         | "deal"
         | "member"
         | "invoice"
@@ -3801,6 +4016,7 @@ export type Database = {
         | "proposal"
         | "proposal_option"
         | "purchase"
+        | "rma"
         | "shipment"
         | "task"
         | "ticket"
@@ -3858,6 +4074,7 @@ export type Database = {
         | "partially_received"
         | "received"
         | "cancelled"
+      rma_status: "requested" | "approved" | "received" | "closed" | "rejected"
       shipment_delivery_status:
         | "preparing"
         | "pending"
@@ -4017,11 +4234,13 @@ export const Constants = {
         "indigo",
       ],
       company_relationship: ["customer", "supplier", "partner", "other"],
+      coupon_discount_type: ["percent", "amount"],
       crm_entity_type: [
         "asset",
         "billable",
         "company",
         "contact",
+        "coupon",
         "deal",
         "member",
         "invoice",
@@ -4030,6 +4249,7 @@ export const Constants = {
         "proposal",
         "proposal_option",
         "purchase",
+        "rma",
         "shipment",
         "task",
         "ticket",
@@ -4094,6 +4314,7 @@ export const Constants = {
         "received",
         "cancelled",
       ],
+      rma_status: ["requested", "approved", "received", "closed", "rejected"],
       shipment_delivery_status: [
         "preparing",
         "pending",

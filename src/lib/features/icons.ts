@@ -17,11 +17,14 @@ import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
+import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 import ShieldIcon from '@lucide/svelte/icons/shield';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
+import StarIcon from '@lucide/svelte/icons/star';
 import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
 import TicketIcon from '@lucide/svelte/icons/ticket';
+import TicketPercentIcon from '@lucide/svelte/icons/ticket-percent';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import TruckIcon from '@lucide/svelte/icons/truck';
 import UsersIcon from '@lucide/svelte/icons/users';
@@ -53,11 +56,14 @@ export const ICONS = {
 	package: PackageIcon,
 	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
+	'rotate-ccw': RotateCcwIcon,
 	shield: ShieldIcon,
 	'sliders-horizontal': SlidersHorizontalIcon,
 	sparkles: SparklesIcon,
+	star: StarIcon,
 	'sticky-note': StickyNoteIcon,
 	ticket: TicketIcon,
+	'ticket-percent': TicketPercentIcon,
 	'toggle-right': ToggleRightIcon,
 	truck: TruckIcon,
 	users: UsersIcon,

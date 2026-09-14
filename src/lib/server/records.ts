@@ -10,9 +10,11 @@ import {
 	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
+	couponRecordSchema,
 	dealRecordSchema,
 	invoiceRecordSchema,
 	productRecordSchema,
+	rmaRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -29,10 +31,12 @@ import { createAsset, getAsset, updateAsset } from './crm/assets';
 import { createBillable, getBillable, updateBillable } from './crm/billables';
 import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
 import { createContact, getContact, listContacts, updateContact } from './crm/contacts';
+import { createCoupon, getCoupon, updateCoupon } from './crm/coupons';
 import { createDeal, dealPlacement, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
 import { listPipelines } from './crm/pipelines';
 import { createProduct, getProduct, updateProduct } from './crm/products';
+import { createRma, getRma, updateRma } from './crm/rmas';
 import { createTask, getTask, updateTask } from './crm/tasks';
 import { createTicket, getTicket, updateTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
@@ -350,6 +354,33 @@ async function recordFormValues(
 					}
 				: {};
 		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row
+				? {
+						code: row.code,
+						discount_type: row.discount_type,
+						discount_value: str(row.discount_value),
+						starts_on: str(row.starts_on),
+						ends_on: str(row.ends_on),
+						is_active: row.is_active ? 'true' : 'false',
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row
+				? {
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						status: row.status,
+						requested_on: str(row.requested_on),
+						reason: str(row.reason),
+						resolution: str(row.resolution)
+					}
+				: {};
+		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
 			return row
@@ -513,6 +544,40 @@ async function writeRecord(
 				billing_email: text(data.billing_email),
 				memo: text(data.memo)
 			});
+			return;
+		}
+		case 'coupon': {
+			const data = couponRecordSchema.parse(values);
+			const columns = {
+				code: data.code,
+				discount_type: data.discount_type,
+				// A not-null money column: blank is zero, the products rule.
+				discount_value: price(data.discount_value),
+				starts_on: text(data.starts_on),
+				ends_on: text(data.ends_on),
+				is_active: data.is_active === 'true',
+				description: text(data.description)
+			};
+			await (id
+				? updateCoupon(supabase, orgId, id, columns)
+				: createCoupon(supabase, orgId, columns));
+			return;
+		}
+		case 'rma': {
+			const data = rmaRecordSchema.parse(values);
+			const columns = {
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				status: data.status,
+				reason: text(data.reason),
+				resolution: text(data.resolution)
+			};
+			// `requested_on` is not null with a default of today, so a blank
+			// field means today rather than a null the column would refuse.
+			const requested = data.requested_on === '' ? {} : { requested_on: data.requested_on };
+			await (id
+				? updateRma(supabase, orgId, id, { ...columns, ...requested })
+				: createRma(supabase, orgId, { ...columns, ...requested }));
 			return;
 		}
 		case 'task': {

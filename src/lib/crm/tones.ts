@@ -34,6 +34,12 @@ export const PRODUCT_KIND_TONE = {
 	service: 'violet'
 } satisfies Record<Enums<'product_kind'>, BadgeTone>;
 
+/** The two ways a coupon says "less": a share of the price, or a sum off it. */
+export const COUPON_DISCOUNT_TYPE_TONE = {
+	percent: 'violet',
+	amount: 'cyan'
+} satisfies Record<Enums<'coupon_discount_type'>, BadgeTone>;
+
 /**
  * Stages are org-defined rows, so their names are not a union to key a
  * palette off. The outcome is: every board has open, won and lost columns
@@ -61,6 +67,19 @@ export const TICKET_STATUS_TONE = {
 	resolved: 'success',
 	closed: 'neutral'
 } satisfies Record<Enums<'ticket_status'>, BadgeTone>;
+
+/**
+ * How far back a return is. `closed` is the one finished state whatever the
+ * outcome was — what was done is the RMA's `resolution`, in words (the rmas
+ * migration says why) — and `rejected` is the end that never started.
+ */
+export const RMA_STATUS_TONE = {
+	requested: 'info',
+	approved: 'violet',
+	received: 'cyan',
+	closed: 'success',
+	rejected: 'error'
+} satisfies Record<Enums<'rma_status'>, BadgeTone>;
 
 export const PRIORITY_TONE = {
 	low: 'neutral',

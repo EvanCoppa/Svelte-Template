@@ -30,6 +30,11 @@ export const QUERY = {
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',
 	assets: 'app:assets',
+	/** The org's merchandising shelves — a group's members change with the group. */
+	featuredGroups: 'app:featured-groups',
+	coupons: 'app:coupons',
+	/** Returns coming back from customers. */
+	rmas: 'app:rmas',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	tasks: 'app:tasks',

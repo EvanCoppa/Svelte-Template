@@ -1,15 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
+import { couponDiscountText } from '$lib/crm/coupons';
 import { recommendedOption } from '$lib/crm/proposals';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
 	PRODUCT_KIND_TONE,
 	PROPOSAL_STATUS_TONE,
+	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	PRIORITY_TONE,
 	TASK_STATUS_LABEL,
@@ -23,6 +26,7 @@ import { getAsset, listAssets, type Asset } from './assets';
 import { getBillable, listBillables, type Billable } from './billables';
 import { getCompany, listCompanies, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
+import { getCoupon, listCoupons, type Coupon } from './coupons';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
 import {
@@ -32,6 +36,7 @@ import {
 	type InvoiceWithParties
 } from './invoices';
 import { getProduct, listProducts, type ProductWithCategory } from './products';
+import { getRma, listRmas, type RmaWithParties } from './rmas';
 import {
 	getProposal,
 	listProposals,
@@ -227,6 +232,49 @@ export function describeAsset(row: Asset): RecordDetail {
 			{ label: 'Acquired', value: date(row.acquired_on) },
 			{ label: 'Disposed', value: date(row.disposed_on) },
 			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describeCoupon(row: Coupon): RecordDetail {
+	return {
+		kind: 'coupon',
+		id: row.id,
+		// A coupon is known by the thing a buyer types.
+		name: row.code,
+		pills: [
+			pill(row.is_active ? 'active' : 'inactive', row.is_active ? 'success' : 'neutral'),
+			pill(row.discount_type, COUPON_DISCOUNT_TYPE_TONE[row.discount_type])
+		],
+		fields: [
+			// Read against the type in the one place that knows how, so this
+			// says exactly what the list cell says.
+			{ label: 'Discount', value: text(couponDiscountText(row)) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Starts', value: date(row.starts_on) },
+			{ label: 'Ends', value: date(row.ends_on) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describeRma(row: RmaWithParties, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'rma',
+		id: row.id,
+		name: row.number,
+		pills: [pill(row.status, RMA_STATUS_TONE[row.status])],
+		fields: [
+			{ label: 'Company', value: record('company', row.companies, canOpen) },
+			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
+			{ label: 'Requested', value: date(row.requested_on) },
+			{ label: 'Reason', value: text(row.reason) },
+			{ label: 'Resolution', value: text(row.resolution) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -549,6 +597,10 @@ export async function getRecord(
 			const row = await getContact(supabase, orgId, id);
 			return row && describeContact(row, canOpen);
 		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row && describeCoupon(row);
+		}
 		case 'product': {
 			const row = await getProduct(supabase, orgId, id);
 			return row && describeProduct(row);
@@ -572,6 +624,10 @@ export async function getRecord(
 		case 'invoice': {
 			const row = await getInvoice(supabase, orgId, id);
 			return row && describeInvoice(row, canOpen);
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row && describeRma(row, canOpen);
 		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
@@ -613,6 +669,8 @@ export async function listRecordNames(
 			return (await listCompanies(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
 		case 'contact':
 			return (await listContacts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'coupon':
+			return (await listCoupons(supabase, orgId)).map((row) => ({ id: row.id, name: row.code }));
 		case 'product':
 			return (await listProducts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
 		case 'deal':
@@ -621,6 +679,8 @@ export async function listRecordNames(
 			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'invoice':
 			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'rma':
+			return (await listRmas(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
 		case 'task':
 			return (await listTasks(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'ticket':
@@ -797,6 +857,16 @@ function relatedTicket(row: TicketWithParties): RelatedRecord {
 	};
 }
 
+function relatedRma(row: RmaWithParties): RelatedRecord {
+	return {
+		id: row.id,
+		name: row.number,
+		href: recordHref('rma', row.id),
+		pill: pill(row.status, RMA_STATUS_TONE[row.status]),
+		meta: row.reason?.trim() || null
+	};
+}
+
 /**
  * The records that reference this one, grouped by kind, in the order the
  * sidebar lists those kinds. The parties collect other records — a deal, an
@@ -853,6 +923,12 @@ export async function listRelatedRecords(
 			? listTickets(supabase, orgId, party).then((rows): RelatedGroup => ({
 					kind: 'ticket',
 					records: rows.map(relatedTicket)
+				}))
+			: null,
+		party && canOpen('rma')
+			? listRmas(supabase, orgId, party).then((rows): RelatedGroup => ({
+					kind: 'rma',
+					records: rows.map(relatedRma)
 				}))
 			: null
 	]);

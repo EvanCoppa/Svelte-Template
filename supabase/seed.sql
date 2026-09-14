@@ -1509,3 +1509,61 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'company', '20000000-0000-0000-0007-000000000002', current_date - 28,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- The commerce shelf: featured groups, coupons and returns (Acme)
+-- ---------------------------------------------------------------------------
+-- Acme is on the `crm` industry, which includes all three features, so these
+-- three pages open with rows on them for the seeded operator. The ids use the
+-- c3… range for groups, c5… for coupons and c6… for returns.
+
+insert into public.featured_groups (id, org_id, name, description, is_active, sort_order, created_by) values
+	('c3000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Spring promo', 'What goes in front of a buyer first this season.', true, 100,
+		'00000000-0000-0000-0000-000000000001'),
+	-- Off rather than deleted: last season's shelf, kept for next season.
+	('c3000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'Winter clearance', null, false, 200, '00000000-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
+
+insert into public.featured_group_products (featured_group_id, product_id, org_id, sort_order) values
+	('c3000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000001',
+		'10000000-0000-0000-0000-000000000001', 0),
+	('c3000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000002',
+		'10000000-0000-0000-0000-000000000001', 1),
+	('c3000000-0000-0000-0000-000000000002', 'b2000000-0000-0000-0000-000000000003',
+		'10000000-0000-0000-0000-000000000001', 0)
+on conflict (featured_group_id, product_id) do nothing;
+
+-- One of each discount type, and one that has run out, so the list has a
+-- value in every filter.
+insert into public.coupons (id, org_id, code, description, discount_type, discount_value,
+		starts_on, ends_on, is_active, created_by) values
+	('c5000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'SPRING20', 'Twenty per cent off, through the end of the promo.', 'percent', 20,
+		current_date - 14, current_date + 30, true, '00000000-0000-0000-0000-000000000001'),
+	('c5000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'FIRST15', 'Fifteen dollars off a first order.', 'amount', 15.00,
+		null, null, true, '00000000-0000-0000-0000-000000000001'),
+	('c5000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'WINTER10', null, 'percent', 10,
+		current_date - 200, current_date - 90, false, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;
+
+-- Returns from both sides of the party: a company's, and one from a contact
+-- who belongs to no company (Bruce Wayne). `number` is the trigger's.
+insert into public.rmas (id, org_id, company_id, contact_id, status, reason, resolution,
+		requested_on, created_by) values
+	('c6000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001',
+		'approved', 'Two packs arrived with the seal broken.', null,
+		current_date - 6, '00000000-0000-0000-0000-000000000001'),
+	('c6000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		null, '30000000-0000-0000-0000-000000000003',
+		'closed', 'Ordered the wrong size.', 'Replaced from stock.',
+		current_date - 30, '00000000-0000-0000-0000-000000000001'),
+	('c6000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'20000000-0000-0000-0000-000000000002', null,
+		'requested', 'Site inspection was billed twice.', null,
+		current_date - 1, '00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;

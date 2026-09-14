@@ -1,30 +1,35 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
+import { couponDiscountText } from '$lib/crm/coupons';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PRIORITY_TONE,
 	PRODUCT_KIND_TONE,
 	PROPOSAL_STATUS_TONE,
+	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
-import { BILLABLE_STATUS_TONE, isCatalogKey, type CatalogKey } from '$lib/lists/catalog';
+import { ACTIVE_STATUS_TONE, isCatalogKey, type CatalogKey } from '$lib/lists/catalog';
 import type { ListCell, ListField, ListKind, ListRow, ListSpec } from '$lib/lists/types';
 import type { Address } from './addresses';
 import { listAssets, type Asset } from './assets';
 import { listBillables, type Billable } from './billables';
 import { listCompanies, type Company } from './companies';
 import { listContacts, type ContactWithCompany } from './contacts';
+import { listCoupons, type Coupon } from './coupons';
 import type { CustomFieldValue } from './custom-fields';
 import { listDeals, type DealWithParties } from './deals';
 import { listInvoices, type InvoiceWithParties } from './invoices';
 import { listProducts, type ProductWithCategory } from './products';
 import { listProposals, proposalParentKind, type ProposalWithOptions } from './proposals';
+import { listRmas, type RmaWithParties } from './rmas';
 import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
 
@@ -53,7 +58,9 @@ export type ListResult =
 	| { kind: 'ticket'; rows: TicketWithParties[] }
 	| { kind: 'invoice'; rows: InvoiceWithParties[] }
 	| { kind: 'proposal'; rows: ProposalWithOptions[] }
-	| { kind: 'billable'; rows: Billable[] };
+	| { kind: 'billable'; rows: Billable[] }
+	| { kind: 'coupon'; rows: Coupon[] }
+	| { kind: 'rma'; rows: RmaWithParties[] };
 
 /** Every row of the kind the org has — a kind's own list page. */
 export async function listRecords(
@@ -80,6 +87,10 @@ export async function listRecords(
 			return { kind, rows: await listProposals(supabase, orgId) };
 		case 'billable':
 			return { kind, rows: await listBillables(supabase, orgId) };
+		case 'coupon':
+			return { kind, rows: await listCoupons(supabase, orgId) };
+		case 'rma':
+			return { kind, rows: await listRmas(supabase, orgId) };
 	}
 }
 
@@ -413,10 +424,56 @@ export function describeListRows(
 						return { type: 'boolean', value: billable.is_featured };
 					case 'status': {
 						const word = billable.is_active ? 'active' : 'inactive';
-						return status(word, BILLABLE_STATUS_TONE[word]);
+						return status(word, ACTIVE_STATUS_TONE[word]);
 					}
 					case 'created_at':
 						return datetime(billable.created_at);
+				}
+			});
+		case 'coupon':
+			return describe(result.kind, result.rows, (coupon, key) => {
+				switch (key) {
+					case 'name':
+						return link('coupon', coupon.id, coupon.code);
+					case 'discount_type':
+						return status(coupon.discount_type, COUPON_DISCOUNT_TYPE_TONE[coupon.discount_type]);
+					case 'discount':
+						// Read against the type, in one place (`$lib/crm/coupons`), so the
+						// list and the record page say the same thing.
+						return text(couponDiscountText(coupon));
+					case 'starts_on':
+						return date(coupon.starts_on);
+					case 'ends_on':
+						return date(coupon.ends_on);
+					case 'status': {
+						const word = coupon.is_active ? 'active' : 'inactive';
+						return status(word, ACTIVE_STATUS_TONE[word]);
+					}
+					case 'description':
+						return text(coupon.description);
+					case 'created_at':
+						return datetime(coupon.created_at);
+				}
+			});
+		case 'rma':
+			return describe(result.kind, result.rows, (rma, key) => {
+				switch (key) {
+					case 'name':
+						return link('rma', rma.id, rma.number);
+					case 'company':
+						return party('company', rma.companies);
+					case 'contact':
+						return party('contact', rma.contacts);
+					case 'status':
+						return status(rma.status, RMA_STATUS_TONE[rma.status]);
+					case 'requested_on':
+						return date(rma.requested_on);
+					case 'reason':
+						return text(rma.reason);
+					case 'resolution':
+						return text(rma.resolution);
+					case 'created_at':
+						return datetime(rma.created_at);
 				}
 			});
 	}

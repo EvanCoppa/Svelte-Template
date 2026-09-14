@@ -546,6 +546,31 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   whenever the load supplies `data.billing` — the thread's data-presence rule. Every
   payment form carries an idempotency key the load minted, so a double submit collides
   on the table instead of recording money twice.
+- **Commerce is three small features, and each one says what it left out**
+  (`featured_groups`, `coupons` and `rmas` migrations + `src/lib/server/crm/featured-groups.ts`,
+  `coupons.ts`, `rmas.ts`). A **featured group** is a named, ordered set of products put
+  in front of a buyer together — editorial, never a fact about a product — so it is the
+  `quick_plans` shape exactly (a row plus join rows, always read and written together)
+  and keeps its own page for the same reason: its one interesting field is a
+  multi-select the generic record form cannot render. A **coupon** is a code, what it
+  takes off (`percent` or `amount`, read together by `couponDiscountText()` in
+  `$lib/crm/coupons.ts` — the one place, so the list cell and the record page agree) and
+  the window it is good for; it is a record kind, so the generic form creates and edits
+  it. An **RMA** is a numbered return from a party — `company_id` and `contact_id` both
+  nullable with at least one set, the ledger's rule — climbing
+  `requested → approved → received → closed`, with `rejected` as the end that never
+  started; `closed` is the one finished state whatever the outcome was, because WHAT was
+  done is `resolution` in words (the task board's `cancelled` reasoning), and its number
+  comes from a sequence and a trigger like an invoice's, with the column defaulting to
+  `''` so an insert can leave it out. **What each one left out is the point**: a coupon
+  has no `max_redemptions` or `times_redeemed`, and an RMA has no `order_id` and no line
+  items — a limit nothing counts against reads as enforced, a column nothing writes is
+  dead weight, and a return line that claimed to restock would be the defect the orders
+  migration already names about `quantity_reserved`. They arrive with the redemption
+  table, the Orders feature and inventory movement respectively; a credit for a return
+  is a `refund` payment on the ledger, never a second copy of an amount. All three are
+  `hidden` for the verticals that quote work rather than ship goods — a vertical joins
+  with one `industry_features` row.
 
 ## Database
 

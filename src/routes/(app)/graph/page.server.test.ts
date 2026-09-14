@@ -108,11 +108,13 @@ function mock() {
 		assets: { data: [] },
 		billables: { data: [] },
 		contacts: { data: [] },
+		coupons: { data: [] },
 		products: { data: [] },
 		deals: { data: [] },
 		proposals: { data: [] },
 		relationship_types: { data: [] },
 		invoices: { data: [] },
+		rmas: { data: [] },
 		tasks: { data: [] },
 		support_tickets: { data: [] }
 	});
