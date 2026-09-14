@@ -30,6 +30,8 @@ export const QUERY = {
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',
 	assets: 'app:assets',
+	/** What customers asked for — a line, a split or a shipment moves the header. */
+	orders: 'app:orders',
 	/** The org's merchandising shelves — a group's members change with the group. */
 	featuredGroups: 'app:featured-groups',
 	/** The catalog tree — a category added, moved or removed changes it. */

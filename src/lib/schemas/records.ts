@@ -47,6 +47,7 @@ export const RECORD_TYPES = [
 	'lease',
 	'invoice',
 	'coupon',
+	'order',
 	'purchase',
 	'rma',
 	'task',
@@ -372,6 +373,25 @@ export const couponRecordSchema = z
 	);
 
 /**
+ * A customer order's header: who asked, their own reference for it, when it
+ * is expected to leave and what rides on top of the lines. The LINES are not
+ * here — they are added on the order's own page, the way an invoice's are —
+ * and neither is either status: confirming and cancelling are acts on that
+ * page, and how much has shipped is folded from the lines.
+ */
+export const orderRecordSchema = z.object({
+	// Not optional: `orders.company_id` is NOT NULL. The CONTACT is, by the
+	// party model — an order can be taken from a company rather than a person.
+	company_id: z.guid({ error: 'Pick the customer this order is for.' }),
+	contact_id: optionalPick,
+	customer_po: optionalText,
+	estimated_ship_date: optionalDate,
+	shipping: optionalAmount,
+	discount: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
  * A purchase order's header: who it is placed with, what it is called, when
  * it is wanted and what rides on top of the lines. The LINES are not here —
  * they are added on the purchase's own page, the way an invoice's are — and
@@ -448,6 +468,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	lease: leaseRecordSchema,
 	invoice: invoiceRecordSchema,
 	coupon: couponRecordSchema,
+	order: orderRecordSchema,
 	purchase: purchaseRecordSchema,
 	rma: rmaRecordSchema,
 	task: taskRecordSchema,
@@ -690,6 +711,22 @@ export const RECORD_FORMS: RecordFormRegistry = {
 				]
 			},
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	order: {
+		feature: 'orders',
+		query: QUERY.orders,
+		// No status field, and no fulfillment either: `draft` is where every
+		// order starts, confirming and cancelling are acts on the record page,
+		// and how much has shipped is the lines' to say.
+		fields: [
+			{ name: 'company_id', label: 'Customer', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'customer_po', label: 'Customer PO', type: 'text', placeholder: 'PO-4471' },
+			{ name: 'estimated_ship_date', label: 'Est. ship', type: 'date' },
+			{ name: 'shipping', label: 'Shipping', type: 'number', placeholder: '25.00' },
+			{ name: 'discount', label: 'Discount', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
 		]
 	},
 	purchase: {

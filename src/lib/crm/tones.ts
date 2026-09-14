@@ -218,6 +218,47 @@ export const INVOICE_STATUS_TONE = {
 } satisfies Record<Enums<'invoice_status'>, BadgeTone>;
 
 /**
+ * Where a customer's order stands with the people who took it. All three are
+ * acts: an order is written, committed to, or called off. How much of it has
+ * SHIPPED is the other axis (`FULFILLMENT_STATE_TONE`), and how much has been
+ * paid is a fact about its invoices rather than a third column.
+ */
+export const ORDER_STATUS_TONE = {
+	draft: 'neutral',
+	confirmed: 'info',
+	cancelled: 'error'
+} satisfies Record<Enums<'order_status'>, BadgeTone>;
+
+/**
+ * The fulfillment axis of an order, a second pill beside the status — folded
+ * from its lines by `refresh_order_fulfillment()`, never written. Shaped like
+ * `PAYMENT_STATE_TONE` because it answers the same question about a different
+ * thing: how much of what was asked for has arrived.
+ */
+export const FULFILLMENT_STATE_TONE = {
+	unfulfilled: 'warning',
+	partial: 'info',
+	fulfilled: 'success'
+} satisfies Record<Enums<'fulfillment_state'>, BadgeTone>;
+
+/**
+ * Where one line of an order stands. `shipped` and `delivered` are the
+ * carrier's — a scan on the shipment carrying the line writes them — and the
+ * rest are a person's, which a late scan never overwrites (the
+ * orders_and_shipments migration's decision 3). `backordered` is a
+ * distributor's normal case, not an exception.
+ */
+export const LINE_FULFILLMENT_TONE = {
+	pending: 'neutral',
+	processing: 'info',
+	backordered: 'warning',
+	shipped: 'info',
+	delivered: 'success',
+	cancelled: 'error',
+	returned: 'rose'
+} satisfies Record<Enums<'line_fulfillment_status'>, BadgeTone>;
+
+/**
  * What a purchase order is doing. Only two of these are acts a person takes —
  * placing it and cancelling it; the three in between are DERIVED from how
  * much of each line has arrived (`refresh_purchase_rollups()`), which is why

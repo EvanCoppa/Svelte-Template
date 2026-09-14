@@ -1904,7 +1904,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           notes?: string | null
-          number: string
+          number?: string
           org_id: string
           placed_at?: string | null
           ship_to_snapshot?: Json | null

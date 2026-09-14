@@ -17,6 +17,7 @@ import {
 	invoiceRecordSchema,
 	leaseRecordSchema,
 	productRecordSchema,
+	orderRecordSchema,
 	purchaseRecordSchema,
 	rmaRecordSchema,
 	propertyRecordSchema,
@@ -54,6 +55,7 @@ import { createInvoice } from './crm/invoices';
 import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
 import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
 import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
 import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
 import {
@@ -392,6 +394,8 @@ async function removeRecord(
 			return deleteTicket(supabase, orgId, id);
 		case 'coupon':
 			return deleteCoupon(supabase, orgId, id);
+		case 'order':
+			return deleteOrder(supabase, orgId, id);
 		case 'purchase':
 			return deletePurchase(supabase, orgId, id);
 		case 'rma':
@@ -523,6 +527,20 @@ async function recordFormValues(
 						acquired_on: str(row.acquired_on),
 						purchase_price: str(row.purchase_price),
 						description: str(row.description)
+					}
+				: {};
+		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						contact_id: str(row.contact_id),
+						customer_po: str(row.customer_po),
+						estimated_ship_date: str(row.estimated_ship_date),
+						shipping: str(row.shipping),
+						discount: str(row.discount),
+						notes: str(row.notes)
 					}
 				: {};
 		}
@@ -801,6 +819,23 @@ async function writeRecord(
 			await (id
 				? updateCoupon(supabase, orgId, id, columns)
 				: createCoupon(supabase, orgId, columns));
+			return;
+		}
+		case 'order': {
+			const data = orderRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				contact_id: text(data.contact_id),
+				customer_po: text(data.customer_po),
+				estimated_ship_date: text(data.estimated_ship_date),
+				// Not-null money columns: blank is zero, the products rule.
+				shipping: price(data.shipping),
+				discount: price(data.discount),
+				notes: text(data.notes)
+			};
+			await (id
+				? updateOrder(supabase, orgId, id, columns)
+				: createOrder(supabase, orgId, columns));
 			return;
 		}
 		case 'purchase': {

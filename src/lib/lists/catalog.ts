@@ -10,6 +10,8 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
@@ -253,6 +255,22 @@ export const LIST_FIELD_CATALOG = {
 		ends_on: date('Ends'),
 		status: enumOf('Status', ACTIVE_STATUS_TONE),
 		description: text('Description'),
+		created_at: created
+	},
+	order: {
+		name: text('Number'),
+		// Both sides of the party model: an order names the company, and the
+		// person at it who asked when there is one.
+		company: record('company'),
+		contact: record('contact'),
+		// The two axes a fulfillment queue reads together — what a person
+		// committed to, and what the lines have folded into.
+		status: enumOf('Status', ORDER_STATUS_TONE),
+		fulfillment_status: enumOf('Fulfillment', FULFILLMENT_STATE_TONE),
+		customer_po: text('Customer PO'),
+		total: money('Total'),
+		estimated_ship_date: date('Est. ship'),
+		confirmed_at: datetime('Confirmed'),
 		created_at: created
 	},
 	purchase: {

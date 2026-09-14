@@ -14,6 +14,8 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
@@ -41,6 +43,7 @@ import {
 	type InvoiceWithParties
 } from './invoices';
 import { getProduct, listProducts, type ProductWithCategory } from './products';
+import { getOrder, listOrders, type OrderWithDetails } from './orders';
 import { getPurchase, listPurchases, type PurchaseWithDetails } from './purchases';
 import { getRma, listRmas, type RmaWithParties } from './rmas';
 import {
@@ -310,6 +313,48 @@ export function describeProperty(
 			{ label: 'Acquired', value: date(row.acquired_on) },
 			{ label: 'Disposed', value: date(row.disposed_on) },
 			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * One customer order.
+ *
+ * Two pills, because an order has two axes: what a person committed to
+ * (`status`) and how much of it has gone out (`fulfillment_status`, folded
+ * from the lines by the database). How much has been PAID is a third axis and
+ * deliberately not here — it is a fact about the order's invoices.
+ *
+ * The lines are not fields: they are the record page's own screen, the way an
+ * invoice's are.
+ */
+export function describeOrder(row: OrderWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'order',
+		id: row.id,
+		name: row.number,
+		pills: [
+			pill(row.status, ORDER_STATUS_TONE[row.status]),
+			pill(row.fulfillment_status, FULFILLMENT_STATE_TONE[row.fulfillment_status])
+		],
+		fields: [
+			{ label: 'Customer', value: record('company', row.companies, canOpen) },
+			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
+			{ label: 'Customer PO', value: text(row.customer_po) },
+			// Every figure here is the database's: the subtotal and the tax
+			// roll up from the lines and the total is generated from them.
+			{ label: 'Subtotal', value: money(row.subtotal, row.currency) },
+			{ label: 'Tax', value: money(row.tax, row.currency) },
+			{ label: 'Shipping', value: money(row.shipping, row.currency) },
+			{ label: 'Discount', value: money(row.discount, row.currency) },
+			{ label: 'Total', value: money(row.total, row.currency) },
+			{ label: 'Confirmed', value: datetime(row.confirmed_at) },
+			{ label: 'Cancelled', value: datetime(row.cancelled_at) },
+			{ label: 'Est. ship', value: date(row.estimated_ship_date) },
+			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -757,6 +802,10 @@ export async function getRecord(
 			const row = await getInvoice(supabase, orgId, id);
 			return row && describeInvoice(row, canOpen);
 		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row && describeOrder(row, canOpen);
+		}
 		case 'purchase': {
 			const row = await getPurchase(supabase, orgId, id);
 			return row && describePurchase(row, canOpen);
@@ -832,6 +881,8 @@ export async function listRecordNames(
 			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'invoice':
 			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'order':
+			return (await listOrders(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
 		case 'purchase':
 			return (await listPurchases(supabase, orgId)).map((row) => ({
 				id: row.id,

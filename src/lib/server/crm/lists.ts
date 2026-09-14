@@ -13,6 +13,8 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
@@ -39,6 +41,7 @@ import { listLeases, type LeaseWithParties } from './leases';
 import { listProducts, type ProductWithCategory } from './products';
 import { listProperties, type Property } from './properties';
 import { listProposals, proposalParentKind, type ProposalWithOptions } from './proposals';
+import { listOrders, type OrderWithCustomer } from './orders';
 import { listPurchases, type PurchaseWithVendor } from './purchases';
 import { listRmas, type RmaWithParties } from './rmas';
 import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
@@ -73,6 +76,7 @@ export type ListResult =
 	| { kind: 'proposal'; rows: ProposalWithOptions[] }
 	| { kind: 'billable'; rows: Billable[] }
 	| { kind: 'coupon'; rows: Coupon[] }
+	| { kind: 'order'; rows: OrderWithCustomer[] }
 	| { kind: 'purchase'; rows: PurchaseWithVendor[] }
 	| { kind: 'rma'; rows: RmaWithParties[] };
 
@@ -107,6 +111,8 @@ export async function listRecords(
 			return { kind, rows: await listBillables(supabase, orgId) };
 		case 'coupon':
 			return { kind, rows: await listCoupons(supabase, orgId) };
+		case 'order':
+			return { kind, rows: await listOrders(supabase, orgId) };
 		case 'purchase':
 			return { kind, rows: await listPurchases(supabase, orgId) };
 		case 'rma':
@@ -547,6 +553,36 @@ export function describeListRows(
 						return text(coupon.description);
 					case 'created_at':
 						return datetime(coupon.created_at);
+				}
+			});
+		case 'order':
+			return describe(result.kind, result.rows, (order, key) => {
+				switch (key) {
+					case 'name':
+						return link('order', order.id, order.number);
+					case 'company':
+						return related('company', order.companies);
+					case 'contact':
+						return related('contact', order.contacts);
+					case 'status':
+						return status(order.status, ORDER_STATUS_TONE[order.status]);
+					case 'fulfillment_status':
+						// Folded from the lines by the database, never typed.
+						return status(
+							order.fulfillment_status,
+							FULFILLMENT_STATE_TONE[order.fulfillment_status]
+						);
+					case 'customer_po':
+						return text(order.customer_po);
+					case 'total':
+						// Generated from the lines, the shipping and the discount.
+						return money(order.total ?? 0, order.currency);
+					case 'estimated_ship_date':
+						return date(order.estimated_ship_date);
+					case 'confirmed_at':
+						return datetime(order.confirmed_at);
+					case 'created_at':
+						return datetime(order.created_at);
 				}
 			});
 		case 'purchase':

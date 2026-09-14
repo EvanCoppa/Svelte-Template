@@ -68,8 +68,10 @@ describe('addRelationship', () => {
 
 	it('refuses an unrecognized kind of record', async () => {
 		const { supabase } = supabaseMockSequence([{ data: [] }]);
+		// A word that is not a kind at all, rather than a kind the app has not
+		// built yet — the latter goes stale the day that kind ships.
 		const fields = addFields.map(([name, value]): [string, string] =>
-			name === 'otherKind' ? [name, 'order'] : [name, value]
+			name === 'otherKind' ? [name, 'not-a-kind'] : [name, value]
 		);
 
 		const result = await run('addRelationship', supabase, OWNER, fields);
