@@ -7,9 +7,10 @@ import { actions } from './+page.server';
 
 /**
  * The record page's address actions from the outside: who may post them,
- * how a post becomes a row, and that a geocoder that is off leaves the
- * coordinates empty rather than the address unsaved. (`GEOCODER_URL` is
- * unset in tests, so `geocode()` takes its unconfigured branch.)
+ * how a post becomes a row, and that a geocoder that finds no match leaves
+ * the coordinates empty rather than the address unsaved. (`GEOCODER_URL` is
+ * unset in tests, so `geocode()` defaults to public Nominatim — global
+ * `fetch` is stubbed below so that stays a fake match, never a real request.)
  */
 
 const OWNER: UserAccess = { role: 'owner', roles: [], grants: new Map() };
@@ -83,10 +84,19 @@ const posted: [string, string][] = [
 
 beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+	// geocode() now defaults to public Nominatim when GEOCODER_URL is unset
+	// (see $lib/server/geocode.ts), so every test's fetch is stubbed rather
+	// than reaching the network — an empty match array is the "no pin" case
+	// these address tests want.
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => new Response('[]', { status: 200 }))
+	);
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe('the address actions', () => {
@@ -102,10 +112,13 @@ describe('the address actions', () => {
 		await expect(
 			run('removeAddress', supabase, READER, [['id', ADDRESS_ID]])
 		).rejects.toMatchObject({ status: 403 });
+		await expect(
+			run('locateAddress', supabase, READER, [['id', ADDRESS_ID]])
+		).rejects.toMatchObject({ status: 403 });
 		expect(from).not.toHaveBeenCalled();
 	});
 
-	it('creates an address on the record, demoting the old primary, with no coordinates when geocoding is off', async () => {
+	it('creates an address on the record, demoting the old primary, with no coordinates when the geocoder finds no match', async () => {
 		const { supabase, from, builder } = supabaseMockSequence([
 			{ data: null },
 			{ data: { id: ADDRESS_ID } }
@@ -131,7 +144,7 @@ describe('the address actions', () => {
 			entity_type: 'contact',
 			entity_id: CONTACT_ID
 		});
-		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('not configured'));
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Geocoder found no match'));
 	});
 
 	it('updates the address the post names', async () => {
@@ -163,6 +176,75 @@ describe('the address actions', () => {
 			'Use the two-letter country code, like US.'
 		]);
 		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('re-geocodes an address by id, writing only the coordinates a fresh match found', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response('[{"lat":"40.5806","lon":"-74.2854"}]', { status: 200 }))
+		);
+		const savedAddress = {
+			id: ADDRESS_ID,
+			kind: 'billing',
+			label: 'HQ',
+			line1: '1007 Mountain Drive',
+			line2: null,
+			city: 'Gotham',
+			region: 'NJ',
+			postal_code: '07001',
+			country: 'US',
+			is_primary: true,
+			latitude: null,
+			longitude: null
+		};
+		const { supabase, from, builder } = supabaseMockSequence([
+			{ data: savedAddress },
+			{ data: { ...savedAddress, latitude: 40.5806, longitude: -74.2854 } }
+		]);
+
+		const result = await run('locateAddress', supabase, MANAGER, [['id', ADDRESS_ID]]);
+		expect(result).toHaveProperty('form.valid', true);
+		expect(from).toHaveBeenNthCalledWith(1, 'addresses');
+		expect(from).toHaveBeenNthCalledWith(2, 'addresses');
+		expect(builder.update).toHaveBeenCalledWith({
+			kind: 'billing',
+			label: 'HQ',
+			line1: '1007 Mountain Drive',
+			line2: null,
+			city: 'Gotham',
+			region: 'NJ',
+			postal_code: '07001',
+			country: 'US',
+			latitude: 40.5806,
+			longitude: -74.2854,
+			is_primary: true
+		});
+	});
+
+	it('reports the failure and writes nothing when the geocoder finds no match', async () => {
+		const savedAddress = {
+			id: ADDRESS_ID,
+			kind: 'billing',
+			label: null,
+			line1: '1007 Mountain Drive',
+			line2: null,
+			city: 'Gotham',
+			region: 'NJ',
+			postal_code: '07001',
+			country: 'US',
+			is_primary: true,
+			latitude: null,
+			longitude: null
+		};
+		const { supabase, builder } = supabaseMockSequence([{ data: savedAddress }]);
+
+		const result = await run('locateAddress', supabase, MANAGER, [['id', ADDRESS_ID]]);
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty(
+			'data.form.message',
+			expect.stringContaining('Geocoder found no match')
+		);
+		expect(builder.update).not.toHaveBeenCalled();
 	});
 
 	it('removes an address, and says so when nothing was removed', async () => {
