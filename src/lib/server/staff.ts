@@ -29,6 +29,8 @@ export type StaffMember = {
 	displayName: string | null;
 	email: string | null;
 	avatarUrl: string | null;
+	/** The colour they chose for their initials, or null to derive it from the id. */
+	avatarTint: string | null;
 	roles: { id: string; name: string }[];
 };
 
@@ -45,7 +47,7 @@ export async function listStaff(
 		await supabase
 			.from('organization_members')
 			.select(
-				'user_id, role, created_at, profiles(display_name, email, avatar_url), member_roles(roles(id, name))'
+				'user_id, role, created_at, profiles(display_name, email, avatar_url, avatar_tint), member_roles(roles(id, name))'
 			)
 			.eq('org_id', orgId)
 	);
@@ -58,6 +60,7 @@ export async function listStaff(
 			displayName: profile.display_name,
 			email: profile.email,
 			avatarUrl: profile.avatar_url,
+			avatarTint: profile.avatar_tint,
 			roles: member_roles.map(({ roles: r }) => ({ id: r.id, name: r.name }))
 		}))
 		.sort((a, b) => (a.displayName ?? a.email ?? '').localeCompare(b.displayName ?? b.email ?? ''));

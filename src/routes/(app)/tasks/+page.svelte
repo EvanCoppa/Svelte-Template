@@ -260,6 +260,16 @@
 	function peopleOn(taskId: string): TaskAssignee[] {
 		return data.assignees[taskId] ?? [];
 	}
+
+	/**
+	 * The colour someone chose for their initials. An assignee arrives as a
+	 * relationship row rather than a profile, so it is looked up on the roster
+	 * — null there simply means `avatarTint()` derives it from the id, the way
+	 * it always did.
+	 */
+	function tintOf(userId: string): string | null {
+		return data.members.find((member) => member.userId === userId)?.tint ?? null;
+	}
 </script>
 
 <div class="space-y-6">
@@ -546,7 +556,12 @@
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
 								<Avatar.Root {...props} class="ring-card -ml-1.5 size-6 ring-2 first:ml-0">
-									<Avatar.Fallback class="{avatarTint(person.userId)} text-[10px] font-medium">
+									<Avatar.Fallback
+										class="{avatarTint(
+											person.userId,
+											tintOf(person.userId)
+										)} text-[10px] font-medium"
+									>
 										{initialsOf(person.name)}
 									</Avatar.Fallback>
 								</Avatar.Root>
@@ -587,7 +602,12 @@
 							{#each people as person (person.id)}
 								<DropdownMenu.Item onSelect={() => unassign(person.id)}>
 									<Avatar.Root class="size-5">
-										<Avatar.Fallback class="{avatarTint(person.userId)} text-[9px] font-medium">
+										<Avatar.Fallback
+											class="{avatarTint(
+												person.userId,
+												tintOf(person.userId)
+											)} text-[9px] font-medium"
+										>
 											{initialsOf(person.name)}
 										</Avatar.Fallback>
 									</Avatar.Root>
@@ -603,7 +623,9 @@
 						{#each data.members.filter((member) => !people.some((p) => p.userId === member.userId)) as member (member.userId)}
 							<DropdownMenu.Item onSelect={() => assign(task.id, member.userId)}>
 								<Avatar.Root class="size-5">
-									<Avatar.Fallback class="{avatarTint(member.userId)} text-[9px] font-medium">
+									<Avatar.Fallback
+										class="{avatarTint(member.userId, member.tint)} text-[9px] font-medium"
+									>
 										{initialsOf(member.name)}
 									</Avatar.Fallback>
 								</Avatar.Root>

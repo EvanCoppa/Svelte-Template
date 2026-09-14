@@ -73,7 +73,7 @@
 	}: {
 		form: SuperValidated<CreateTaskValues>;
 		/** The roster the assignee picker offers, named as the staff page names people. */
-		members: readonly { userId: string; name: string }[];
+		members: readonly { userId: string; name: string; tint: string | null }[];
 		/** The companies and people the record picker offers — only the kinds the reader may open. */
 		records: readonly LinkableRecord[];
 		/** Who a new task is assigned to until somebody says otherwise. */
@@ -335,7 +335,9 @@
 						{#each assigned as person (person.userId)}
 							<Badge variant="secondary" class="gap-1.5 py-1 pe-1">
 								<Avatar.Root class="size-4">
-									<Avatar.Fallback class="{avatarTint(person.userId)} text-[8px] font-medium">
+									<Avatar.Fallback
+										class="{avatarTint(person.userId, person.tint)} text-[8px] font-medium"
+									>
 										{initialsOf(person.name)}
 									</Avatar.Fallback>
 								</Avatar.Root>
@@ -357,7 +359,9 @@
 					{#each unassigned as member (member.userId)}
 						<Command.Item value={member.name} onSelect={() => addPerson(member.userId)}>
 							<Avatar.Root class="size-5">
-								<Avatar.Fallback class="{avatarTint(member.userId)} text-[9px] font-medium">
+								<Avatar.Fallback
+									class="{avatarTint(member.userId, member.tint)} text-[9px] font-medium"
+								>
 									{initialsOf(member.name)}
 								</Avatar.Fallback>
 							</Avatar.Root>

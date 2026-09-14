@@ -108,7 +108,13 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		// Named here the way the roster names a member, so a card and the staff
 		// page call the same person the same thing — and named only: the board
 		// has no use for a roster row's roles, email or avatar.
-		members: staff.map((member) => ({ userId: member.userId, name: memberName(member) })),
+		members: staff.map((member) => ({
+			userId: member.userId,
+			name: memberName(member),
+			// Carried so a chip wears the colour they chose on /settings/profile
+			// rather than a second, hashed one.
+			tint: member.avatarTint
+		})),
 		canMove: canManage,
 		canCreate: canManage,
 		records,

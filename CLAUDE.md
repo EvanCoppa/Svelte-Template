@@ -882,6 +882,26 @@ flickers on load. The full account is `docs/user-preferences.md`; the rules:
 - **The organization decides what exists.** Features on and off, tier, industry,
   roles — the registry, edited at `/settings/features` by an owner or admin. Not a
   preference; never duplicate one as a preference.
+- **Who you are is not a switch at all.** Your display name and your photo are
+  identity — the `profiles` row, edited at `/settings/profile` — so they are read by
+  everyone you share an org with rather than only by you, and they never become a
+  `PREFERENCES` entry. The photo has **four doors and two columns** (the
+  `profile_photos` migration + `src/lib/server/profile.ts`): an upload lands in the
+  public `avatars` bucket under `{user_id}/` and writes its URL, a generated avatar
+  and a Gravatar write someone else's URL, and initials write `avatar_tint` with
+  `avatar_url` null. Which door a URL came through is deliberately not stored. A URL
+  the app did not upload is checked against **`AVATAR_URL_HOSTS`**
+  (`src/routes/(app)/settings/profile/schema.ts`) — `avatar_url` renders in every
+  colleague's browser, so an arbitrary host is not accepted — and every entry there
+  must also be in `img-src` in `src/lib/server/security-headers.ts` or it will not
+  render; the two lists move together, and a new source adds to both. The colour is
+  the one avatar vocabulary: `avatarTint(userId, tone)` uses the tone the person
+  chose and falls back to the hash of their id, so a screen that reads a profile row
+  (the user menu, the roster, a notification's actor, a member chip) shows their
+  choice and one that only has an id keeps the derived colour, with no second
+  palette either way. The `(app)` layout ships the reader's own row as
+  `page.data.profile` under `QUERY.profile`, so the sidebar follows a change with no
+  second query.
 - **The account decides how you work.** `user_preferences`, one row per key, private
   to its owner (no policy grants anyone else's, not even an org owner's), loaded once
   in the `(app)` layout and shipped as `page.data.preferences`. Written by the form

@@ -62,7 +62,10 @@
 				<Avatar.Image src={notification.actor.avatar_url} alt="" />
 			{/if}
 			<Avatar.Fallback
-				class={cn('text-[11px] font-semibold', Avatar.avatarTint(notification.actor.id))}
+				class={cn(
+					'text-[11px] font-semibold',
+					Avatar.avatarTint(notification.actor.id, notification.actor.avatar_tint)
+				)}
 			>
 				{initialsOf(name ?? '?')}
 			</Avatar.Fallback>

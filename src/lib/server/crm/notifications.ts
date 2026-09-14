@@ -21,7 +21,10 @@ export type AppNotification = Tables<'notifications'>;
  * Null for the ones the system raises itself, which have no actor and read
  * as a statement rather than as somebody's doing.
  */
-export type NotificationActor = Pick<Tables<'profiles'>, 'id' | 'display_name' | 'avatar_url'>;
+export type NotificationActor = Pick<
+	Tables<'profiles'>,
+	'id' | 'display_name' | 'avatar_url' | 'avatar_tint'
+>;
 
 /** One row as every surface that lists notifications wants it: with its actor. */
 export type InboxNotification = AppNotification & { actor: NotificationActor | null };
@@ -46,7 +49,8 @@ export type NotificationFilter = {
  * (the ambiguity the organizations query in `org-context.ts` ran into), and
  * naming the foreign key costs nothing and cannot become ambiguous later.
  */
-const WITH_ACTOR = '*, actor:profiles!notifications_actor_id_fkey (id, display_name, avatar_url)';
+const WITH_ACTOR =
+	'*, actor:profiles!notifications_actor_id_fkey (id, display_name, avatar_url, avatar_tint)';
 
 export async function listNotifications(
 	supabase: SupabaseClient<Database>,

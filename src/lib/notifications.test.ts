@@ -123,7 +123,11 @@ describe('the line under a notification', () => {
 });
 
 describe('the name in front of the title', () => {
-	const actor = { id: '00000000-0000-0000-0000-000000000003', avatar_url: null };
+	const actor = {
+		id: '00000000-0000-0000-0000-000000000003',
+		avatar_url: null,
+		avatar_tint: null
+	};
 
 	it('is the actor display name when there is one', () => {
 		const row = notification({ actor: { ...actor, display_name: 'Evan Coppa' } });
