@@ -61,7 +61,6 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 			contact: Object.fromEntries(contacts.map((row) => [row.id, row.name])),
 			company: Object.fromEntries(companies.map((row) => [row.id, row.name])),
 			deal: Object.fromEntries(deals.map((row) => [row.id, row.title]))
-		},
-		canConnect: passesFeatureGate('/email', features, canRead)
+		}
 	};
 };

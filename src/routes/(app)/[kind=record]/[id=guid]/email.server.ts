@@ -211,7 +211,9 @@ export const emailActions: Actions = {
 		const bcc = splitRecipients(form.data.bcc);
 
 		// The ledger row first: a second post with the same key collides here
-		// and nothing goes out twice.
+		// and nothing goes out twice — unless the earlier post was refused by
+		// Google, in which case the same key is a retry and the row is reused.
+		let outboxId: string;
 		const queued = await supabase
 			.from('email_outbox')
 			.insert({
@@ -229,8 +231,21 @@ export const emailActions: Actions = {
 			.select('id')
 			.single();
 		if (queued.error) {
-			if (queued.error.code === '23505') return { form };
-			return message(form, queued.error.message, { status: 400 });
+			if (queued.error.code !== '23505') {
+				return message(form, queued.error.message, { status: 400 });
+			}
+			const earlier = unwrap(
+				await supabase
+					.from('email_outbox')
+					.select('id, status')
+					.eq('mailbox_id', mailbox.id)
+					.eq('idempotency_key', form.data.idempotency_key)
+					.maybeSingle()
+			);
+			if (!earlier || earlier.status !== 'failed') return { form };
+			outboxId = earlier.id;
+		} else {
+			outboxId = queued.data.id;
 		}
 
 		const admin = createSupabaseAdminClient();
@@ -241,8 +256,11 @@ export const emailActions: Actions = {
 		}) =>
 			admin
 				.from('email_outbox')
-				.update({ ...values, sent_at: values.status === 'sent' ? new Date().toISOString() : null })
-				.eq('id', queued.data.id);
+				.update({
+					...values,
+					sent_at: values.status === 'sent' ? new Date().toISOString() : null
+				})
+				.eq('id', outboxId);
 
 		const access = await accessTokenFor(admin, mailbox, config);
 		if (!access.ok) {

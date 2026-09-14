@@ -28,7 +28,7 @@
 	import type { Enums } from '$lib/database.types';
 	import { QUERY } from '$lib/queries';
 	import { showUpgrade } from '$lib/upgrade.svelte';
-	import { exclusionSchema, FORM_IDS } from './schema';
+	import { FORM_IDS, exclusionSchema, mailboxIdSchema } from './schema';
 
 	/**
 	 * Integrations: the Google mailboxes connected to this organization, and
