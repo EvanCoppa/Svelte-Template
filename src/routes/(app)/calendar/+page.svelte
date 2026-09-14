@@ -162,10 +162,16 @@
 	/** The slot being booked, drawn as a ghost on the week until the popover closes. */
 	let draft = $state<Calendar.SlotSelection | null>(null);
 	let createForm = $state<EventForm | null>(null);
-	/** What the booking form opens on; the popover's content mounts with it. */
+	/** What the booking form opens on: a new slot per click, for `openOn()`. */
 	let createValues = $state<EventFormValues | null>(null);
 
-	function openCreate(slot: Calendar.SlotSelection, at: Calendar.CalendarAnchor) {
+	/**
+	 * Book the slot the grid handed up: the form opens on the two instants that
+	 * were clicked, drawn or picked, so a press at 2:47 on Wednesday is a
+	 * Wednesday 2:30 booking before a word is typed.
+	 */
+	async function openCreate(slot: Calendar.SlotSelection, at: Calendar.CalendarAnchor) {
+		const reopening = createOpen;
 		createValues = {
 			id: '',
 			title: '',
@@ -181,6 +187,16 @@
 		draft = slot;
 		createAnchor = at;
 		createOpen = true;
+		// The popover keeps its content mounted while it animates out, and stays
+		// mounted outright when this click landed on another slot with it still
+		// open, so the form here may be the last booking's: open it on this slot
+		// (`openOn` in event-form.svelte). One that really was just born is
+		// already showing these values, and there is nothing to open yet.
+		await tick();
+		createForm?.openOn();
+		// Opening focuses the title through `onOpenAutoFocus`; a click straight
+		// from one slot to the next has no open transition to hang that on.
+		if (reopening) createForm?.focusTitle();
 	}
 
 	/** The header's button: the next hour, today. */
@@ -210,10 +226,11 @@
 	// --- editing and deleting -----------------------------------------------
 
 	let editOpen = $state(false);
-	/** The event the edit form opens on; the modal's content mounts with it. */
+	/** The event the edit form opens on, for the same `openOn()`. */
 	let editValues = $state<EventFormValues | null>(null);
+	let editForm = $state<EventForm | null>(null);
 
-	function openEdit(event: CalendarEvent) {
+	async function openEdit(event: CalendarEvent) {
 		editValues = {
 			id: event.id,
 			title: event.title,
@@ -228,6 +245,11 @@
 		};
 		selectedId = null;
 		editOpen = true;
+		// The dialog is still mounted while it animates out, and this form
+		// carries the id the save posts, so a second Edit must open on its own
+		// event rather than on the one before it.
+		await tick();
+		editForm?.openOn();
 	}
 
 	let removingId = $state<string | null>(null);
@@ -554,6 +576,7 @@
 	<Modal.Root bind:open={editOpen}>
 		<Modal.Content>
 			<EventForm
+				bind:this={editForm}
 				data={data.updateForm}
 				values={editValues}
 				id="update-event"

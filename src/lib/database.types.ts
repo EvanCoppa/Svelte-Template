@@ -2248,18 +2248,29 @@ export type Database = {
       }
       products: {
         Row: {
+          additional_images: Json
           category_id: string | null
           created_at: string
           created_by: string | null
           currency: string
           description: string | null
           id: string
+          image_url: string | null
           is_active: boolean
+          is_subscription: boolean
           kind: Database["public"]["Enums"]["product_kind"]
+          long_description: string | null
+          metadata: Json
+          msrp: number | null
           name: string
           org_id: string
           quantity_on_hand: number | null
           sku: string | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          subscription_interval: string | null
+          subscription_interval_count: number | null
+          tags: string[] | null
           track_inventory: boolean
           unit: string | null
           unit_cost: number | null
@@ -2267,18 +2278,29 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          additional_images?: Json
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          is_subscription?: boolean
           kind?: Database["public"]["Enums"]["product_kind"]
+          long_description?: string | null
+          metadata?: Json
+          msrp?: number | null
           name: string
           org_id: string
           quantity_on_hand?: number | null
           sku?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscription_interval?: string | null
+          subscription_interval_count?: number | null
+          tags?: string[] | null
           track_inventory?: boolean
           unit?: string | null
           unit_cost?: number | null
@@ -2286,18 +2308,29 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          additional_images?: Json
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          is_subscription?: boolean
           kind?: Database["public"]["Enums"]["product_kind"]
+          long_description?: string | null
+          metadata?: Json
+          msrp?: number | null
           name?: string
           org_id?: string
           quantity_on_hand?: number | null
           sku?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscription_interval?: string | null
+          subscription_interval_count?: number | null
+          tags?: string[] | null
           track_inventory?: boolean
           unit?: string | null
           unit_cost?: number | null

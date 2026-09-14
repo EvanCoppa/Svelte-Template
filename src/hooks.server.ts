@@ -8,6 +8,7 @@ import {
 } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { dev } from '$app/environment';
+import { env as publicEnv } from '$env/dynamic/public';
 import { PUBLIC_SUPABASE_PUBLISHABLE_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import type { Database } from '$lib/database.types';
 import {
@@ -23,7 +24,7 @@ import { readActiveOrg } from '$lib/server/active-org';
 import { loadOrgContext } from '$lib/server/org-context';
 import { isPasswordRecovery } from '$lib/server/password-recovery';
 import { hasGrant } from '$lib/server/roles';
-import { applySecurityHeaders } from '$lib/server/security-headers';
+import { applySecurityHeaders, imageOrigins } from '$lib/server/security-headers';
 
 /**
  * Server errors get an opaque code the user can report; the detail stays in
@@ -65,12 +66,15 @@ const RECOVERY_ALLOWED_PATHS = ['/reset-password', '/auth/confirm', '/logout'];
 /**
  * Outermost handle so every rendered response carries the header set. The
  * CSP's origins are derived, never listed: Supabase's from its URL, the
- * map's from the style URL (`$lib/map`).
+ * map's from the style URL (`$lib/map`), and any host record imagery is
+ * served from out of `PUBLIC_IMAGE_ORIGINS` (unset by default — Supabase
+ * Storage is already admitted).
  */
 const securityHeaders: Handle = async ({ event, resolve }) => {
 	return applySecurityHeaders(await resolve(event), PUBLIC_SUPABASE_URL, {
 		dev,
-		mapOrigins: mapOrigins(mapConfig())
+		mapOrigins: mapOrigins(mapConfig()),
+		imageOrigins: imageOrigins(publicEnv.PUBLIC_IMAGE_ORIGINS)
 	});
 };
 

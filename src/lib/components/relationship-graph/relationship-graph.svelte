@@ -12,19 +12,37 @@
 	import { reducedMotion } from '$lib/motion.js';
 	import { theme } from '$lib/theme.svelte';
 	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { namesAt, placeLabels, truncate, type LabelRequest } from './labels.js';
 
 	/**
 	 * The map: every node the page hands it, laid out by a force simulation
 	 * (d3-force — the layout only; the drawing, the pointer and the keyboard
 	 * are this file's) on a canvas the reader can pan, zoom, pull a node
 	 * around on and rest the pointer on. A node is coloured by its kind's
-	 * swatch, sized by how many edges it has, and named beneath itself once
-	 * the reader is close enough for the names to be legible; resting on one
-	 * lights up its neighbourhood — the records one step away, the edges
-	 * between, and on each edge the words that read from the node under the
-	 * pointer ("owns", "owned by"). A click opens the record through
-	 * `onopen`, which the page turns into a navigation; the component never
-	 * decides where a node leads.
+	 * swatch and sized by how many edges it has; resting on one lights up its
+	 * neighbourhood — the records one step away, the edges between, and on
+	 * each edge the words that read from the node under the pointer ("owns",
+	 * "owned by"). A click opens the record through `onopen`, which the page
+	 * turns into a navigation; the component never decides where a node leads.
+	 *
+	 * **The names are the hard part**, and they follow the rule every dense
+	 * map settles on rather than being drawn all at once (`labels.ts`): a
+	 * record earns its name from zoom and standing together, so the map
+	 * prints its hubs from across the room and the rest as the reader comes
+	 * in; a name is then drawn only where one fits whole, trying each side of
+	 * its dot before it is left off; it is cut to a width no name may exceed;
+	 * and it is drawn over a halo of the map's own backdrop so a name that
+	 * crosses a line is still a name. Resting on a node narrows that to its
+	 * neighbourhood alone — the rest of the map goes quiet rather than fading
+	 * to a grey mush behind it. All of it is measured in screen pixels
+	 * whatever the zoom, because overlapping is something that happens on the
+	 * reader's screen.
+	 *
+	 * The layout is the other half of legibility: a node's pull on its
+	 * neighbours and the length of its links both grow with how many it has
+	 * (the degree-scaled repulsion a force layout needs to keep a hub's
+	 * spokes apart), so a record with two hundred relationships opens into a
+	 * ring you can read into instead of collapsing into a disc.
 	 *
 	 * The colours come from the `app.css` tokens, re-read when the theme
 	 * flips; a reader who asked for less motion gets the settled layout
@@ -66,11 +84,66 @@
 
 	/** How far the pointer may move between down and up and still be a click, in screen pixels. */
 	const CLICK_SLOP = 3;
-	const MIN_ZOOM = 0.2;
-	const MAX_ZOOM = 4;
+	const MIN_ZOOM = 0.08;
+	const MAX_ZOOM = 6;
 
-	/** A node's radius in map units: a little for each edge, capped so a hub stays a dot. */
-	const radiusOf = (node: SimNode) => 4 + Math.min(node.degree, 12) * 0.75;
+	/** A record's name, and the line it takes, in screen pixels. */
+	const NAME_SIZE = 12;
+	const NAME_LINE = 15;
+	/** The words on an edge, read from the node under the pointer. */
+	const EDGE_SIZE = 11;
+	/**
+	 * The widest a name may be drawn. A practice with nine words in its name
+	 * would otherwise take a box a third of the map wide and crowd out
+	 * everything it passes over; cut, it says as much as any other name.
+	 */
+	const NAME_MAX_WIDTH = 148;
+
+	/**
+	 * How much of a line the map spends on a relationship at rest. A line's
+	 * job when nothing is lit is to say *there is one here* — the
+	 * neighbourhood pass says what it is — so it is drawn as a light dash
+	 * rather than a solid hairline. Dashing spends about half the ink of a
+	 * solid line at the same alpha, and the two together put a resting line
+	 * at well under a third of the weight a solid hairline was laying down.
+	 * Grey felt is the state a dense map stops being readable in, and it is
+	 * the lines, not the dots, that get it there.
+	 */
+	const EDGE_REST_ALPHA = 0.22;
+	/** The dash, in screen pixels — constant at every zoom, as the names are. */
+	const EDGE_DASH = 3;
+	/** An edge outside the lit neighbourhood: present, and nothing more. */
+	const EDGE_QUIET_ALPHA = 0.06;
+	/** An edge inside it, which is where a relationship is actually read. */
+	const EDGE_LIT_ALPHA = 0.95;
+
+	/**
+	 * A node's radius in map units: the square root of its degree, so the
+	 * dot's area is its standing. This is the room the **layout** reserves
+	 * for a record — uncapped, because a hub genuinely needs it for its
+	 * spokes — and deliberately not the size the dot is drawn at.
+	 */
+	const radiusOf = (node: SimNode) => 3.5 + Math.sqrt(node.degree) * 1.6;
+
+	/**
+	 * The dot as it is **drawn**, in screen pixels — the one place the map
+	 * reconciles its two coordinate systems, and what decides whether it
+	 * reads as words or as bubbles.
+	 *
+	 * A dot is laid out in map units and so scales with the zoom; a name is
+	 * drawn at a fixed size in screen pixels and does not. Multiply the one
+	 * straight by the other and a record sits right beside its own name at
+	 * exactly one zoom: from across the room the dots are specks with type
+	 * scattered between them, and coming in they swell into discs a name is
+	 * lost against — a hub with two hundred relationships reaching a disc
+	 * several names wide. So the zoom is damped, and the result held to a
+	 * band either side of a name's own line: a record reads as a word with a
+	 * dot on it at every zoom, which is the whole job.
+	 */
+	const DOT_MIN_RADIUS = 2.75;
+	const DOT_MAX_RADIUS = NAME_LINE - 1;
+	const screenRadiusOf = (node: SimNode, zoom: number) =>
+		Math.min(DOT_MAX_RADIUS, Math.max(DOT_MIN_RADIUS, radiusOf(node) * Math.sqrt(zoom)));
 
 	let hovered = $state<string | null>(null);
 	const lit = $derived(hovered ?? focus);
@@ -111,13 +184,61 @@
 			const kinds: Record<string, string> = {};
 			for (const [kind, swatch] of Object.entries(swatches)) kinds[kind] = token(`--${swatch}`);
 			return {
-				surface: token('--background'),
+				// The halo behind a name and the hairline around a dot are both
+				// "the colour of whatever is behind this", so they have to be the
+				// map's real backdrop rather than a token that resembles it — a
+				// near-miss reads as a patch around every name, which is the one
+				// place a halo exists to be invisible. Hence the opaque `bg-card`
+				// on the container below: a tint over the page (`bg-muted/40`)
+				// has no colour of its own to hand back here.
+				surface: token('--card'),
 				edge: token('--muted-foreground'),
 				label: token('--foreground'),
 				muted: token('--muted-foreground'),
 				ring: token('--primary'),
 				kinds
 			};
+		}
+
+		// ── Type: read once, measured once ──
+
+		/** The page's own family, so the map's names are the app's type. */
+		let family = '';
+		const fontOf = (size: number) => {
+			if (!family) family = getComputedStyle(container).fontFamily || 'system-ui, sans-serif';
+			return `${size}px ${family}`;
+		};
+
+		/**
+		 * `measureText` is the hot call in the name pass — every name, every
+		 * frame — so each string is measured once per size and kept. Nothing
+		 * that changes a measurement changes without the component being torn
+		 * down, so the cache never needs clearing.
+		 *
+		 * A bare object without a prototype, like `remembered` above and for
+		 * the same reason: nothing renders from it, so a reactive collection
+		 * would only cost. Keyed by text a record supplied, so no prototype —
+		 * a company called "toString" is a key like any other.
+		 */
+		const measured: Record<string, number> = Object.create(null);
+		function widthOf(size: number, text: string): number {
+			const key = `${size}:${text}`;
+			const hit = measured[key];
+			if (hit !== undefined) return hit;
+			context.font = fontOf(size);
+			const width = context.measureText(text).width;
+			measured[key] = width;
+			return width;
+		}
+
+		/** A name cut to the width a name may take, kept so the cut is paid for once. */
+		const shortened: Record<string, string> = Object.create(null);
+		function nameOf(text: string): string {
+			const hit = shortened[text];
+			if (hit !== undefined) return hit;
+			const short = truncate(text, NAME_MAX_WIDTH, (candidate) => widthOf(NAME_SIZE, candidate));
+			shortened[text] = short;
+			return short;
 		}
 
 		/** Screen → map coordinates. */
@@ -133,7 +254,9 @@
 				const dx = (node.x ?? 0) - point.x;
 				const dy = (node.y ?? 0) - point.y;
 				const distance = Math.hypot(dx, dy);
-				const reach = radiusOf(node) + 4 / view.k;
+				// The dot as it is drawn plus a little slack, back in map units,
+				// so what the pointer catches is what the reader can see.
+				const reach = (screenRadiusOf(node, view.k) + 4) / view.k;
 				if (distance <= reach && distance < bestDistance) {
 					best = node;
 					bestDistance = distance;
@@ -176,66 +299,66 @@
 			view.y = height / 2 - ((minY + maxY) / 2) * view.k;
 		}
 
-		function draw() {
-			frame = 0;
-			const dpr = window.devicePixelRatio || 1;
-			context.setTransform(dpr, 0, 0, dpr, 0, 0);
-			context.clearRect(0, 0, width, height);
-			context.translate(view.x, view.y);
-			context.scale(view.k, view.k);
+		/**
+		 * One line between two records, at the weight its standing in the
+		 * scope earns it. Lit, it is solid — and dashed only when the
+		 * relationship has ended, which is where that distinction is worth the
+		 * ink, because the reader is looking straight at it. At rest every
+		 * line is a light dash instead: ongoing-or-ended is unreadable at that
+		 * weight anyway, and a solid hairline per relationship is what turns
+		 * the map into felt.
+		 */
+		function strokeLink(link: SimLink, alpha: number, solid: boolean) {
+			context.globalAlpha = alpha * (link.ended ? 0.55 : 1);
+			context.strokeStyle = colours.edge;
+			const dash = EDGE_DASH / view.k;
+			context.setLineDash(solid && !link.ended ? [] : [dash, dash]);
+			context.beginPath();
+			context.moveTo(link.source.x ?? 0, link.source.y ?? 0);
+			context.lineTo(link.target.x ?? 0, link.target.y ?? 0);
+			context.stroke();
+		}
 
-			const scope = neighbourhood;
-			// Names come in once the map is close enough to read them; the lit
-			// neighbourhood is always named.
-			const labelAlpha = Math.max(0, Math.min(1, (view.k - 0.55) / 0.5));
-			const dim = scope ? 0.15 : 1;
-
-			context.lineWidth = 1 / view.k;
-			for (const link of simLinks) {
-				const inScope = scope?.edges.has(link.id) ?? false;
-				context.globalAlpha = (scope ? (inScope ? 0.9 : dim) : 0.45) * (link.ended ? 0.5 : 1);
-				context.strokeStyle = colours.edge;
-				context.setLineDash(link.ended ? [4 / view.k, 4 / view.k] : []);
-				context.beginPath();
-				context.moveTo(link.source.x ?? 0, link.source.y ?? 0);
-				context.lineTo(link.target.x ?? 0, link.target.y ?? 0);
-				context.stroke();
-			}
-			context.setLineDash([]);
+		/**
+		 * The names, in screen pixels: which have been earned at this zoom,
+		 * cut to width, laid out so none touches another, and drawn over a
+		 * halo of the page's own background. Resting on a node narrows the
+		 * whole pass to its neighbourhood.
+		 */
+		function drawNames(scope: ReturnType<typeof neighbourhoodOf> | null) {
+			const requests: LabelRequest[] = [];
+			const drawn: Record<string, { text: string; size: number; fill: string }> =
+				Object.create(null);
 
 			for (const node of simNodes) {
-				const inScope = scope?.nodes.has(node.id) ?? true;
-				context.globalAlpha = inScope ? 1 : dim;
-				context.fillStyle = colours.kinds[node.kind] ?? colours.muted;
-				context.beginPath();
-				context.arc(node.x ?? 0, node.y ?? 0, radiusOf(node), 0, Math.PI * 2);
-				context.fill();
-				if (node.id === lit) {
-					context.lineWidth = 2 / view.k;
-					context.strokeStyle = colours.ring;
-					context.stroke();
-					context.lineWidth = 1 / view.k;
-				}
-			}
-
-			// Labels are drawn in screen pixels whatever the zoom, so the map
-			// gets closer while the type stays the size it is read at.
-			context.font = `${12 / view.k}px ${getComputedStyle(container).fontFamily}`;
-			context.textAlign = 'center';
-			context.textBaseline = 'top';
-			for (const node of simNodes) {
-				const inScope = scope?.nodes.has(node.id) ?? false;
-				const alpha = inScope ? 1 : labelAlpha * dim;
-				if (alpha <= 0.02) continue;
-				context.globalAlpha = alpha;
-				context.fillStyle = colours.label;
-				context.fillText(node.name, node.x ?? 0, (node.y ?? 0) + radiusOf(node) + 3 / view.k);
+				// Under the pointer, the map names the neighbourhood and nothing
+				// else; otherwise a name is earned by zoom and degree together.
+				if (scope ? !scope.nodes.has(node.id) : !namesAt(view.k, node.degree)) continue;
+				const x = (node.x ?? 0) * view.k + view.x;
+				const y = (node.y ?? 0) * view.k + view.y;
+				// Off the canvas: nothing to place, and nothing to measure.
+				if (x < -NAME_MAX_WIDTH || x > width + NAME_MAX_WIDTH) continue;
+				if (y < -NAME_LINE * 2 || y > height + NAME_LINE * 2) continue;
+				const text = nameOf(node.name);
+				drawn[node.id] = { text, size: NAME_SIZE, fill: colours.label };
+				requests.push({
+					id: node.id,
+					x,
+					y,
+					radius: screenRadiusOf(node, view.k),
+					width: widthOf(NAME_SIZE, text),
+					height: NAME_LINE,
+					priority: node.degree,
+					// The record the reader is pointing at is never the one left off.
+					required: node.id === lit
+				});
 			}
 
 			// The words on each lit edge, read from the node under the pointer.
+			// They queue behind every name: which records these are matters
+			// more than what joins them, and a hub's two hundred lines would
+			// otherwise spell one word across the whole map.
 			if (scope && lit) {
-				context.font = `${11 / view.k}px ${getComputedStyle(container).fontFamily}`;
-				context.textBaseline = 'middle';
 				for (const link of simLinks) {
 					if (!scope.edges.has(link.id)) continue;
 					const words = edgeLabelFrom(
@@ -243,24 +366,86 @@
 						lit
 					);
 					if (!words) continue;
-					const mx = ((link.source.x ?? 0) + (link.target.x ?? 0)) / 2;
-					const my = ((link.source.y ?? 0) + (link.target.y ?? 0)) / 2;
-					const measured = context.measureText(words).width;
-					const padX = 4 / view.k;
-					const padY = 2 / view.k;
-					context.globalAlpha = 0.92;
-					context.fillStyle = colours.surface;
-					context.fillRect(
-						mx - measured / 2 - padX,
-						my - 6 / view.k - padY,
-						measured + padX * 2,
-						12 / view.k + padY * 2
-					);
-					context.globalAlpha = 1;
-					context.fillStyle = colours.muted;
-					context.fillText(words, mx, my);
+					const id = `edge:${link.id}`;
+					drawn[id] = { text: words, size: EDGE_SIZE, fill: colours.muted };
+					requests.push({
+						id,
+						x: (((link.source.x ?? 0) + (link.target.x ?? 0)) / 2) * view.k + view.x,
+						y: (((link.source.y ?? 0) + (link.target.y ?? 0)) / 2) * view.k + view.y,
+						radius: 0,
+						width: widthOf(EDGE_SIZE, words),
+						height: EDGE_SIZE + 3,
+						priority: -1
+					});
 				}
 			}
+
+			context.globalAlpha = 1;
+			context.textAlign = 'left';
+			context.textBaseline = 'middle';
+			context.lineJoin = 'round';
+			context.lineWidth = 3;
+			context.setLineDash([]);
+			for (const placement of placeLabels(requests, { width, height })) {
+				const item = drawn[placement.id];
+				if (!item) continue;
+				context.font = fontOf(item.size);
+				// The halo first: a name that crosses a line is still a name.
+				context.strokeStyle = colours.surface;
+				context.strokeText(item.text, placement.x, placement.y);
+				context.fillStyle = item.fill;
+				context.fillText(item.text, placement.x, placement.y);
+			}
+		}
+
+		function draw() {
+			frame = 0;
+			const dpr = window.devicePixelRatio || 1;
+			context.setTransform(dpr, 0, 0, dpr, 0, 0);
+			context.clearRect(0, 0, width, height);
+			context.save();
+			context.translate(view.x, view.y);
+			context.scale(view.k, view.k);
+
+			const scope = neighbourhood;
+			// A record outside the lit neighbourhood stays a legible dot; a line
+			// outside it goes quieter still, because lines are the thing there
+			// are hundreds of.
+			const dimNode = scope ? 0.12 : 1;
+
+			// The lit lines are drawn last so they sit on top of the rest.
+			const litLinks: SimLink[] = [];
+			context.lineWidth = 1 / view.k;
+			for (const link of simLinks) {
+				if (scope?.edges.has(link.id)) litLinks.push(link);
+				else strokeLink(link, scope ? EDGE_QUIET_ALPHA : EDGE_REST_ALPHA, false);
+			}
+			for (const link of litLinks) strokeLink(link, EDGE_LIT_ALPHA, true);
+			context.setLineDash([]);
+
+			for (const node of simNodes) {
+				const inScope = scope?.nodes.has(node.id) ?? true;
+				context.globalAlpha = inScope ? 1 : dimNode;
+				context.beginPath();
+				context.arc(
+					node.x ?? 0,
+					node.y ?? 0,
+					screenRadiusOf(node, view.k) / view.k,
+					0,
+					Math.PI * 2
+				);
+				context.fillStyle = colours.kinds[node.kind] ?? colours.muted;
+				context.fill();
+				// A hairline in the map's own backdrop: where the layout packs a
+				// hub's neighbours together, two dots that touch still read as two.
+				const isLit = node.id === lit;
+				context.lineWidth = (isLit ? 2.5 : 1.25) / view.k;
+				context.strokeStyle = isLit ? colours.ring : colours.surface;
+				context.stroke();
+			}
+
+			context.restore();
+			drawNames(scope);
 			context.globalAlpha = 1;
 		}
 
@@ -315,22 +500,37 @@
 				];
 			});
 
+			// Both the push and the length of a link grow with how many
+			// relationships the records on it have. A record everything points
+			// at otherwise pulls its neighbours into a disc the width of one
+			// link, which is the state a map is unreadable in; given room in
+			// proportion to what it holds, the same record opens into a ring.
+			// The caps keep a very large hub from throwing the rest of the map
+			// off the canvas.
 			simulation = lib
 				.forceSimulation(simNodes)
 				.force(
 					'link',
 					lib
 						.forceLink<SimNode, SimLink>(simLinks)
-						.distance((link) => 40 + radiusOf(link.source) + radiusOf(link.target))
-						.strength(0.6)
+						.distance((link) => {
+							const crowd = Math.max(link.source.degree, link.target.degree);
+							return (
+								32 + radiusOf(link.source) + radiusOf(link.target) + Math.min(crowd, 220) * 1.1
+							);
+						})
+						.strength(0.55)
 				)
-				.force('charge', lib.forceManyBody<SimNode>().strength(-160).distanceMax(400))
 				.force(
-					'collide',
-					lib.forceCollide<SimNode>((node) => radiusOf(node) + 6)
+					'charge',
+					lib
+						.forceManyBody<SimNode>()
+						.strength((node) => -100 - Math.min(node.degree, 120) * 5)
+						.distanceMax(500)
 				)
-				.force('x', lib.forceX(0).strength(0.03))
-				.force('y', lib.forceY(0).strength(0.03))
+				.force('collide', lib.forceCollide<SimNode>((node) => radiusOf(node) + 8).strength(0.9))
+				.force('x', lib.forceX(0).strength(0.05))
+				.force('y', lib.forceY(0).strength(0.05))
 				.force('center', lib.forceCenter(0, 0).strength(0.05));
 
 			const remember = () => {
@@ -516,7 +716,7 @@
 <div
 	bind:this={ref}
 	data-slot="relationship-graph"
-	class={cn('bg-muted/40 relative min-h-64 w-full overflow-hidden rounded-lg border', className)}
+	class={cn('bg-card relative min-h-64 w-full overflow-hidden rounded-lg border', className)}
 	{...restProps}
 	{@attach graphAttachment}
 >

@@ -64,6 +64,13 @@ const record = (kind: 'company' | 'contact' | 'property'): FieldMeta => ({
 /** A field naming another record under a label of its own — a role, not a kind. */
 const namedRecord = (label: string): FieldMeta => ({ label: { text: label }, type: 'record' });
 const number = (label: string): FieldMeta => ({ label: { text: label }, type: 'number' });
+/**
+ * The record's picture, as a thumbnail beside its name. A column like any
+ * other — an industry that does not sell things people look at hides it with
+ * one `industry_list_fields` row — but never searched, filtered or sorted:
+ * there is no value in it to compare.
+ */
+const image = (label: string): FieldMeta => ({ label: { text: label }, type: 'image' });
 /** A member's name, labelled by a word that belongs to no feature (a proposal's presenter). */
 const person = (id: TermId): FieldMeta => ({ label: { term: id }, type: 'text' });
 
@@ -166,11 +173,12 @@ export const LIST_FIELD_CATALOG = {
 	},
 	product: {
 		name: text('Name'),
+		image: image('Image'),
 		kind: enumOf('Kind', PRODUCT_KIND_TONE),
 		category: text('Category'),
 		sku: text('SKU'),
 		unit_price: money('Price'),
-		quantity_on_hand: { label: { text: 'On hand' }, type: 'number' },
+		quantity_on_hand: number('On hand'),
 		created_at: created
 	},
 	deal: {
@@ -184,7 +192,7 @@ export const LIST_FIELD_CATALOG = {
 		created_at: created
 	},
 	ticket: {
-		number: { label: { text: '#' }, type: 'number' },
+		number: number('#'),
 		name: text('Subject'),
 		company: record('company'),
 		contact: record('contact'),
@@ -208,7 +216,7 @@ export const LIST_FIELD_CATALOG = {
 		// The record it hangs off — a company, a contact, or a deal — whichever
 		// it is (docs/proposals.md, "the record it hangs off"); an unattached
 		// draft reads blank.
-		contact: { label: { text: 'Contact' }, type: 'record' },
+		contact: namedRecord('Contact'),
 		owner: person('proposal_responsible'),
 		presenter: person('proposal_presenter'),
 		status: enumOf('Status', PROPOSAL_STATUS_TONE),

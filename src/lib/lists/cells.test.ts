@@ -14,6 +14,7 @@ describe('cellText', () => {
 		expect(cellText({ type: 'boolean', value: null }, TODAY)).toBe('');
 		expect(cellText({ type: 'date', value: '2026-01-15' }, TODAY)).toBe('2026-01-15');
 		expect(cellText({ type: 'datetime', value: null }, TODAY)).toBe('');
+		expect(cellText({ type: 'image', url: 'https://cdn.test/a.png' }, TODAY)).toBe('');
 	});
 });
 
@@ -41,5 +42,7 @@ describe('cellSortValue', () => {
 		expect(
 			cellSortValue({ type: 'payment', state: 'unpaid', dueDate: null, owed: true }, TODAY)
 		).toBe('unpaid');
+		// A picture holds nothing to order by, so every row ties.
+		expect(cellSortValue({ type: 'image', url: 'https://cdn.test/a.png' }, TODAY)).toBe('');
 	});
 });

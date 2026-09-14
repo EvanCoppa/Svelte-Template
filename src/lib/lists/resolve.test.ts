@@ -226,6 +226,15 @@ describe('resolveList', () => {
 				[]
 			)
 		).toThrow('a money field cannot be filtered');
+		expect(() =>
+			resolveList(
+				'product',
+				'products',
+				{ defaults: [row('products', 'image', 150, { filterable: true })], industries: [] },
+				'crm',
+				[]
+			)
+		).toThrow('an image field cannot be filtered');
 	});
 });
 

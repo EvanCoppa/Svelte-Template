@@ -50,7 +50,6 @@
 
 <Combobox
 	multiple
-	size="sm"
 	clearable
 	{options}
 	{selected}

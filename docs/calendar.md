@@ -77,9 +77,25 @@ the day a block belongs to is the day it starts in the viewer's zone. So:
   `ends_at` as ISO strings and the visible `date` / `datetime-local` inputs are views
   onto them in the browser's zone (`toLocalDateTimeInput()` and friends). Without
   JavaScript the naive value arrives instead and is read as UTC — `instant()` in
-  `$lib/server/records`, the same rule the generic record form follows. The form is
-  born with the slot or the event it opens on: a popover's content mounts fresh on
-  every open, so there is nothing to sync and no effect writing into the store.
+  `$lib/server/records`, the same rule the generic record form follows.
+- **The form opens on the slot that was clicked**, so a press on Wednesday at 2:47
+  opens a Wednesday 2:30 booking before a word is typed — the week and the day views
+  hand up the instants under the pointer (`timedSlot()` floored to the half hour, or
+  the range that was drawn), the month view the day at 9:00, the header button the
+  next hour. Two things make that stick, and neither is an effect syncing a store:
+
+  - **`superForm` is handed the load's own form object**, the way `CreateRecord` is.
+    Superforms remembers the object it was given and applies every _other_
+    `SuperValidated` of that id which the page store publishes; hand it a
+    `{ ...data, data: slot }` wrapper of its own and the load's blank copy becomes
+    one of those, applied at birth — which is how a click on 2:30 opened an empty
+    form. The slot goes in right after, through superforms' `reset()`.
+  - **The page calls `openOn()` on every open**, because a surface being opened is
+    not always a form being born. A popover and a dialog both keep their content
+    mounted while they animate out, and the popover stays mounted outright when the
+    next click lands on another slot with it still open — so without that call the
+    second booking would open on the first one's hours, and a second Edit on the
+    first event's values, id included.
 
 ## What lives in the URL
 
