@@ -4281,7 +4281,10 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
-      create_default_visit_outcomes: { Args: { org: string }; Returns: undefined }
+      create_default_visit_outcomes: {
+        Args: { org: string }
+        Returns: undefined
+      }
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
