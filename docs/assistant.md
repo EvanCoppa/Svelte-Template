@@ -178,6 +178,8 @@ needs there, on the same `read < manage < delete` ladder the rest of the app is 
 | `deleteTask`      | tasks     | delete | user     |
 | `listDeals`       | deals     | read   |          |
 | `listTickets`     | tickets   | read   |          |
+| `listEvents`      | calendar  | read   |          |
+| `exploreGraph`    | graph     | read   |          |
 
 `activeToolNames(org)` (`tools/index.ts`) keeps a tool only when the feature's mode for
 the org is `enabled` **and** the caller holds the level — the same intersection the hook
@@ -186,6 +188,44 @@ it may not call: switch tasks off for an org and the task tools vanish from the 
 view; a member holding only `read` on tasks can list them and nothing more. Every tool
 still runs `requireToolContext()` first, so a stale call replayed from a stored thread
 fails as a tool error the model can explain rather than reaching a data module.
+
+### Tools addressed by kind
+
+The tools above are one per feature, each with that feature's own filters. A second
+family serves **every kind of record with a page** through one door each, the way one
+route serves every record page (`(app)/[kind=record]/[id=guid]`) and one form creates and
+edits every kind — the generic record layer (`$lib/server/crm/records`,
+`$lib/server/records`) rather than a tool per table:
+
+| tool                    | access                  | what it does                                                                                                                                                                                                 |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `findRecords`           | read on the kind        | Records of one kind by name (`listRecordNames()`), ids to pass on.                                                                                                                                           |
+| `getRecord`             | read on the kind        | One record as its page shows it — fields (a field naming another record carries its kind and id), custom fields, tags, related records, relationships, latest activity — plus `editableFields` for a writer. |
+| `updateRecord`          | manage on the kind      | A partial edit through `patchRecord()`: the named fields change, the rest keep their values, the kind's schema validates and `writeRecord()` writes.                                                         |
+| `linkRecords`           | manage on the from kind | Draws a relationship of a type, refusing an open duplicate — the record page's rule.                                                                                                                         |
+| `listRelationshipTypes` | read on any kind        | The relationship types, with both labels and the kinds each end must be.                                                                                                                                     |
+
+Their `ToolAccess` is the second shape, `anyOf`: the tool is **offered** while any record
+kind's feature is open to the caller at the level, and each call re-checks the one kind it
+names with `recordAccess(kind, level)` — the kind's feature, on the same ladder. So a kind
+whose feature the org, its tier or its industry withholds is refused inside the call, and
+the model is told which kinds exist up front: the session block lists every kind this
+caller may read, **in the industry's words** (`recordKindAccess()` — "contact — Patients
+(one: patient) — read, update"), so it asks for a patient as `kind: 'contact'` and never
+for a kind that does not exist here. `canOpenFor(org)` is the record page's `canOpen`
+answered from the tool context, and it decides what a related group, a relationship's
+other end or a graph node names — exactly what the page would link, never more.
+
+**Traversal** is two tools. `getRecord` is the one-hop view — the records that point at
+this one and the relationships it stands in, each with an id to follow — and
+`exploreGraph` is the neighbourhood: a breadth-first walk over the org's `relationships`
+rows from one record, up to three hops and forty nodes, naming records through their
+list modules and members through the roster exactly as the graph page does. The walk
+never steps onto a kind the caller may not open, so nothing beyond such a record is
+reached through it. It is the `graph` feature's tool, since that is the page that draws
+the graph whole. The instructions tell the model to draw conclusions only from what those
+two returned, to name the records and relationships a conclusion rests on, and to say when
+the graph shows no connection.
 
 The `assistant` feature itself grants nothing beyond the page. Opening it is a `read`
 grant on `assistant`; what the assistant can _do_ for you is your grants on everything
@@ -199,8 +239,11 @@ the browser's copy of the assistant message is **not** trusted: only its approva
 decisions are copied onto the stored message, by approval id.
 
 Adding a tool: a new file exporting the `tool()` and its `ToolAccess`, one line in each of
-the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`. The type of
-`AssistantUIMessage` follows, so the page's `tool-<name>` part is typed on arrival.
+the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`, and a case in
+`sourcesOf()` (`src/lib/ai/sources.ts`) saying which records its output names. The type of
+`AssistantUIMessage` follows, so the page's `tool-<name>` part is typed on arrival. A tool
+about a kind of record takes the kind as input and checks `recordAccess()` per call rather
+than adding a file per kind.
 
 ## Persistence
 

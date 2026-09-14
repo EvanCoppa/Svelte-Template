@@ -837,7 +837,14 @@ version; read them before the website. The full account is `docs/assistant.md`.
   features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
   org and the caller holds the level, and every tool re-checks with
   `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
-  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts` + a
+  case in `sourcesOf()`. **A tool about a kind of record is addressed by kind, never a
+  file per kind**: `findRecords`, `getRecord`, `updateRecord`, `linkRecords` and
+  `exploreGraph` serve every kind with a page through the generic record layer
+  (`getRecord()`, `patchRecord()`, `getRelationships()`), their `ToolAccess` is `anyOf`
+  the kinds' features, each call re-checks the kind it names with `recordAccess()`, and
+  the session block lists the kinds this caller may read in the industry's words
+  (`recordKindAccess()`) — docs/assistant.md, "Tools addressed by kind".
 - **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
   tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
   result is a data part; a message-level fact is metadata (`messageMetadataSchema`).

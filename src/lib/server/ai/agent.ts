@@ -3,6 +3,7 @@ import type { AssistantToolContext } from './context';
 import { buildInstructions } from './prompts';
 import { openaiCallOptions } from './provider';
 import { activeToolNames, assistantTools, TOOL_APPROVAL, toolsContextFor } from './tools';
+import { recordKindAccess } from './tools/access';
 
 /**
  * Steps per turn. Each step is one model call that ends in text or in tool
@@ -52,7 +53,11 @@ export function createAssistantAgent({
 			tierName: activeOrg.tierName,
 			role: activeOrg.role,
 			userName,
-			timeZone
+			timeZone,
+			// The kinds of record this caller may read, in the industry's words —
+			// the kind-addressed tools take the kind, and the model must not ask
+			// for one the org, its tier or its industry does not have.
+			kinds: recordKindAccess(context.org)
 		}),
 		tools: assistantTools,
 		toolsContext: toolsContextFor(context),

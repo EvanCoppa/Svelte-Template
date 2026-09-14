@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { RECORD_KINDS, recordHref, type RecordKind } from '$lib/crm/records';
+import { isRecordKind, recordHref, type RecordKind } from '$lib/crm/records';
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
 import type { CrmEntityType } from './entity';
@@ -37,10 +37,11 @@ export async function recordLinks(
 ): Promise<Record<string, RecordLink>> {
 	const targets = new Map<string, { kind: RecordKind; id: string }>();
 	for (const row of rows) {
-		const kind = RECORD_KINDS.find((candidate) => candidate === row.entity_type);
 		// `proposal_option` is an entity type with no page of its own; a row
 		// about one is legal in the database and simply unnamed here.
-		if (!kind || !row.entity_id || !canOpen(kind)) continue;
+		if (!row.entity_type || !isRecordKind(row.entity_type) || !row.entity_id) continue;
+		const kind = row.entity_type;
+		if (!canOpen(kind)) continue;
 		targets.set(`${kind}:${row.entity_id}`, { kind, id: row.entity_id });
 	}
 	if (targets.size === 0) return {};

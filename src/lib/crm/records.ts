@@ -80,6 +80,11 @@ export const RECORD_KIND_META = {
 	ticket: { feature: 'tickets', segment: 'tickets' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;
 
+/** Whether a string names a record kind — an entity type read off a row, say. */
+export function isRecordKind(value: string): value is RecordKind {
+	return RECORD_KINDS.some((kind) => kind === value);
+}
+
 /** A path segment the `[kind=record]` matcher accepts: one kind's list route. */
 export type RecordSegment = (typeof RECORD_KIND_META)[RecordKind]['segment'];
 
