@@ -13,6 +13,7 @@ import {
 	isCalendarView,
 	layoutDay,
 	layoutRow,
+	relativeDayLabel,
 	minutesAtY,
 	monthGrid,
 	movedToDay,
@@ -343,6 +344,26 @@ describe('words for times', () => {
 		expect(hourLabel(9)).toBe('9 AM');
 		expect(hourLabel(12)).toBe('12 PM');
 		expect(hourLabel(17)).toBe('5 PM');
+	});
+
+	it('names the days near today rather than dating them', () => {
+		// The one place a date becomes "Tomorrow": the task list's due dates and
+		// the deal board's expected close both read through it, so they cannot
+		// word the same day two ways.
+		const now = new Date(2026, 8, 15, 12, 0, 0);
+		const day = (offset: number) => new Date(2026, 8, 15 + offset);
+
+		expect(relativeDayLabel(day(0), now)).toBe('Today');
+		expect(relativeDayLabel(day(1), now)).toBe('Tomorrow');
+		expect(relativeDayLabel(day(-1), now)).toBe('Yesterday');
+		expect(relativeDayLabel(day(-3), now)).toBe('3 days ago');
+		// Inside the coming week a weekday is unambiguous and needs no date.
+		expect(relativeDayLabel(day(5), now)).toBe('Sunday');
+		expect(relativeDayLabel(day(6), now)).toBe('Monday');
+		// A week out is NOT named: "Tuesday" is today's word too, and one word
+		// for two different days is worse than a date.
+		expect(relativeDayLabel(day(7), now)).toBe('Sep 22');
+		expect(relativeDayLabel(day(8), now)).toBe('Sep 23');
 	});
 
 	it('says when an event is, in one line', () => {

@@ -15,9 +15,13 @@
 
 	// The columns, the search and the filters are the list's fields as the
 	// org's industry has them (docs/lists.md); the page only composes the parts.
+	// The owner / presenter columns are labelled from the vocabulary, not a
+	// constant, so the industry's own words ("Project manager", "Estimator")
+	// show up here too.
 	const table = createListTable(
 		() => data.list,
-		() => page.data.terms
+		() => page.data.terms,
+		() => page.data.vocabulary
 	);
 </script>
 

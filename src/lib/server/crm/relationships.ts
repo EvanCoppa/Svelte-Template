@@ -45,7 +45,10 @@ import { unwrap, unwrapDeleted } from './unwrap';
  * key, because an org may define a type reusing a system key.
  */
 export const RELATIONSHIP_TYPE = {
-	assignedTo: 'f0000000-0000-0000-0000-000000000012'
+	assignedTo: 'f0000000-0000-0000-0000-000000000012',
+	responsibleFor: 'f0000000-0000-0000-0000-000000000013',
+	presents: 'f0000000-0000-0000-0000-000000000031',
+	proposedTo: 'f0000000-0000-0000-0000-000000000032'
 } as const;
 
 export type RelationshipType = Tables<'relationship_types'>;

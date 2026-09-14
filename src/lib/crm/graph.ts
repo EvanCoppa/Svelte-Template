@@ -34,7 +34,11 @@ export type GraphNode = {
 };
 
 export type GraphEdge = {
-	/** The `relationships` row id. */
+	/**
+	 * The `relationships` row id, or a synthetic id for an edge computed at
+	 * read time from a column rather than a stored row (a proposal's
+	 * presenter, responsible member or parent link — see `describeGraph()`).
+	 */
 	id: string;
 	/** Node ids: the row's `from` and `to`. */
 	source: string;

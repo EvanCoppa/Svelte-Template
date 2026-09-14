@@ -162,6 +162,19 @@ Three rules keep it one page for every industry:
 `d3-force` is the one dependency, for the layout only; the drawing, the pointer and the
 sr-only list of nodes (the map's accessibility rule) are the component's.
 
+**Three of a proposal's facts are drawn as edges without ever becoming `relationships`
+rows.** `proposals.presenter_id`, `responsible_id` and the `entity_type`/`entity_id`
+parent link (proposal_graph_edges migration) stay plain columns — each is genuinely
+single-valued per proposal, the same reason `deals.assigned_to` is a column and not a
+relationship — but `describeGraph()` reads them directly and synthesizes edges for
+them at request time, labelled from the same `presents` / `responsible_for` /
+`proposed_to` `relationship_types` rows a stored edge would use. They are never
+written to `relationships`: that table's uniqueness index only dedupes an exact
+`(type, from, to)` triple, not "at most one of this type from this record," so a
+real row would let the generic Relationships card silently edit or delete it with no
+path back to resync the column — a permanent drift the read-time approach can't
+have. A future reader should not "fix" this by inserting real rows for them.
+
 ## Assets
 
 `assets` holds only what every asset has: `name`, `asset_type` (free text, the org's

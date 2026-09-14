@@ -219,6 +219,24 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+  **The page is a header, then tabs with a record rail beside them**, never a
+  wall of cards: the header is the way back (one `←` icon button, since the
+  breadcrumb trail is the way back on a wide screen), a **square** record tile
+  of initials (round reads as a person, and a product is not one), the name
+  with its pills and tags, and the `link` fields as a row of quick facts. Under
+  it, `ui/tabs` in the `underline` variant — the strip is the page's own
+  navigation, not a control inside a card — are the page — Overview (highlights that jump to a tab,
+  relationships, the latest activity), Activity, the sections only some kinds
+  have (Addresses, Billing, Photos, Conversation) and one tab per
+  related-records group — with the rail on the end side holding what the
+  record IS whichever tab is open: a panel on a hairline rather than a card,
+  carrying two `ui/collapsible` sections — "<Kind> details" (its fields as
+  label-and-value rows, then its custom fields, then created / updated / id),
+  with `EditRecord compact` beside that heading, and Notes. A value that names
+  another record or a member wears a chip (`Detail.Value`), so a rail row reads
+  as a thing rather than a sentence. A new section is a tab, drawn only while
+  active; a new fact about the record is a row in the rail; never a card
+  outside the two.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
@@ -372,7 +390,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   roofer do not run the same board — a deal's `stage_id` is pinned to its own
   pipeline by a composite foreign key, every org gets a default board by trigger, and
   an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
-  board has exactly those three. Custom fields follow the same rule and now apply to
+  board has exactly those three. A board is therefore also a screen: `/deals` draws
+  the stages as a `Kanban` funnel beside its table, and a card dropped on a stage
+  posts the page's `move` action, which writes the pair through `dealPlacement()` —
+  the one place that says which board a stage is on, and so the one place that proves
+  it is this org's (docs/deals.md). Custom fields follow the same rule and now apply to
   **any** kind of record — a definition declares its `entity_type` and values
   reference `(field_definition_id, entity_type)`, so a contact's field cannot be
   filled in on a product. That is where industry specifics belong: a column if two
@@ -407,7 +429,10 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   "Estimator" / "Project manager" on a roof), the `(app)` layout ships the resolved
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
-  a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+  a `terms` row and an id in `TERM_IDS`; nothing is settable per org. Both, plus the
+  entity link below, also draw as edges on `/graph`, computed at read time from these
+  columns rather than stored as `relationships` rows (see the graph bullet below and
+  `proposal_graph_edges` migration).
 - **Relationships are one table, not a junction table per pair of kinds**
   (`relationships` migration + `src/lib/server/crm/relationships.ts`; docs/relationships.md).
   A `relationships` row names two records through the shared entity link
@@ -435,7 +460,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
     applies kind by kind, and a member is on the map only where a relationship names
     one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
     people who work here) and its edges labelled by their types. Nothing per industry is
-    stored for it; a kind or a type joins the map by existing.
+    stored for it; a kind or a type joins the map by existing. A proposal's presenter,
+    responsible member and parent link are drawn too, even though they stay plain
+    columns on `proposals` — `describeGraph()` reads them directly and synthesizes
+    edges at request time, never writing a `relationships` row (they are genuinely
+    single-valued per proposal, and that table's uniqueness index cannot enforce
+    that, so a real row could drift from the column with no way back).
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
   name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
   a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).
@@ -868,7 +898,14 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
+  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
+  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
+  for a column that groups several states, not for every board. It draws one pipeline at a
+  time (a stage only means something inside its own board, so which one is in the query
+  string like the ledger's account filter), the stage's `probability` as the ring's fill,
+  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
+  `$lib/crm/tasks.ts` does for the task board.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and

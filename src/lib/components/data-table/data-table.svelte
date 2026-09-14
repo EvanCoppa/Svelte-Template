@@ -51,7 +51,7 @@
 <div
 	bind:this={ref}
 	data-slot="data-table"
-	class={cn('space-y-4', className)}
+	class={cn('space-y-2', className)}
 	{...restProps}
 	{@attach pageSize === undefined
 		? fitPageSize({ setPageSize: (size) => table.setPageSize(size), minPageSize })

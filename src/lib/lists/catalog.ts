@@ -11,6 +11,7 @@ import {
 	PROPOSAL_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
+import type { TermId } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
 import type { FieldLabel, FieldType, FilterOption, ListKind } from './types';
 
@@ -63,12 +64,14 @@ const record = (kind: 'company' | 'contact' | 'property'): FieldMeta => ({
 /** A field naming another record under a label of its own — a role, not a kind. */
 const namedRecord = (label: string): FieldMeta => ({ label: { text: label }, type: 'record' });
 const number = (label: string): FieldMeta => ({ label: { text: label }, type: 'number' });
+/** A member's name, labelled by a word that belongs to no feature (a proposal's presenter). */
+const person = (id: TermId): FieldMeta => ({ label: { term: id }, type: 'text' });
 
 /**
  * Whether a tenancy runs to a date or rolls on. A STORED fact (`ends_on` null
  * or not), and deliberately not "is it running today" — that is a question
- * about the viewer's date, answered by `leaseStateOn()` in the browser, and a
- * server-described cell would be wrong at midnight.
+ * about the viewer's date, and a server-described cell would be wrong at
+ * midnight. `leaseStateOn()` is that question, in the browser.
  */
 export const LEASE_TERM_TONE = {
 	'fixed term': 'neutral',
@@ -202,10 +205,15 @@ export const LIST_FIELD_CATALOG = {
 	},
 	proposal: {
 		name: text('Title'),
+		// The record it hangs off — a company, a contact, or a deal — whichever
+		// it is (docs/proposals.md, "the record it hangs off"); an unattached
+		// draft reads blank.
+		contact: { label: { text: 'Contact' }, type: 'record' },
+		owner: person('proposal_responsible'),
+		presenter: person('proposal_presenter'),
 		status: enumOf('Status', PROPOSAL_STATUS_TONE),
-		options: { label: { text: 'Options' }, type: 'number' },
-		recommended: money('Recommended'),
-		valid_until: datetime('Valid until'),
+		// What a client actually chose; blank until `selected_option_id` is set.
+		value: money('Value'),
 		created_at: datetime('Created')
 	},
 	billable: {

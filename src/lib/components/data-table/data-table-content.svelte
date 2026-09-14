@@ -43,7 +43,8 @@
 									: undefined}
 							class={cn(
 								header.column.id === 'select' && 'w-8 ps-3 pe-0',
-								header.column.id === 'actions' && 'w-8 pe-3'
+								header.column.id === 'actions' && 'w-8 pe-3',
+								header.column.columnDef.meta?.class
 							)}
 						>
 							{#if !header.isPlaceholder}
@@ -61,7 +62,8 @@
 						<Table.Cell
 							class={cn(
 								cell.column.id === 'select' && 'w-8 ps-3 pe-0',
-								cell.column.id === 'actions' && 'w-8 pe-3'
+								cell.column.id === 'actions' && 'w-8 pe-3',
+								cell.column.columnDef.meta?.class
 							)}
 						>
 							<FlexRender {cell} />
