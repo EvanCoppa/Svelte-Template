@@ -1,1 +1,78 @@
-IyBBcHBsaWVzIHBlbmRpbmcgbWlncmF0aW9ucyB0byB0aGUgcHJvZHVjdGlvbiBTdXBhYmFzZSBwcm9qZWN0IHdoZW4gYSBQUgojIG1lcmdlZCBpbnRvIG1haW4uIFRoaXMgd29ya2Zsb3cgaXMgdGhlIG9ubHkgc2FuY3Rpb25lZCBwYXRoIHRvIHByb2R1Y3Rpb246CiMgYHN1cGFiYXNlIGRiIHB1c2hgIGZyb20gYSBsYXB0b3AgbGVhdmVzIHRoZSBtaWdyYXRpb24gaGlzdG9yeSBhbmQgdGhlIHJlcG8KIyBkaXNhZ3JlZWluZywgYW5kIG5vdGhpbmcgZWxzZSBjYXRjaGVzIHRoYXQuCiMKIyBUaGUgU3VwYWJhc2UgR2l0SHViIGludGVncmF0aW9uIGhhcyBpdHMgb3duICJEZXBsb3kgdG8gcHJvZHVjdGlvbiIgdG9nZ2xlCiMgdGhhdCBkb2VzIHRoZSBzYW1lIGpvYi4gTGVhdmUgaXQgT0ZGIC0tIHR3byBtZWNoYW5pc21zIHJhY2luZyBvbiB0aGUgc2FtZQojIG1pZ3JhdGlvbiBoaXN0b3J5IGlzIHRoZSBvbmUgdGhpbmcgd29yc2UgdGhhbiBub25lLgojCiMgUmVxdWlyZWQgc2VjcmV0cyAoU2V0dGluZ3Mg4oaSIFNlY3JldHMgYW5kIHZhcmlhYmxlcyDihpIgQWN0aW9ucyk6CiMgICBTVVBBQkFTRV9BQ0NFU1NfVE9LRU4gICBwZXJzb25hbCBhY2Nlc3MgdG9rZW4sIHN1cGFiYXNlLmNvbS9kYXNoYm9hcmQvYWNjb3VudC90b2tlbnMKIyAgIFNVUEFCQVNFX1BST0pFQ1RfSUQgICAgIHByb2R1Y3Rpb24gcHJvamVjdCByZWYKIyAgIFNVUEFCQVNFX0RCX1BBU1NXT1JEICAgIHByb2R1Y3Rpb24gZGF0YWJhc2UgcGFzc3dvcmQKbmFtZTogRGVwbG95IG1pZ3JhdGlvbnMKCm9uOgogIHB1c2g6CiAgICBicmFuY2hlczogW21haW5dCiAgICBwYXRoczoKICAgICAgLSAnc3VwYWJhc2UvbWlncmF0aW9ucy8qKicKICAgICAgLSAnc3VwYWJhc2UvY29uZmlnLnRvbWwnCiAgICAgIC0gJy5naXRodWIvd29ya2Zsb3dzL2RiLWRlcGxveS55bWwnCiAgd29ya2Zsb3dfZGlzcGF0Y2g6CgojIE5ldmVyIGxldCB0d28gZGVwbG95cyBpbnRlcmxlYXZlIG9uIG9uZSBtaWdyYXRpb24gaGlzdG9yeS4gUXVldWUgaW5zdGVhZCBvZgojIGNhbmNlbGxpbmc6IGEgY2FuY2VsbGVkIHB1c2ggY2FuIGxlYXZlIG1pZ3JhdGlvbnMgaGFsZiBhcHBsaWVkLgpjb25jdXJyZW5jeToKICBncm91cDogZGItZGVwbG95LXByb2R1Y3Rpb24KICBjYW5jZWwtaW4tcHJvZ3Jlc3M6IGZhbHNlCgpqb2JzOgogIHB1c2g6CiAgICBuYW1lOiBzdXBhYmFzZSBkYiBwdXNoCiAgICBydW5zLW9uOiB1YnVudHUtbGF0ZXN0CiAgICAjIEFkZCByZXF1aXJlZCByZXZpZXdlcnMgdG8gdGhpcyBlbnZpcm9ubWVudCBpbiByZXBvIHNldHRpbmdzIHRvIGdhdGUKICAgICMgcHJvZHVjdGlvbiBzY2hlbWEgY2hhbmdlcyBiZWhpbmQgYSBodW1hbi4KICAgIGVudmlyb25tZW50OiBwcm9kdWN0aW9uCiAgICBlbnY6CiAgICAgIFNVUEFCQVNFX0FDQ0VTU19UT0tFTjogJHt7IHNlY3JldHMuU1VQQUJBU0VfQUNDRVNTX1RPS0VOIH19CiAgICAgIFNVUEFCQVNFX0RCX1BBU1NXT1JEOiAke3sgc2VjcmV0cy5TVVBBQkFTRV9EQl9QQVNTV09SRCB9fQogICAgICBTVVBBQkFTRV9QUk9KRUNUX0lEOiAke3sgc2VjcmV0cy5TVVBBQkFTRV9QUk9KRUNUX0lEIH19CiAgICBzdGVwczoKICAgICAgLSB1c2VzOiBhY3Rpb25zL2NoZWNrb3V0QHY0CgogICAgICAtIHVzZXM6IGFjdGlvbnMvc2V0dXAtbm9kZUB2NAogICAgICAgIHdpdGg6CiAgICAgICAgICBub2RlLXZlcnNpb246IDIyCiAgICAgICAgICBjYWNoZTogbnBtCgogICAgICAtIG5hbWU6IEluc3RhbGwKICAgICAgICBydW46IG5wbSBjaQoKICAgICAgLSBuYW1lOiBMaW5rIHByb2R1Y3Rpb24gcHJvamVjdAogICAgICAgIHJ1bjogbnB4IHN1cGFiYXNlIGxpbmsgLS1wcm9qZWN0LXJlZiAiJFNVUEFCQVNFX1BST0pFQ1RfSUQiCgogICAgICAjIC0taW5jbHVkZS1hbGw6IHR3byBtaWdyYXRpb25zIHdlcmUgcHVzaGVkIHRvIHByb2R1Y3Rpb24gb3V0IG9mIGJhbmQKICAgICAgIyAoc2VlIHRoZSBub3RpZmljYXRpb25faW5ib3ggZHJpZnQgZml4KSwgd2hpY2ggbGVmdCB0d28KICAgICAgIyBzdGlsbC1wZW5kaW5nIGZpbGVzIChyb29maW5nX2luZHVzdHJ5X2RlcHRoLCByb29maW5nX2N1c3RvbV9maWVsZHMpCiAgICAgICMgdGltZXN0YW1wZWQgZWFybGllciB0aGFuIHRoZSBsYXN0IG1pZ3JhdGlvbiByZW1vdGUgbm93IGhhcyByZWNvcmRlZC4KICAgICAgIyBXaXRob3V0IHRoZSBmbGFnIHRoZSBDTEkgcmVmdXNlcyB0byBpbnNlcnQgYSBtaWdyYXRpb24gImludG8gdGhlCiAgICAgICMgcGFzdCIuIEl0IG9ubHkgbGlmdHMgdGhhdCByZWZ1c2FsIC0tIG1pZ3JhdGlvbnMgc3RpbGwgYXBwbHkgaW4KICAgICAgIyB2ZXJzaW9uIG9yZGVyLCBhbmQgYWxyZWFkeS1hcHBsaWVkIHZlcnNpb25zIGFyZSBzdGlsbCBza2lwcGVkLgogICAgICAtIG5hbWU6IFdoYXQgd291bGQgYmUgYXBwbGllZAogICAgICAgIHJ1bjogbnB4IHN1cGFiYXNlIGRiIHB1c2ggLS1kcnktcnVuIC0taW5jbHVkZS1hbGwKCiAgICAgIC0gbmFtZTogQXBwbHkKICAgICAgICBydW46IG5weCBzdXBhYmFzZSBkYiBwdXNoIC0taW5jbHVkZS1hbGwKCiAgICAgIC0gbmFtZTogU3VtbWFyeQogICAgICAgIGlmOiBhbHdheXMoKQogICAgICAgIHJ1bjogfAogICAgICAgICAgewogICAgICAgICAgICBlY2hvICIjIyMgTWlncmF0aW9ucyBkZXBsb3llZCB0byBcYCRTVVBBQkFTRV9QUk9KRUNUX0lEXGAiCiAgICAgICAgICAgIGVjaG8KICAgICAgICAgICAgZWNobyAnYGBgJwogICAgICAgICAgICBucHggc3VwYWJhc2UgbWlncmF0aW9uIGxpc3QgLS1saW5rZWQgMj4mMSB8IHRhaWwgLTIwCiAgICAgICAgICAgIGVjaG8gJ2BgYCcKICAgICAgICAgIH0gPj4gIiRHSVRIVUJfU1RFUF9TVU1NQVJZIgo=
+# Applies pending migrations to the production Supabase project when a PR is
+# merged into main. This workflow is the only sanctioned path to production:
+# `supabase db push` from a laptop leaves the migration history and the repo
+# disagreeing, and nothing else catches that.
+#
+# The Supabase GitHub integration has its own "Deploy to production" toggle
+# that does the same job. Leave it OFF — two mechanisms racing on the same
+# migration history is the one thing worse than none.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   personal access token, supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_ID     production project ref
+#   SUPABASE_DB_PASSWORD    production database password
+name: Deploy migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/db-deploy.yml'
+  workflow_dispatch:
+
+# Never let two deploys interleave on one migration history. Queue instead of
+# cancelling: a cancelled push can leave migrations half applied.
+concurrency:
+  group: db-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: supabase db push
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in repo settings to gate
+    # production schema changes behind a human.
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Link production project
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      # --include-all: two migrations were pushed to production out of band
+      # (see the notification_inbox drift fix), which left two
+      # still-pending files (roofing_industry_depth, roofing_custom_fields)
+      # timestamped earlier than the last migration remote now has recorded.
+      # Without the flag the CLI refuses to insert a migration "into the
+      # past". It only lifts that refusal — migrations still apply in
+      # version order, and already-applied versions are still skipped.
+      - name: What would be applied
+        run: npx supabase db push --dry-run --include-all
+
+      - name: Apply
+        run: npx supabase db push --include-all
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Migrations deployed to \`$SUPABASE_PROJECT_ID\`"
+            echo
+            echo '```'
+            npx supabase migration list --linked 2>&1 | tail -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
