@@ -141,7 +141,8 @@ migration, exactly like a feature's name.
 ## Nav sections
 
 A feature's `category` is the section it is filed under. The values are `general`,
-`crm`, `tools`, `library`, `workspace` and `other` — declared once as `NAV_CATEGORIES`
+`crm`, `commerce`, `finances`, `tools`, `library`, `workspace` and `other` — declared
+once as `NAV_CATEGORIES`
 in `src/lib/navigation.ts`, in the order the sections render, and mirrored by the check
 constraint on `features.category` (the `feature_categories` migration). `groupNav()`
 buckets the entries and drops the empty sections, so a category may ship before the
@@ -151,7 +152,13 @@ A section is not a guess about the future: `insights` was declared empty for pag
 read across the records, and the only one ever filed under it was the graph — one page
 is a link, not a section, so the category was retired and the graph joined the CRM (the
 `graph_in_crm_staff_in_user_menu` migration). Declare a section when its second page
-exists.
+exists — which is what `commerce` and `finances` did (the
+`commerce_and_finances_sections` migration): the catalog, the shelf, the discounts, the
+quote and the return are one kind of work, and the bill, the account and the vendor are
+another, and both had outgrown sharing Tools and CRM. Because a category is one column
+on the feature, that re-file reaches **every** vertical — a practice's treatment plans
+move with a distributor's quotes. Sections are not per-industry (below), so that is the
+trade: the position inside a section is the industry's, the section itself is not.
 
 The column is **nullable on purpose**: a feature that says nothing about where it
 belongs is filed under Other rather than under a default the migration had to guess.
