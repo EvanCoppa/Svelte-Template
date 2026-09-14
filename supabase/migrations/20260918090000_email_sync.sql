@@ -851,7 +851,8 @@ on conflict (id) do nothing;
 
 -- Every vertical writes email, and none calls it anything else, so the rows
 -- are derived; the ordered sections then each place it just before their
--- graph (the graph migration's positions), on the ledger migration's
+-- graph (the graph migration's positions; roofing's graph moved to 1100 in
+-- the roofing_graph_last_in_crm migration), on the ledger migration's
 -- precedent of a value between two hundreds. `crm` inherits 1150.
 insert into public.industry_features (industry_id, feature_id)
 select i.id, 'email'
@@ -863,7 +864,7 @@ set sort_order = v.sort_order
 from (values
 	('dentistry', 850),
 	('cosmetic', 750),
-	('roofing', 850),
+	('roofing', 1050),
 	('medical-supplies', 950),
 	('beverage', 950),
 	('merchant-services', 1150)
