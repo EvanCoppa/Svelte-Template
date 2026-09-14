@@ -12,7 +12,7 @@ import {
 } from '$lib/server/ai/conversations';
 import { toUIMessages } from '$lib/server/ai/messages';
 import { isAiConfigured } from '$lib/server/ai/provider';
-import { deleteConversationSchema, renameConversationSchema } from './schema';
+import { deleteConversationSchema, renameConversationSchema } from '$lib/schemas/assistant';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
