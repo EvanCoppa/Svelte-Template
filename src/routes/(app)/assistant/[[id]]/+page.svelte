@@ -190,7 +190,7 @@
 							<FormAlert
 								variant="default"
 								class="w-full"
-								message="The assistant is not configured on this server. Set ANTHROPIC_API_KEY to turn it on."
+								message="The assistant is not configured on this server. Set OPENAI_API_KEY to turn it on."
 							/>
 						{/if}
 
