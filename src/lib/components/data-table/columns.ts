@@ -6,6 +6,7 @@ import {
 	type RowData
 } from '@tanstack/svelte-table';
 import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+import ExpandCell from './data-table-expand-cell.svelte';
 import type { DataTableFeatures } from './features.js';
 
 /**
@@ -59,6 +60,36 @@ export function actionsColumn<TData extends RowData>(
 		id: 'actions',
 		header: () => '',
 		cell,
+		enableSorting: false,
+		enableHiding: false
+	});
+}
+
+/**
+ * The expand column: a chevron at the very start of every row that opens the
+ * nested rows under it — a proposal's options, an order's shipments and
+ * invoices, whatever the record is made of. Goes first in the column list,
+ * before the checkbox.
+ *
+ * The table only holds which rows are open; what an open row shows is the
+ * page's, drawn in `DataTable.Content`'s `detail` snippet from
+ * `DataTable.SubSection` and `DataTable.SubRow`. A row is openable only when
+ * the table says so, so pass `getRowCanExpand` to `createTable` — a row with
+ * nothing under it then has no dead chevron:
+ *
+ *   createTable({ …, getRowCanExpand: (row) => row.original.shipments.length > 0 })
+ *
+ * `label` names the row for the button's screen-reader label; it is the rest
+ * of "Show …" / "Hide …", so it reads as what opens rather than as a control.
+ */
+export function expandColumn<TData extends RowData>(
+	columnHelper: ColumnHelper<DataTableFeatures, TData>,
+	label: (row: TData) => string
+) {
+	return columnHelper.display({
+		id: 'expand',
+		header: () => '',
+		cell: ({ row }) => renderComponent(ExpandCell, { row, label: label(row.original) }),
 		enableSorting: false,
 		enableHiding: false
 	});
