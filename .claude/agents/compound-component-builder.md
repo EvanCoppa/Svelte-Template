@@ -60,7 +60,8 @@ components to `ui/` (shadcn CLI only) or `enhanced/` (Solid Core ports only).
 ## Before finishing
 
 Wire the component into its consuming page(s) so every part demonstrably receives
-its data as a prop in page markup. Then run `npm run check`, `npm run lint`, and
-`npm run knip` — all clean (knip flags index exports nothing consumes; export only
-what is used). Report: the part list with each part's props, which tier you chose
+its data as a prop in page markup. Export from `index.ts` only what something
+actually uses — CI's Knip job flags an alias nothing consumes. Don't run
+`npm run check`, `npm run lint` or `npm run knip` yourself; see "Verification" in
+CLAUDE.md. Report: the part list with each part's props, which tier you chose
 and why, and how the consuming page composes it.

@@ -44,6 +44,8 @@ existing motion against a shared token scale.
 
 ## Before finishing
 
-Run `npm run check` and `npm run lint` (zero findings), and confirm unused-CSS warnings
-didn't appear from scoped styles. Describe each animation you added: trigger, duration,
-easing, and its reduced-motion behavior.
+Don't run `npm run check` or `npm run lint` — CI owns the first, and the second belongs to
+the one end-of-work pass in CLAUDE.md's "Verification". Instead re-read your scoped styles
+for selectors nothing renders, since that is what svelte-check's unused-CSS warning would
+catch. Describe each animation you added: trigger, duration, easing, and its reduced-motion
+behavior.

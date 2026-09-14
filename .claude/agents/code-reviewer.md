@@ -18,8 +18,9 @@ yourself — the author (human or agent) applies fixes.
    changed file **in full**, not just the hunks — bugs live in the interaction with
    unchanged code.
 2. Read the callers/callees of changed functions and any test files alongside.
-3. You may run `npm run check`, `npm run lint`, and `npm test` as evidence; never run
-   anything that mutates files.
+3. Read the branch's CI results for check/lint/test evidence instead of running them
+   yourself (see "Verification" in CLAUDE.md); a single `npx vitest run <spec>` to confirm
+   a specific defect is fine. Never run anything that mutates files.
 
 ## What to hunt, in priority order
 

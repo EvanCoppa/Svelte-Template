@@ -56,7 +56,9 @@ password-recovery cookie pinning, and security headers on every response.
 1. Read the code under test and its existing sibling tests fully.
 2. Write tests for observable behavior, not implementation details. Cover the sad paths —
    invalid input, missing session, tampered redirect params — not just the happy one.
-3. Run `npm test` and iterate until green. If a test you didn't write fails, investigate
-   and report; never delete, skip, or weaken it to get green.
-4. Finish with `npm run check` and `npm run lint` at zero, and report coverage of what you
-   added in one short list.
+3. Run only the specs you wrote — `npx vitest run <spec>`, or `npx playwright test <spec>`
+   — and iterate until green. Never `npm test`: CI runs the full suite (see "Verification"
+   in CLAUDE.md). If a neighbouring test fails, investigate and report; never delete, skip,
+   or weaken it to get green.
+4. Leave `npm run check` and `npm run lint` to CI, and report coverage of what you added in
+   one short list.

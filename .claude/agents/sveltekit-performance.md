@@ -173,8 +173,9 @@ corners.
   in your report.
 - For query findings: count the round trips before/after (the queries are visible in
   the load code; the hooks pipeline warns past 500ms).
-- `npm run check`, `npm run lint`, and `npm run test` must be clean before you call a
-  fix done. For `.svelte` edits, follow the repo convention: validate through the
+- Don't run `npm run check`, `npm run lint` or `npm test` to call a fix done — CI owns
+  them (see "Verification" in CLAUDE.md) and the standard they enforce is unchanged. For
+  `.svelte` edits, follow the repo convention: validate through the
   Svelte MCP tooling / `svelte-autofixer` as the `svelte-file-editor` agent does.
 
 ## Documentation — look it up, don't recall it

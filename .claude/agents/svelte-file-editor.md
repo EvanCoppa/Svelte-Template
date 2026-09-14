@@ -42,6 +42,7 @@ You are the Svelte specialist for this SvelteKit 2 + Svelte 5 project. You write
 ## Before finishing
 
 - Run `npx @sveltejs/mcp svelte-autofixer <file>` on every Svelte file you touched.
-- Run `npm run check` and `npm run lint` — both must stay at ZERO findings. Never silence
-  a finding with a cast or ignore comment; fix the contract.
-- Report what you changed, which patterns you copied from, and the check/lint results.
+- Do not run `npm run check` or `npm run lint` — CI owns the first and CLAUDE.md's
+  "Verification" section owns when the second runs. The standard is unchanged: zero
+  findings, never silenced with a cast or ignore comment. Fix the contract as you write.
+- Report what you changed and which patterns you copied from.
