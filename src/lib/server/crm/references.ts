@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { documentMentions, type DocumentMention } from '$lib/crm/documents';
 import type { Database, Enums, Tables } from '$lib/database.types';
-import { updateDocument, type Document, type DocumentEdit } from './documents';
+import { listDocuments, updateDocument, type Document, type DocumentEdit } from './documents';
 import type { CrmEntityRef } from './entity';
 import { unwrap } from './unwrap';
 
@@ -47,22 +47,25 @@ export async function listReferencesTo(
 	return unwrap(await query);
 }
 
-/** What this piece of writing names — the outward half, for the editor's rail. */
-export async function listReferencesFrom(
+/**
+ * The pages whose prose names this record — a record page's backlinks.
+ *
+ * Two reads rather than an embed, because PostgREST cannot join a
+ * polymorphic pair: the index says which pages, and the pages module names
+ * them. Archived pages are left out; a page filed away is not something the
+ * record still points at.
+ */
+export async function listMentioningDocuments(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	source: CrmEntityRef,
-	kind?: ReferenceKind
-): Promise<EntityReference[]> {
-	let query = supabase
-		.from('entity_references')
-		.select('*')
-		.eq('org_id', orgId)
-		.eq('source_type', source.entityType)
-		.eq('source_id', source.entityId)
-		.order('created_at', { ascending: true });
-	if (kind) query = query.eq('kind', kind);
-	return unwrap(await query);
+	target: CrmEntityRef
+): Promise<Document[]> {
+	const references = await listReferencesTo(supabase, orgId, target, 'mention');
+	const ids = references
+		.filter((row) => row.source_type === 'document')
+		.map((row) => row.source_id);
+	if (ids.length === 0) return [];
+	return listDocuments(supabase, orgId, { ids, archived: false });
 }
 
 /**

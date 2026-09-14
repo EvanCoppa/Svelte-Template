@@ -415,6 +415,33 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   exception the note dock takes, since the bell floats over every screen — and
   the panel is one row component for all three piles, which starts the
   breadcrumb trail over when it navigates, like every other shell surface.
+- **A document is the writing that has a title, and `@` is what makes it data**
+  (`document_entity_kind` + `documents` migrations + `src/lib/crm/documents.ts` +
+  `src/lib/server/crm/documents.ts`, `references.ts` + `(app)/documents/`;
+  docs/documents.md). A note is scratch, a record is a row the business counts, and a
+  document is the middle the app had nowhere for: the account strategy, the inspection
+  write-up, the runbook. The table is `documents` because `public.pages` is the
+  route/title registry; the SCREEN says whatever the industry calls it ("Pages",
+  "Job files", "Chart notes"), through `features.name` / `industry_features` like every
+  other feature. It IS a `RECORD_KIND` — so the list, its industry-chosen columns, the
+  terms, the graph node and the generic create form come free — and it takes its own
+  screen under `(app)/documents/[id=guid]/` because a document IS its body and the
+  generic record page has no frame for one. **The body is jsonb in OUR envelope**
+  (`{ version, blocks }`, the `slide_decks` call: always read and written whole), strict
+  on the way in and lenient on the way out — one block this version cannot read is
+  dropped, never the page. **What it MENTIONS is rows**, because a backlink is the one
+  thing you cannot ask of jsonb: `entity_references` reuses the shared
+  `(crm_entity_type, id)` link on both sides, and is deliberately not `relationships`
+  (those are curated, typed and ended; these are derived from text and rewritten on every
+  save). `mentionAnchor()` and `documentMentions()` are a matched pair, and
+  `createMentionTool()` is what stops the editor's sanitizer eating the anchor — write a
+  mention any other way and backlinks silently stop. `saveDocument()` is the one place a
+  body and its index are written together, body first. The autosave is a **form action**
+  through a hidden form (the calendar's drag road), never a `fetch`; `/api/records/search`
+  is the `@` picker and gates kind by kind. Every record page opens with the pages that
+  name it. Pictures live in a **private** bucket served back through the app, so the URL
+  never expires and `img-src 'self'` covers it. Never a database block, never a per-page
+  ACL, never a block type per industry.
 - **The party model is two tables, split by what a row IS** (`crm_party_model`
   migration). `companies` are organizations you deal with — `relationship` says
   customer, supplier or partner, so a vendor is not a second table — and `contacts`

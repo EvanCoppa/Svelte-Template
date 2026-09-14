@@ -1,3 +1,12 @@
+import type { Json } from '$lib/database.types';
+import {
+	blockSchema,
+	documentBodyReadSchema,
+	DOCUMENT_BODY_VERSION,
+	stringsInSchema,
+	type DocumentBlock,
+	type DocumentBody
+} from '$lib/schemas/documents';
 import { isRecordKind, type RecordKind } from './records';
 
 /**
@@ -17,72 +26,58 @@ import { isRecordKind, type RecordKind } from './records';
  * somebody's writing.
  */
 
-/** The envelope's version. Bump only when old bodies need reading differently. */
-export const DOCUMENT_BODY_VERSION = 1;
-
-/** One block, as the editor emits it. `data` is deliberately opaque. */
-export type DocumentBlock = {
-	id?: string;
-	type: string;
-	data: Record<string, unknown>;
-};
-
-export type DocumentBody = {
-	version: number;
-	blocks: DocumentBlock[];
-};
+export { DOCUMENT_BODY_VERSION };
+export type { DocumentBlock, DocumentBody };
 
 /** What a page is created with, and what an unreadable body reads as. */
 export function emptyDocumentBody(): DocumentBody {
 	return { version: DOCUMENT_BODY_VERSION, blocks: [] };
 }
 
-function isBlock(value: unknown): value is DocumentBlock {
-	if (typeof value !== 'object' || value === null) return false;
-	const block: Record<string, unknown> = value as Record<string, unknown>;
-	return typeof block.type === 'string' && typeof block.data === 'object' && block.data !== null;
-}
-
 /**
- * The `body` column as a body. The database guarantees the envelope, so this
- * only has to survive a row written before a schema change — and it does the
- * same thing the whiteboard's scene reader does: a body that cannot be read
- * opens EMPTY rather than half-understood, because half a document is a
- * document somebody is about to overwrite.
+ * The `body` column as a body.
+ *
+ * Decoded by the schema, never inspected field by field — the same call
+ * `$lib/whiteboard/scene` makes about a stored scene. An envelope that
+ * cannot be read at all opens EMPTY rather than half-understood; a single
+ * block that cannot be read is DROPPED and the rest of the page survives,
+ * which is the opposite trade and the right one — losing one paragraph to a
+ * version skew beats losing the document.
  */
-export function documentBody(value: unknown): DocumentBody {
-	if (typeof value !== 'object' || value === null) return emptyDocumentBody();
-	const body: Record<string, unknown> = value as Record<string, unknown>;
-	if (!Array.isArray(body.blocks)) return emptyDocumentBody();
+export function documentBody(value: Json): DocumentBody {
+	const envelope = documentBodyReadSchema.safeParse(value);
+	if (!envelope.success) return emptyDocumentBody();
 	return {
-		version: typeof body.version === 'number' ? body.version : DOCUMENT_BODY_VERSION,
-		blocks: body.blocks.filter(isBlock)
+		version: envelope.data.version,
+		blocks: envelope.data.blocks.flatMap((block) => {
+			const parsed = blockSchema.safeParse(block);
+			return parsed.success ? [parsed.data] : [];
+		})
 	};
 }
 
 const TAG = /<[^>]*>/g;
-const ENTITY: Record<string, string> = {
-	'&amp;': '&',
-	'&lt;': '<',
-	'&gt;': '>',
-	'&quot;': '"',
-	'&#39;': "'",
-	'&nbsp;': ' '
-};
+const ENTITY = new Map([
+	['&amp;', '&'],
+	['&lt;', '<'],
+	['&gt;', '>'],
+	['&quot;', '"'],
+	['&#39;', "'"],
+	['&nbsp;', ' ']
+]);
+
+/** Every string inside a block — its words and the markup around them. */
+function blockStrings(block: DocumentBlock): string[] {
+	const parsed = stringsInSchema.safeParse(block.data);
+	return parsed.success ? parsed.data : [];
+}
 
 /** One block's words, without the markup the editor wrote around them. */
 export function blockText(block: DocumentBlock): string {
-	const parts: string[] = [];
-	const walk = (value: unknown) => {
-		if (typeof value === 'string') parts.push(value);
-		else if (Array.isArray(value)) value.forEach(walk);
-		else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
-	};
-	walk(block.data);
-	return parts
+	return blockStrings(block)
 		.join(' ')
 		.replace(TAG, '')
-		.replace(/&[a-z#0-9]+;/gi, (entity) => ENTITY[entity] ?? entity)
+		.replace(/&[a-z#0-9]+;/gi, (entity) => ENTITY.get(entity) ?? entity)
 		.replace(/\s+/g, ' ')
 		.trim();
 }
@@ -96,10 +91,10 @@ export function blockText(block: DocumentBlock): string {
  * The fallback word is deliberately not the industry's noun: this is the name
  * of a page that has none, and "Untitled" is what every editor calls that.
  */
-export function documentTitle(document: { title: string | null; body?: unknown }): string {
+export function documentTitle(document: { title: string | null; body?: Json }): string {
 	const title = document.title?.trim();
 	if (title) return title;
-	for (const block of documentBody(document.body).blocks) {
+	for (const block of documentBody(document.body ?? null).blocks) {
 		const text = blockText(block);
 		if (text) return text.length > 80 ? `${text.slice(0, 79)}…` : text;
 	}
@@ -150,17 +145,10 @@ const ID_VALUE = new RegExp(
  * afford. A kind the app has no page for is skipped: the index only holds
  * things a backlink could open.
  */
-export function documentMentions(body: unknown): DocumentMention[] {
+export function documentMentions(body: Json): DocumentMention[] {
 	const found = new Map<string, DocumentMention>();
 	for (const block of documentBody(body).blocks) {
-		const html: string[] = [];
-		const walk = (value: unknown) => {
-			if (typeof value === 'string') html.push(value);
-			else if (Array.isArray(value)) value.forEach(walk);
-			else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
-		};
-		walk(block.data);
-		for (const fragment of html) {
+		for (const fragment of blockStrings(block)) {
 			for (const tag of fragment.match(ANCHOR) ?? []) {
 				const kind = tag.match(TYPE_VALUE)?.[1];
 				const id = tag.match(ID_VALUE)?.[1];

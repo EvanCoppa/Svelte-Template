@@ -44,6 +44,7 @@ import { getCoupon, listCoupons, type Coupon } from './coupons';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
 import { getDocument, listDocuments, type Document as DocumentRow } from './documents';
+import { listMentioningDocuments } from './references';
 import { getLease, listLeases, type LeaseWithParties } from './leases';
 import { getProperty, isUnit, listProperties, type Property } from './properties';
 import {
@@ -1375,6 +1376,20 @@ function relatedTask(row: Task): RelatedRecord {
 }
 
 /** A unit under the building on screen. Its meta is what makes a unit a unit. */
+/**
+ * One page in a backlink group. No pill: a page has no lifecycle to wear —
+ * it is open or it is archived, and an archived one is not listed at all.
+ */
+function relatedDocument(row: DocumentRow): RelatedRecord {
+	return {
+		id: row.id,
+		name: documentTitle(row),
+		href: recordHref('document', row.id),
+		pill: null,
+		meta: `Edited ${mediumDate.format(new Date(row.updated_at))}`
+	};
+}
+
 function relatedProperty(row: Property): RelatedRecord {
 	const measurements = [
 		row.bedrooms === null ? null : `${row.bedrooms} bed`,
@@ -1444,6 +1459,16 @@ export async function listRelatedRecords(
 	id: string,
 	canOpen: CanOpen
 ): Promise<RelatedGroup[]> {
+	// Every kind gets this one, before the kind-specific groups below: the
+	// pages whose prose names this record. It is the same question whatever
+	// the record is — "what have we written about this?" — and it is the
+	// question the writing exists to make answerable.
+	const mentioned = canOpen('document')
+		? await listMentioningDocuments(supabase, orgId, { entityType: kind, entityId: id })
+		: [];
+	const mentions: RelatedGroup[] =
+		mentioned.length > 0 ? [{ kind: 'document', records: mentioned.map(relatedDocument) }] : [];
+
 	// A property's related records are its own: the units inside it, and the
 	// tenancies on it. Handled before the party check because a property is
 	// not a party — this is the tree and the rent roll, not the CRM graph.
@@ -1453,12 +1478,13 @@ export async function listRelatedRecords(
 			canOpen('lease') ? listLeases(supabase, orgId, { propertyId: id }) : Promise.resolve([])
 		]);
 		return [
+			...mentions,
 			{ kind: 'property' as const, records: units.map(relatedProperty) },
 			{ kind: 'lease' as const, records: leases.map(relatedLease) }
 		].filter((group) => group.records.length > 0);
 	}
 
-	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return [];
+	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return mentions;
 	const party =
 		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
 
@@ -1516,7 +1542,11 @@ export async function listRelatedRecords(
 			: null
 	]);
 
-	return groups.filter(
-		(group): group is RelatedGroup => group !== null && group.records.length > 0
-	);
+	// Backlinks lead, because "what have we written about this?" is the
+	// question a reader opens an account with — and because it is the one
+	// group every kind has, so it sits in the same place on every page.
+	return [
+		...mentions,
+		...groups.filter((group): group is RelatedGroup => group !== null && group.records.length > 0)
+	];
 }

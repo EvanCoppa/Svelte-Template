@@ -21,6 +21,7 @@ import {
 	couponRecordSchema,
 	dealRecordSchema,
 	deleteRecordSchema,
+	documentRecordSchema,
 	invoiceRecordSchema,
 	leaseRecordSchema,
 	productRecordSchema,
@@ -59,6 +60,7 @@ import {
 } from './crm/contacts';
 import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
 import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
+import { createDocument, deleteDocument, getDocument, updateDocument } from './crm/documents';
 import { createInvoice } from './crm/invoices';
 import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
@@ -490,6 +492,10 @@ async function removeRecord(
 			return deleteRma(supabase, orgId, id);
 		case 'visit':
 			return deleteVisit(supabase, orgId, id);
+		// The pages under it go with it (`parent_id` cascades) and its
+		// references go with the row (the documents migration's delete path).
+		case 'document':
+			return deleteDocument(supabase, orgId, id);
 	}
 }
 
@@ -586,6 +592,13 @@ async function recordFormValues(
 						description: str(row.description)
 					}
 				: {};
+		}
+		case 'document': {
+			const row = await getDocument(supabase, orgId, id);
+			// The body is not here on purpose: the form does not ask for it, so
+			// it is not the form's to carry back — and a round trip through a
+			// text input is how a document loses its blocks.
+			return row ? { title: row.title, icon: str(row.icon) } : {};
 		}
 		case 'coupon': {
 			const row = await getCoupon(supabase, orgId, id);
@@ -915,6 +928,18 @@ async function writeRecord(
 				billing_email: text(data.billing_email),
 				memo: text(data.memo)
 			});
+			return;
+		}
+		case 'document': {
+			const data = documentRecordSchema.parse(values);
+			const columns = { title: data.title, icon: text(data.icon) };
+			// Body is deliberately absent on both paths: creating a page leaves
+			// the default empty envelope, and editing its name must never touch
+			// what somebody wrote. The body is saved by the editor alone, through
+			// `saveDocument()`, which is what keeps the reference index in step.
+			await (id
+				? updateDocument(supabase, orgId, id, columns)
+				: createDocument(supabase, orgId, columns));
 			return;
 		}
 		case 'coupon': {
