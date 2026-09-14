@@ -1,6 +1,7 @@
 import type { RowData, SvelteTable } from '@tanstack/svelte-table';
 import { getContext, setContext } from 'svelte';
 import type { DataTableFeatures } from './features.js';
+import type { PinnedCellKind } from './pinned.js';
 
 type Getter<T> = () => T;
 
@@ -55,5 +56,56 @@ export function setDataTable<TData extends RowData>(
 export function useDataTable(): DataTableState<RowData> {
 	const state = getContext<DataTableState<RowData> | undefined>(Symbol.for(SYMBOL_KEY));
 	if (!state) throw new Error('DataTable.* parts must be used inside <DataTable.Root>.');
+	return state;
+}
+
+export type DataTableRowsProps = {
+	/**
+	 * The visible leaf columns, in order — the boundaries a nested row's cells
+	 * line up with, so hiding a column from `ViewOptions` moves the rows an
+	 * expanded row opens with it.
+	 */
+	columns: Getter<readonly string[]>;
+	/** The classes a cell at this index needs to stay pinned; `false` when it scrolls. */
+	pinnedClass: (index: number, kind: PinnedCellKind) => string | false;
+	/** Where a pinned cell sits; `undefined` when it scrolls with the rest. */
+	pinnedStyle: (index: number) => string | undefined;
+};
+
+/**
+ * What `DataTable.Content` knows about the shape of a row and the parts it
+ * renders inside its `detail` snippet do not: which columns are on screen and
+ * which of their cells are pinned. Coordination only — a nested row's content
+ * still arrives from the page, at the `DataTable.SubRow` that draws it.
+ */
+class DataTableRowsState {
+	readonly props: DataTableRowsProps;
+	columns = $derived.by(() => this.props.columns());
+
+	constructor(props: DataTableRowsProps) {
+		this.props = props;
+	}
+
+	pinnedClass = (index: number, kind: PinnedCellKind) => this.props.pinnedClass(index, kind);
+	pinnedStyle = (index: number) => this.props.pinnedStyle(index);
+}
+
+const ROWS_SYMBOL_KEY = 'app-data-table-rows';
+
+export function setDataTableRows(props: DataTableRowsProps): DataTableRowsState {
+	return setContext(Symbol.for(ROWS_SYMBOL_KEY), new DataTableRowsState(props));
+}
+
+/**
+ * Read by the parts a page composes inside `DataTable.Content`'s `detail`
+ * snippet. This is a class instance, so consumers must not destructure it.
+ */
+export function useDataTableRows(): DataTableRowsState {
+	const state = getContext<DataTableRowsState | undefined>(Symbol.for(ROWS_SYMBOL_KEY));
+	if (!state) {
+		throw new Error(
+			'DataTable.SubRow / DataTable.SubSection must be used inside <DataTable.Content>.'
+		);
+	}
 	return state;
 }

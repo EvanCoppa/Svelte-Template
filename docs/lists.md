@@ -174,6 +174,43 @@ All of it is client state over rows the load already shipped, like sorting and p
 the table holds every row of the kind, and nothing is refetched to narrow it. Nothing
 goes in the URL.
 
+## A row that opens
+
+Some records are made of other records: an order and the shipments and invoices
+against it, a proposal and its options. A list of them has two things to show at once
+— the record, and what it is made of — and the answer is **more rows of the same
+table**, not a second grid inside a cell. That is what keeps a nested value under the
+column it belongs to, and what lets hiding a column from `ViewOptions`, pinning the
+first one or scrolling sideways move the nested rows with the rest. Three parts, on
+top of the table any list page already builds:
+
+- **`DataTable.expandColumn(columnHelper, label)`** is the chevron, first in the
+  columns — before the checkbox, since both are controls on the row rather than
+  columns of data (`pinnedColumnCount()` pins them together with the first real
+  column). `label` names the row for the button's screen-reader label; it is the rest
+  of "Show …" / "Hide …". Which rows can open at all is the table's own
+  `getRowCanExpand`, so a record with nothing under it has no dead control.
+- **`DataTable.Content`'s `detail` snippet** is what an open row shows, drawn straight
+  after it and handed that row's record. It is rendered only while the row is open.
+- **`DataTable.SubSection`** is the heading over one run of nested rows — its label and
+  count, or, with children instead, the sentence an open record with nothing under it
+  says. **`DataTable.SubRow`** is one row of that run: its `cell` snippet is drawn once
+  per column on screen and handed that column's id, and a column the nested row has no
+  value for is simply left unsaid.
+
+Both take a `divider` — the rule above them. `start` (a dashed rule) marks where the
+record's own row ends and the rows it opened begin, `section` (a dotted one) separates
+a later group from the one above it, and `row` is one more row of the group it is in.
+It is drawn on the top edge because the table body already owns every cell's bottom
+border.
+
+Expansion is state on the table, not on the page: `rowExpandingFeature` is in the
+shared `DataTable.features` preset, because `DataTable.Root` takes a
+`SvelteTable<DataTableFeatures, TData>` and a table that registered the feature on its
+own could not be handed to the parts. No `expandedRowModel` is registered — the rows an
+open row shows are the page's own, not TanStack sub-rows, so nothing needs flattening
+into the row model. `/components` → "Data table — a row that opens" is the reference.
+
 ## The industries that are not the default
 
 Two ship today:

@@ -8,6 +8,7 @@ import {
 	filterFn_includesString,
 	globalFilteringFeature,
 	metaHelper,
+	rowExpandingFeature,
 	rowPaginationFeature,
 	rowSelectionFeature,
 	rowSortingFeature,
@@ -53,11 +54,20 @@ export const filterFn_oneOf = constructFilterFn({
  *
  * TanStack Table v9 makes features opt-in so unused ones tree-shake away; this
  * preset pins the app's baseline — sorting, column and global filtering,
- * column visibility, pagination and row selection — so every table behaves
- * the same and every column definition can type against a single
- * `DataTableFeatures`. A page that needs more (faceting, grouping, …) extends
- * the table it creates; it does not fork this preset, because two presets
- * would fork that type.
+ * column visibility, pagination, row selection and row expansion — so every
+ * table behaves the same and every column definition can type against a
+ * single `DataTableFeatures`. A page that needs more (faceting, grouping, …)
+ * extends the table it creates; it does not fork this preset, because two
+ * presets would fork that type.
+ *
+ * Row expansion is in the baseline rather than in a table of its own for that
+ * reason: `DataTable.Root` takes a `SvelteTable<DataTableFeatures, TData>`, so
+ * a table that added the feature on its own could not be handed to the parts.
+ * It costs a table that never expands nothing — a row can only open when the
+ * page says so with `getRowCanExpand`, and no `expandedRowModel` is
+ * registered because the rows an expanded row opens are not TanStack sub-rows:
+ * they are the page's own, drawn by `DataTable.SubRow` (docs/lists.md, "A row
+ * that opens").
  *
  * Global filtering is what `DataTable.Search` drives: it scans the columns
  * that opt in with `enableGlobalFilter` (a list's searchable fields), and
@@ -67,6 +77,7 @@ export const features = tableFeatures({
 	columnFilteringFeature,
 	columnVisibilityFeature,
 	globalFilteringFeature,
+	rowExpandingFeature,
 	rowPaginationFeature,
 	rowSelectionFeature,
 	rowSortingFeature,

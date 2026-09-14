@@ -80,7 +80,7 @@
 	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import { Badge, type BadgeTone } from '$lib/components/ui/badge/index.js';
+	import { Badge, StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Calendar } from '$lib/components/ui/calendar/index.js';
@@ -423,6 +423,161 @@
 			}
 		},
 		onRowSelectionChange: setPaymentSelection
+	});
+
+	// Data table, expanded — a row that opens. The order is a row of the table;
+	// what it is made of is more rows of the same table, so a shipment's status
+	// lands under Status and its amount under Total.
+	type OrderLink = {
+		id: string;
+		group: string;
+		name: string;
+		status: string;
+		tone: BadgeTone;
+		amount: number | null;
+		when: string;
+	};
+
+	type Order = {
+		id: string;
+		customer: string;
+		status: 'Paid' | 'Pending' | 'Refunded';
+		total: number;
+		placed: string;
+		links: OrderLink[];
+	};
+
+	const orders: Order[] = [
+		{
+			id: 'ORD-4471',
+			customer: 'Northwind Dental',
+			status: 'Paid',
+			total: 2480,
+			placed: 'Mar 4',
+			links: [
+				{
+					id: 'SHP-1',
+					group: 'Shipments',
+					name: 'UPS Ground',
+					status: 'Delivered',
+					tone: 'success',
+					amount: null,
+					when: 'Delivered Mar 9'
+				},
+				{
+					id: 'SHP-2',
+					group: 'Shipments',
+					name: 'UPS Ground',
+					status: 'In transit',
+					tone: 'info',
+					amount: null,
+					when: 'ETA Mar 12'
+				},
+				{
+					id: 'INV-88',
+					group: 'Invoices',
+					name: 'INV-0088',
+					status: 'Paid',
+					tone: 'success',
+					amount: 2480,
+					when: 'Due Mar 18'
+				}
+			]
+		},
+		{
+			id: 'ORD-4472',
+			customer: 'Harbour Roofing',
+			status: 'Pending',
+			total: 15920,
+			placed: 'Mar 6',
+			links: [
+				{
+					id: 'INV-89',
+					group: 'Invoices',
+					name: 'INV-0089',
+					status: 'Overdue',
+					tone: 'error',
+					amount: 15920,
+					when: 'Due Mar 10'
+				},
+				{
+					id: 'RMA-3',
+					group: 'Returns',
+					name: 'RMA-0003',
+					status: 'Approved',
+					tone: 'warning',
+					amount: 640,
+					when: 'Mar 8'
+				}
+			]
+		},
+		{
+			id: 'ORD-4473',
+			customer: 'Cedar Park Clinic',
+			status: 'Refunded',
+			total: 310,
+			placed: 'Mar 7',
+			links: []
+		}
+	];
+
+	/** The links of one order in the runs the detail rows are drawn in. */
+	function orderGroups(order: Order): { label: string; rows: OrderLink[] }[] {
+		const groups: { label: string; rows: OrderLink[] }[] = [];
+		for (const link of order.links) {
+			const group = groups.find((candidate) => candidate.label === link.group);
+			if (group) group.rows.push(link);
+			else groups.push({ label: link.group, rows: [link] });
+		}
+		return groups;
+	}
+
+	const ORDER_TONES = {
+		Paid: 'success',
+		Pending: 'warning',
+		Refunded: 'neutral'
+	} satisfies Record<Order['status'], BadgeTone>;
+
+	const orderColumnHelper = createColumnHelper<DataTable.DataTableFeatures, Order>();
+
+	const orderColumns = orderColumnHelper.columns([
+		DataTable.expandColumn(orderColumnHelper, (order) => `records linked to ${order.id}`),
+		orderColumnHelper.accessor('customer', {
+			header: ({ column }) =>
+				renderComponent(DataTable.ColumnHeader, { column, title: 'Customer' }),
+			enableGlobalFilter: true,
+			meta: { title: 'Customer' }
+		}),
+		orderColumnHelper.accessor('status', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
+			cell: ({ row }) =>
+				DataTable.statusCell(row.original.status, ORDER_TONES[row.original.status]),
+			enableGlobalFilter: false,
+			filterFn: 'oneOf',
+			meta: { title: 'Status', filter: { options: null } }
+		}),
+		orderColumnHelper.accessor('total', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Total' }),
+			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.total }),
+			enableGlobalFilter: false,
+			meta: { title: 'Total' }
+		}),
+		orderColumnHelper.accessor('placed', {
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Placed' }),
+			enableGlobalFilter: false,
+			meta: { title: 'Placed' }
+		})
+	]);
+
+	const ordersTable = createTable({
+		features: DataTable.features,
+		get data() {
+			return orders;
+		},
+		columns: orderColumns,
+		// Every order has a page of its own to open, including the one with
+		// nothing linked yet — that is a fact about the order worth reading.
+		getRowCanExpand: () => true
 	});
 
 	// Map — the page owns the pins and the style; the compound draws them.
@@ -3515,6 +3670,65 @@
 				</DataTable.Toolbar>
 				<DataTable.Content />
 				<DataTable.Pagination noun="payment" />
+			</DataTable.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Data table — a row that opens</Card.Title>
+			<Card.Description>
+				The same compound with <code>DataTable.expandColumn(columnHelper, label)</code> first in the
+				columns and a <code>detail</code> snippet on <code>DataTable.Content</code>. What an open
+				row shows is more rows of this table — <code>DataTable.SubSection</code> for the heading
+				over a run, <code>DataTable.SubRow</code> for a row of it — so a nested value lands under
+				the column it belongs to, and hiding, pinning or scrolling a column moves it too. A
+				<code>SubRow</code>'s <code>cell</code> snippet is drawn once per column on screen and
+				handed that column's id; say nothing for a column the nested row has no value for. Which
+				rows can open is the table's <code>getRowCanExpand</code>, and what they hold is the page's
+				— the parts only place it.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<DataTable.Root table={ordersTable} pageSize={5}>
+				<DataTable.Toolbar>
+					<DataTable.Search placeholder="Search customers…" ariaLabel="Search orders" />
+					<DataTable.Filters />
+					<DataTable.ViewOptions class="ms-auto" />
+				</DataTable.Toolbar>
+				<DataTable.Content emptyMessage="No orders match.">
+					{#snippet detail(order: Order)}
+						{#each orderGroups(order) as group, groupIndex (group.label)}
+							<DataTable.SubSection
+								label={group.label}
+								count={group.rows.length}
+								divider={groupIndex === 0 ? 'start' : 'section'}
+							/>
+							{#each group.rows as link (link.id)}
+								<DataTable.SubRow>
+									{#snippet cell(columnId)}
+										{#if columnId === 'customer'}
+											<span class="text-foreground font-medium">{link.name}</span>
+										{:else if columnId === 'status'}
+											<StatusBadge tone={link.tone}>{link.status}</StatusBadge>
+										{:else if columnId === 'total'}
+											<span class="tabular-nums">
+												{link.amount === null ? '—' : usd.format(link.amount)}
+											</span>
+										{:else if columnId === 'placed'}
+											{link.when}
+										{/if}
+									{/snippet}
+								</DataTable.SubRow>
+							{/each}
+						{:else}
+							<DataTable.SubSection divider="start">
+								Nothing is linked to this order yet.
+							</DataTable.SubSection>
+						{/each}
+					{/snippet}
+				</DataTable.Content>
+				<DataTable.Pagination noun="order" />
 			</DataTable.Root>
 		</Card.Content>
 	</Card.Root>
