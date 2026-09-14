@@ -756,8 +756,13 @@ SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the insta
 version; read them before the website. The full account is `docs/assistant.md`.
 
 - **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
-  unconfigured the page says so and the endpoint answers 503, never a crash.
+  imports a provider package — `@ai-sdk/openai`, over the Responses API. Config is env-only
+  (`OPENAI_API_KEY`, `AI_MODEL`; the default model is `gpt-5.6-luna`); when unconfigured
+  the page says so and the endpoint answers 503, never a crash. What the API is asked for
+  on a call — `store: false`, the per-thread `promptCacheKey` — is the SDK's namespaced
+  `providerOptions`, spelled once in `openaiCallOptions()` (`provider.ts`) and set on the
+  agent and the title call; reasoning is the SDK's portable `reasoning` setting, never a
+  provider option.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.

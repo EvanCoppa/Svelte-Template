@@ -399,9 +399,9 @@ this app's one API endpoint instead of a form action are in
 
 ## AI assistant
 
-`/assistant` is a chat over the organization's data, built on the Vercel AI SDK. Set
-`ANTHROPIC_API_KEY` (and optionally `AI_MODEL`) in `.env` to turn it on; without a key the
-page renders but says it is not configured. The assistant's tools are linked to features —
+`/assistant` is a chat over the organization's data, built on the Vercel AI SDK over
+OpenAI. Set `OPENAI_API_KEY` (and optionally `AI_MODEL`; the default is `gpt-5.6-luna`) in
+`.env` to turn it on; without a key the page renders but says it is not configured. The assistant's tools are linked to features —
 a tool is available only when its feature is enabled for the org and the signed-in member
 holds the level it needs — and anything destructive asks for approval in the thread. The
 architecture, the tool contract and how to add a tool are in `docs/assistant.md`.

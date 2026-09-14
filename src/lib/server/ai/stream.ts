@@ -80,7 +80,13 @@ export async function streamAssistantTurn({
 	}
 
 	return createAgentUIStreamResponse({
-		agent: createAssistantAgent({ model, context, timeZone: request.timeZone, userName }),
+		agent: createAssistantAgent({
+			model,
+			context,
+			conversationId,
+			timeZone: request.timeZone,
+			userName
+		}),
 		uiMessages: messages,
 		originalMessages: messages,
 		generateMessageId,

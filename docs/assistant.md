@@ -1,7 +1,7 @@
 # The assistant: an AI feature built the AI SDK's way
 
 The assistant at `/assistant` is a chat over the organization's data, built on the
-[Vercel AI SDK](https://ai-sdk.dev) (`ai` v7, `@ai-sdk/svelte`, `@ai-sdk/anthropic`). The
+[Vercel AI SDK](https://ai-sdk.dev) (`ai` v7, `@ai-sdk/svelte`, `@ai-sdk/openai`). The
 rule for everything in it: **the SDK's own mechanism is the answer to every AI concern.**
 When the SDK documents a way to do something, that is the way it is done here, under the
 SDK's own names, so its documentation reads as documentation of this code.
@@ -125,13 +125,36 @@ endpoint constructs it per request, because two of those settings are the reques
   agent is built where the request is.
 - **`activeTools`** — see "Tools are linked to features".
 
-The model comes from `src/lib/server/ai/provider.ts` and nowhere else. `ANTHROPIC_API_KEY`
-turns the assistant on; `AI_MODEL` picks the model (default `claude-opus-5`). Unconfigured,
-the page says so and the endpoint answers 503.
+The model comes from `src/lib/server/ai/provider.ts` and nowhere else: `OPENAI_API_KEY`
+turns the assistant on, `AI_MODEL` picks the model (default `gpt-5.6-luna`; the larger
+GPT-5.6 siblings are `gpt-5.6-terra` and `gpt-5.6-sol`). `createOpenAI()`'s model factory
+selects the Responses API for a GPT-5 model, which is the API the SDK's OpenAI tools,
+reasoning and prompt caching are built on. The provider package is imported in that one
+file; everything else holds the SDK's `LanguageModel`. Unconfigured, the page says so and
+the endpoint answers 503.
+
+What the API is asked for on a call is the SDK's namespaced `providerOptions`, spelled once
+in `openaiCallOptions()` (`provider.ts`) and set on the agent and on the title call:
+
+- `store: false` — a turn over an organization's data is not retained on OpenAI's side.
+  The thread is ours (`conversations.ts`), and with storage off the SDK asks for the
+  model's encrypted reasoning and carries it between the steps of a tool loop itself.
+- `promptCacheKey`, the thread id — OpenAI caches the longest stable prefix of a request
+  (instructions, tool definitions, the thread so far) and the key routes every turn of a
+  thread to the same cache.
+
+Reasoning effort is the model's default — `medium` on `gpt-5.6-luna` — and its summaries
+stream as `reasoning` parts, which the page folds. When a screen needs a different effort,
+it is the SDK's portable `reasoning` setting on the call, never `reasoningEffort` in the
+provider block: the thread title (`src/lib/server/ai/title.ts`) is one `generateText` call
+with `reasoning: 'none'`, because six words need no thinking and the thinking would count
+against its small output budget.
 
 Instructions are two system messages (`src/lib/server/ai/prompts.ts`): the stable persona,
-carrying Anthropic's `cacheControl` marker, then a `<session_context>` block with the org,
-the caller, their role and the time zone. The split is the cache boundary.
+then a `<session_context>` block with the org, the caller, their role and the time zone.
+The split is the cache boundary: the persona (and the tool definitions the SDK sends in a
+stable order) is the prefix served from the cache on every turn, and the per-request block
+after it never invalidates that prefix.
 
 ## Tools are linked to features
 
