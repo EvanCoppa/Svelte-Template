@@ -100,7 +100,15 @@
 	</div>
 
 	<Tabs.Root bind:value={active} variant="underline" class="min-h-0 flex-1 gap-0">
-		<Tabs.List class="shrink-0 gap-4 px-4">
+		<!-- The padding has to carry the variant prefix. `underline` sets
+		     `group-data-[variant=underline]/tabs:p-0` so a page-level strip can
+		     span its page, and tailwind-merge does not treat that as the same
+		     utility as a plain `px-4` — both survive, and the variant's wins on
+		     specificity, leaving the first tab flush against the panel's edge
+		     and clipped by it. Matching the prefix is what makes this override,
+		     and it lines the tabs up with the header and the rows above and
+		     below. The gap is the variant's; this panel has no quarrel with it. -->
+		<Tabs.List class="shrink-0 group-data-[variant=underline]/tabs:px-4">
 			{#each tabs as tab (tab.id)}
 				{@const unread = unreadIn(notifications, tab.id)}
 				<Tabs.Trigger value={tab.id} class="gap-1.5 text-sm">
