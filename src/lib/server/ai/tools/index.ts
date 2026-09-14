@@ -10,8 +10,10 @@ import { getCompany, getCompanyAccess } from './get-company';
 import { listDeals, listDealsAccess } from './list-deals';
 import { listTasks, listTasksAccess } from './list-tasks';
 import { listTickets, listTicketsAccess } from './list-tickets';
+import { readEmailThread, readEmailThreadAccess } from './read-email-thread';
 import { searchCompanies, searchCompaniesAccess } from './search-companies';
 import { searchContacts, searchContactsAccess } from './search-contacts';
+import { searchEmails, searchEmailsAccess } from './search-emails';
 
 /**
  * The assistant's tools, one file each: an AI SDK `tool()` — zod
@@ -35,7 +37,9 @@ export const assistantTools = {
 	completeTask,
 	deleteTask,
 	listDeals,
-	listTickets
+	listTickets,
+	searchEmails,
+	readEmailThread
 } satisfies ToolSet;
 
 export type AssistantTools = typeof assistantTools;
@@ -51,7 +55,9 @@ export const TOOL_ACCESS = {
 	completeTask: completeTaskAccess,
 	deleteTask: deleteTaskAccess,
 	listDeals: listDealsAccess,
-	listTickets: listTicketsAccess
+	listTickets: listTicketsAccess,
+	searchEmails: searchEmailsAccess,
+	readEmailThread: readEmailThreadAccess
 } satisfies Record<AssistantToolName, ToolAccess>;
 
 export const TOOL_NAMES =

@@ -31,6 +31,8 @@ export const FEATURE_IDS = [
 	'tasks',
 	'tickets',
 	'staff',
+	// Synced email, per member (the email_sync migration).
+	'email',
 	'components',
 	'best-practices',
 	'assistant',

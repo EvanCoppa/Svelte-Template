@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { page } from '$app/state';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
@@ -30,8 +31,10 @@
 	import { canArchiveNote, canEditNote } from '$lib/notes';
 	import { noteCommands } from '$lib/notes-api';
 	import { iconFor } from '$lib/features/icons';
+	import { featureTerms } from '$lib/features/terms';
 	import { iconForPath } from '$lib/navigation';
 	import { QUERY } from '$lib/queries';
+	import type { EmailMessageView } from '$lib/server/crm/emails';
 	import { capitalize } from '$lib/utils.js';
 
 	let { data } = $props();
@@ -107,6 +110,29 @@
 	// open is this view's own business — nothing worth a preference or a cookie.
 	let detailsOpen = $state(true);
 	let notesOpen = $state(true);
+
+	/**
+	 * The mail filed on this record, for the kinds that carry it — the load
+	 * supplies `email` only then, and only when this session has the feature,
+	 * which is also what puts its words in `terms`.
+	 */
+	const emailTerms = $derived(data.email ? featureTerms(page.data.terms, 'email') : null);
+
+	// The compose modal is mounted once, beside the tabs, so it can be open
+	// whichever tab is showing; the Emails tab hands the message to answer up.
+	let composeOpen = $state(false);
+	let replyTo = $state<EmailMessageView | null>(null);
+	let composer = $state<Detail.ComposeEmail | null>(null);
+
+	async function openCompose(reply: EmailMessageView | null) {
+		replyTo = reply;
+		composeOpen = true;
+		// The dialog is still mounted while it animates out, and this form
+		// carries the message it answers, so a second Reply must open on its
+		// own message rather than on the one before it (see the calendar).
+		await tick();
+		composer?.openOn();
+	}
 </script>
 
 <div class="space-y-6">
@@ -200,6 +226,12 @@
 					<Tabs.Trigger value="conversation">
 						<MessagesSquareIcon />Conversation
 						{@render count(data.thread.messages.length)}
+					</Tabs.Trigger>
+				{/if}
+				{#if data.email && emailTerms}
+					<Tabs.Trigger value="email">
+						<MailIcon />{emailTerms.name}
+						{@render count(data.email.threads.length)}
 					</Tabs.Trigger>
 				{/if}
 				{#each data.related as group (group.kind)}
@@ -314,6 +346,26 @@
 							canModerate={thread.canModerate}
 							noun={terms.noun}
 							{queryKey}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/if}
+			{#if data.email && emailTerms}
+				{@const email = data.email}
+				<Tabs.Content value="email">
+					{#if tab === 'email'}
+						<Detail.EmailThreads
+							threads={email.threads}
+							userId={email.userId}
+							isOrgManager={email.isOrgManager}
+							canSend={email.canSend}
+							canConnect={email.canConnect}
+							configured={email.configured}
+							privacyForm={email.privacyForm}
+							terms={emailTerms}
+							noun={terms.noun}
+							{queryKey}
+							onCompose={openCompose}
 						/>
 					{/if}
 				</Tabs.Content>
@@ -487,6 +539,19 @@
 	</div>
 </div>
 
+<!-- Writing mail: one modal for a new message and every reply, opened by the Emails tab. -->
+{#if data.email?.canSend && emailTerms}
+	<Detail.ComposeEmail
+		bind:this={composer}
+		bind:open={composeOpen}
+		form={data.email.composeForm}
+		mailboxes={data.email.mailboxes}
+		{replyTo}
+		terms={emailTerms}
+		{queryKey}
+	/>
+{/if}
+
 <!-- How many a tab holds, after its name. -->
 {#snippet count(n: number)}
 	{#if n > 0}
@@ -545,6 +610,33 @@
 						<p class="text-muted-foreground mt-1.5 text-sm">Nothing logged yet</p>
 					{/if}
 				</button>
+				{#if data.email && emailTerms}
+					{@const newest = data.email.threads[0]}
+					<button
+						type="button"
+						class="bg-card hover:bg-accent/50 rounded-xl border p-4 text-left transition-colors"
+						onclick={() => (tab = 'email')}
+					>
+						<p class="text-muted-foreground flex items-center gap-1.5 text-xs">
+							<MailIcon class="size-3.5" />
+							Latest {emailTerms.noun}
+						</p>
+						{#if newest}
+							<p class="mt-1.5 truncate text-sm font-medium">{newest.subject ?? '(no subject)'}</p>
+							<p class="text-muted-foreground text-xs">
+								{#if newest.lastMessageAt}
+									{datetime.format(new Date(newest.lastMessageAt))}
+								{:else}
+									{newest.messageCount === 1
+										? 'One message'
+										: `${String(newest.messageCount)} messages`}
+								{/if}
+							</p>
+						{:else}
+							<p class="text-muted-foreground mt-1.5 text-sm">Nothing synced yet</p>
+						{/if}
+					</button>
+				{/if}
 				{#each data.related as group (group.kind)}
 					{@const groupTerms = recordTerms(page.data.terms, group.kind)}
 					{@const GroupIcon = iconFor(iconForPath(recordListHref(group.kind), page.data.nav ?? []))}

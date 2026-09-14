@@ -1559,3 +1559,89 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'company', '20000000-0000-0000-0007-000000000002', current_date - 28,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- Synced email, so the record pages' Emails tab and /email draw without a
+-- Google account: dev's mailbox in Acme, kept `paused` (no credentials, so
+-- the worker never touches it), holding a two-message thread with Lucius at
+-- Wayne and one message from Pepper at Stark. Filed on the person AND the
+-- company, the way the worker files a match. Threads and their counts are
+-- maintained by trigger from the messages.
+insert into public.mailboxes (id, org_id, user_id, provider, email_address, visibility, status, backfilled_at, last_synced_at) values
+	('a6000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'00000000-0000-0000-0000-000000000001', 'google', 'dev@example.com', 'shared', 'paused',
+		now() - interval '2 days', now() - interval '1 hour')
+on conflict (id) do nothing;
+
+insert into public.email_threads (id, org_id, subject) values
+	('a9000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'Roof inspection for the Tower'),
+	('a9000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'Q4 procurement forecast')
+on conflict (id) do nothing;
+
+insert into public.email_messages (id, org_id, thread_id, rfc_message_id, in_reply_to, reference_ids, subject, snippet, body_text, from_address, from_name, sent_at) values
+	('ab000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a9000000-0000-0000-0000-000000000001', 'seed-0001@wayne.example.com', null, '{}',
+		'Roof inspection for the Tower',
+		'Could your team come by next Tuesday to look at the east wing?',
+		E'Hi,\n\nCould your team come by next Tuesday to look at the east wing? We had some leaking after the storm.\n\nLucius',
+		'lucius@wayne.example.com', 'Lucius Fox', now() - interval '3 days'),
+	('ab000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a9000000-0000-0000-0000-000000000001', 'seed-0002@example.com', 'seed-0001@wayne.example.com',
+		'{seed-0001@wayne.example.com}',
+		'Re: Roof inspection for the Tower',
+		'Tuesday works. We will be there at 9.',
+		E'Tuesday works. We will be there at 9.\n\nDev',
+		'dev@example.com', 'Dev User', now() - interval '3 days' + interval '2 hours'),
+	('ab000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'a9000000-0000-0000-0000-000000000002', 'seed-0003@stark.example.com', null, '{}',
+		'Q4 procurement forecast',
+		'Sending over the numbers we discussed. Let me know if the volumes look right.',
+		E'Sending over the numbers we discussed. Let me know if the volumes look right before I take it to finance.\n\nPepper',
+		'pepper@stark.example.com', 'Pepper Potts', now() - interval '1 day')
+on conflict (id) do nothing;
+
+insert into public.mailbox_messages (id, org_id, mailbox_id, message_id, gmail_message_id, gmail_thread_id, label_ids, is_sent) values
+	('ac000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'a6000000-0000-0000-0000-000000000001', 'ab000000-0000-0000-0000-000000000001',
+		'seedgm0001', 'seedgt0001', '{INBOX}', false),
+	('ac000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'a6000000-0000-0000-0000-000000000001', 'ab000000-0000-0000-0000-000000000002',
+		'seedgm0002', 'seedgt0001', '{SENT}', true),
+	('ac000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'a6000000-0000-0000-0000-000000000001', 'ab000000-0000-0000-0000-000000000003',
+		'seedgm0003', 'seedgt0002', '{INBOX}', false)
+on conflict (id) do nothing;
+
+insert into public.email_participants (id, org_id, message_id, role, address, display_name, contact_id) values
+	('ad000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000001', 'from', 'lucius@wayne.example.com', 'Lucius Fox',
+		'30000000-0000-0000-0000-000000000001'),
+	('ad000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000001', 'to', 'dev@example.com', 'Dev User', null),
+	('ad000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000002', 'from', 'dev@example.com', 'Dev User', null),
+	('ad000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000002', 'to', 'lucius@wayne.example.com', 'Lucius Fox',
+		'30000000-0000-0000-0000-000000000001'),
+	('ad000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000003', 'from', 'pepper@stark.example.com', 'Pepper Potts',
+		'30000000-0000-0000-0000-000000000002'),
+	('ad000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000003', 'to', 'dev@example.com', 'Dev User', null)
+on conflict (id) do nothing;
+
+insert into public.email_message_links (id, org_id, message_id, entity_type, entity_id, source, created_by) values
+	('ae000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000001', 'contact', '30000000-0000-0000-0000-000000000001', 'participant', null),
+	('ae000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000001', 'company', '20000000-0000-0000-0000-000000000001', 'participant', null),
+	('ae000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000002', 'contact', '30000000-0000-0000-0000-000000000001', 'participant', null),
+	('ae000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000002', 'company', '20000000-0000-0000-0000-000000000001', 'participant', null),
+	('ae000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000003', 'contact', '30000000-0000-0000-0000-000000000002', 'participant', null),
+	('ae000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001',
+		'ab000000-0000-0000-0000-000000000003', 'company', '20000000-0000-0000-0000-000000000002', 'participant', null)
+on conflict (id) do nothing;

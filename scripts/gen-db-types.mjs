@@ -20,6 +20,8 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readEnvFiles } from './dotenv.mjs';
 
 const OUT_FILE = 'src/lib/database.types.ts';
@@ -84,8 +86,18 @@ if (check) {
 		process.exit(0);
 	}
 	// Write it anyway so a failing CI run leaves the corrected file in the
-	// workspace — `git diff` then shows exactly what was missed.
+	// workspace — and print the difference, so the log alone says exactly
+	// what was missed when the workspace is a runner nobody can open.
+	const previous = join(tmpdir(), 'database.types.previous.ts');
+	writeFileSync(previous, current);
 	writeFileSync(OUT_FILE, output);
+	try {
+		execFileSync('git', ['--no-pager', 'diff', '--no-index', '--', previous, OUT_FILE], {
+			stdio: 'inherit'
+		});
+	} catch {
+		// `git diff` exits 1 when the files differ, which they do.
+	}
 	console.error(
 		`\n${OUT_FILE} does not match the schema.\n` + 'Run `npm run db:types` and commit the result.'
 	);

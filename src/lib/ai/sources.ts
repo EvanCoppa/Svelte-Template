@@ -55,8 +55,11 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 			}));
 		// A note is not a record with a page of its own, and a deleted task no
 		// longer has one to open — neither belongs in a list of things to read.
+		// Nor is an email thread: it is read on the record it is filed on.
 		case 'tool-addNote':
 		case 'tool-deleteTask':
+		case 'tool-searchEmails':
+		case 'tool-readEmailThread':
 			return [];
 	}
 }

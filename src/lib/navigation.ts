@@ -264,6 +264,12 @@ export const settingsNav: SettingsNavGroup[] = [
 				href: '/settings/features',
 				icon: 'toggle-right',
 				aliases: ['plan', 'modules', 'upgrade']
+			},
+			{
+				label: 'Integrations',
+				href: '/settings/integrations',
+				icon: 'link',
+				aliases: ['email', 'gmail', 'google', 'mailbox', 'connect']
 			}
 		]
 	}
