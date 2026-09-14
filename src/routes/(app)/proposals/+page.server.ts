@@ -1,8 +1,9 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
+import { deleteRecord, loadDeleteRecord } from '$lib/server/records';
 import { can } from '$lib/server/roles';
 import { loadRecordList } from '$lib/server/lists';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 // Gated by the hook on the `proposals` feature + read grant; see companies.
 // What the page is called — Proposals, Quotes, Treatment plans — is the
@@ -18,6 +19,13 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		// proposal is options and lines, not one row of strings. The button
 		// links there for whoever may write the feature; the builder's own load
 		// refuses everyone else.
-		canCreate: can(locals.org.access, 'proposals', 'manage')
+		canCreate: can(locals.org.access, 'proposals', 'manage'),
+		...(await loadDeleteRecord(locals, 'proposal'))
 	};
+};
+
+// Deleting goes through the generic row menu ($lib/server/records.ts), which
+// opens with requirePermission(locals.org.access, 'proposals', 'delete').
+export const actions: Actions = {
+	deleteRecord: (event) => deleteRecord(event, 'proposal')
 };
