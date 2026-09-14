@@ -16,6 +16,7 @@ import {
 	FULFILLMENT_STATE_TONE,
 	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TICKET_STATUS_TONE
@@ -43,6 +44,7 @@ import { listProperties, type Property } from './properties';
 import { listProposals, proposalParentKind, type ProposalWithOptions } from './proposals';
 import { listOrders, type OrderWithCustomer } from './orders';
 import { listPurchases, type PurchaseWithVendor } from './purchases';
+import { listShipments, type ShipmentWithOrder } from './shipments';
 import { listRmas, type RmaWithParties } from './rmas';
 import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
@@ -77,6 +79,7 @@ export type ListResult =
 	| { kind: 'billable'; rows: Billable[] }
 	| { kind: 'coupon'; rows: Coupon[] }
 	| { kind: 'order'; rows: OrderWithCustomer[] }
+	| { kind: 'shipment'; rows: ShipmentWithOrder[] }
 	| { kind: 'purchase'; rows: PurchaseWithVendor[] }
 	| { kind: 'rma'; rows: RmaWithParties[] };
 
@@ -113,6 +116,8 @@ export async function listRecords(
 			return { kind, rows: await listCoupons(supabase, orgId) };
 		case 'order':
 			return { kind, rows: await listOrders(supabase, orgId) };
+		case 'shipment':
+			return { kind, rows: await listShipments(supabase, orgId) };
 		case 'purchase':
 			return { kind, rows: await listPurchases(supabase, orgId) };
 		case 'rma':
@@ -583,6 +588,41 @@ export function describeListRows(
 						return datetime(order.confirmed_at);
 					case 'created_at':
 						return datetime(order.created_at);
+				}
+			});
+		case 'shipment':
+			return describe(result.kind, result.rows, (shipment, key) => {
+				switch (key) {
+					case 'name':
+						// A shipment has no name; the tracking number is what it is
+						// known by, and a box not yet handed to a carrier has none.
+						return link('shipment', shipment.id, shipment.tracking_number ?? 'Not tracked');
+					case 'order':
+						// Not `related()`: that takes a `{ id, name }`, and an order
+						// is known by its number.
+						return {
+							type: 'record',
+							text: shipment.orders?.number ?? '',
+							href:
+								shipment.orders && canOpen('order') ? recordHref('order', shipment.orders.id) : null
+						};
+					case 'delivery_status':
+						return status(
+							shipment.delivery_status,
+							SHIPMENT_DELIVERY_TONE[shipment.delivery_status]
+						);
+					case 'carrier':
+						return text(shipment.carrier);
+					case 'supplier':
+						return related('company', shipment.companies);
+					case 'ship_date':
+						return date(shipment.ship_date);
+					case 'estimated_delivery_date':
+						return date(shipment.estimated_delivery_date);
+					case 'delivered_at':
+						return datetime(shipment.delivered_at);
+					case 'created_at':
+						return datetime(shipment.created_at);
 				}
 			});
 		case 'purchase':

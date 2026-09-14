@@ -32,6 +32,8 @@ export const QUERY = {
 	assets: 'app:assets',
 	/** What customers asked for — a line, a split or a shipment moves the header. */
 	orders: 'app:orders',
+	/** Boxes going out — packing one or a carrier scan moves its order too. */
+	shipments: 'app:shipments',
 	/** The org's merchandising shelves — a group's members change with the group. */
 	featuredGroups: 'app:featured-groups',
 	/** The catalog tree — a category added, moved or removed changes it. */

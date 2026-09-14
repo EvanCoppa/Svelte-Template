@@ -38,6 +38,7 @@ export const LIST_KINDS = [
 	'ticket',
 	'coupon',
 	'order',
+	'shipment',
 	'purchase',
 	'rma'
 ] as const satisfies readonly RecordKind[];

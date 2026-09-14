@@ -14,6 +14,7 @@ import {
 	updateOrderLine
 } from '$lib/server/crm/orders';
 import { listProducts } from '$lib/server/crm/products';
+import { createShipment, listShipments } from '$lib/server/crm/shipments';
 import { loadEditRecord, updateRecord } from '$lib/server/records';
 import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import {
@@ -46,6 +47,11 @@ import type { Actions, PageServerLoad } from './$types';
  * And of a LINE's states, `shipped` and `delivered` are the carrier's — they
  * arrive when a scan lands on the shipment carrying the line, so this page
  * offers the other five (`LINE_FULFILLMENT_STATUSES`).
+ *
+ * **A box is born here**, because `shipments.order_id` is not null and
+ * insert-only: there is no "add shipment" button on the shipments list, and
+ * "Ship this order" is the one door. It opens an empty `preparing` box on this
+ * order; what goes in it is packed on the shipment's own page.
  */
 
 const FORM_IDS = {
@@ -54,6 +60,7 @@ const FORM_IDS = {
 	removeLine: 'remove-order-line',
 	setStatus: 'set-order-line-status',
 	splitLine: 'split-order-line',
+	ship: 'ship-order',
 	confirm: 'confirm-order',
 	cancel: 'cancel-order'
 } as const;
@@ -87,7 +94,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		removeLineForm,
 		statusForm,
 		splitForm,
-		actForm
+		shipForm,
+		actForm,
+		shipments
 	] = await Promise.all([
 		getOrder(supabase, orgId, params.id),
 		// The catalog and the vendor list a line can cite. Only for a writer: a
@@ -99,7 +108,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		superValidate(zod4(removeOrderLineSchema), { id: FORM_IDS.removeLine }),
 		superValidate(zod4(setLineStatusSchema), { id: FORM_IDS.setStatus }),
 		superValidate(zod4(splitOrderLineSchema), { id: FORM_IDS.splitLine }),
-		superValidate(zod4(orderActSchema), { id: FORM_IDS.confirm })
+		superValidate(zod4(orderActSchema), { id: FORM_IDS.ship }),
+		superValidate(zod4(orderActSchema), { id: FORM_IDS.confirm }),
+		listShipments(supabase, orgId, { orderId: params.id })
 	]);
 
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
@@ -136,7 +147,15 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		removeLineForm,
 		statusForm,
 		splitForm,
+		shipForm,
 		actForm,
+		// The boxes already going out against this order, so the page is the
+		// one place that answers "what has left".
+		shipments,
+		canShip: can(org.access, 'shipments', 'manage'),
+		canOpenShipment: passesFeatureGate('/shipments', org.features, (id) =>
+			hasGrant(org.access, id)
+		),
 		// The number titles the page and names its crumb.
 		title: order.number
 	};
@@ -264,6 +283,44 @@ export const actions: Actions = {
 			});
 		}
 		return { form };
+	},
+
+	/**
+	 * Opens an empty box against this order and goes to it. The one door a
+	 * shipment comes through: its `order_id` is not null and insert-only, so
+	 * there is nowhere else it could be created from.
+	 *
+	 * It needs its own grant, not the order's — shipping and taking an order
+	 * are different jobs, and a role may hold one without the other.
+	 */
+	ship: async ({ request, locals, params }) => {
+		const { supabase, orgId, org } = orgOf(locals);
+		requirePermission(org.access, 'shipments', 'manage');
+		const form = await superValidate(request, zod4(orderActSchema), { id: FORM_IDS.ship });
+
+		let shipment;
+		try {
+			shipment = await createShipment(supabase, orgId, params.id, {
+				supplier_id: null,
+				carrier: null,
+				tracking_number: null,
+				tracking_url: null,
+				// Ours, not a carrier's: the box exists in the warehouse before
+				// anyone has heard of it, and nothing on the order moves yet.
+				delivery_status: 'preparing',
+				ship_date: null,
+				estimated_delivery_date: null,
+				shipped_at: null,
+				delivered_at: null,
+				notes: null
+			});
+		} catch (cause) {
+			return message(form, cause instanceof Error ? cause.message : 'Could not open a box.', {
+				status: 400
+			});
+		}
+		// Packing is the shipment's own screen, so the act lands there.
+		throw redirect(303, `/shipments/${shipment.id}`);
 	},
 
 	/** Commits to the order. A draft only — the module scopes the write to one. */

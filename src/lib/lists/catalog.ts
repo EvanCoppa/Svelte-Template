@@ -13,6 +13,7 @@ import {
 	FULFILLMENT_STATE_TONE,
 	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
 	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
@@ -271,6 +272,20 @@ export const LIST_FIELD_CATALOG = {
 		total: money('Total'),
 		estimated_ship_date: date('Est. ship'),
 		confirmed_at: datetime('Confirmed'),
+		created_at: created
+	},
+	shipment: {
+		// A shipment has no name of its own — the tracking number is what a
+		// row is known by, so the catalog's `name` key is that.
+		name: text('Tracking number'),
+		order: namedRecord('Order'),
+		delivery_status: enumOf('Status', SHIPMENT_DELIVERY_TONE),
+		carrier: text('Carrier'),
+		// Who shipped it, when it was not the org itself.
+		supplier: record('company'),
+		ship_date: date('Shipped'),
+		estimated_delivery_date: date('Due'),
+		delivered_at: datetime('Delivered'),
 		created_at: created
 	},
 	purchase: {

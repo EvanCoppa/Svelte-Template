@@ -17,6 +17,7 @@ import {
 	FULFILLMENT_STATE_TONE,
 	ORDER_STATUS_TONE,
 	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	PRIORITY_TONE,
@@ -45,6 +46,7 @@ import {
 import { getProduct, listProducts, type ProductWithCategory } from './products';
 import { getOrder, listOrders, type OrderWithDetails } from './orders';
 import { getPurchase, listPurchases, type PurchaseWithDetails } from './purchases';
+import { getShipment, listShipments, type ShipmentWithDetails } from './shipments';
 import { getRma, listRmas, type RmaWithParties } from './rmas';
 import {
 	getProposal,
@@ -354,6 +356,41 @@ export function describeOrder(row: OrderWithDetails, canOpen: CanOpen): RecordDe
 			{ label: 'Confirmed', value: datetime(row.confirmed_at) },
 			{ label: 'Cancelled', value: datetime(row.cancelled_at) },
 			{ label: 'Est. ship', value: date(row.estimated_ship_date) },
+			{ label: 'Notes', value: text(row.notes) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * One box.
+ *
+ * It has no name of its own — a shipment is known by its carrier and tracking
+ * number, unique together per org — so the tracking number names the record,
+ * and a box not yet handed to a carrier reads as untracked rather than blank.
+ *
+ * The pill is `delivery_status`, which is the CARRIER's word: writing it is
+ * what pushes `shipped` or `delivered` onto every line in the box.
+ */
+export function describeShipment(row: ShipmentWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'shipment',
+		id: row.id,
+		name: row.tracking_number ?? 'Untracked shipment',
+		pills: [pill(row.delivery_status, SHIPMENT_DELIVERY_TONE[row.delivery_status])],
+		fields: [
+			{ label: 'Carrier', value: text(row.carrier) },
+			{ label: 'Shipped by', value: record('company', row.companies, canOpen) },
+			{ label: 'Shipped', value: date(row.ship_date) },
+			{ label: 'Due', value: date(row.estimated_delivery_date) },
+			{ label: 'Delivered', value: datetime(row.delivered_at) },
+			// The carrier's own last words, and why live tracking stopped when
+			// it has. Both are the sync's, never typed.
+			{ label: 'Detail', value: text(row.status_detail) },
+			{ label: 'Last scan', value: datetime(row.carrier_updated_at) },
+			{ label: 'Tracking error', value: text(row.tracking_error) },
 			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
@@ -806,6 +843,10 @@ export async function getRecord(
 			const row = await getOrder(supabase, orgId, id);
 			return row && describeOrder(row, canOpen);
 		}
+		case 'shipment': {
+			const row = await getShipment(supabase, orgId, id);
+			return row && describeShipment(row, canOpen);
+		}
 		case 'purchase': {
 			const row = await getPurchase(supabase, orgId, id);
 			return row && describePurchase(row, canOpen);
@@ -883,6 +924,11 @@ export async function listRecordNames(
 			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
 		case 'order':
 			return (await listOrders(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'shipment':
+			return (await listShipments(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: row.tracking_number ?? 'Untracked shipment'
+			}));
 		case 'purchase':
 			return (await listPurchases(supabase, orgId)).map((row) => ({
 				id: row.id,

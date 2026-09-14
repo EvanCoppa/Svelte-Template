@@ -29,6 +29,7 @@ export const FEATURE_IDS = [
 	// Commerce: what a customer asked for, what you shelve, what you knock off
 	// it, and what comes back.
 	'orders',
+	'shipments',
 	'featured-groups',
 	'categories',
 	'coupons',

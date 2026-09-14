@@ -57,6 +57,7 @@ import { listPipelines } from './crm/pipelines';
 import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
 import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
 import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
+import { deleteShipment } from './crm/shipments';
 import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
 import {
 	createProperty,
@@ -396,6 +397,11 @@ async function removeRecord(
 			return deleteCoupon(supabase, orgId, id);
 		case 'order':
 			return deleteOrder(supabase, orgId, id);
+		// A shipment is deletable but not creatable or editable through the
+		// generic form: `order_id` is not null and insert-only, so a box is
+		// packed on the order it ships.
+		case 'shipment':
+			return deleteShipment(supabase, orgId, id);
 		case 'purchase':
 			return deletePurchase(supabase, orgId, id);
 		case 'rma':

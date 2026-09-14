@@ -259,6 +259,27 @@ export const LINE_FULFILLMENT_TONE = {
 } satisfies Record<Enums<'line_fulfillment_status'>, BadgeTone>;
 
 /**
+ * Where the carrier last saw the box. Mirrors what carrier APIs actually
+ * report, unhappy paths included — a shipment that failed or went back to
+ * sender is a thing that happens, and having no value for it is how one ends
+ * up `unknown` forever. `preparing` is the one value that is ours: the box
+ * exists in the warehouse before any carrier has heard of it.
+ */
+export const SHIPMENT_DELIVERY_TONE = {
+	preparing: 'neutral',
+	pending: 'neutral',
+	pre_transit: 'info',
+	in_transit: 'info',
+	out_for_delivery: 'info',
+	available_for_pickup: 'warning',
+	delivered: 'success',
+	return_to_sender: 'warning',
+	failed: 'error',
+	cancelled: 'error',
+	unknown: 'neutral'
+} satisfies Record<Enums<'shipment_delivery_status'>, BadgeTone>;
+
+/**
  * What a purchase order is doing. Only two of these are acts a person takes —
  * placing it and cancelling it; the three in between are DERIVED from how
  * much of each line has arrived (`refresh_purchase_rollups()`), which is why

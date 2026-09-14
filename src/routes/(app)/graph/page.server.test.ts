@@ -115,6 +115,7 @@ function mock() {
 		deals: { data: [] },
 		orders: { data: [] },
 		proposals: { data: [] },
+		shipments: { data: [] },
 		purchases: { data: [] },
 		relationship_types: { data: [] },
 		invoices: { data: [] },

@@ -35,6 +35,7 @@ export const RECORD_KINDS = [
 	'proposal',
 	'invoice',
 	'order',
+	'shipment',
 	'purchase',
 	'rma',
 	'task',
@@ -69,6 +70,10 @@ export const RECORD_KIND_META = {
 	proposal: { feature: 'proposals', segment: 'proposals' },
 	invoice: { feature: 'invoices', segment: 'invoices' },
 	order: { feature: 'orders', segment: 'orders' },
+	// A shipment is the one kind the generic record form cannot create: its
+	// `order_id` is not null and insert-only, so a box is packed on the order
+	// it ships — the "creation is genuinely special" exception in CLAUDE.md.
+	shipment: { feature: 'shipments', segment: 'shipments' },
 	purchase: { feature: 'purchases', segment: 'purchases' },
 	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },

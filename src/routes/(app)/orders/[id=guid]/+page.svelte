@@ -8,6 +8,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ShoppingCartIcon from '@lucide/svelte/icons/shopping-cart';
 	import SplitIcon from '@lucide/svelte/icons/split';
+	import TruckIcon from '@lucide/svelte/icons/truck';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import EditRecord from '$lib/components/edit-record.svelte';
 	import * as Modal from '$lib/components/modal/index.js';
@@ -24,7 +25,13 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { isCarrierOwned, LINE_FULFILLMENT_STATUSES } from '$lib/crm/orders';
 	import { recordTerms } from '$lib/crm/records';
-	import { FULFILLMENT_STATE_TONE, LINE_FULFILLMENT_TONE, ORDER_STATUS_TONE } from '$lib/crm/tones';
+	import { deliveryLabel } from '$lib/crm/shipments';
+	import {
+		FULFILLMENT_STATE_TONE,
+		LINE_FULFILLMENT_TONE,
+		ORDER_STATUS_TONE,
+		SHIPMENT_DELIVERY_TONE
+	} from '$lib/crm/tones';
 	import { QUERY } from '$lib/queries';
 	import { capitalize } from '$lib/utils.js';
 	import {
@@ -210,6 +217,12 @@
 		}
 	});
 
+	const { submitting: shipping, enhance: shipEnhance } = superForm(data.shipForm, {
+		id: 'ship-order',
+		invalidateAll: false
+		// No `onUpdated`: the action redirects to the box it opened.
+	});
+
 	const {
 		message: actMessage,
 		submitting: acting,
@@ -289,6 +302,14 @@
 				<form method="POST" action="?/confirm" use:actEnhance>
 					<Button type="submit" disabled={$acting}>
 						{$acting ? 'Confirming…' : 'Confirm order'}
+					</Button>
+				</form>
+			{/if}
+			{#if data.canShip}
+				<form method="POST" action="?/ship" use:shipEnhance>
+					<Button type="submit" variant="outline" disabled={$shipping}>
+						<TruckIcon />
+						{$shipping ? 'Opening…' : 'Ship this order'}
 					</Button>
 				</form>
 			{/if}
@@ -413,6 +434,45 @@
 			<FormAlert message={$statusMessage} class="mx-6 mb-4" />
 		</Card.Content>
 	</Card.Root>
+
+	<!-- What has left against this order. A box is opened from the button
+	     above and packed on its own page. -->
+	{#if data.shipments.length > 0}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Shipments</Card.Title>
+				<Card.Description>
+					Each box carries whole lines, and its carrier status is what moves them.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="p-0">
+				<ul class="divide-border divide-y">
+					{#each data.shipments as shipment (shipment.id)}
+						<li class="flex flex-wrap items-center gap-3 px-6 py-4">
+							{#if data.canOpenShipment}
+								<a href="/shipments/{shipment.id}" class="font-medium hover:underline">
+									{shipment.tracking_number ?? 'Untracked shipment'}
+								</a>
+							{:else}
+								<span class="font-medium">
+									{shipment.tracking_number ?? 'Untracked shipment'}
+								</span>
+							{/if}
+							{#if shipment.carrier}
+								<span class="text-muted-foreground text-xs">{shipment.carrier}</span>
+							{/if}
+							<StatusBadge tone={SHIPMENT_DELIVERY_TONE[shipment.delivery_status]}>
+								{deliveryLabel(shipment.delivery_status)}
+							</StatusBadge>
+							<span class="text-muted-foreground ms-auto text-xs">
+								{shipment.ship_date ?? '—'}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	{#if data.order.notes}
 		<Card.Root>
