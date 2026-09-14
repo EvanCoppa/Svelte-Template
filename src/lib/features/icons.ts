@@ -17,6 +17,7 @@ import MailIcon from '@lucide/svelte/icons/mail';
 import MapIcon from '@lucide/svelte/icons/map';
 import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
+import PencilRulerIcon from '@lucide/svelte/icons/pencil-ruler';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import ShieldIcon from '@lucide/svelte/icons/shield';
@@ -55,6 +56,7 @@ export const ICONS = {
 	map: MapIcon,
 	'map-pin': MapPinIcon,
 	package: PackageIcon,
+	'pencil-ruler': PencilRulerIcon,
 	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
 	shield: ShieldIcon,
