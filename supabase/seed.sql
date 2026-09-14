@@ -1315,9 +1315,9 @@ insert into public.organization_members (org_id, user_id, role) values
 	('10000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000002', 'member')
 on conflict (org_id, user_id) do nothing;
 
---   Keystone Payments:         dev = Sales Rep; e2e = Merchant Support
+--   Keystone Payments:         dev = Sales Representative; e2e = Merchant Support
 --   Cobalt Merchant Services:  e2e = Viewer
--- Sales Rep is the interesting one to sign in as: it manages merchants,
+-- Sales Representative is the interesting one to sign in as: it manages merchants,
 -- applications and rate proposals but only reads the fee schedule, so
 -- /billables opens read-only and its "Add fee" button is not rendered.
 insert into public.member_roles (org_id, user_id, role_id) values

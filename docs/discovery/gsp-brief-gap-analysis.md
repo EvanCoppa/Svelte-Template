@@ -327,10 +327,10 @@ All of this is rows — one migration, no behaviour change:
 - **Vocabulary**: `proposal_presenter` → "Sales rep" and `proposal_responsible` →
   "Onboarding owner" are what the handoff fields in module 12 actually say. Worth one
   question rather than a guess (below).
-- **A Prospector rung** (`…0007-000000000007`) for Cody: manage companies, contacts,
+- **A Business Development Representative rung** (`…0007-000000000007`) for Cody: manage companies, contacts,
   calendar and tasks; read deals; no proposals.
-- **Davey's rung** already exists as Onboarding Coordinator and needs `tickets: manage`
-  added once PCI and the onboarding queue land.
+- **Merchant Onboarding and Support Specialist** (`…0007-000000000008`) covers Davey's combined onboarding, installation, merchant-support and PCI follow-through responsibilities; the existing split roles remain available.
+- **An Account Executive rung** (`…0007-000000000009`) distinguishes senior sellers who own the full cycle and commercial setup from standard Sales Representatives.
 - **`invoices` and `ledger` stay hidden.** The brief never bills a merchant — the hardware
   recoup flag is a commission field, not an invoice. That absence is now confirmed rather
   than assumed.
