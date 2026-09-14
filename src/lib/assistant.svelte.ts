@@ -124,6 +124,56 @@ function createOpenThreads() {
 export const openThreads = createOpenThreads();
 
 /**
+ * Whether the sources rail beside the conversation is shown. The reader's own
+ * choice for this tab — closed with the panel's own ×, reopened from the
+ * button the header shows in its place — kept in `sessionStorage` like
+ * `openThreads` above and for the same reason: this tab's own, gone the
+ * moment it is.
+ */
+const SOURCES_KEY = 'assistant:sources-open';
+
+function createSourcesPanel() {
+	let open = $state<boolean>(read());
+
+	function read(): boolean {
+		if (!browser) return true;
+		try {
+			const raw = sessionStorage.getItem(SOURCES_KEY);
+			return raw === null ? true : raw === '1';
+		} catch {
+			// Cleared, blocked or corrupt storage reads as "shown", the default.
+			return true;
+		}
+	}
+
+	function save() {
+		if (!browser) return;
+		try {
+			sessionStorage.setItem(SOURCES_KEY, open ? '1' : '0');
+		} catch {
+			// A private window can refuse to store; the toggle still works for this visit.
+		}
+	}
+
+	return {
+		/** Whether the rail is shown right now. */
+		get open() {
+			return open;
+		},
+		close() {
+			open = false;
+			save();
+		},
+		show() {
+			open = true;
+			save();
+		}
+	};
+}
+
+export const sourcesPanel = createSourcesPanel();
+
+/**
  * The conversation on screen, as whatever is drawn beside it needs to read
  * it. The thread lives in the SDK `Chat` that `Assistant.Root` owns, and the
  * context rail the `(app)` layout mounts is not inside that page — so Root

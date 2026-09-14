@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { sourcesOf, type Source } from '$lib/ai/sources';
-	import { assistantThread } from '$lib/assistant.svelte';
+	import { assistantThread, sourcesPanel } from '$lib/assistant.svelte';
 	import * as ContextPanel from '$lib/components/context-panel/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { RECORD_KIND_META, recordHref, recordTerms } from '$lib/crm/records';
 	import { iconFor } from '$lib/features/icons';
 	import { iconForPath } from '$lib/navigation';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	/**
 	 * What the assistant's answers drew on, as a rail of the shell rather than
@@ -60,6 +62,10 @@
 		<ContextPanel.Title>Sources</ContextPanel.Title>
 		<ContextPanel.Actions>
 			<span class="text-xs tabular-nums">{total}</span>
+			<Button variant="ghost" size="icon" class="size-6" onclick={() => sourcesPanel.close()}>
+				<XIcon class="size-4" />
+				<span class="sr-only">Close sources</span>
+			</Button>
 		</ContextPanel.Actions>
 	</ContextPanel.Header>
 	<ContextPanel.Body>

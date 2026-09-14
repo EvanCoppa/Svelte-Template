@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { sourcesPanel } from '$lib/assistant.svelte';
 	import AssistantTabs from '$lib/components/assistant-tabs.svelte';
 	import Breadcrumbs from '$lib/components/breadcrumbs.svelte';
 	import * as Notifications from '$lib/components/notifications/index.js';
@@ -11,6 +12,7 @@
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MoonIcon from '@lucide/svelte/icons/moon';
+	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
 	import SunIcon from '@lucide/svelte/icons/sun';
 
 	const sidebar = useSidebar();
@@ -94,11 +96,28 @@
 					<SunIcon size={16} />
 				{/if}
 			</button>
-			<form method="POST" action="/logout" style="display: contents;">
-				<button type="submit" class="icon-btn" aria-label="Log out">
-					<LogOutIcon size={16} />
-				</button>
-			</form>
+			{#if inAssistant}
+				<!-- The assistant docks the sources rail here instead of a log-out
+				     button: closing the rail (its own ×) needs a way back, and this
+				     is that way — shown only while the rail is closed, since the ×
+				     is right there on the rail itself once it's open. -->
+				{#if !sourcesPanel.open}
+					<button
+						type="button"
+						class="icon-btn"
+						aria-label="Show sources"
+						onclick={() => sourcesPanel.show()}
+					>
+						<PanelRightOpenIcon size={16} />
+					</button>
+				{/if}
+			{:else}
+				<form method="POST" action="/logout" style="display: contents;">
+					<button type="submit" class="icon-btn" aria-label="Log out">
+						<LogOutIcon size={16} />
+					</button>
+				</form>
+			{/if}
 		</div>
 	</div>
 </header>
