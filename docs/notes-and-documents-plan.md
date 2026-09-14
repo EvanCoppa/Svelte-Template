@@ -1,10 +1,19 @@
 # Notes, Documents and Records — the plan
 
-> **Status: a plan, not a description.** Everything in [notes.md](notes.md) is built;
-> everything below the "What exists today" section is not. This file is the agreed
-> shape, the decisions that were already made, and the order to build in. It becomes
-> `docs/documents.md` (and amendments to `notes.md`) as the phases land, and it should
-> be deleted when the last one does — a plan that outlives its work turns into folklore.
+> **Status: partly built.** Phase 1a (the scratch pad), Phase 2 (the enum) and Phase 3
+> (documents) have landed, and Phase 4's promotion half has not. What is built is
+> described in [documents.md](documents.md) — read that first; this file is now only the
+> phases that remain: **1b** (the `::` command registry and the wider `/` palette in
+> notes), **4** (`::create-page`, the `/view` embed block), **5** (local autocomplete),
+> **6** (dictation) and **7** (cloud commands). Delete this file when the last one lands
+> — a plan that outlives its work turns into folklore.
+>
+> Two decisions below were overtaken by the build and documents.md is the truth on both:
+> the route is **`/documents`**, not `/docs`; and a document **is** a `RECORD_KINDS`
+> entry (Decision 3's last bullet said it would not be), because it earns the list, the
+> terms, the graph node and the generic create form for nothing and still keeps its own
+> screen — a static segment outranks the matcher. Decision 4's `@` half is built as
+> described; the `/` and `::` halves are not.
 
 ## The one idea
 

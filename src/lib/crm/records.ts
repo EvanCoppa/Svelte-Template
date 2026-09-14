@@ -40,7 +40,12 @@ export const RECORD_KINDS = [
 	'rma',
 	'task',
 	'ticket',
-	'visit'
+	'visit',
+	// The one kind whose page is an editor rather than the generic record
+	// page: a document IS its body, so `(app)/documents/[id=guid]/` outranks
+	// the matcher. Everything else about being a kind — the list, the terms,
+	// the graph node, the create form — it gets for free.
+	'document'
 ] as const satisfies readonly Enums<'crm_entity_type'>[];
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
@@ -79,8 +84,18 @@ export const RECORD_KIND_META = {
 	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },
 	ticket: { feature: 'tickets', segment: 'tickets' },
-	visit: { feature: 'visits', segment: 'visits' }
+	visit: { feature: 'visits', segment: 'visits' },
+	document: { feature: 'documents', segment: 'documents' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;
+
+/**
+ * One record as a single string: `<kind>:<id>`. The general form of the key
+ * `visitSubjectKey()` and `proposalParentKey()` each spell for their own kind
+ * — used wherever records of several kinds share one lookup map.
+ */
+export function recordKey(kind: string, id: string): string {
+	return `${kind}:${id}`;
+}
 
 /** Whether a string names a record kind — an entity type read off a row, say. */
 export function isRecordKind(value: string): value is RecordKind {

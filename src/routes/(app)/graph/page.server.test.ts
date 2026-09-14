@@ -122,7 +122,8 @@ function mock() {
 		rmas: { data: [] },
 		tasks: { data: [] },
 		support_tickets: { data: [] },
-		visits: { data: [] }
+		visits: { data: [] },
+		documents: { data: [] }
 	});
 }
 

@@ -53,6 +53,7 @@ export const RECORD_TYPES = [
 	'rma',
 	'task',
 	'ticket',
+	'document',
 	'visit'
 ] as const;
 
@@ -530,6 +531,23 @@ export const deleteRecordSchema = z.object({ id: z.guid() });
  */
 type RecordSchemas = { [K in RecordType]: z.ZodType<RecordFormValues> };
 
+/**
+ * A page is a title and, if you like, an emoji — and nothing else, because
+ * everything else about a page is its body, which is the editor's. This is
+ * therefore the thinnest entry in the registry on purpose: the modal exists
+ * to name the thing, and the writing starts on the next screen.
+ */
+export const documentRecordSchema = z.object({
+	title: z
+		.string()
+		.trim()
+		.min(1, 'A page needs a name.')
+		.max(200, 'A name is 200 characters or fewer.'),
+	// One emoji, the way a Notion page wears one. Not validated as an emoji:
+	// the column caps the length and anything else is the author's business.
+	icon: z.string().trim().max(16, 'One character or emoji is enough.').default('')
+});
+
 export const RECORD_SCHEMAS: RecordSchemas = {
 	company: companyRecordSchema,
 	contact: contactRecordSchema,
@@ -546,7 +564,8 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	rma: rmaRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema,
-	visit: visitRecordSchema
+	visit: visitRecordSchema,
+	document: documentRecordSchema
 };
 
 /** One vocabulary, shared by tasks and tickets (the `priority` enum). */
@@ -756,6 +775,14 @@ export const RECORD_FORMS: RecordFormRegistry = {
 				placeholder: 'Shown on the invoice',
 				wide: true
 			}
+		]
+	},
+	document: {
+		feature: 'documents',
+		query: QUERY.documents,
+		fields: [
+			{ name: 'title', label: 'Name', type: 'text', placeholder: 'Account strategy' },
+			{ name: 'icon', label: 'Icon', type: 'text', placeholder: '📄' }
 		]
 	},
 	coupon: {

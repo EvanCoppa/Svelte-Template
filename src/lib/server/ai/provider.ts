@@ -25,6 +25,7 @@ import {
 	type OpenAIProvider
 } from '@ai-sdk/openai';
 import type {
+	EmbeddingModel,
 	Experimental_RealtimeFactoryGetTokenResult as RealtimeToken,
 	Experimental_RealtimeSessionConfig as RealtimeSessionConfig,
 	LanguageModel
@@ -43,6 +44,26 @@ export const DEFAULT_REALTIME_MODEL_ID = 'gpt-realtime-2.1';
 
 /** The voice a call speaks in when `AI_REALTIME_VOICE` is not set. */
 export const DEFAULT_VOICE = 'marin';
+
+/**
+ * The model that turns a passage into a vector when `AI_EMBEDDING_MODEL` is
+ * not set. A different model from the one that answers typing, so it is its
+ * own setting — and a much cheaper one, which is what makes indexing every
+ * page affordable.
+ */
+export const DEFAULT_EMBEDDING_MODEL_ID = 'text-embedding-3-small';
+
+/**
+ * The width of a vector, and therefore of the `content_chunks.embedding`
+ * column — a fact the SCHEMA owns, not a setting.
+ *
+ * `text-embedding-3-small` produces this natively, and
+ * `text-embedding-3-large` produces it when asked (`dimensions` below), so
+ * `AI_EMBEDDING_MODEL` can move between them with no migration. A model with
+ * a different native width needs one, and the content_chunks migration says
+ * what that costs.
+ */
+export const EMBEDDING_DIMENSIONS = 1536;
 
 /**
  * How long a minted client secret stays usable. The browser connects with it
@@ -65,6 +86,7 @@ export interface AiEnv {
 	AI_MODEL?: string | undefined;
 	AI_REALTIME_MODEL?: string | undefined;
 	AI_REALTIME_VOICE?: string | undefined;
+	AI_EMBEDDING_MODEL?: string | undefined;
 	[key: string]: string | undefined;
 }
 
@@ -100,6 +122,11 @@ export function realtimeVoice(source: AiEnv = env): string {
 	return (source.AI_REALTIME_VOICE ?? '').trim() || DEFAULT_VOICE;
 }
 
+/** The embedding model in use — also stored on every row it writes. */
+export function embeddingModelId(source: AiEnv = env): string {
+	return (source.AI_EMBEDDING_MODEL ?? '').trim() || DEFAULT_EMBEDDING_MODEL_ID;
+}
+
 /**
  * What OpenAI's Responses API is asked for on every call, as the SDK's
  * namespaced `providerOptions` — the one place a setting of the API rather
@@ -130,6 +157,17 @@ export function openaiCallOptions({
 	return options;
 }
 
+/**
+ * What the embeddings endpoint is asked for, as the SDK's namespaced
+ * `providerOptions`. One setting, and it is the one that keeps the column
+ * width a schema fact rather than a deployment surprise: every model is asked
+ * for `EMBEDDING_DIMENSIONS`, so swapping `text-embedding-3-small` for
+ * `-large` changes quality and price and nothing else.
+ */
+export function embeddingCallOptions() {
+	return { openai: { dimensions: EMBEDDING_DIMENSIONS } };
+}
+
 let cached: { apiKey: string; provider: OpenAIProvider } | null = null;
 
 /** One provider instance per key; a key change (tests, rotation) rebuilds it. */
@@ -150,6 +188,21 @@ export function chatModel(source: AiEnv = env): LanguageModel {
 		throw new Error('The assistant is not configured. Set OPENAI_API_KEY.');
 	}
 	return provider(config.apiKey)(config.modelId);
+}
+
+/**
+ * The embedding model, for indexing passages and for turning a question into
+ * the vector that finds them. Throws when unconfigured, like `chatModel()` —
+ * but unlike the assistant, retrieval has somewhere to fall back to, so its
+ * callers check `isAiConfigured()` and search by text instead of answering
+ * 503 (docs/retrieval.md).
+ */
+export function embeddingModel(source: AiEnv = env): EmbeddingModel {
+	const config = aiConfig(source);
+	if (!config) {
+		throw new Error('Embeddings are not configured. Set OPENAI_API_KEY.');
+	}
+	return provider(config.apiKey).embeddingModel(embeddingModelId(source));
 }
 
 /**

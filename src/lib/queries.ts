@@ -49,6 +49,8 @@ export const QUERY = {
 	leases: 'app:leases',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
+	/** The org's pages — the list, the tree beside the editor, and a record's own. */
+	documents: 'app:documents',
 	/** The bell's inbox — reading, dismissing or restoring one changes it. */
 	notifications: 'app:notifications',
 	tasks: 'app:tasks',

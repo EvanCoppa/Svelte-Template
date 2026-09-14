@@ -239,6 +239,9 @@ describe('getRecord', () => {
 		support_tickets: { data: [] },
 		relationships: { data: [wayneAssignedToDev] },
 		activities: { data: [activity] },
+		// Nothing has been written about this company yet. Every record now
+		// opens with its backlinks, so every record's mock needs this table.
+		entity_references: { data: [] },
 		profiles: { data: [{ id: USER_ID, display_name: 'Dev Example', email: 'dev@example.com' }] },
 		terms: { data: terms }
 	};

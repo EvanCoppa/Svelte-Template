@@ -3,7 +3,8 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import { couponDiscountText } from '$lib/crm/coupons';
 import { recommendedOption } from '$lib/crm/proposals';
 import { leaseName } from '$lib/crm/leases';
-import { recordHref, type RecordKind } from '$lib/crm/records';
+import { isRecordKind, recordHref, recordKey, type RecordKind } from '$lib/crm/records';
+import { documentTitle } from '$lib/crm/documents';
 import {
 	isVisitSubjectKind,
 	visitName,
@@ -42,6 +43,8 @@ import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import { getCoupon, listCoupons, type Coupon } from './coupons';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
+import { getDocument, listDocuments, type Document as DocumentRow } from './documents';
+import { listMentioningDocuments } from './references';
 import { getLease, listLeases, type LeaseWithParties } from './leases';
 import { getProperty, isUnit, listProperties, type Property } from './properties';
 import {
@@ -545,6 +548,42 @@ export function describeLease(row: LeaseWithParties, canOpen: CanOpen): RecordDe
 	};
 }
 
+/** What a document is about, resolved: the kind, the id and the name at the other end. */
+export type DocumentSubject = { kind: RecordKind; id: string; name: string };
+
+/**
+ * A page as a record. It has its own screen — a document IS its body, so
+ * `(app)/documents/[id=guid]/` outranks the generic matcher — but being a
+ * kind still means being nameable, graphable and reachable by the assistant,
+ * and this is what answers those.
+ *
+ * Its own words are deliberately absent: what a page is CALLED is its
+ * feature's terms as the industry says them, and the title is the row's.
+ */
+export function describeDocument(
+	row: DocumentRow,
+	subject: DocumentSubject | null,
+	parent: { id: string; name: string } | null,
+	canOpen: CanOpen
+): RecordDetail {
+	return {
+		kind: 'document',
+		id: row.id,
+		name: documentTitle(row),
+		pills: row.archived_at ? [pill('archived', 'neutral')] : [],
+		fields: [
+			// What it is about, and what it sits inside — the two links a page
+			// has that are its own rather than something its prose mentioned.
+			{ label: 'About', value: subject ? record(subject.kind, subject, canOpen) : EMPTY },
+			{ label: 'Inside', value: record('document', parent, canOpen) },
+			{ label: 'Last edited', value: datetime(row.updated_at) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
 export function describeBillable(row: Billable): RecordDetail {
 	const pills: Pill[] = [];
 	// Featured is the exception worth a pill: it is on every option's checklist.
@@ -928,6 +967,20 @@ export async function getRecord(
 			const row = await getVisit(supabase, orgId, id);
 			return row && describeVisit(row, await resolveVisitSubject(supabase, orgId, row), canOpen);
 		}
+		case 'document': {
+			const row = await getDocument(supabase, orgId, id);
+			if (!row) return null;
+			const [subject, parent] = await Promise.all([
+				resolveDocumentSubject(supabase, orgId, row, canOpen),
+				row.parent_id ? getDocument(supabase, orgId, row.parent_id) : Promise.resolve(null)
+			]);
+			return describeDocument(
+				row,
+				subject,
+				parent && { id: parent.id, name: documentTitle(parent) },
+				canOpen
+			);
+		}
 	}
 }
 
@@ -1015,6 +1068,13 @@ export async function listRecordNames(
 				name: visitName(subjects.get(visitSubjectKey(row.entity_type, row.entity_id))?.name)
 			}));
 		}
+		case 'document':
+			// Named the way every surface names one: its title, or the first
+			// words in it when it has none.
+			return (await listDocuments(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: documentTitle(row)
+			}));
 	}
 }
 
@@ -1127,6 +1187,64 @@ export async function resolveVisitSubjects(
 	for (const row of deals) put('deal', row.id, row.title);
 	for (const row of properties) put('property', row.id, row.name);
 	for (const row of assets) put('asset', row.id, row.name);
+	return subjects;
+}
+
+/**
+ * What one page is about, named through the kind's own list module.
+ *
+ * Goes through `listRecordNames()` — the one namer — rather than a switch of
+ * its own, so a page's subject reads exactly as that record's own page titles
+ * it, and a kind added later is covered with no edit here. `canOpen` is asked
+ * FIRST: a kind the reader's feature gate hides is never fetched, so a page
+ * about a deal in a feature you lack shows no name rather than a leak.
+ *
+ * The cost is one list read per kind present, which is what the graph page
+ * already pays for the same guarantee. A page is about at most one record, so
+ * that is one read.
+ */
+export async function resolveDocumentSubject(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	document: Pick<DocumentRow, 'entity_type' | 'entity_id'>,
+	canOpen: CanOpen
+): Promise<DocumentSubject | null> {
+	const kind = document.entity_type;
+	const id = document.entity_id;
+	if (!kind || !id || !isRecordKind(kind) || !canOpen(kind)) return null;
+	const named = (await listRecordNames(supabase, orgId, kind)).find((row) => row.id === id);
+	return named ? { kind, id, name: named.name } : null;
+}
+
+/**
+ * What many pages are about, one list read per kind present rather than one
+ * per row — the list page's version of `resolveDocumentSubject()`, keyed by
+ * `recordKey()`.
+ */
+export async function resolveDocumentSubjects(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	rows: readonly Pick<DocumentRow, 'entity_type' | 'entity_id'>[],
+	canOpen: CanOpen
+): Promise<ReadonlyMap<string, DocumentSubject>> {
+	const wanted = new Map<RecordKind, Set<string>>();
+	for (const row of rows) {
+		const kind = row.entity_type;
+		if (!kind || !row.entity_id || !isRecordKind(kind) || !canOpen(kind)) continue;
+		const ids = wanted.get(kind) ?? new Set<string>();
+		ids.add(row.entity_id);
+		wanted.set(kind, ids);
+	}
+
+	const subjects = new Map<string, DocumentSubject>();
+	await Promise.all(
+		[...wanted].map(async ([kind, ids]) => {
+			for (const named of await listRecordNames(supabase, orgId, kind)) {
+				if (!ids.has(named.id)) continue;
+				subjects.set(recordKey(kind, named.id), { kind, id: named.id, name: named.name });
+			}
+		})
+	);
 	return subjects;
 }
 
@@ -1258,6 +1376,20 @@ function relatedTask(row: Task): RelatedRecord {
 }
 
 /** A unit under the building on screen. Its meta is what makes a unit a unit. */
+/**
+ * One page in a backlink group. No pill: a page has no lifecycle to wear —
+ * it is open or it is archived, and an archived one is not listed at all.
+ */
+function relatedDocument(row: DocumentRow): RelatedRecord {
+	return {
+		id: row.id,
+		name: documentTitle(row),
+		href: recordHref('document', row.id),
+		pill: null,
+		meta: `Edited ${mediumDate.format(new Date(row.updated_at))}`
+	};
+}
+
 function relatedProperty(row: Property): RelatedRecord {
 	const measurements = [
 		row.bedrooms === null ? null : `${row.bedrooms} bed`,
@@ -1327,6 +1459,16 @@ export async function listRelatedRecords(
 	id: string,
 	canOpen: CanOpen
 ): Promise<RelatedGroup[]> {
+	// Every kind gets this one, before the kind-specific groups below: the
+	// pages whose prose names this record. It is the same question whatever
+	// the record is — "what have we written about this?" — and it is the
+	// question the writing exists to make answerable.
+	const mentioned = canOpen('document')
+		? await listMentioningDocuments(supabase, orgId, { entityType: kind, entityId: id })
+		: [];
+	const mentions: RelatedGroup[] =
+		mentioned.length > 0 ? [{ kind: 'document', records: mentioned.map(relatedDocument) }] : [];
+
 	// A property's related records are its own: the units inside it, and the
 	// tenancies on it. Handled before the party check because a property is
 	// not a party — this is the tree and the rent roll, not the CRM graph.
@@ -1336,12 +1478,13 @@ export async function listRelatedRecords(
 			canOpen('lease') ? listLeases(supabase, orgId, { propertyId: id }) : Promise.resolve([])
 		]);
 		return [
+			...mentions,
 			{ kind: 'property' as const, records: units.map(relatedProperty) },
 			{ kind: 'lease' as const, records: leases.map(relatedLease) }
 		].filter((group) => group.records.length > 0);
 	}
 
-	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return [];
+	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return mentions;
 	const party =
 		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
 
@@ -1399,7 +1542,11 @@ export async function listRelatedRecords(
 			: null
 	]);
 
-	return groups.filter(
-		(group): group is RelatedGroup => group !== null && group.records.length > 0
-	);
+	// Backlinks lead, because "what have we written about this?" is the
+	// question a reader opens an account with — and because it is the one
+	// group every kind has, so it sits in the same place on every page.
+	return [
+		...mentions,
+		...groups.filter((group): group is RelatedGroup => group !== null && group.records.length > 0)
+	];
 }

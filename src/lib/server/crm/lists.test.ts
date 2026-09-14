@@ -18,7 +18,8 @@ const NO_EXTRAS: ListExtras = {
 	customValues: [],
 	proposalParents: new Map(),
 	memberNames: new Map(),
-	visitSubjects: new Map()
+	visitSubjects: new Map(),
+	documentSubjects: new Map()
 };
 
 const STEEL = '20000000-0000-0000-0000-000000000003';
@@ -159,7 +160,8 @@ describe('listNeeds', () => {
 			customValues: false,
 			proposalParents: false,
 			memberNames: false,
-			visitSubjects: false
+			visitSubjects: false,
+			documentSubjects: false
 		});
 		expect(
 			listNeeds({
@@ -174,7 +176,8 @@ describe('listNeeds', () => {
 			customValues: true,
 			proposalParents: false,
 			memberNames: false,
-			visitSubjects: false
+			visitSubjects: false,
+			documentSubjects: false
 		});
 	});
 
@@ -186,7 +189,8 @@ describe('listNeeds', () => {
 			customValues: false,
 			proposalParents: false,
 			memberNames: false,
-			visitSubjects: false
+			visitSubjects: false,
+			documentSubjects: false
 		});
 		expect(
 			listNeeds({
@@ -198,7 +202,8 @@ describe('listNeeds', () => {
 			customValues: false,
 			proposalParents: true,
 			memberNames: true,
-			visitSubjects: false
+			visitSubjects: false,
+			documentSubjects: false
 		});
 		// A 'contact' column means something else on a contact's own kind of list
 		// (the contact's company) — it must never trip the proposal-only needs.
@@ -207,7 +212,8 @@ describe('listNeeds', () => {
 			customValues: false,
 			proposalParents: false,
 			memberNames: false,
-			visitSubjects: false
+			visitSubjects: false,
+			documentSubjects: false
 		});
 	});
 });

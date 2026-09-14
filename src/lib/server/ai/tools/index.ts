@@ -21,6 +21,7 @@ import { listTickets, listTicketsAccess } from './list-tickets';
 import { packableLines, packableLinesAccess } from './packable-lines';
 import { searchCompanies, searchCompaniesAccess } from './search-companies';
 import { searchContacts, searchContactsAccess } from './search-contacts';
+import { searchDocuments, searchDocumentsAccess } from './search-documents';
 import { updateRecord, updateRecordAccess } from './update-record';
 
 /**
@@ -57,6 +58,7 @@ export const assistantTools = {
 	searchCompanies,
 	getCompany,
 	searchContacts,
+	searchDocuments,
 	addNote,
 	listTasks,
 	createTask,
@@ -83,6 +85,7 @@ export const TOOL_ACCESS = {
 	searchCompanies: searchCompaniesAccess,
 	getCompany: getCompanyAccess,
 	searchContacts: searchContactsAccess,
+	searchDocuments: searchDocumentsAccess,
 	addNote: addNoteAccess,
 	listTasks: listTasksAccess,
 	createTask: createTaskAccess,

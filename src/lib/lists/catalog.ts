@@ -317,6 +317,23 @@ export const LIST_FIELD_CATALOG = {
 		notes: text('Notes'),
 		created_at: created
 	},
+	document: {
+		name: text('Title'),
+		/**
+		 * What the page is about. `namedRecord` rather than `record`, because
+		 * the target's kind is whatever the writer attached it to — the column
+		 * is a role ("About"), not one kind's word.
+		 */
+		about: namedRecord('About'),
+		/** Who wrote it, by display name — filterable, so "my pages" is a click. */
+		author: text('Author'),
+		/**
+		 * For a page the interesting date is the last edit, not the birth,
+		 * which is why the migration ships this shown and `created_at` hidden.
+		 */
+		updated_at: datetime('Updated'),
+		created_at: created
+	},
 	rma: {
 		name: text('Number'),
 		company: record('company'),

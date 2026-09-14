@@ -25,6 +25,7 @@ import {
 	listRelatedRecords
 } from './records';
 import type { TaskWithParties } from './tasks';
+import type { Document as DocumentRow } from './documents';
 import { ORG_ID, supabaseMock, supabaseMockSequence, supabaseTablesMock } from './test-support';
 import type { TicketThread } from './tickets';
 
@@ -35,6 +36,22 @@ const STAMPS = {
 	created_at: '2026-09-01T09:00:00Z',
 	updated_at: '2026-09-02T09:00:00Z',
 	created_by: USER_ID
+};
+
+const DOCUMENT_ID = '40000000-0000-0000-0000-000000000001';
+
+/** A page, for the backlink group every kind now has. */
+const strategy: DocumentRow = {
+	id: DOCUMENT_ID,
+	org_id: ORG_ID,
+	parent_id: null,
+	entity_type: null,
+	entity_id: null,
+	title: 'Account strategy',
+	icon: null,
+	body: { version: 1, blocks: [] },
+	archived_at: null,
+	...STAMPS
 };
 
 const openAll = () => true;
@@ -786,7 +803,10 @@ describe('listRelatedRecords', () => {
 			rmas: { data: [damagedGloves] },
 			// A company with no tenancies: the group is dropped, so the six
 			// below are unchanged. A tenant's leases have their own test.
-			leases: { data: [] }
+			leases: { data: [] },
+			// Nothing has been written about this company yet. Every kind reads
+			// this now — backlinks are the one group they all have.
+			entity_references: { data: [] }
 		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);
@@ -890,12 +910,16 @@ describe('listRelatedRecords', () => {
 				}
 			]
 		};
-		const { supabase, from, builders } = supabaseTablesMock({ proposals: { data: [unpriced] } });
+		const { supabase, from, builders } = supabaseTablesMock({
+			proposals: { data: [unpriced] },
+			entity_references: { data: [] }
+		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'deal', contract.id, openAll);
 
 		expect(groups.map((g) => g.kind)).toEqual(['proposal']);
-		expect(from).toHaveBeenCalledTimes(1);
+		// The backlink read, then the proposals: every kind asks the first.
+		expect(from).toHaveBeenCalledTimes(2);
 		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_type', 'deal');
 		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_id', contract.id);
 		// Nothing recommended: the meta says how many there are to choose from.
@@ -905,11 +929,87 @@ describe('listRelatedRecords', () => {
 		});
 	});
 
-	it('has nothing to list for a kind nothing points at', async () => {
-		const { supabase, from } = supabaseMock({ data: [] });
+	it('has nothing to list for a kind nothing points at, beyond its backlinks', async () => {
+		const { supabase, from } = supabaseTablesMock({ entity_references: { data: [] } });
 
 		await expect(
 			listRelatedRecords(supabase, ORG_ID, 'product', fixings.id, openAll)
+		).resolves.toEqual([]);
+		// The one read a kind with no related records still makes: nothing else
+		// points at a product, but anything may have been written about one.
+		expect(from).toHaveBeenCalledWith('entity_references');
+		expect(from).not.toHaveBeenCalledWith('products');
+	});
+
+	it('leads a party\u2019s groups with the pages that name it', async () => {
+		const { supabase } = supabaseTablesMock({
+			contacts: { data: [lucius] },
+			deals: { data: [] },
+			proposals: { data: [] },
+			invoices: { data: [] },
+			tasks: { data: [] },
+			support_tickets: { data: [] },
+			rmas: { data: [] },
+			leases: { data: [] },
+			entity_references: {
+				data: [
+					{
+						id: 'ref-2',
+						org_id: ORG_ID,
+						source_type: 'document',
+						source_id: DOCUMENT_ID,
+						target_type: 'company',
+						target_id: COMPANY_ID,
+						kind: 'mention',
+						created_at: '2026-02-01T10:00:00Z'
+					}
+				]
+			},
+			documents: { data: [strategy] }
+		});
+
+		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);
+
+		// Backlinks first, then the kind's own groups — the same place on
+		// every record page, whichever kind it is.
+		expect(groups.map((g) => g.kind)).toEqual(['document', 'contact']);
+	});
+
+	it('lists the pages whose prose names a record, for a kind nothing else points at', async () => {
+		const { supabase } = supabaseTablesMock({
+			entity_references: {
+				data: [
+					{
+						id: 'ref-1',
+						org_id: ORG_ID,
+						source_type: 'document',
+						source_id: DOCUMENT_ID,
+						target_type: 'product',
+						target_id: fixings.id,
+						kind: 'mention',
+						created_at: '2026-02-01T10:00:00Z'
+					}
+				]
+			},
+			documents: { data: [strategy] }
+		});
+
+		const groups = await listRelatedRecords(supabase, ORG_ID, 'product', fixings.id, openAll);
+
+		expect(groups.map((g) => g.kind)).toEqual(['document']);
+		expect(groups[0].records[0]).toMatchObject({
+			id: DOCUMENT_ID,
+			name: 'Account strategy',
+			href: `/documents/${DOCUMENT_ID}`,
+			pill: null
+		});
+	});
+
+	it('asks for no backlinks at all when the reader cannot open a page', async () => {
+		const { supabase, from } = supabaseTablesMock({});
+
+		await expect(
+			listRelatedRecords(supabase, ORG_ID, 'product', fixings.id, (kind) => kind !== 'document')
 		).resolves.toEqual([]);
 		expect(from).not.toHaveBeenCalled();
 	});
