@@ -5,17 +5,32 @@
 	import { page } from '$app/state';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
+	import { isAvatarTone } from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import ProfilePhoto from './profile-photo.svelte';
 	import { profileSchema } from './schema';
 
 	let { data } = $props();
 
 	let user = $derived(page.data.user);
 
+	// Named the way the roster names a member: display name, else the email's
+	// local part — so the photo card never shows a blank or a uuid.
+	let name = $derived(data.profile?.display_name || user?.email?.split('@')[0] || 'You');
+	let initials = $derived(
+		name
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((part: string) => part.charAt(0))
+			.join('')
+			.toUpperCase() || 'U'
+	);
+
 	const { form, errors, message, constraints, submitting, enhance } = superForm(data.profileForm, {
+		id: 'profile',
 		validators: zod4Client(profileSchema),
 		resetForm: false,
 		onUpdated({ form }) {
@@ -29,6 +44,36 @@
 	<PageHeader.Root>
 		<PageHeader.Title />
 	</PageHeader.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Photo</Card.Title>
+			<Card.Description>
+				How you appear to everyone you share an organization with — the sidebar, the staff roster, a
+				notification you sent.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			{#if data.profile === null}
+				<p class="text-muted-foreground text-sm">
+					No profile row found. Apply the starter migration in
+					<code>supabase/migrations/</code> (see the README), then reload.
+				</p>
+			{:else if user}
+				<ProfilePhoto
+					userId={user.id}
+					{name}
+					{initials}
+					avatarUrl={data.profile?.avatar_url ?? null}
+					tone={isAvatarTone(data.profile?.avatar_tint) ? data.profile.avatar_tint : null}
+					gravatarUrl={data.gravatarUrl}
+					uploadForm={data.avatarUploadForm}
+					urlForm={data.avatarUrlForm}
+					initialsForm={data.avatarInitialsForm}
+				/>
+			{/if}
+		</Card.Content>
+	</Card.Root>
 
 	<Card.Root>
 		<Card.Header>

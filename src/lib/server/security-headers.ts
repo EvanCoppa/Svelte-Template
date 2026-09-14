@@ -66,6 +66,16 @@ export function buildContentSecurityPolicy(
 		// avatar demo — remove them along with it.
 		'https://github.com',
 		'https://avatars.githubusercontent.com',
+		// The two profile-photo sources that are not uploads: a generated
+		// avatar and a Gravatar (/settings/profile). Constants rather than
+		// deployment config because they are the app's own offer — the list
+		// the action validates a URL against is AVATAR_URL_HOSTS in
+		// src/routes/(app)/settings/profile/schema.ts, and the two move
+		// together. Images only: gravatar.com is probed from the server, so
+		// neither of these belongs in connect-src.
+		'https://api.dicebear.com',
+		'https://gravatar.com',
+		'https://secure.gravatar.com',
 		...mapOrigins,
 		...images
 	];

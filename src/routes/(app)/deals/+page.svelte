@@ -195,8 +195,10 @@
 		return null;
 	}
 
-	/** Who it is assigned to, named by the roster. A deal is one person's. */
-	function owner(deal: DealWithParties): { userId: string; name: string } | null {
+	/** Who it is assigned to, named and coloured by the roster. A deal is one person's. */
+	function owner(
+		deal: DealWithParties
+	): { userId: string; name: string; tint: string | null } | null {
 		if (!deal.assigned_to) return null;
 		const assigned = deal.assigned_to;
 		return data.members.find((member) => member.userId === assigned) ?? null;
@@ -379,7 +381,9 @@
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
 							<Avatar.Root {...props} class="size-6">
-								<Avatar.Fallback class="{avatarTint(assignee.userId)} text-[10px] font-medium">
+								<Avatar.Fallback
+									class="{avatarTint(assignee.userId, assignee.tint)} text-[10px] font-medium"
+								>
 									{initialsOf(assignee.name)}
 								</Avatar.Fallback>
 							</Avatar.Root>

@@ -99,7 +99,13 @@ export const load: PageServerLoad = async ({ locals, depends, url }) => {
 		// Named here the way the roster names a member, so a card and the staff
 		// page call the same person the same thing — and named only: a card has
 		// no use for a roster row's roles, email or avatar.
-		members: staff.map((member) => ({ userId: member.userId, name: memberName(member) })),
+		members: staff.map((member) => ({
+			userId: member.userId,
+			name: memberName(member),
+			// Carried so a chip wears the colour they chose on /settings/profile
+			// rather than a second, hashed one.
+			tint: member.avatarTint
+		})),
 		canMove,
 		moveForm: await superValidate(zod4(moveDealSchema), { id: MOVE_FORM_ID }),
 		...(await loadCreateRecord(locals, 'deal')),

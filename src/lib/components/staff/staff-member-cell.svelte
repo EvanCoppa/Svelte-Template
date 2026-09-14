@@ -21,7 +21,9 @@
 		{#if member.avatarUrl}
 			<Avatar.Image src={member.avatarUrl} alt="" />
 		{/if}
-		<Avatar.Fallback class="{Avatar.avatarTint(member.userId)} text-xs font-semibold">
+		<Avatar.Fallback
+			class="{Avatar.avatarTint(member.userId, member.avatarTint)} text-xs font-semibold"
+		>
 			{memberInitials(member)}
 		</Avatar.Fallback>
 	</Avatar.Root>

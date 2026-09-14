@@ -27,7 +27,8 @@ const rosterRow = (
 	profiles: {
 		display_name: displayName,
 		email: extra.email ?? `${displayName ?? 'x'}@example.com`,
-		avatar_url: null
+		avatar_url: null,
+		avatar_tint: null
 	},
 	member_roles: (extra.roles ?? []).map((r) => ({ roles: r }))
 });

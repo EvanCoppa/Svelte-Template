@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { User } from '@supabase/supabase-js';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -26,17 +27,30 @@
 		return typeof value === 'string' && value.trim() !== '';
 	}
 
+	// What the reader chose on /settings/profile, shipped by the (app) layout.
+	// It wins over user_metadata, which is only what an auth provider happened
+	// to know at signup and is never written again.
+	let profile = $derived(page.data.profile ?? null);
+
 	// Supabase stores optional profile fields in user_metadata; fall back to the
 	// email so the menu is never blank.
 	let displayName = $derived.by(() => {
-		const name = user?.user_metadata?.full_name ?? user?.user_metadata?.name;
+		const name =
+			profile?.display_name ?? user?.user_metadata?.full_name ?? user?.user_metadata?.name;
 		if (isNonBlankString(name)) return name;
 		return user?.email?.split('@')[0] ?? 'User';
 	});
 	let avatarUrl = $derived.by(() => {
-		const url = user?.user_metadata?.avatar_url;
+		const url = profile?.avatar_url ?? user?.user_metadata?.avatar_url;
 		return isNonBlankString(url) ? url : null;
 	});
+	// The colour they picked behind their initials. Without one, the sidebar
+	// keeps its own rainbow ring — the flourish that marks "this is you".
+	let tintClasses = $derived(
+		Avatar.isAvatarTone(profile?.avatar_tint) && user
+			? Avatar.avatarTint(user.id, profile.avatar_tint)
+			: 'rainbow-avatar text-foreground'
+	);
 	let initials = $derived(
 		displayName
 			.split(/\s+/)
@@ -54,8 +68,9 @@
 	}
 
 	const sidebar = useSidebar();
-	const fallbackClasses =
-		'rainbow-avatar rounded-full text-xs font-semibold uppercase tracking-wide text-foreground';
+	const fallbackClasses = $derived(
+		`${tintClasses} rounded-full text-xs font-semibold uppercase tracking-wide`
+	);
 </script>
 
 <Sidebar.Menu>

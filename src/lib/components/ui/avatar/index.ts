@@ -2,7 +2,7 @@ import Root from './avatar.svelte';
 import Image from './avatar-image.svelte';
 import Fallback from './avatar-fallback.svelte';
 
-export { avatarTint } from './avatar-tint.js';
+export { avatarTint, isAvatarTone, AVATAR_TONES, type AvatarTone } from './avatar-tint.js';
 
 export {
 	Root,

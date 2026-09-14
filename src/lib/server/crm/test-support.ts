@@ -124,6 +124,8 @@ export type StorageResult = {
 		error?: { message: string } | null;
 	};
 	remove?: { data?: unknown; error?: { message: string } | null };
+	/** The public URL `getPublicUrl()` hands back for any path. */
+	publicUrl?: string;
 };
 
 /**
@@ -148,6 +150,10 @@ export function storageMock(result: StorageResult = {}) {
 			data: null,
 			error: null,
 			...result.remove
+		})),
+		// Synchronous in storage-js, and it never fails: it only formats a URL.
+		getPublicUrl: vi.fn<(path: string) => { data: { publicUrl: string } }>((path) => ({
+			data: { publicUrl: result.publicUrl ?? `https://stack.test/storage/v1/object/public/${path}` }
 		}))
 	};
 	const from = vi.fn(() => bucket);
