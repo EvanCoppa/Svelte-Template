@@ -40,6 +40,17 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 				id: contact.id,
 				name: contact.name
 			}));
+		case 'tool-searchDocuments': {
+			// A passage's source is a page with a record page of its own, so the
+			// rail can offer it. The same page quoted three times is one source
+			// — `sourcesOf()` dedupes below.
+			const seen = new Set<string>();
+			return part.output.passages.flatMap((passage) => {
+				if (seen.has(passage.documentId)) return [];
+				seen.add(passage.documentId);
+				return [{ kind: 'document' as const, id: passage.documentId, name: passage.title }];
+			});
+		}
 		case 'tool-listTasks':
 			return part.output.tasks.map((task) => ({ kind: 'task', id: task.id, name: task.title }));
 		case 'tool-createTask':

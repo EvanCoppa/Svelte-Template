@@ -9,6 +9,7 @@ export const TOOL_LABELS = {
 	searchCompanies: { running: 'Searching companies', done: 'Searched companies' },
 	getCompany: { running: 'Opening the company record', done: 'Read the company record' },
 	searchContacts: { running: 'Searching contacts', done: 'Searched contacts' },
+	searchDocuments: { running: 'Reading what you have written', done: 'Read what you have written' },
 	addNote: { running: 'Adding a note', done: 'Added a note' },
 	listTasks: { running: 'Listing tasks', done: 'Listed tasks' },
 	createTask: { running: 'Creating a task', done: 'Created a task' },

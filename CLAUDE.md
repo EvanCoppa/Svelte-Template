@@ -442,6 +442,31 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   name it. Pictures live in a **private** bucket served back through the app, so the URL
   never expires and `img-src 'self'` covers it. Never a database block, never a per-page
   ACL, never a block type per industry.
+- **Retrieval is a second index over the same writing, and it is not per-feature**
+  (`content_chunks` migration + `src/lib/ai/chunks.ts` + `src/lib/server/crm/chunks.ts` +
+  `src/lib/server/ai/retrieval.ts` + the `searchDocuments` tool; docs/retrieval.md).
+  `entity_references` says what a page NAMES; `content_chunks` says what it SAYS —
+  passages of prose, embedded, so the assistant can answer "what did we agree about the
+  north elevation?" from the org's own words rather than from a column. **Not
+  `document_chunks`**: a chunk points at its source through the shared
+  `(crm_entity_type, entity_id)` link, so `crm_entity_exists()` validates it,
+  `on_crm_entity_gone()` cleans it up, and a note or a ticket thread joins retrieval with
+  a chunker and one `indexChunks()` call — never a migration. **A chunk is not a block**:
+  `chunkDocument()` gathers blocks under a character budget, breaks at headings and
+  prefixes the heading trail, so a passage read alone still says what it is about — and
+  that is deterministic code a model never does. **The write path never embeds**: a save
+  stores the TEXT and leaves `embedding` null, and the read path tops up what is pending
+  (capped) before searching — so typing costs nothing, a save never fails because a
+  provider is down, and the index heals itself with nothing scheduled to run. The
+  per-passage `content_hash` is what makes that cheap: editing one paragraph re-embeds one
+  paragraph. Search is `match_content_chunks` (cosine, HNSW, `security invoker` so RLS
+  keeps deciding) with a full-text fallback over the same rows, and the mode comes back
+  so the tool says how it found something — **retrieval works with no API key at all**.
+  The vector width (1536) is a SCHEMA fact, `embedding_model` is on every row because
+  comparing two models' vectors is nonsense Postgres cannot refuse, and
+  `embeddingCallOptions()` asks every model for that width so the two OpenAI models are
+  interchangeable. Never a rerank stage, a stored model-written summary, a job queue, or
+  chunks of record rows.
 - **The party model is two tables, split by what a row IS** (`crm_party_model`
   migration). `companies` are organizations you deal with — `relationship` says
   customer, supplier or partner, so a vendor is not a second table — and `contacts`

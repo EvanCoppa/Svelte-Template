@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { documentMentions, type DocumentMention } from '$lib/crm/documents';
 import type { Database, Enums, Tables } from '$lib/database.types';
+import { indexDocument } from './chunks';
 import { listDocuments, updateDocument, type Document, type DocumentEdit } from './documents';
 import type { CrmEntityRef } from './entity';
 import { unwrap } from './unwrap';
@@ -127,12 +128,23 @@ export async function setReferences(
 }
 
 /**
- * Saves a document and re-indexes what it mentions, in that order.
+ * Saves a document and rebuilds what it mentions and what it says, in that
+ * order.
  *
- * The order is the point: the writing lands first, so a failure in the
- * derived index can never cost somebody their page. Callers never write
- * `body` through `updateDocument()` directly — go through here, or the
- * backlinks quietly stop matching the prose.
+ * **The order is the point.** The writing lands first, so a failure in either
+ * derived index can never cost somebody their page — which is also why both
+ * are best effort here rather than allowed to throw. A missing backlink or an
+ * unsearchable paragraph is repaired by the next save; a save that reported
+ * failure over a body that is already stored is a person retyping work they
+ * did not lose.
+ *
+ * Callers never write `body` through `updateDocument()` directly — go through
+ * here, or the backlinks and the passages quietly stop matching the prose.
+ *
+ * The title matters to both: it is the root of every passage's heading trail,
+ * so renaming a page genuinely changes what its passages say and re-indexes
+ * them. That is rare, and the alternative — a passage that does not know
+ * which page it is from — is worse at exactly the moment retrieval is used.
  */
 export async function saveDocument(
 	supabase: SupabaseClient<Database>,
@@ -141,13 +153,27 @@ export async function saveDocument(
 	values: DocumentEdit
 ): Promise<Document> {
 	const document = await updateDocument(supabase, orgId, documentId, values);
-	if (values.body !== undefined) {
+	const rewritten = values.body !== undefined || values.title !== undefined;
+	if (!rewritten) return document;
+
+	try {
 		await setReferences(
 			supabase,
 			orgId,
 			{ entityType: 'document', entityId: documentId },
 			documentMentions(document.body)
 		);
+		// Text only — nothing here calls a model. The vectors are filled in by
+		// the first question asked afterwards ($lib/server/ai/retrieval.ts),
+		// which is what keeps typing free and a save independent of any
+		// provider being up.
+		await indexDocument(supabase, orgId, document);
+	} catch (cause) {
+		// Derived data, and the body is already stored. The next save rebuilds
+		// both, so the failure mode is "stale for a minute", never "lost" — but
+		// an index that never builds is a feature quietly not working, so it is
+		// logged rather than swallowed outright.
+		console.error('Could not rebuild the indexes for document %s:', documentId, cause);
 	}
 	return document;
 }

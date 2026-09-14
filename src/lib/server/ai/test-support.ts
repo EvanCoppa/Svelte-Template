@@ -27,7 +27,8 @@ const FEATURE_IDS = [
 	'calendar',
 	'graph',
 	'orders',
-	'shipments'
+	'shipments',
+	'documents'
 ] as const;
 
 function featureRow(id: string): Feature {

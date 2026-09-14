@@ -28,7 +28,8 @@ const METHODS = [
 	'order',
 	'limit',
 	'single',
-	'maybeSingle'
+	'maybeSingle',
+	'textSearch'
 ] as const;
 
 type BuilderMethod = (typeof METHODS)[number];
@@ -68,14 +69,23 @@ export function supabaseMock(result: QueryResult = {}) {
  * (the org context loader): one builder per table name, each with its own
  * result. A table not listed resolves to an empty result.
  */
-export function supabaseTablesMock(results: Record<string, QueryResult>) {
+export function supabaseTablesMock(
+	results: Record<string, QueryResult>,
+	/**
+	 * Results for `supabase.rpc(name, args)`, keyed by function name — the
+	 * door a Postgres function is called through, which `.from()` cannot
+	 * express (a vector search, say). A name not listed resolves empty.
+	 */
+	rpcResults: Record<string, QueryResult> = {}
+) {
 	const builders = Object.fromEntries(
 		Object.entries(results).map(([table, result]) => [table, makeBuilder(result)])
 	);
 	const from = vi.fn((table: string) => builders[table] ?? makeBuilder({}));
+	const rpc = vi.fn((name: string) => makeBuilder(rpcResults[name] ?? {}));
 	// SAFETY: see supabaseMock.
-	const supabase: SupabaseClient<Database> = { from } as never;
-	return { supabase, from, builders };
+	const supabase: SupabaseClient<Database> = { from, rpc } as never;
+	return { supabase, from, rpc, builders };
 }
 
 /**

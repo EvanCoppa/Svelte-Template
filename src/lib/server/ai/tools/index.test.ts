@@ -109,7 +109,10 @@ describe('activeToolNames — tools are linked to features', () => {
 					tasks: 'disabled',
 					tickets: 'disabled',
 					orders: 'disabled',
-					shipments: 'disabled'
+					shipments: 'disabled',
+					// A page is a record kind, so it has to go too for "no kind is
+					// open" to be true.
+					documents: 'disabled'
 				}
 			})
 		);

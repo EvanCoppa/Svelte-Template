@@ -101,7 +101,10 @@ describe('kind-addressed access', () => {
 			'order',
 			'shipment',
 			'task',
-			'ticket'
+			'ticket',
+			// A page is a record kind too, so the session block names it and the
+			// kind-addressed tools reach it (the documents migration).
+			'document'
 		]);
 	});
 });

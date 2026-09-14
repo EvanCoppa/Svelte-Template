@@ -599,6 +599,62 @@ export type Database = {
           },
         ]
       }
+      content_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          content_hash: string
+          created_at: string
+          embedded_at: string | null
+          embedding: string | null
+          embedding_model: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          org_id: string
+          search_text: unknown
+          updated_at: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          content_hash: string
+          created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          org_id: string
+          search_text?: unknown
+          updated_at?: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          content_hash?: string
+          created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          org_id?: string
+          search_text?: unknown
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_chunks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupons: {
         Row: {
           code: string
@@ -4389,6 +4445,23 @@ export type Database = {
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
+      }
+      match_content_chunks: {
+        Args: {
+          match_count?: number
+          match_kinds?: Database["public"]["Enums"]["crm_entity_type"][]
+          match_org: string
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          chunk_index: number
+          content: string
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          similarity: number
+        }[]
       }
     }
     Enums: {
