@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BADGE_TONES } from '$lib/components/ui/badge/badge-tones.js';
+import { instantField as instant } from '$lib/schemas/fields';
 import { recordRefField } from '$lib/schemas/record-ref';
 
 /**
@@ -11,19 +12,6 @@ import { recordRefField } from '$lib/schemas/record-ref';
  * instants and nothing else, so a gesture never overwrites a title someone
  * else is editing.
  */
-
-/**
- * An instant as the browser posts it — ISO with its offset — or the naive
- * wall-clock value a no-JS post carries, which the server reads as UTC
- * (`instant()` in `$lib/server/records`). Both fields take the same shape,
- * so the ordering check below compares like with like.
- */
-const instant = z
-	.string()
-	.trim()
-	.regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/, {
-		error: 'Choose a date and time.'
-	});
 
 const title = z
 	.string()

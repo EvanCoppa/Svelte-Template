@@ -25,7 +25,10 @@ export const TOOL_LABELS = {
 		running: 'Reading relationship types',
 		done: 'Read relationship types'
 	},
-	linkRecords: { running: 'Linking records', done: 'Linked records' }
+	linkRecords: { running: 'Linking records', done: 'Linked records' },
+	listRecords: { running: 'Building a list', done: 'Built a list' },
+	findOpenSlots: { running: 'Looking for free time', done: 'Found free time' },
+	packableLines: { running: 'Reading what is left to ship', done: 'Read what is left to ship' }
 } satisfies Record<AssistantToolName, { running: string; done: string }>;
 
 function isLabelled(name: string): name is keyof typeof TOOL_LABELS {

@@ -65,6 +65,23 @@ const answer: AssistantUIMessage = {
 			}
 		},
 		{
+			type: 'tool-listRecords',
+			toolCallId: 'c4',
+			state: 'output-available',
+			input: { kind: 'company', limit: 50 },
+			output: {
+				kind: 'company',
+				spec: { kind: 'company', fields: [] },
+				rows: [
+					{
+						id: 'c-steel',
+						cells: [{ type: 'link', text: 'Gotham Steel Supply', href: '/companies/c-steel' }]
+					}
+				],
+				total: 1
+			}
+		},
+		{
 			type: 'tool-exploreGraph',
 			toolCallId: 'c3',
 			state: 'output-available',
@@ -95,6 +112,7 @@ describe('sourcesOf', () => {
 			wayne,
 			lucius,
 			{ kind: 'deal', id: 'd1', name: 'Renewal' },
+			{ kind: 'company', id: 'c-steel', name: 'Gotham Steel Supply' },
 			{ kind: 'task', id: 't9', name: 'Call back' }
 		]);
 	});

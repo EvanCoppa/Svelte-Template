@@ -83,14 +83,26 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 			return part.output.nodes.flatMap((node) =>
 				node.kind === 'member' ? [] : [{ kind: node.kind, id: node.recordId, name: node.name }]
 			);
+		case 'tool-listRecords':
+			// A row's name is its `link` cell, whichever column the list put it in.
+			return part.output.rows.flatMap((row) => {
+				const link = row.cells.find((cell) => cell.type === 'link');
+				return link ? [{ kind: part.output.kind, id: row.id, name: link.text }] : [];
+			});
+		case 'tool-packableLines':
+			return part.output.order
+				? [{ kind: 'order', id: part.output.order.id, name: part.output.order.number }]
+				: [];
 		// A note is not a record with a page of its own, and a deleted task no
 		// longer has one to open — neither belongs in a list of things to read.
 		// A relationship type is reference data, and a link's two ends were
 		// found by the tools that named them.
+		// A free slot is time, not a record.
 		case 'tool-addNote':
 		case 'tool-deleteTask':
 		case 'tool-listRelationshipTypes':
 		case 'tool-linkRecords':
+		case 'tool-findOpenSlots':
 			return [];
 	}
 }

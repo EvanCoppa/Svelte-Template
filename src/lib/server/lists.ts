@@ -27,6 +27,13 @@ import { hasGrant } from './roles';
 
 export type ListData = { list: { spec: ListSpec; rows: ListRow[] } };
 
+/**
+ * What a list needs of the request: the client, the org context and the
+ * active org — a page's `locals`, or the same three fields as the assistant's
+ * tool context carries them.
+ */
+export type ListLocals = Pick<App.Locals, 'supabase' | 'org' | 'activeOrgId'>;
+
 /** A kind's own list page: every row of the kind, described for its feature's list. */
 export async function loadRecordList(locals: App.Locals, kind: ListKind): Promise<ListData> {
 	const { supabase, activeOrgId } = locals;
@@ -40,7 +47,7 @@ export async function loadRecordList(locals: App.Locals, kind: ListKind): Promis
 
 /** Rows already read (a view's), described for the list `featureId` owns. */
 export async function loadList(
-	locals: App.Locals,
+	locals: ListLocals,
 	featureId: string,
 	result: ListResult
 ): Promise<ListData> {
