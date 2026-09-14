@@ -23,9 +23,14 @@ describe('createAssistantAgent', () => {
 		expect(sent).toEqual([
 			'completeTask',
 			'createTask',
+			'findRecords',
 			'getCompany',
+			'getRecord',
+			'linkRecords',
+			'listRelationshipTypes',
 			'listTasks',
-			'searchCompanies'
+			'searchCompanies',
+			'updateRecord'
 		]);
 	});
 
@@ -62,6 +67,30 @@ describe('createAssistantAgent', () => {
 		expect(system[1]?.content).toContain('Organization: Acme Inc (Pro plan)');
 		expect(system[1]?.content).toContain('User: evan@example.com (owner)');
 		expect(system[1]?.content).toContain('Time zone: Europe/Paris');
+	});
+
+	it('tells the model which kinds of record this caller may use, in the org’s words', async () => {
+		const model = streamingModel('Hi');
+		const agent = createAssistantAgent({
+			model,
+			context: toolContext(
+				orgContext({ role: 'member', grants: { contacts: 'manage', deals: 'read' } })
+			)
+		});
+
+		await (
+			await agent.stream({ prompt: 'Hi' })
+		).text;
+
+		const session = String(
+			model.doStreamCalls[0]?.prompt.find(
+				(m) => m.role === 'system' && String(m.content).includes('<session_context>')
+			)?.content
+		);
+		expect(session).toContain('- contact — contacts (one: contact) — read, update');
+		expect(session).toContain('- deal — deals (one: deal) — read');
+		expect(session).not.toContain('- company');
+		expect(session).not.toContain('- task');
 	});
 
 	it('asks OpenAI not to store the turn, to cache per thread, and to summarise its thinking', async () => {

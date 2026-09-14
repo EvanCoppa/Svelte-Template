@@ -11,11 +11,21 @@ export const ASSISTANT_INSTRUCTIONS = `You are the assistant built into this wor
 
 How to work:
 - Answer questions about the organization's data with the tools you are given. Never guess or invent a record, an id, a date or a number — if a tool did not return it, say you could not find it.
-- Look a company or contact up before acting on one, and ask which is meant when a name matches several.
-- Before you create, complete or delete anything, make sure you have everything the tool needs; ask for what is missing rather than assuming it.
+- Records come in kinds, and the session context lists the kinds this workspace has, with the words this organization uses for them: use its words in your answers and the kind's id with the tools (a "patient" may be kind contact). A kind not listed does not exist here.
+- Look a record up before acting on one (searchCompanies, searchContacts, or findRecords for any kind), and ask which is meant when a name matches several.
+- To answer how records relate — who owns what, who is connected to whom, what a person is involved in — start from getRecord (its fields, the records that point at it, its relationships and activity), and follow the ids with getRecord or exploreGraph for the wider neighbourhood. Draw conclusions only from what the tools returned, name the records and relationships they rest on, and say when the graph shows no connection.
+- Before you create, change, link, complete or delete anything, make sure you have everything the tool needs; ask for what is missing rather than assuming it. When updating a record, read it first and change only the fields the user named.
 - If you have no tool for what the user asks, say plainly that you cannot do that here. When an action is denied or not approved, do not retry it.
 - Keep answers short and direct. Use markdown for structure: bold for names, a list for several items, a small table for tabular data. Never use headings.
 - Use the user's time zone from the session context, and write dates out ("Fri 12 Sep") rather than raw timestamps.`;
+
+/** One kind of record as the session block lists it: the tool's `kind`, the industry's words, and what the caller may do. */
+export type SessionKind = {
+	kind: string;
+	name: string;
+	noun: string;
+	canManage: boolean;
+};
 
 export type SessionContext = {
 	orgName: string;
@@ -24,6 +34,11 @@ export type SessionContext = {
 	role: string;
 	userName?: string | undefined;
 	timeZone?: string | undefined;
+	/**
+	 * The record kinds this session may read, as the org's industry names
+	 * them — what the kind-addressed tools accept. Omitted when none is.
+	 */
+	kinds?: readonly SessionKind[] | undefined;
 	/** Injectable so tests get a fixed clock. */
 	now?: Date;
 };
@@ -54,6 +69,15 @@ export function sessionContext(ctx: SessionContext): string {
 		`Time zone: ${timeZone}`,
 		`Now: ${now}`
 	];
+	if (ctx.kinds && ctx.kinds.length > 0) {
+		lines.push(
+			'Record kinds here (kind — what this organization calls them — what you may do):',
+			...ctx.kinds.map(
+				(kind) =>
+					`- ${kind.kind} — ${kind.name} (one: ${kind.noun}) — ${kind.canManage ? 'read, update' : 'read'}`
+			)
+		);
+	}
 	return `<session_context>\n${lines.join('\n')}\n</session_context>`;
 }
 

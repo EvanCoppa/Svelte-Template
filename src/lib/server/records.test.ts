@@ -12,6 +12,7 @@ import {
 	loadCreateRecord,
 	loadDeleteRecord,
 	loadEditRecord,
+	patchRecord,
 	updateRecord
 } from './records';
 import type { UserAccess } from './roles';
@@ -568,5 +569,63 @@ describe('deleteRecord', () => {
 			'data.form.message',
 			'Company was not deleted: it does not exist, or you are not allowed to.'
 		);
+	});
+});
+
+describe('patchRecord', () => {
+	const row = {
+		id: RECORD_ID,
+		name: 'Sunrise Smoothie Bar',
+		relationship: 'customer',
+		status: 'lead',
+		email: 'hi@sunrise.example',
+		phone: null,
+		website: 'sunrise.example'
+	};
+
+	it('changes only the named fields and writes the whole row through the form’s switch', async () => {
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: row },
+			{ data: { id: RECORD_ID } }
+		]);
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, {
+				status: 'active',
+				phone: '+1 555 0100'
+			})
+		).resolves.toEqual({ saved: true });
+
+		expect(builder.update).toHaveBeenCalledWith({
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'active',
+			email: 'hi@sunrise.example',
+			phone: '+1 555 0100',
+			website: 'sunrise.example'
+		});
+		expect(builder.eq).toHaveBeenCalledWith('id', RECORD_ID);
+	});
+
+	it('hands back the schema’s issues instead of writing', async () => {
+		const { supabase, builder } = supabaseMockSequence([{ data: row }]);
+
+		const result = await patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { name: '  ' });
+
+		expect(result).toEqual({ saved: false, issues: ['name: Name is required.'] });
+		expect(builder.update).not.toHaveBeenCalled();
+	});
+
+	it('refuses a field the kind does not have, and a record that is not there', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: null }]);
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { colour: 'teal' })
+		).rejects.toThrow(/no field named colour/);
+		expect(from).not.toHaveBeenCalled();
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { status: 'active' })
+		).rejects.toThrow(/no company with id/);
 	});
 });

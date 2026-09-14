@@ -317,12 +317,16 @@ describe('describing a record', () => {
 		expect(field(describeContact(lucius, openAll), 'Company')).toEqual({
 			type: 'record',
 			value: 'Wayne Enterprises',
-			href: `/companies/${COMPANY_ID}`
+			href: `/companies/${COMPANY_ID}`,
+			kind: 'company',
+			id: COMPANY_ID
 		});
 		expect(field(describeContact(lucius, openNone), 'Company')).toEqual({
 			type: 'record',
 			value: 'Wayne Enterprises',
-			href: null
+			href: null,
+			kind: 'company',
+			id: COMPANY_ID
 		});
 		// A person who is the customer themselves belongs to no company.
 		expect(field(describeContact({ ...lucius, companies: null }, openAll), 'Company')).toEqual({
@@ -396,7 +400,9 @@ describe('describing a record', () => {
 		expect(field(detail, 'For')).toEqual({
 			type: 'record',
 			value: 'Annual support contract',
-			href: `/deals/${contract.id}`
+			href: `/deals/${contract.id}`,
+			kind: 'deal',
+			id: contract.id
 		});
 		// The two people, labelled as the industry labels them.
 		expect(field(detail, 'Presenter')).toEqual({ type: 'person', userId: USER_ID });
@@ -425,7 +431,9 @@ describe('describing a record', () => {
 		expect(field(describeProposal(options, parent, openNone, VOCABULARY), 'For')).toEqual({
 			type: 'record',
 			value: 'Annual support contract',
-			href: null
+			href: null,
+			kind: 'deal',
+			id: contract.id
 		});
 
 		// An unattached draft: nothing recommended, nothing priced, no parent.
@@ -565,12 +573,16 @@ describe('describeInvoice', () => {
 		expect(field(detail, 'Company')).toEqual({
 			type: 'record',
 			value: 'Wayne Enterprises',
-			href: `/companies/${COMPANY_ID}`
+			href: `/companies/${COMPANY_ID}`,
+			kind: 'company',
+			id: COMPANY_ID
 		});
 		expect(field(detail, 'Contact')).toEqual({
 			type: 'record',
 			value: 'Lucius Fox',
-			href: `/contacts/${CONTACT_ID}`
+			href: `/contacts/${CONTACT_ID}`,
+			kind: 'contact',
+			id: CONTACT_ID
 		});
 		expect(field(detail, 'Terms')).toEqual({ type: 'text', value: 'Net 30' });
 		expect(field(detail, 'Due')).toEqual({ type: 'date', value: '2026-09-01' });
@@ -602,7 +614,13 @@ describe('describeInvoice', () => {
 		expect(draft.pills).toEqual([{ label: 'Draft', tone: 'neutral' }]);
 		expect(field(draft, 'Company')).toEqual({ type: 'empty' });
 		// Named, but not linked: the reader may not open contacts.
-		expect(field(draft, 'Contact')).toEqual({ type: 'record', value: 'Lucius Fox', href: null });
+		expect(field(draft, 'Contact')).toEqual({
+			type: 'record',
+			value: 'Lucius Fox',
+			href: null,
+			kind: 'contact',
+			id: CONTACT_ID
+		});
 	});
 });
 
@@ -726,7 +744,9 @@ describe('getRecord', () => {
 		expect(detail && field(detail, 'For')).toEqual({
 			type: 'record',
 			value: 'Annual support contract',
-			href: `/deals/${contract.id}`
+			href: `/deals/${contract.id}`,
+			kind: 'deal',
+			id: contract.id
 		});
 
 		// Unattached: one read, no parent to look for.

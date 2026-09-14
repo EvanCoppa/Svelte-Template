@@ -33,6 +33,22 @@ describe('sessionContext', () => {
 		expect(block).toContain('Sunday, September 6, 2026 at 11:30 AM');
 	});
 
+	it('lists the kinds of record the session may use, and nothing about kinds when there are none', () => {
+		const block = sessionContext({
+			...ctx,
+			kinds: [
+				{ kind: 'contact', name: 'Patients', noun: 'patient', canManage: true },
+				{ kind: 'proposal', name: 'Treatment plans', noun: 'treatment plan', canManage: false }
+			]
+		});
+		expect(block).toContain('Record kinds here');
+		expect(block).toContain('- contact — Patients (one: patient) — read, update');
+		expect(block).toContain('- proposal — Treatment plans (one: treatment plan) — read');
+
+		expect(sessionContext(ctx)).not.toContain('Record kinds');
+		expect(sessionContext({ ...ctx, kinds: [] })).not.toContain('Record kinds');
+	});
+
 	it('has a name for an anonymous caller', () => {
 		expect(sessionContext({ ...ctx, userName: undefined })).toContain(
 			'User: a team member (admin)'

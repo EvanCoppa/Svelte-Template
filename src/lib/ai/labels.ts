@@ -15,7 +15,17 @@ export const TOOL_LABELS = {
 	completeTask: { running: 'Updating a task', done: 'Updated a task' },
 	deleteTask: { running: 'Deleting a task', done: 'Deleted a task' },
 	listDeals: { running: 'Listing deals', done: 'Listed deals' },
-	listTickets: { running: 'Listing tickets', done: 'Listed tickets' }
+	listTickets: { running: 'Listing tickets', done: 'Listed tickets' },
+	listEvents: { running: 'Reading the calendar', done: 'Read the calendar' },
+	findRecords: { running: 'Finding records', done: 'Found records' },
+	getRecord: { running: 'Opening a record', done: 'Read a record' },
+	updateRecord: { running: 'Updating a record', done: 'Updated a record' },
+	exploreGraph: { running: 'Exploring connections', done: 'Explored connections' },
+	listRelationshipTypes: {
+		running: 'Reading relationship types',
+		done: 'Read relationship types'
+	},
+	linkRecords: { running: 'Linking records', done: 'Linked records' }
 } satisfies Record<AssistantToolName, { running: string; done: string }>;
 
 function isLabelled(name: string): name is keyof typeof TOOL_LABELS {

@@ -136,7 +136,7 @@ export async function loadCreateRecord(
 }
 
 /** The org's rows behind each party picker on the form for `type` — none for a form without one. */
-async function loadPickers(
+export async function loadPickers(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType
@@ -148,7 +148,8 @@ async function loadPickers(
 	return Object.fromEntries(wanted.map((kind, index) => [kind, loaded[index]]));
 }
 
-async function pickerOptions(
+/** The options behind one picker kind — every row of the org's the picker may name. */
+export async function pickerOptions(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	kind: RecordPickerKind
@@ -303,6 +304,52 @@ export async function updateRecord(
 	}
 
 	return { form };
+}
+
+/** What a partial edit came to: saved, or the validation it failed, as sentences. */
+export type PatchResult = { saved: true } | { saved: false; issues: string[] };
+
+/**
+ * A partial edit for a writer that is not a form — the assistant. The edit
+ * form posts every field, so a blank one means "clear it"; a tool names
+ * only the fields it means to change, and the rest keep what the record
+ * says now. Same registry, same schema and same `writeRecord()` switch as
+ * the form, so a change is validated and written exactly as a person's
+ * would be. A field the registry does not list is a call error (the model
+ * can read the list and retry); a value the schema refuses comes back as
+ * issues rather than a throw, because that is an answer, not a failure.
+ * The caller checks `manage` first — this is the write, not the gate.
+ */
+export async function patchRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: EditableRecordType,
+	id: string,
+	changes: Partial<RecordFormValues>
+): Promise<PatchResult> {
+	const fields = RECORD_FORMS[type].fields;
+	const unknown = Object.keys(changes).filter(
+		(name) => !fields.some((field) => field.name === name)
+	);
+	if (unknown.length > 0) {
+		throw new Error(
+			`A ${type} has no field named ${unknown.join(', ')}. ` +
+				`Its fields are: ${fields.map((field) => field.name).join(', ')}.`
+		);
+	}
+
+	const current = await recordFormValues(supabase, orgId, type, id);
+	if (Object.keys(current).length === 0) throw new Error(`There is no ${type} with id ${id}.`);
+
+	const parsed = RECORD_SCHEMAS[type].safeParse({ ...current, ...changes });
+	if (!parsed.success) {
+		return {
+			saved: false,
+			issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+		};
+	}
+	await writeRecord(supabase, orgId, type, parsed.data, id);
+	return { saved: true };
 }
 
 // ---------------------------------------------------------------------------

@@ -101,8 +101,12 @@ export type FieldValue =
 	| { type: 'datetime'; value: string }
 	/** Somewhere outside the app: a mailto, a tel, a website. */
 	| { type: 'link'; value: string; href: string }
-	/** Another CRM record; `href` is null when the reader may not open it. */
-	| { type: 'record'; value: string; href: string | null }
+	/**
+	 * Another CRM record, named and addressed; `href` is null when the reader
+	 * may not open it (the page draws plain text), while `kind` and `id` say
+	 * which record it is for a reader that follows links by id — the assistant.
+	 */
+	| { type: 'record'; value: string; href: string | null; kind: RecordKind; id: string }
 	/** A member, by user id — the page resolves the name (see `$lib/server/profiles`). */
 	| { type: 'person'; userId: string };
 
@@ -210,7 +214,9 @@ function record(
 	return {
 		type: 'record',
 		value: target.name,
-		href: canOpen(kind) ? recordHref(kind, target.id) : null
+		href: canOpen(kind) ? recordHref(kind, target.id) : null,
+		kind,
+		id: target.id
 	};
 }
 
