@@ -127,6 +127,14 @@ export const TOOL_APPROVAL = {
 	updateRecord: 'user-approval'
 } as const;
 
+/**
+ * Tools whose result is a card the reader works in — a table to filter, free
+ * time to pick from, lines to tick into a box — rather than something to be
+ * told (docs/assistant.md, "Artifacts"). The typed thread draws them; a voice
+ * call, which has no cards, is not offered them (`voiceToolNames()`).
+ */
+export const CARD_TOOLS = ['listRecords', 'findOpenSlots', 'packableLines'] as const;
+
 /** One request context for every tool; the SDK wants the map keyed by tool name. */
 export function toolsContextFor(
 	context: AssistantToolContext

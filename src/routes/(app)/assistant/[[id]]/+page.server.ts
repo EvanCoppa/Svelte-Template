@@ -11,7 +11,7 @@ import {
 	updateConversationTitle
 } from '$lib/server/ai/conversations';
 import { toUIMessages } from '$lib/server/ai/messages';
-import { isAiConfigured } from '$lib/server/ai/provider';
+import { isAiConfigured, realtimeModelId } from '$lib/server/ai/provider';
 import { createCalendarEvent } from '$lib/server/crm/calendar';
 import { splitOrderLine, type OrderLineItem } from '$lib/server/crm/orders';
 import { createShipment, packableLines, packLine } from '$lib/server/crm/shipments';
@@ -90,6 +90,12 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		initialMessages,
 		/** Off when the server has no provider key: the page says so instead of failing on send. */
 		configured: isAiConfigured(),
+		/**
+		 * Which realtime model a voice call opens with. The browser needs it
+		 * before it connects — the session names the model in the update it
+		 * sends — and which model that is stays the server's decision.
+		 */
+		voiceModel: realtimeModelId(),
 		renameForm,
 		deleteForm,
 		bookForm,

@@ -30,6 +30,13 @@
 	/** The thread on screen, or null while a new one has not been sent yet. */
 	const activeId = $derived(page.params.id ?? null);
 
+	/**
+	 * Whether a voice call is open. The composer's commit button starts one
+	 * when there is nothing written to send, and closing the screen is what
+	 * hangs up — see `Assistant.Call`.
+	 */
+	let calling = $state(false);
+
 	/** Openers, offered by the composer's `+` — each is just a prompt to edit and send. */
 	const SUGGESTIONS = [
 		'Which companies are still leads?',
@@ -307,6 +314,7 @@
 							class="w-full"
 							onSend={(text) => chat.sendMessage({ text, metadata: { createdAt: Date.now() } })}
 							onStop={() => chat.stop()}
+							onCall={data.configured ? () => (calling = true) : undefined}
 						/>
 					</div>
 				</div>
@@ -314,6 +322,19 @@
 		</Assistant.Root>
 	{/key}
 </div>
+
+<!--
+	The call: talking to the assistant instead of typing at it, over the same
+	tools and the same data. It is the page's rather than the shell's because
+	the button that starts it is in this page's composer, and the workspace it
+	is about is the one this page is already showing.
+-->
+<Assistant.Call
+	open={calling}
+	modelId={data.voiceModel}
+	workspace={data.activeOrg.name}
+	onClose={() => (calling = false)}
+/>
 
 <!-- Rename — the row menu's first action. -->
 <Modal.Root

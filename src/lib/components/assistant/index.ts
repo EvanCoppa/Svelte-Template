@@ -1,12 +1,14 @@
 import Activity from './assistant-activity.svelte';
 import Artifact from './assistant-artifact.svelte';
 import Aura from './assistant-aura.svelte';
+import Call from './assistant-call.svelte';
 import Composer from './assistant-composer.svelte';
 import Diff from './assistant-diff.svelte';
 import Graph from './assistant-graph.svelte';
 import List from './assistant-list.svelte';
 import Markdown from './assistant-markdown.svelte';
 import Message from './assistant-message.svelte';
+import Orb from './assistant-orb.svelte';
 import Packing from './assistant-packing.svelte';
 import Reasoning from './assistant-reasoning.svelte';
 import RecordCard from './assistant-record-card.svelte';
@@ -22,7 +24,9 @@ import ToolCall from './assistant-tool-call.svelte';
  * behind an unstarted one; `Thread` is the scrolling
  * column; `Message` one message rendered on `part.type` (through `Markdown`,
  * `Reasoning`, `Activity` and `ToolCall`); `Shimmer` the wait before the
- * first word; `Composer` the prompt box. The page owns the data — the stored
+ * first word; `Composer` the prompt box. `Call` is the same assistant reached
+ * by talking — the screen a voice call happens on — and `Orb` the thing it
+ * puts you in front of, which is presentational enough to use anywhere. The page owns the data — the stored
  * messages, the suggestions — and every handler. The member's threads are the
  * sidebar's (`$lib/components/assistant-sidebar.svelte`), because under
  * `/assistant` they are what the shell navigates.
@@ -38,6 +42,8 @@ import ToolCall from './assistant-tool-call.svelte';
 export {
 	Root,
 	Aura,
+	Orb,
+	Call,
 	Thread,
 	Message,
 	Markdown,
@@ -56,6 +62,8 @@ export {
 	//
 	Root as Assistant,
 	Aura as AssistantAura,
+	Orb as AssistantOrb,
+	Call as AssistantCall,
 	Thread as AssistantThread,
 	Message as AssistantMessage,
 	Markdown as AssistantMarkdown,
