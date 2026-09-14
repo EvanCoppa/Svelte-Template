@@ -15,33 +15,44 @@ import type { FeatureMap } from '$lib/features/types';
  * the shell every org gets. Icons are named, not imported — every slug
  * resolves through the one-per-file map in `$lib/features/icons`, so the
  * icon barrel never lands in the bundle. A feature's `category` is the
- * sidebar section it is filed under: they render as labeled sections in the
- * order declared in NAV_CATEGORIES, empty ones are omitted, and a feature
- * that names no category (or one the app does not know) falls into Other.
+ * section it is filed under: they render as labeled sections in the order
+ * declared in NAV_CATEGORIES, empty ones are omitted, and a feature that
+ * names no category (or one the app does not know) falls into Other.
  *
- * Settings is deliberately NOT one of them. It is a shell of its own,
- * entered from the user menu in the sidebar footer, and once you are inside
- * it the sidebar becomes `settingsNav` below — so the app nav lists the
- * places you work, never the place you configure them.
+ * A category also says WHERE its section renders — its `surface`. Most are
+ * the sidebar: the places you work. `workspace` is the user menu in the
+ * sidebar footer, where you administer the workspace itself: Settings is
+ * already there, so a feature filed under it sits underneath Settings
+ * rather than taking a section of the sidebar. `sidebarNav()` and
+ * `userMenuNav()` are the two reads; the ⌘K palette lists both, because
+ * everywhere you can go is findable from it.
+ *
+ * Settings itself is deliberately not a feature. It is a shell of its own,
+ * entered from that same menu, and once you are inside it the sidebar
+ * becomes `settingsNav` below — so the app nav lists the places you work,
+ * never the place you configure them.
  */
 
-export type NavCategoryKey = 'general' | 'crm' | 'tools' | 'insights' | 'library' | 'other';
+export type NavCategoryKey = 'general' | 'crm' | 'tools' | 'library' | 'workspace' | 'other';
+
+/** Which surface a section renders on: the sidebar, or the user menu under it. */
+export type NavSurface = 'sidebar' | 'user-menu';
 
 /**
- * The sidebar's sections, in the order they render. Mirrors the values
+ * The nav's sections, in the order they render. Mirrors the values
  * `features.category` accepts (the feature_categories migration); a feature
  * whose category is null or unknown is filed under Other by
  * `navCategoryOf()`, so a section never goes missing because a row said
  * nothing. Empty sections are dropped by `groupNav()`, which is why a
  * category may ship before the features that will live in it.
  */
-export const NAV_CATEGORIES: { key: NavCategoryKey; label: string }[] = [
-	{ key: 'general', label: 'General' },
-	{ key: 'crm', label: 'CRM' },
-	{ key: 'tools', label: 'Tools' },
-	{ key: 'insights', label: 'Insights' },
-	{ key: 'library', label: 'Library' },
-	{ key: 'other', label: 'Other' }
+export const NAV_CATEGORIES: { key: NavCategoryKey; label: string; surface: NavSurface }[] = [
+	{ key: 'general', label: 'General', surface: 'sidebar' },
+	{ key: 'crm', label: 'CRM', surface: 'sidebar' },
+	{ key: 'tools', label: 'Tools', surface: 'sidebar' },
+	{ key: 'library', label: 'Library', surface: 'sidebar' },
+	{ key: 'workspace', label: 'Workspace', surface: 'user-menu' },
+	{ key: 'other', label: 'Other', surface: 'sidebar' }
 ];
 
 /**
@@ -56,6 +67,11 @@ export function navCategoryOf(category: string | null | undefined): NavCategoryK
 
 function isNavCategory(value: string | null | undefined): value is NavCategoryKey {
 	return NAV_CATEGORIES.some((c) => c.key === value);
+}
+
+/** Where a section renders. The one place a surface is looked up. */
+export function navSurfaceOf(category: NavCategoryKey): NavSurface {
+	return NAV_CATEGORIES.find((c) => c.key === category)?.surface ?? 'sidebar';
 }
 
 export interface NavItem {
@@ -84,6 +100,7 @@ export interface NavItem {
 export interface NavGroup {
 	key: NavCategoryKey;
 	label: string;
+	surface: NavSurface;
 	items: NavItem[];
 }
 
@@ -129,12 +146,29 @@ export function buildNav(features: FeatureMap, canRead: (featureId: string) => b
 	);
 }
 
-/** Buckets items into labeled sidebar sections; empty sections are omitted. */
+/**
+ * Buckets items into labeled sections, whatever surface they render on;
+ * empty sections are omitted. The ⌘K palette lists these, so a page is
+ * findable from it whether the sidebar or the user menu holds it.
+ */
 export function groupNav(items: NavItem[]): NavGroup[] {
 	return NAV_CATEGORIES.map((category) => ({
 		...category,
 		items: items.filter((item) => item.category === category.key)
 	})).filter((group) => group.items.length > 0);
+}
+
+/** The sections the app sidebar draws: everything filed on that surface. */
+export function sidebarNav(items: NavItem[]): NavGroup[] {
+	return groupNav(items).filter((group) => group.surface === 'sidebar');
+}
+
+/**
+ * The entries the user menu draws under Settings — one flat list, already in
+ * category and sort order, because that menu has no section headings.
+ */
+export function userMenuNav(items: NavItem[]): NavItem[] {
+	return items.filter((item) => navSurfaceOf(item.category) === 'user-menu');
 }
 
 /**

@@ -153,8 +153,9 @@ function builtInField(kind: ListKind, featureId: string, row: MergedRow): ListFi
 		throw new Error(`List ${featureId} shows a field ${kind} does not have: ${row.field}.`);
 	}
 	if (row.filterable && !FILTERABLE_TYPES.some((type) => type === meta.type)) {
+		const article = /^[aeiou]/.test(meta.type) ? 'an' : 'a';
 		throw new Error(
-			`List ${featureId} filters on ${row.field}, but a ${meta.type} field cannot be filtered.`
+			`List ${featureId} filters on ${row.field}, but ${article} ${meta.type} field cannot be filtered.`
 		);
 	}
 	return {

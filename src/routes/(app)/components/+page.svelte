@@ -2030,6 +2030,35 @@
 
 		<Card.Root class="lg:col-span-2">
 			<Card.Header>
+				<Card.Title>Tabs — underline</Card.Title>
+				<Card.Description>
+					<code>variant="underline"</code> on <code>Tabs.Root</code>: a full-width strip on a
+					hairline, for a screen whose tabs are its own navigation rather than a control inside a
+					card. The record page is the worked example.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Tabs.Root value="overview" variant="underline">
+					<Tabs.List>
+						<Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+						<Tabs.Trigger value="activity">Activity</Tabs.Trigger>
+						<Tabs.Trigger value="files">Files</Tabs.Trigger>
+					</Tabs.List>
+					<Tabs.Content value="overview" class="text-muted-foreground pt-3 text-sm">
+						The active tab is marked by the rule under it.
+					</Tabs.Content>
+					<Tabs.Content value="activity" class="text-muted-foreground pt-3 text-sm">
+						Nothing happened, which is its own kind of news.
+					</Tabs.Content>
+					<Tabs.Content value="files" class="text-muted-foreground pt-3 text-sm">
+						Three spreadsheets and a photo of a whiteboard.
+					</Tabs.Content>
+				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
 				<Card.Title>Tabs</Card.Title>
 				<Card.Description>Switch between related views without navigation.</Card.Description>
 			</Card.Header>
@@ -3376,13 +3405,15 @@
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
-				<code>pageSize</code>.
+				<code>pageSize</code>. A table wider than its screen scrolls sideways;
+				<code>&lt;DataTable.Content pinFirstColumn /&gt;</code> keeps the first column (and the checkbox
+				in front of it) in place while the rest scroll — narrow the window to see it.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
-			<DataTable.Root table={paymentsTable} pageSize={5}>
+			<DataTable.Root table={paymentsTable} pageSize={5} pinFirstColumn>
 				<DataTable.Toolbar>
 					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
 					<DataTable.Filters />

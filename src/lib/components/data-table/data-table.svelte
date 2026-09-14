@@ -1,6 +1,8 @@
 <script lang="ts" generics="TData extends RowData">
 	import type { RowData, SvelteTable } from '@tanstack/svelte-table';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import { page } from '$app/state';
+	import { createViewPreference } from '$lib/list-view.svelte';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 	import { setDataTable } from './context.svelte.js';
 	import type { DataTableFeatures } from './features.js';
@@ -11,6 +13,7 @@
 		table,
 		pageSize,
 		minPageSize = MIN_PAGE_SIZE,
+		pinFirstColumn = false,
 		class: className,
 		children,
 		...restProps
@@ -30,9 +33,34 @@
 		pageSize?: number;
 		/** Floor for the fitted size, so a short viewport still lists something. */
 		minPageSize?: number;
+		/**
+		 * Whether the first column starts out pinned — kept in place while the
+		 * rest scroll sideways. The reader can change it from `ViewOptions`, and
+		 * the choice is remembered per device for this page (docs/user-preferences.md,
+		 * the device axis); this prop is only the default a fresh device opens on.
+		 */
+		pinFirstColumn?: boolean;
 	} = $props();
 
-	setDataTable({ table: () => table });
+	// The two views are ordered so the prop is the fallback `createViewPreference`
+	// takes (its first entry); the page's path keys the choice, so every list
+	// remembers its own without naming itself.
+	const pinned = createViewPreference(
+		`data-table.pin:${page.url.pathname}`,
+		pinFirstColumn ? (['on', 'off'] as const) : (['off', 'on'] as const)
+	);
+
+	setDataTable({
+		table: () => table,
+		pinFirstColumn: {
+			get current() {
+				return pinned.current === 'on';
+			},
+			set current(value: boolean) {
+				pinned.current = value ? 'on' : 'off';
+			}
+		}
+	});
 
 	// A fixed size belongs to the first render rather than to a correction made
 	// after hydration, so it is applied as the component initialises and the
@@ -51,7 +79,7 @@
 <div
 	bind:this={ref}
 	data-slot="data-table"
-	class={cn('space-y-4', className)}
+	class={cn('space-y-2', className)}
 	{...restProps}
 	{@attach pageSize === undefined
 		? fitPageSize({ setPageSize: (size) => table.setPageSize(size), minPageSize })

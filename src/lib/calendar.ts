@@ -196,6 +196,7 @@ const shortDay = new Intl.DateTimeFormat(LOCALE, {
 	day: 'numeric'
 });
 const longDay = new Intl.DateTimeFormat(LOCALE, { weekday: 'long', month: 'long', day: 'numeric' });
+const weekdayName = new Intl.DateTimeFormat(LOCALE, { weekday: 'long' });
 const clock = new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit' });
 
 /** What the toolbar calls the span on screen: "September 2026", "Sep 7 – 13, 2026", "Tuesday, September 9, 2026". */
@@ -217,6 +218,41 @@ export function rangeLabel(view: CalendarView, anchor: Date): string {
 		case 'day':
 			return fullDay.format(anchor);
 	}
+}
+
+/** How many days ahead still counts as "this week" rather than "later". */
+export const WEEK_AHEAD = 7;
+
+/**
+ * How far ahead a weekday still names a day unambiguously: six, not seven.
+ * Next Tuesday is "Tuesday" and so is today, so a seventh day inside the
+ * horizon would word two different days the same — which is the one thing this
+ * wording exists to avoid. Deliberately not `WEEK_AHEAD`: that answers which
+ * pile a task falls in, where a day exactly a week out genuinely is "this
+ * week".
+ */
+const NAMED_DAYS = 6;
+
+/**
+ * A day in as few words as carry the meaning: the days near today are named
+ * rather than dated, because "Tomorrow" is read faster than a date the reader
+ * has to work out.
+ *
+ * `now` is passed rather than read so the function is the same on both sides
+ * of hydration and a test can say when "today" is. Every date a screen shows
+ * this way is wall-clock — a task's due date, a deal's expected close — so it
+ * lives here with the rest of the local-time reasoning and not in whichever
+ * domain module needed it first.
+ */
+export function relativeDayLabel(date: Date, now: Date): string {
+	const days = daysBetween(startOfDay(now), startOfDay(date));
+	if (days === 0) return 'Today';
+	if (days === 1) return 'Tomorrow';
+	if (days === -1) return 'Yesterday';
+	if (days < 0) return `${String(-days)} days ago`;
+	// Inside the coming week a weekday is unambiguous and needs no date.
+	if (days <= NAMED_DAYS) return weekdayName.format(date);
+	return monthDay.format(date);
 }
 
 // ---------------------------------------------------------------------------

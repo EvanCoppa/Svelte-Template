@@ -222,6 +222,30 @@ export async function updateProposal(
 	);
 }
 
+/** The three columns the graph draws as edges — nothing else about a proposal. */
+export type ProposalGraphFact = Pick<
+	Proposal,
+	'id' | 'presenter_id' | 'responsible_id' | 'entity_type' | 'entity_id'
+>;
+
+/**
+ * Every proposal's presenter, responsible member and parent link, for
+ * `describeGraph()` to draw as synthetic edges — read directly from these
+ * columns, never from `relationships` (see the proposal_graph_edges
+ * migration for why they stay columns).
+ */
+export async function listProposalGraphFacts(
+	supabase: SupabaseClient<Database>,
+	orgId: string
+): Promise<ProposalGraphFact[]> {
+	return unwrap(
+		await supabase
+			.from('proposals')
+			.select('id, presenter_id, responsible_id, entity_type, entity_id')
+			.eq('org_id', orgId)
+	);
+}
+
 export async function deleteProposal(
 	supabase: SupabaseClient<Database>,
 	orgId: string,

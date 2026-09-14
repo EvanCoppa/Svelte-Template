@@ -660,6 +660,65 @@ export async function resolveProposalParent(
 	}
 }
 
+/** The lookup key `resolveProposalParents()` fills and the proposals list reads. */
+export function proposalParentKey(kind: ProposalParentKind, id: string): string {
+	return `${kind}:${id}`;
+}
+
+/**
+ * The records many proposals hang off, in three queries rather than one per
+ * row — the proposals list's version of `resolveProposalParent()` above.
+ * Grouped by kind first, so a page of a hundred proposals against a dozen
+ * companies still reads each company once.
+ */
+export async function resolveProposalParents(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	rows: readonly { entity_type: CrmEntityType | null; entity_id: string | null }[]
+): Promise<ReadonlyMap<string, ProposalParent>> {
+	const idsByKind = new Map<ProposalParentKind, string[]>();
+	for (const row of rows) {
+		const kind = proposalParentKind(row.entity_type);
+		if (kind === null || row.entity_id === null) continue;
+		const ids = idsByKind.get(kind) ?? [];
+		ids.push(row.entity_id);
+		idsByKind.set(kind, ids);
+	}
+	const companyIds = idsByKind.get('company') ?? [];
+	const contactIds = idsByKind.get('contact') ?? [];
+	const dealIds = idsByKind.get('deal') ?? [];
+
+	const [companies, contacts, deals] = await Promise.all([
+		companyIds.length ? listCompanies(supabase, orgId, { ids: companyIds }) : [],
+		contactIds.length ? listContacts(supabase, orgId, { ids: contactIds }) : [],
+		dealIds.length ? listDeals(supabase, orgId, { ids: dealIds }) : []
+	]);
+
+	const parents = new Map<string, ProposalParent>();
+	for (const company of companies) {
+		parents.set(proposalParentKey('company', company.id), {
+			kind: 'company',
+			id: company.id,
+			name: company.name
+		});
+	}
+	for (const contact of contacts) {
+		parents.set(proposalParentKey('contact', contact.id), {
+			kind: 'contact',
+			id: contact.id,
+			name: contact.name
+		});
+	}
+	for (const deal of deals) {
+		parents.set(proposalParentKey('deal', deal.id), {
+			kind: 'deal',
+			id: deal.id,
+			name: deal.title
+		});
+	}
+	return parents;
+}
+
 // ---------------------------------------------------------------------------
 // The records that point at this one
 // ---------------------------------------------------------------------------

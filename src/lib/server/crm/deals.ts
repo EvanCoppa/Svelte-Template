@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
-import { defaultPipeline } from './pipelines';
+import { defaultPipeline, listPipelines } from './pipelines';
 import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
@@ -48,7 +48,13 @@ type DealInsert = Pick<TablesInsert<'deals'>, Exclude<DealColumn, 'pipeline_id' 
 export async function listDeals(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { companyId?: string; contactId?: string; pipelineId?: string; stageId?: string } = {}
+	filter: {
+		companyId?: string;
+		contactId?: string;
+		pipelineId?: string;
+		stageId?: string;
+		ids?: readonly string[];
+	} = {}
 ): Promise<DealWithParties[]> {
 	let query = supabase
 		.from('deals')
@@ -61,6 +67,7 @@ export async function listDeals(
 	if (filter.contactId) query = query.eq('contact_id', filter.contactId);
 	if (filter.pipelineId) query = query.eq('pipeline_id', filter.pipelineId);
 	if (filter.stageId) query = query.eq('stage_id', filter.stageId);
+	if (filter.ids) query = query.in('id', [...filter.ids]);
 	return unwrap(await query);
 }
 
@@ -114,6 +121,44 @@ async function defaultPlacement(
 		throw new Error('This organization has no default pipeline to place the deal in.');
 	}
 	return { pipeline_id: board.id, stage_id: first.id };
+}
+
+/**
+ * The board a stage belongs to, as the pair `deals` stores. A stage only means
+ * something inside its own pipeline, so the two ids always move together — and
+ * looking the pair up here is also what proves the stage is this org's:
+ * `listPipelines` reads through RLS, so a forged id simply is not in the list.
+ *
+ * The one place that answers "which board is this stage on", for the record
+ * form and for `moveDeal()` below.
+ */
+export async function dealPlacement(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	stageId: string
+): Promise<{ pipeline_id: string; stage_id: string }> {
+	const boards = await listPipelines(supabase, orgId);
+	for (const board of boards) {
+		if (board.pipeline_stages.some((stage) => stage.id === stageId)) {
+			return { pipeline_id: board.id, stage_id: stageId };
+		}
+	}
+	throw new Error('That stage is not on any board in this organization.');
+}
+
+/**
+ * A deal moved to another stage — a card dropped on the pipeline board, or
+ * carried there with the arrow keys. The board is written with the stage
+ * rather than taken from the caller, so a move onto another board carries the
+ * deal there too; a stage on no board of this org is refused above.
+ */
+export async function moveDeal(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	dealId: string,
+	stageId: string
+): Promise<Deal> {
+	return updateDeal(supabase, orgId, dealId, await dealPlacement(supabase, orgId, stageId));
 }
 
 export async function updateDeal(

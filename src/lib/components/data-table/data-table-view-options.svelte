@@ -12,7 +12,7 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger
 		data-slot="data-table-view-options"
-		class={buttonVariants({ variant: 'outline', size: 'sm', class: className })}
+		class={buttonVariants({ variant: 'outline', size: 'default', class: className })}
 	>
 		<Settings2Icon />
 		View
@@ -33,6 +33,18 @@
 					{column.columnDef.meta?.title ?? column.id}
 				</DropdownMenu.CheckboxItem>
 			{/each}
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			<DropdownMenu.Label>Layout</DropdownMenu.Label>
+			<DropdownMenu.Separator />
+			<!-- Remembered per device for this page (`DataTable.Root`), like a board
+			     versus list choice: a wide screen and a narrow one want different answers. -->
+			<DropdownMenu.CheckboxItem
+				bind:checked={() => dataTable.pinFirstColumn, (v) => (dataTable.pinFirstColumn = !!v)}
+			>
+				Pin first column
+			</DropdownMenu.CheckboxItem>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

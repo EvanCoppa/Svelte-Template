@@ -11,6 +11,11 @@ export type DataTableStateProps<TData extends RowData> = {
 	 * ever swapped tables.
 	 */
 	table: Getter<SvelteTable<DataTableFeatures, TData>>;
+	/**
+	 * Whether the first column stays put while the rest scroll — a per-device
+	 * choice `DataTable.Root` remembers and `ViewOptions` toggles.
+	 */
+	pinFirstColumn: { get current(): boolean; set current(value: boolean) };
 };
 
 /**
@@ -20,6 +25,13 @@ export type DataTableStateProps<TData extends RowData> = {
 class DataTableState<TData extends RowData> {
 	readonly props: DataTableStateProps<TData>;
 	table = $derived.by(() => this.props.table());
+
+	get pinFirstColumn(): boolean {
+		return this.props.pinFirstColumn.current;
+	}
+	set pinFirstColumn(value: boolean) {
+		this.props.pinFirstColumn.current = value;
+	}
 
 	constructor(props: DataTableStateProps<TData>) {
 		this.props = props;

@@ -28,7 +28,7 @@ their board is data. What is missing is not decoration:
    but until they exist the brief's one non-negotiable is unenforceable and every dashboard
    they asked for is unbuildable.
 2. **There are no dashboards.** The `(app)` index is still the template's "Welcome back"
-   marketing page, and the `insights` nav category is empty in every industry. Their
+   marketing page, and no reporting section exists in the nav at all. Their
    modules 1 and 2 — the Command Center and the Rep Home — are the product to Eli.
 3. **Three modules have no home at all**: the training/resource centre (module 17), the
    cadence engine (module 10) and call recordings/transcripts (module 8). Nothing in the
@@ -98,7 +98,7 @@ long as a merchant has one MID.
 
 | #   | Brief module                          | Status             | What it takes                                                                                                                                                                                                                                                                                                                                                       |
 | --- | ------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Executive Command Center              | **build**          | A real dashboard page in the empty `insights` category; thirteen tiles, all of them folds over deals/activities/tasks. Blocked on module 4's columns.                                                                                                                                                                                                               |
+| 1   | Executive Command Center              | **build**          | A real dashboard page, and the reporting section to file it under; thirteen tiles, all of them folds over deals/activities/tasks. Blocked on module 4's columns.                                                                                                                                                                                                    |
 | 2   | Rep Home / Daily Game Plan            | **build**          | Same page mechanism, filtered to the signed-in rep. Ten tiles, same blocker.                                                                                                                                                                                                                                                                                        |
 | 3   | Prospecting / lead intake             | **part**           | `companies` + `contacts` + `party_status` (lead/prospect/active/inactive) + the `prospects` view exist. Missing: lead source, lead quality, business type, estimated monthly volume, current processor, current POS/gateway, and **duplicate detection** — nothing in the schema stops two "Joe's Pizza" rows today.                                                |
 | 4   | Sales pipeline                        | **config + build** | Their ten stages are per-org `pipeline_stages` rows — config. The fifteen required fields per open deal are the build (see below).                                                                                                                                                                                                                                  |
@@ -153,7 +153,7 @@ dashboards — which is what "if a deal can sit quietly, the CRM failed" actuall
 ### 2. The two dashboards
 
 `src/routes/(app)/+page.svelte` is still the template's feature-card marketing page, and
-nothing has ever been registered in the `insights` category. Both of their dashboards are
+no reporting section exists to register one under. Both of their dashboards are
 lists and counts over data we will have once (1) lands.
 
 One decision worth making early: `views` — the cheapest surface we ship — only has

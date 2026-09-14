@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { PROPOSAL_STATUS_TONE } from '$lib/crm/tones';
 import type { ListSpec } from '$lib/lists/types';
 import type { Address } from './addresses';
 import type { Asset } from './assets';
 import type { Company } from './companies';
 import type { CustomFieldValue } from './custom-fields';
 import type { InvoiceWithParties } from './invoices';
-import { describeListRows, listNeeds, listRecords, resultIds } from './lists';
+import { describeListRows, listNeeds, listRecords, resultIds, type ListExtras } from './lists';
+import type { ProductWithCategory } from './products';
+import type { ProposalWithOptions } from './proposals';
+import { proposalParentKey } from './records';
 import { ORG_ID, supabaseTablesMock } from './test-support';
+
+/** The extras every `describeListRows()` call needs; a test overrides only what it uses. */
+const NO_EXTRAS: ListExtras = {
+	addresses: [],
+	customValues: [],
+	proposalParents: new Map(),
+	memberNames: new Map()
+};
 
 const STEEL = '20000000-0000-0000-0000-000000000003';
 const TAP = 'f1000000-0000-0000-0013-000000000001';
@@ -44,6 +56,52 @@ const tap: Asset = {
 	purchase_price: 1850,
 	currency: 'USD',
 	...STAMPS
+};
+
+const ALIGNER = 'c1000000-0000-0000-0021-000000000001';
+const CONSULT = 'c1000000-0000-0000-0021-000000000002';
+
+const productBase = {
+	org_id: ORG_ID,
+	category_id: null,
+	sku: null,
+	description: null,
+	long_description: null,
+	unit_cost: null,
+	currency: 'USD',
+	unit: null,
+	is_active: true,
+	track_inventory: false,
+	quantity_on_hand: null,
+	additional_images: [],
+	tags: null,
+	metadata: {},
+	msrp: null,
+	is_subscription: false,
+	subscription_interval: null,
+	subscription_interval_count: null,
+	stripe_product_id: null,
+	stripe_price_id: null,
+	product_categories: null,
+	...STAMPS
+};
+
+const aligner: ProductWithCategory = {
+	...productBase,
+	id: ALIGNER,
+	kind: 'good',
+	name: 'Clear aligner tray',
+	unit_price: 240,
+	image_url: '  https://cdn.test/aligner.png  '
+};
+
+const consult: ProductWithCategory = {
+	...productBase,
+	id: CONSULT,
+	kind: 'service',
+	name: 'Whitening consult',
+	unit_price: 95,
+	image_url: '   '
 };
 
 const field = (
@@ -97,7 +155,9 @@ describe('listNeeds', () => {
 	it('asks for addresses only for a city column and custom values only for a custom field', () => {
 		expect(listNeeds({ kind: 'company', fields: [field('name', 'text')] })).toEqual({
 			addresses: false,
-			customValues: false
+			customValues: false,
+			proposalParents: false,
+			memberNames: false
 		});
 		expect(
 			listNeeds({
@@ -107,7 +167,32 @@ describe('listNeeds', () => {
 					field('custom:mid', 'text', { custom: { definitionId: 'd', valueType: 'text' } })
 				]
 			})
-		).toEqual({ addresses: true, customValues: true });
+		).toEqual({ addresses: true, customValues: true, proposalParents: false, memberNames: false });
+	});
+
+	it('asks for a proposal’s parents and member names only on a proposals list, and only when the field is there', () => {
+		expect(
+			listNeeds({ kind: 'proposal', fields: [field('name', 'text'), field('status', 'enum')] })
+		).toEqual({
+			addresses: false,
+			customValues: false,
+			proposalParents: false,
+			memberNames: false
+		});
+		expect(
+			listNeeds({
+				kind: 'proposal',
+				fields: [field('contact', 'record'), field('owner', 'text'), field('presenter', 'text')]
+			})
+		).toEqual({ addresses: false, customValues: false, proposalParents: true, memberNames: true });
+		// A 'contact' column means something else on a contact's own kind of list
+		// (the contact's company) — it must never trip the proposal-only needs.
+		expect(listNeeds({ kind: 'deal', fields: [field('contact', 'record')] })).toEqual({
+			addresses: false,
+			customValues: false,
+			proposalParents: false,
+			memberNames: false
+		});
 	});
 });
 
@@ -124,8 +209,8 @@ describe('describeListRows', () => {
 			]
 		};
 		const rows = describeListRows({ kind: 'company', rows: [steel] }, spec, () => true, {
-			addresses: [address],
-			customValues: []
+			...NO_EXTRAS,
+			addresses: [address]
 		});
 		expect(rows).toEqual([
 			{
@@ -136,6 +221,37 @@ describe('describeListRows', () => {
 					{ type: 'text', text: '+1 555 0180' },
 					{ type: 'text', text: 'Jersey City' },
 					{ type: 'datetime', value: '2026-01-01T00:00:00Z' }
+				]
+			}
+		]);
+	});
+
+	it('carries a product’s picture as an image cell, and null when it has none', () => {
+		const spec: ListSpec = {
+			kind: 'product',
+			fields: [field('name', 'text'), field('image', 'image')]
+		};
+		const rows = describeListRows(
+			{ kind: 'product', rows: [aligner, consult] },
+			spec,
+			() => true,
+			NO_EXTRAS
+		);
+		expect(rows).toEqual([
+			{
+				id: ALIGNER,
+				cells: [
+					{ type: 'link', text: 'Clear aligner tray', href: `/products/${ALIGNER}` },
+					{ type: 'image', url: 'https://cdn.test/aligner.png' }
+				]
+			},
+			{
+				id: CONSULT,
+				cells: [
+					{ type: 'link', text: 'Whitening consult', href: `/products/${CONSULT}` },
+					// A column of whitespace is no picture at all — the page draws the
+					// placeholder tile rather than a broken frame.
+					{ type: 'image', url: null }
 				]
 			}
 		]);
@@ -169,7 +285,7 @@ describe('describeListRows', () => {
 			]
 		};
 		const [row] = describeListRows({ kind: 'asset', rows: [tap] }, spec, () => false, {
-			addresses: [],
+			...NO_EXTRAS,
 			customValues: [location]
 		});
 		expect(row?.cells).toEqual([
@@ -225,7 +341,7 @@ describe('describeListRows', () => {
 			{ kind: 'invoice', rows: [invoice] },
 			spec,
 			(kind) => kind === 'invoice',
-			{ addresses: [], customValues: [] }
+			NO_EXTRAS
 		);
 		expect(row?.cells).toEqual([
 			{ type: 'link', text: 'INV-0001', href: '/invoices/i1' },
@@ -242,8 +358,116 @@ describe('describeListRows', () => {
 				{ kind: 'asset', rows: [tap] },
 				{ kind: 'company', fields: [field('name', 'text')] },
 				() => true,
-				{ addresses: [], customValues: [] }
+				NO_EXTRAS
 			)
 		).toEqual([]);
+	});
+
+	it('reads a proposal’s parent, its owner and presenter’s names, and what was selected', () => {
+		const PROPOSAL = 'a1000000-0000-0000-0000-000000000001';
+		const CONTACT = '30000000-0000-0000-0000-000000000009';
+		const OWNER_ID = '40000000-0000-0000-0000-000000000001';
+		const PRESENTER_ID = '40000000-0000-0000-0000-000000000002';
+		const OPTION_STANDARD = 'a2000000-0000-0000-0000-000000000001';
+		const OPTION_PREMIUM = 'a2000000-0000-0000-0000-000000000002';
+
+		const decided: ProposalWithOptions = {
+			id: PROPOSAL,
+			org_id: ORG_ID,
+			entity_type: 'contact',
+			entity_id: CONTACT,
+			title: 'Roof replacement',
+			base_config: {},
+			status: 'accepted',
+			default_fee: null,
+			tax_rate: null,
+			valid_until: null,
+			selected_option_id: OPTION_PREMIUM,
+			deck_id: null,
+			presenter_id: PRESENTER_ID,
+			responsible_id: OWNER_ID,
+			...STAMPS,
+			proposal_options: [
+				{
+					id: OPTION_STANDARD,
+					label: 'Standard',
+					sort_order: 0,
+					is_recommended: false,
+					computed_total: 500,
+					currency: 'USD'
+				},
+				{
+					id: OPTION_PREMIUM,
+					label: 'Premium',
+					sort_order: 1,
+					is_recommended: true,
+					computed_total: 900,
+					currency: 'USD'
+				}
+			]
+		};
+		// A fresh draft: no parent, no people, nothing chosen yet.
+		const draft: ProposalWithOptions = {
+			...decided,
+			id: 'a1000000-0000-0000-0000-000000000002',
+			entity_type: null,
+			entity_id: null,
+			status: 'draft',
+			selected_option_id: null,
+			presenter_id: null,
+			responsible_id: null,
+			proposal_options: []
+		};
+
+		const spec: ListSpec = {
+			kind: 'proposal',
+			fields: [
+				field('name', 'text'),
+				field('contact', 'record'),
+				field('owner', 'text'),
+				field('presenter', 'text'),
+				field('status', 'enum'),
+				field('value', 'money'),
+				field('created_at', 'datetime')
+			]
+		};
+		const rows = describeListRows(
+			{ kind: 'proposal', rows: [decided, draft] },
+			spec,
+			(kind) => kind === 'proposal' || kind === 'contact',
+			{
+				...NO_EXTRAS,
+				proposalParents: new Map([
+					[
+						proposalParentKey('contact', CONTACT),
+						{ kind: 'contact', id: CONTACT, name: 'Jane Doe' }
+					]
+				]),
+				memberNames: new Map([
+					[OWNER_ID, 'Pat Owner'],
+					[PRESENTER_ID, 'Sam Presenter']
+				])
+			}
+		);
+
+		expect(rows[0]?.cells).toEqual([
+			{ type: 'link', text: 'Roof replacement', href: `/proposals/${PROPOSAL}` },
+			{ type: 'record', text: 'Jane Doe', href: `/contacts/${CONTACT}` },
+			{ type: 'text', text: 'Pat Owner' },
+			{ type: 'text', text: 'Sam Presenter' },
+			{ type: 'status', text: 'accepted', tone: PROPOSAL_STATUS_TONE.accepted },
+			{ type: 'money', value: 900, currency: 'USD', unit: null },
+			{ type: 'datetime', value: STAMPS.created_at }
+		]);
+		// A draft names no parent, no people and nothing chosen — blank, not an error.
+		expect(rows[1]?.cells).toEqual([
+			{ type: 'link', text: 'Roof replacement', href: `/proposals/${draft.id}` },
+			{ type: 'record', text: '', href: null },
+			{ type: 'text', text: '' },
+			{ type: 'text', text: '' },
+			{ type: 'status', text: 'draft', tone: PROPOSAL_STATUS_TONE.draft },
+			{ type: 'money', value: null, currency: 'USD', unit: null },
+			{ type: 'datetime', value: STAMPS.created_at }
+		]);
 	});
 });

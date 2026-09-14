@@ -236,13 +236,14 @@ A sub-agent earns a split and never logs in. `relationships` already models the 
 a member — they are closer to a contact, and the split has to point at something durable.
 Decide once, when Gap 3 is designed, not twice. **Q6.**
 
-### 7. Portfolio insights — the empty `insights` section
+### 7. Portfolio insights — a section that does not exist yet
 
-The nav has an `insights` category with nothing in it, and this vertical is what fills it:
-volume trend, attrition (a MID whose volume falls off a cliff is churning, and it is worth
-more to save it than to sign a new one), effective-rate drift, rep leaderboard, expected
-versus received residual. Needs Gaps 2 and 3 first — all of it is a fold over
-`residual_lines`. **Q27.**
+There is no reporting section in the nav: `insights` was declared empty and then retired
+for having only the graph in it (docs/features.md, "Nav sections"), and this vertical is
+what would bring it back with enough pages to be a section: volume trend, attrition (a
+MID whose volume falls off a cliff is churning, and it is worth more to save it than to
+sign a new one), effective-rate drift, rep leaderboard, expected versus received
+residual. Needs Gaps 2 and 3 first — all of it is a fold over `residual_lines`. **Q27.**
 
 ### 8. Smaller, known, cheap
 

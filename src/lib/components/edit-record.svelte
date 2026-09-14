@@ -39,7 +39,8 @@
 		type,
 		recordId,
 		form: data,
-		pickers = {}
+		pickers = {},
+		compact = false
 	}: {
 		type: RecordType;
 		/** The row being edited — the record page's own id, for the freshness key. */
@@ -47,6 +48,8 @@
 		form: SuperValidated<RecordFormValues>;
 		/** The options behind each picker field, as `loadEditRecord()` read them. */
 		pickers?: RecordPickers;
+		/** Icon only, for a card header with no room for a word. */
+		compact?: boolean;
 	} = $props();
 
 	const definition = RECORD_FORMS[type];
@@ -85,10 +88,17 @@
 <Modal.Root bind:open>
 	<Modal.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline">
-				<PencilIcon />
-				Edit
-			</Button>
+			{#if compact}
+				<Button {...props} variant="ghost" size="icon" class="size-7">
+					<PencilIcon />
+					<span class="sr-only">Edit {terms.noun}</span>
+				</Button>
+			{:else}
+				<Button {...props} variant="outline">
+					<PencilIcon />
+					Edit
+				</Button>
+			{/if}
 		{/snippet}
 	</Modal.Trigger>
 
