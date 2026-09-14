@@ -76,7 +76,9 @@ npm run format         # prettier (svelte + tailwind plugins)
 - The service-role client (`src/lib/supabase.server.ts`) bypasses RLS: create it per
   request in server files only. RLS stays enabled on every table regardless.
 - Every response carries the security headers from
-  `src/lib/server/security-headers.ts`. The CSP's origins derive from
+  `src/lib/server/security-headers.ts`. `Permissions-Policy` grants the microphone to
+  this origin and nothing else (`microphone=(self)`) — dictation and the assistant's
+  voice call are the app's own; camera and location stay refused. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
   as a parameter or documented constant, never a hardcoded project ref. Hosts
   that only serve **images** (a product's `image_url` on a storefront CDN) are the
@@ -819,14 +821,19 @@ The assistant (`/assistant`, feature id `assistant`) is built on the Vercel AI S
 SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the installed
 version; read them before the website. The full account is `docs/assistant.md`.
 
-- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package — `@ai-sdk/openai`, over the Responses API. Config is env-only
-  (`OPENAI_API_KEY`, `AI_MODEL`; the default model is `gpt-5.6-luna`); when unconfigured
-  the page says so and the endpoint answers 503, never a crash. What the API is asked for
-  on a call — `store: false`, the per-thread `promptCacheKey` — is the SDK's namespaced
-  `providerOptions`, spelled once in `openaiCallOptions()` (`provider.ts`) and set on the
-  agent and the title call; reasoning is the SDK's portable `reasoning` setting, never a
-  provider option.
+- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`, `realtimeToken()`),
+  which is the only **server** file that imports a provider package — `@ai-sdk/openai`,
+  over the Responses API. Config is env-only (`OPENAI_API_KEY`, `AI_MODEL`; the default
+  model is `gpt-5.6-luna`); when unconfigured the page says so and the endpoint answers
+  503, never a crash. What the API is asked for on a call — `store: false`, the
+  per-thread `promptCacheKey` — is the SDK's namespaced `providerOptions`, spelled once in
+  `openaiCallOptions()` (`provider.ts`) and set on the agent and the title call; reasoning
+  is the SDK's portable `reasoning` setting, never a provider option. The one browser
+  exception is `realtimeModel()` in `src/lib/ai/realtime.svelte.ts`: a realtime model's
+  other half parses the provider's events and serialises ours **in the browser**, so it
+  cannot live on the server the way `chatModel()` does. It is loaded only when a call
+  starts, its key is a placeholder that is never used, and it is the only client module
+  allowed to name the vendor.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.
@@ -854,6 +861,21 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
+- **Talking to it is the same assistant** (`docs/assistant.md`, "The call"). The
+  composer's commit button is whatever there is to commit — Send with something written,
+  Stop while an answer streams, and **Call** with an empty box — and pressing Call opens
+  `Assistant.Call` over the SDK's `Experimental_AbstractRealtimeSession`, bound to runes
+  in `src/lib/ai/realtime.svelte.ts` because `@ai-sdk/svelte` ships no realtime binding
+  yet. The key never reaches the browser: `/assistant/realtime/token` mints a short-lived
+  client secret with the session already decided (`voiceSessionConfig()`), because a
+  `session.update` only changes the fields it carries — so instructions and voice are the
+  server's and the browser states only how it listens. A tool call comes back through
+  `/assistant/realtime/tool` and `runVoiceTool()`, gated exactly as a typed turn is; the
+  browser is a relay, not the thing with the permissions. A call offers one tool fewer
+  than a thread — anything in `TOOL_APPROVAL` is withheld, because a spoken "yes" is not
+  an approval this app can evidence. `Assistant.Orb` is what you talk to, and it knows
+  only how loud and how fast. The transcript is not saved: a thread you want to keep is
+  the typed one.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
   (`page.data.conversations`) with New chat, Home and a "Chats" label that gives

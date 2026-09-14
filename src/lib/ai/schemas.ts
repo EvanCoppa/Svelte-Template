@@ -1,3 +1,4 @@
+import type { JSONValue } from 'ai';
 import { z } from 'zod';
 
 /**
@@ -76,3 +77,36 @@ export const streamRequestSchema = z.discriminatedUnion('trigger', [
 ]);
 
 export type StreamRequest = z.infer<typeof streamRequestSchema>;
+
+/**
+ * A voice call's setup request. The SDK's realtime session posts the session
+ * config it is about to send and nothing else, so the one per-request fact
+ * the server needs — where the caller is, for "today" — travels in the setup
+ * URL's `tz` instead. Bounded like a turn's for the same reason: it ends up
+ * in the model's instructions.
+ */
+export const realtimeTimeZoneSchema = z.string().trim().min(1).max(64);
+
+/**
+ * JSON itself, as the one contract the tool bridge holds its arguments to —
+ * checked on the way out of the browser and again on the way into the server.
+ * It goes no further than the shape on purpose: a tool's arguments are the
+ * model's, and only the named tool's own schema can say whether they are
+ * valid for it, which is `runVoiceTool()`'s first act.
+ */
+export const jsonValueSchema: z.ZodType<JSONValue> = z.lazy(() =>
+	z.union([
+		z.string(),
+		z.number(),
+		z.boolean(),
+		z.null(),
+		z.array(jsonValueSchema),
+		z.record(z.string(), jsonValueSchema)
+	])
+);
+
+/** What the browser relays when the model calls a tool during a call. */
+export const realtimeToolRequestSchema = z.object({
+	name: z.string().trim().min(1).max(100),
+	input: jsonValueSchema
+});

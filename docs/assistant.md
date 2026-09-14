@@ -98,11 +98,18 @@ chips on the empty screen, and why they stay reachable once a thread is underway
 microphone is dictation**, and it is drawn only where the browser has a speech engine
 at all (`$lib/speech`, which is the one place that knows the API is still prefixed):
 while it listens the icon becomes a level meter and the settled transcript lands in the
-draft, so nothing reaches a server that the reader has not read first. **Send becomes
-Stop** while an answer streams. The controls sit beside the field while the draft still
-fits on one line and drop to their own row under it when it does not — measured off a
-hidden copy of the text, because asking "has it wrapped" would wrap, widen, unwrap and
-oscillate.
+draft, so nothing reaches a server that the reader has not read first. The controls sit
+beside the field while the draft still fits on one line and drop to their own row under
+it when it does not — measured off a hidden copy of the text, because asking "has it
+wrapped" would wrap, widen, unwrap and oscillate.
+
+**The fourth control is whatever there is to commit**, and it is one button in one
+place with three states: Send with something written, **Stop** while an answer streams,
+and — with an empty box — **Call**. An empty box is not a mistake to grey a button out
+for, it is a different way of asking, so the button does not sit there disabled waiting
+for typing; it offers the other way in. That is also why dictation keeps its own
+microphone beside it: putting words in the box and talking to someone are not the same
+act.
 
 A message is the reader's turn as a bubble on the end side and the assistant's as the
 page's own text — full width, no avatar, nothing framing it. Its tool calls land in one
@@ -111,6 +118,87 @@ is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; 
 other call is activity, and they collapse into the one `Assistant.Activity` line above
 the answer — the newest tool named while they run, a count to unfold once they are
 done. `Assistant.Shimmer` is the wait before the first word.
+
+## The call
+
+Pressing the composer's button on an empty box opens a **voice call**: the same
+assistant, the same tools over the same organization's data, reached by talking
+instead of writing. It is the product this template is selling — you can ask your
+business a question out loud and it goes and looks.
+
+**The SDK's realtime mechanism is the mechanism**, as everywhere else here.
+`ai` ships `Experimental_AbstractRealtimeSession`, which owns the socket, captures
+the microphone, plays the model's audio, stops that playback the instant you start
+talking again, assembles both sides of the conversation into `UIMessage`s and
+normalises tool calls. It is deliberately framework-agnostic — one abstract
+`setState` is the whole of a binding, which is what `@ai-sdk/react`'s
+`experimental_useRealtime` implements with React state. `@ai-sdk/svelte` has no
+realtime binding yet, so `src/lib/ai/realtime.svelte.ts` is that same binding in
+runes (`SvelteRealtimeSession`), and `VoiceCall` around it is the app's own part:
+the microphone permission, the mute switch, the input level the orb breathes with,
+and which tool is running. Nothing in it re-implements something the SDK has.
+
+**The key never leaves the server.** `POST /assistant/realtime/token` is the SDK's
+setup endpoint: it builds the session (`voiceSessionConfig()` in
+`src/lib/server/ai/realtime.ts`), mints a short-lived client secret with
+`openai.experimental_realtime.getToken()` through `provider.ts`, and answers with
+`{ token, url, expiresAt, tools }`. The browser opens the WebSocket with that
+secret, which is why `wss://api.openai.com` is in `connect-src` — derived from the
+endpoint by `realtimeOrigins()` (`$lib/ai/realtime`) the way the map's origins are
+derived from its style URLs — and why `Permissions-Policy` now reads
+`microphone=(self)`.
+
+**Instructions and voice are set at mint time, on purpose.** A `session.update`
+only changes the fields it carries, so the browser states how it _listens_
+(`voiceSession()` — semantic VAD, input transcription, audio out) and never what it
+is _told_: a caller who reshaped the update it sends would still be talking to this
+organization's assistant. The spoken persona is `VOICE_INSTRUCTIONS` in `prompts.ts`,
+which shares its tool discipline with the typed one — `TOOL_DISCIPLINE`, written once
+— and differs only where the shape of an answer does: two or three sentences at a
+time, no markdown, money and dates said the way a person says them.
+
+**Tools run on the server, with the caller's own session.** The model is at the far
+end of a socket the browser holds, so a tool call comes back through
+`POST /assistant/realtime/tool`, and `runVoiceTool()` gates it exactly as a typed turn
+is gated: the name must be a tool this caller may use right now, the input is
+validated against that tool's own schema, `requireToolContext()` checks again inside
+the tool, and RLS and the column grants apply underneath. The browser is a relay, not
+the thing with the permissions. A tool that fails answers with its message rather than
+throwing, because a tool call with no output leaves the model waiting for one.
+
+The AI SDK's realtime guide asks for an endpoint per tool rather than one that runs a
+tool by name, on the grounds that a generic route is easy to build without
+authentication, validation or authorization. This app has a generic route _and_ all
+three, in the one place that already expresses them for every tool — seventeen
+endpoints repeating that would be seventeen chances to leave one out. That is the
+deviation, and this paragraph is it being surfaced rather than quietly taken.
+
+**A call offers fewer tools than a thread**, by exactly one: anything in
+`TOOL_APPROVAL` is withheld (`voiceToolNames()`). Approval is a card with Approve and
+Deny on it and a call has no cards; a spoken "yes" is not a decision this app can
+evidence afterwards, and the tool behind that gate deletes data. Deleting is what the
+typed thread is for.
+
+**The screen is `Assistant.Call`** — `ui/dialog` rather than `Modal`, which is the
+documented exception (`Modal` is a tray holding a card; a call is a room you step
+into), keeping the focus trap and the Escape because it is still something you are
+inside. It is the orb, what it is doing, and the last thing either of you said, and
+nothing else: on a call there is nothing to read, only something to listen to, and the
+one line of transcript is there so you can check a name you half-heard. Closing it IS
+hanging up — the `$effect` that opens the call tears it down, so the button, Escape, a
+click outside and navigating away all release the microphone through the same line.
+
+**`Assistant.Orb`** is what you talk to: six conic gradients turning at different
+rates behind a blur and a contrast curve, which is what makes the colours look like
+they move through a liquid rather than cross-fade, grained with a dot grid in the
+page's own background colour. Every measurement scales off `size`, because the effect
+does not survive being resized on its own — at 32px the blur of a 192px orb is the
+whole orb. It is painted from `--primary` with relative `oklch()`, so it follows the
+theme, and it knows only how loud and how fast: `Assistant.Call` maps the call's state
+onto those, and `/components` → Badges & avatars shows the range. The orb swells with
+**your** voice and not the assistant's — while it is talking, the microphone hears an
+echo-cancelled room, and a swell from that would be the orb reacting to itself, so
+speaking gets a breath of its own instead.
 
 ## The agent
 
@@ -272,6 +360,12 @@ itself: `createdAt`, `model`, `inputTokens`, `outputTokens`. The endpoint attach
 - **Attachments**, **retrieval** (needs pgvector and an ingest path), **stream
   resumption** (`resumeStream` needs a stream store), and an embedded assistant on other
   pages.
+- **A saved call.** A voice call's transcript lives as long as the call — the screen
+  shows it a turn at a time and nothing is written to `assistant_messages`. Saving one
+  means mapping messages the realtime session assembled onto the thread's own shape so
+  that `validateUIMessages` accepts them on reload, and a half-mapped thread that fails
+  to load is worse than a call that was only a call. A thread you want to keep is the
+  typed one.
 - **`experimental_toolApprovalSecret`** — with the server owning the thread and merging
   only approval decisions, a forged approval cannot rewrite a tool call; add the secret if
   the trust model ever changes.
