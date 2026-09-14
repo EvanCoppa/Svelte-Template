@@ -30,6 +30,7 @@ export const FEATURE_IDS = [
 	'featured-groups',
 	'categories',
 	'coupons',
+	'purchases',
 	'rmas',
 	'assets',
 	// The rental portfolio (the properties_and_leases migration). Real-estate

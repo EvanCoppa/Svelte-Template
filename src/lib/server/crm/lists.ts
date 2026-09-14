@@ -13,6 +13,7 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TICKET_STATUS_TONE
@@ -38,6 +39,7 @@ import { listLeases, type LeaseWithParties } from './leases';
 import { listProducts, type ProductWithCategory } from './products';
 import { listProperties, type Property } from './properties';
 import { listProposals, proposalParentKind, type ProposalWithOptions } from './proposals';
+import { listPurchases, type PurchaseWithVendor } from './purchases';
 import { listRmas, type RmaWithParties } from './rmas';
 import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
@@ -71,6 +73,7 @@ export type ListResult =
 	| { kind: 'proposal'; rows: ProposalWithOptions[] }
 	| { kind: 'billable'; rows: Billable[] }
 	| { kind: 'coupon'; rows: Coupon[] }
+	| { kind: 'purchase'; rows: PurchaseWithVendor[] }
 	| { kind: 'rma'; rows: RmaWithParties[] };
 
 /** Every row of the kind the org has — a kind's own list page. */
@@ -104,6 +107,8 @@ export async function listRecords(
 			return { kind, rows: await listBillables(supabase, orgId) };
 		case 'coupon':
 			return { kind, rows: await listCoupons(supabase, orgId) };
+		case 'purchase':
+			return { kind, rows: await listPurchases(supabase, orgId) };
 		case 'rma':
 			return { kind, rows: await listRmas(supabase, orgId) };
 	}
@@ -542,6 +547,28 @@ export function describeListRows(
 						return text(coupon.description);
 					case 'created_at':
 						return datetime(coupon.created_at);
+				}
+			});
+		case 'purchase':
+			return describe(result.kind, result.rows, (purchase, key) => {
+				switch (key) {
+					case 'name':
+						return link('purchase', purchase.id, purchase.number);
+					case 'company':
+						return related('company', purchase.companies);
+					case 'status':
+						return status(purchase.status, PURCHASE_STATUS_TONE[purchase.status]);
+					case 'reference':
+						return text(purchase.reference);
+					case 'total':
+						// Generated from the lines, the freight and the fee; never typed.
+						return money(purchase.total ?? 0, purchase.currency);
+					case 'expected_at':
+						return datetime(purchase.expected_at);
+					case 'ordered_at':
+						return datetime(purchase.ordered_at);
+					case 'created_at':
+						return datetime(purchase.created_at);
 				}
 			});
 		case 'rma':

@@ -35,6 +35,8 @@ export const QUERY = {
 	/** The catalog tree — a category added, moved or removed changes it. */
 	categories: 'app:categories',
 	coupons: 'app:coupons',
+	/** What the org buys from its vendors — a line received moves the header too. */
+	purchases: 'app:purchases',
 	/** Returns coming back from customers. */
 	rmas: 'app:rmas',
 	/** The portfolio — buildings and the units inside them, which are rows in the same list. */

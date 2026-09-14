@@ -34,6 +34,7 @@ export const RECORD_KINDS = [
 	'deal',
 	'proposal',
 	'invoice',
+	'purchase',
 	'rma',
 	'task',
 	'ticket'
@@ -66,6 +67,7 @@ export const RECORD_KIND_META = {
 	deal: { feature: 'deals', segment: 'deals' },
 	proposal: { feature: 'proposals', segment: 'proposals' },
 	invoice: { feature: 'invoices', segment: 'invoices' },
+	purchase: { feature: 'purchases', segment: 'purchases' },
 	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },
 	ticket: { feature: 'tickets', segment: 'tickets' }

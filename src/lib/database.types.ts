@@ -3062,7 +3062,7 @@ export type Database = {
           freight?: number
           id?: string
           notes?: string | null
-          number: string
+          number?: string
           ordered_at?: string | null
           org_id: string
           paid_at?: string | null

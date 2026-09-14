@@ -22,6 +22,7 @@ const METHODS = [
 	'in',
 	'is',
 	'lt',
+	'neq',
 	'not',
 	'or',
 	'order',

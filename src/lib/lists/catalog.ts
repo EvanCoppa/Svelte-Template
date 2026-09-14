@@ -10,6 +10,7 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
@@ -252,6 +253,18 @@ export const LIST_FIELD_CATALOG = {
 		ends_on: date('Ends'),
 		status: enumOf('Status', ACTIVE_STATUS_TONE),
 		description: text('Description'),
+		created_at: created
+	},
+	purchase: {
+		name: text('Number'),
+		// The vendor. A purchase names a company and never a person: you buy
+		// from an organisation, and the table's column is not nullable.
+		company: record('company'),
+		status: enumOf('Status', PURCHASE_STATUS_TONE),
+		reference: text('Reference'),
+		total: money('Total'),
+		expected_at: datetime('Expected'),
+		ordered_at: datetime('Ordered'),
 		created_at: created
 	},
 	rma: {

@@ -22,6 +22,7 @@ import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 import ShieldIcon from '@lucide/svelte/icons/shield';
+import ShoppingBagIcon from '@lucide/svelte/icons/shopping-bag';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import StarIcon from '@lucide/svelte/icons/star';
@@ -64,6 +65,7 @@ export const ICONS = {
 	'receipt-text': ReceiptTextIcon,
 	'rotate-ccw': RotateCcwIcon,
 	shield: ShieldIcon,
+	'shopping-bag': ShoppingBagIcon,
 	'sliders-horizontal': SlidersHorizontalIcon,
 	sparkles: SparklesIcon,
 	star: StarIcon,

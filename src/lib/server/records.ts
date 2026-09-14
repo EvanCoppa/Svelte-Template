@@ -17,6 +17,7 @@ import {
 	invoiceRecordSchema,
 	leaseRecordSchema,
 	productRecordSchema,
+	purchaseRecordSchema,
 	rmaRecordSchema,
 	propertyRecordSchema,
 	taskRecordSchema,
@@ -53,6 +54,7 @@ import { createInvoice } from './crm/invoices';
 import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
 import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
 import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
 import {
 	createProperty,
@@ -390,6 +392,8 @@ async function removeRecord(
 			return deleteTicket(supabase, orgId, id);
 		case 'coupon':
 			return deleteCoupon(supabase, orgId, id);
+		case 'purchase':
+			return deletePurchase(supabase, orgId, id);
 		case 'rma':
 			return deleteRma(supabase, orgId, id);
 	}
@@ -519,6 +523,20 @@ async function recordFormValues(
 						acquired_on: str(row.acquired_on),
 						purchase_price: str(row.purchase_price),
 						description: str(row.description)
+					}
+				: {};
+		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						reference: str(row.reference),
+						expected_at: str(row.expected_at),
+						due_date: str(row.due_date),
+						freight: str(row.freight),
+						tax: str(row.tax),
+						notes: str(row.notes)
 					}
 				: {};
 		}
@@ -783,6 +801,23 @@ async function writeRecord(
 			await (id
 				? updateCoupon(supabase, orgId, id, columns)
 				: createCoupon(supabase, orgId, columns));
+			return;
+		}
+		case 'purchase': {
+			const data = purchaseRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				reference: text(data.reference),
+				expected_at: instant(data.expected_at),
+				due_date: text(data.due_date),
+				// Not-null money columns: blank is zero, the products rule.
+				freight: price(data.freight),
+				tax: price(data.tax),
+				notes: text(data.notes)
+			};
+			await (id
+				? updatePurchase(supabase, orgId, id, columns)
+				: createPurchase(supabase, orgId, columns));
 			return;
 		}
 		case 'rma': {

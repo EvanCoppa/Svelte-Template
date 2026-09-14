@@ -14,6 +14,7 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
 	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	PRIORITY_TONE,
@@ -40,6 +41,7 @@ import {
 	type InvoiceWithParties
 } from './invoices';
 import { getProduct, listProducts, type ProductWithCategory } from './products';
+import { getPurchase, listPurchases, type PurchaseWithDetails } from './purchases';
 import { getRma, listRmas, type RmaWithParties } from './rmas';
 import {
 	getProposal,
@@ -308,6 +310,33 @@ export function describeProperty(
 			{ label: 'Acquired', value: date(row.acquired_on) },
 			{ label: 'Disposed', value: date(row.disposed_on) },
 			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describePurchase(row: PurchaseWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'purchase',
+		id: row.id,
+		name: row.number,
+		pills: [pill(row.status, PURCHASE_STATUS_TONE[row.status])],
+		fields: [
+			{ label: 'Vendor', value: record('company', row.companies, canOpen) },
+			{ label: 'Reference', value: text(row.reference) },
+			// Every figure here is the database's: the subtotal rolls up from
+			// the lines and the total is generated from it.
+			{ label: 'Subtotal', value: money(row.subtotal, row.currency) },
+			{ label: 'Freight', value: money(row.freight, row.currency) },
+			{ label: 'Tax', value: money(row.tax, row.currency) },
+			{ label: 'Total', value: money(row.total, row.currency) },
+			{ label: 'Ordered', value: datetime(row.ordered_at) },
+			{ label: 'Expected', value: datetime(row.expected_at) },
+			{ label: 'Received', value: datetime(row.received_at) },
+			{ label: 'Due', value: date(row.due_date) },
+			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -728,6 +757,10 @@ export async function getRecord(
 			const row = await getInvoice(supabase, orgId, id);
 			return row && describeInvoice(row, canOpen);
 		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row && describePurchase(row, canOpen);
+		}
 		case 'rma': {
 			const row = await getRma(supabase, orgId, id);
 			return row && describeRma(row, canOpen);
@@ -799,6 +832,11 @@ export async function listRecordNames(
 			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'invoice':
 			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'purchase':
+			return (await listPurchases(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: row.number
+			}));
 		case 'rma':
 			return (await listRmas(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
 		case 'task':

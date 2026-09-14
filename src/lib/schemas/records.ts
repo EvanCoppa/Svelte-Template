@@ -47,6 +47,7 @@ export const RECORD_TYPES = [
 	'lease',
 	'invoice',
 	'coupon',
+	'purchase',
 	'rma',
 	'task',
 	'ticket'
@@ -371,6 +372,24 @@ export const couponRecordSchema = z
 	);
 
 /**
+ * A purchase order's header: who it is placed with, what it is called, when
+ * it is wanted and what rides on top of the lines. The LINES are not here —
+ * they are added on the purchase's own page, the way an invoice's are — and
+ * neither is the status: placing and cancelling are acts on that page, and
+ * everything between is derived from what has arrived.
+ */
+export const purchaseRecordSchema = z.object({
+	// Not optional: `purchases.company_id` is NOT NULL — you buy FROM someone.
+	company_id: z.guid({ error: 'Pick the vendor this order goes to.' }),
+	reference: optionalText,
+	expected_at: optionalInstant,
+	due_date: optionalDate,
+	freight: optionalAmount,
+	tax: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
  * A return: who it is from, why, how far along, and what was decided. The
  * number is the database's, and which units are coming back waits for
  * inventory movement (the rmas migration).
@@ -429,6 +448,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	lease: leaseRecordSchema,
 	invoice: invoiceRecordSchema,
 	coupon: couponRecordSchema,
+	purchase: purchaseRecordSchema,
 	rma: rmaRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
@@ -670,6 +690,21 @@ export const RECORD_FORMS: RecordFormRegistry = {
 				]
 			},
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	purchase: {
+		feature: 'purchases',
+		query: QUERY.purchases,
+		// No status field: `draft` is where every purchase starts, and moving
+		// it is an act on the record page, never a picked value.
+		fields: [
+			{ name: 'company_id', label: 'Vendor', type: 'company' },
+			{ name: 'reference', label: 'Reference', type: 'text', placeholder: 'Spring restock' },
+			{ name: 'expected_at', label: 'Expected', type: 'datetime' },
+			{ name: 'due_date', label: 'Payment due', type: 'date' },
+			{ name: 'freight', label: 'Freight', type: 'number', placeholder: '120.00' },
+			{ name: 'tax', label: 'Tax', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
 		]
 	},
 	rma: {

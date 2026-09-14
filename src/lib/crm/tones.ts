@@ -218,6 +218,20 @@ export const INVOICE_STATUS_TONE = {
 } satisfies Record<Enums<'invoice_status'>, BadgeTone>;
 
 /**
+ * What a purchase order is doing. Only two of these are acts a person takes —
+ * placing it and cancelling it; the three in between are DERIVED from how
+ * much of each line has arrived (`refresh_purchase_rollups()`), which is why
+ * receiving is a line write and never a status write.
+ */
+export const PURCHASE_STATUS_TONE = {
+	draft: 'neutral',
+	ordered: 'info',
+	partially_received: 'warning',
+	received: 'success',
+	cancelled: 'error'
+} satisfies Record<Enums<'purchase_status'>, BadgeTone>;
+
+/**
  * The money axis of an invoice (and later an order), a second pill beside
  * the status: how much of what it asks for has arrived.
  */
