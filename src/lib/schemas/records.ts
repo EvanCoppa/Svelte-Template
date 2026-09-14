@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FeatureId } from '$lib/features/types';
+import { parseFix } from '$lib/crm/visits';
 import { QUERY } from '$lib/queries';
 
 /**
@@ -51,7 +52,8 @@ export const RECORD_TYPES = [
 	'purchase',
 	'rma',
 	'task',
-	'ticket'
+	'ticket',
+	'visit'
 ] as const;
 
 export type RecordType = (typeof RECORD_TYPES)[number];
@@ -68,7 +70,22 @@ export type RecordFieldOption = { value: string; label: string; sublabel?: strin
  * the choices differ per org and per industry), and the property a lease is
  * over (a unit is a row like any other).
  */
-export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage', 'property'] as const;
+export const RECORD_PICKER_KINDS = [
+	'company',
+	'contact',
+	'stage',
+	'property',
+	/**
+	 * Who a visit was to, across every kind you can go and see — one picker
+	 * rather than "pick a kind, then pick a record", because that is two
+	 * questions for one answer. Its values are `<kind>:<id>` (the ledger's
+	 * `company:<id>` account key, generalised), and `writeRecord()` is the one
+	 * place that splits the pair back into the entity link's two columns.
+	 */
+	'subject',
+	/** An org's own `visit_outcomes` rows, like a deal's stage. */
+	'outcome'
+] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
@@ -96,6 +113,13 @@ export type RecordField = {
 		| 'datetime'
 		| 'textarea'
 		| 'select'
+		/**
+		 * A point the device reported, as one string (`$lib/crm/visits`'
+		 * `formatFix()`): a latitude and a longitude are not two fields,
+		 * because neither half is separately typeable or separately
+		 * meaningful. Read-only to the keyboard — it is captured, not typed.
+		 */
+		| 'geo'
 		| RecordPickerKind;
 	placeholder?: string;
 	/** Required for `type: 'select'`, meaningless otherwise. */
@@ -430,6 +454,55 @@ export const rmaRecordSchema = z
 		path: ['company_id']
 	});
 
+/**
+ * Who a visit was to: a kind you can go and see, and one of them. Mirrors
+ * `visits_subject_is_visitable` and the entity link's not-null pair — a visit
+ * to nobody is refused here as well as by the database.
+ */
+const visitSubject = z
+	.string()
+	.trim()
+	.regex(
+		/^(company|contact|deal|property|asset):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+		'Choose who was visited.'
+	);
+
+/** A fix as the geo field posts it: blank, or a point with an optional radius. */
+const optionalFix = z
+	.string()
+	.trim()
+	.refine((value) => value === '' || parseFix(value) !== null, {
+		error: 'That location could not be read.'
+	})
+	.default('');
+
+/**
+ * A visit. The subject and the timings; who attended is a relationship and
+ * what the vertical asks is a custom field, so neither is a form field here
+ * (the visits migration says why).
+ */
+export const visitRecordSchema = z
+	.object({
+		subject: visitSubject,
+		status: z.enum(['planned', 'completed', 'missed']).default('completed'),
+		scheduled_for: optionalInstant,
+		occurred_at: optionalInstant,
+		ended_at: optionalInstant,
+		outcome_id: optionalPick,
+		location: optionalFix,
+		notes: optionalLongText
+	})
+	// The database's `visits_planned_is_scheduled`, said in words: you can only
+	// miss something that was on the plan.
+	.refine((data) => data.status === 'completed' || data.scheduled_for !== '', {
+		error: 'A visit that has not happened needs the date it is planned for.',
+		path: ['scheduled_for']
+	})
+	.refine((data) => data.ended_at === '' || data.occurred_at !== '', {
+		error: 'A visit cannot have ended before it says it happened.',
+		path: ['ended_at']
+	});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
@@ -472,7 +545,8 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	purchase: purchaseRecordSchema,
 	rma: rmaRecordSchema,
 	task: taskRecordSchema,
-	ticket: ticketRecordSchema
+	ticket: ticketRecordSchema,
+	visit: visitRecordSchema
 };
 
 /** One vocabulary, shared by tasks and tickets (the `priority` enum). */
@@ -741,6 +815,29 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'due_date', label: 'Payment due', type: 'date' },
 			{ name: 'freight', label: 'Freight', type: 'number', placeholder: '120.00' },
 			{ name: 'tax', label: 'Tax', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
+	visit: {
+		feature: 'visits',
+		query: QUERY.visits,
+		fields: [
+			{ name: 'subject', label: 'Visited', type: 'subject' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'completed', label: 'Happened' },
+					{ value: 'planned', label: 'Planned' },
+					{ value: 'missed', label: 'Missed' }
+				]
+			},
+			{ name: 'outcome_id', label: 'Outcome', type: 'outcome' },
+			{ name: 'scheduled_for', label: 'Scheduled for', type: 'datetime' },
+			{ name: 'occurred_at', label: 'Arrived', type: 'datetime' },
+			{ name: 'ended_at', label: 'Left', type: 'datetime' },
+			{ name: 'location', label: 'Location', type: 'geo', wide: true },
 			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
 		]
 	},

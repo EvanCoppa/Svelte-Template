@@ -57,7 +57,7 @@ export function isUnit(row: Pick<Property, 'parent_id'>): boolean {
 export async function listProperties(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { status?: Property['status']; parentId?: string | null } = {}
+	filter: { status?: Property['status']; parentId?: string | null; ids?: readonly string[] } = {}
 ): Promise<Property[]> {
 	let query = supabase
 		.from('properties')
@@ -74,6 +74,9 @@ export async function listProperties(
 				? query.is('parent_id', null)
 				: query.eq('parent_id', filter.parentId);
 	}
+	// Named rows only — how a caller resolves a handful of properties it
+	// already holds ids for, the way listCompanies() does for the view filters.
+	if (filter.ids) query = query.in('id', filter.ids);
 	return unwrap(await query);
 }
 

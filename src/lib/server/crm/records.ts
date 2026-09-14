@@ -5,6 +5,12 @@ import { recommendedOption } from '$lib/crm/proposals';
 import { leaseName } from '$lib/crm/leases';
 import { recordHref, type RecordKind } from '$lib/crm/records';
 import {
+	isVisitSubjectKind,
+	visitName,
+	visitSubjectKey,
+	type VisitSubjectKind
+} from '$lib/crm/visits';
+import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
 	COUPON_DISCOUNT_TYPE_TONE,
@@ -23,7 +29,8 @@ import {
 	PRIORITY_TONE,
 	TASK_STATUS_LABEL,
 	TASK_STATUS_TONE,
-	TICKET_STATUS_TONE
+	TICKET_STATUS_TONE,
+	VISIT_STATUS_TONE
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
@@ -58,6 +65,7 @@ import {
 import type { CrmEntityType } from './entity';
 import { getTask, listTasks, type Task, type TaskWithParties } from './tasks';
 import { getTicket, listTickets, type TicketThread, type TicketWithParties } from './tickets';
+import { getVisit, listVisits, type VisitWithOutcome } from './visits';
 
 /**
  * One record of any kind, as the generic record page shows it.
@@ -444,6 +452,53 @@ export function describeRma(row: RmaWithParties, canOpen: CanOpen): RecordDetail
 			{ label: 'Requested', value: date(row.requested_on) },
 			{ label: 'Reason', value: text(row.reason) },
 			{ label: 'Resolution', value: text(row.resolution) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/** The record a visit was to, resolved through that kind's own module. */
+export type VisitSubject = { kind: VisitSubjectKind; id: string; name: string };
+
+/**
+ * A visit.
+ *
+ * Named for who was visited (`visitName()`), because a visit has no name
+ * column — the lease's arrangement, and for the same reason. The outcome is a
+ * `visit_outcomes` row, so its pill wears the tone the ORG gave it rather than
+ * one this file picked; the status pill is ours, from the enum.
+ *
+ * There is no "Attended by" field: attendance is a relationship, and the
+ * Relationships card already draws it (docs/tasks.md's rule — never a second
+ * copy of a relationship as a record field). Time on site is not a field
+ * either: it is `ended_at` minus `occurred_at`, and subtracting two instants
+ * for display is the browser's job, exactly as formatting one is.
+ */
+export function describeVisit(
+	row: VisitWithOutcome,
+	subject: VisitSubject | null,
+	canOpen: CanOpen
+): RecordDetail {
+	const outcome = row.visit_outcomes;
+	return {
+		kind: 'visit',
+		id: row.id,
+		name: visitName(subject?.name),
+		pills: [
+			pill(row.status, VISIT_STATUS_TONE[row.status]),
+			...(outcome ? [{ label: outcome.name, tone: outcome.tone }] : [])
+		],
+		fields: [
+			// The subject is never null in the database, so a blank here means
+			// the reader cannot see it — not that the visit was to nobody.
+			{ label: 'Visited', value: subject ? record(subject.kind, subject, canOpen) : EMPTY },
+			{ label: 'Scheduled', value: datetime(row.scheduled_for) },
+			{ label: 'Arrived', value: datetime(row.occurred_at) },
+			{ label: 'Left', value: datetime(row.ended_at) },
+			{ label: 'Outcome', value: text(outcome?.name ?? null) },
+			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -869,6 +924,10 @@ export async function getRecord(
 			const row = await getTicket(supabase, orgId, id);
 			return row && describeTicket(row, canOpen);
 		}
+		case 'visit': {
+			const row = await getVisit(supabase, orgId, id);
+			return row && describeVisit(row, await resolveVisitSubject(supabase, orgId, row), canOpen);
+		}
 	}
 }
 
@@ -946,6 +1005,16 @@ export async function listRecordNames(
 			return (await listTasks(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'ticket':
 			return (await listTickets(supabase, orgId)).map((row) => ({ id: row.id, name: row.subject }));
+		case 'visit': {
+			// A visit has no name column: it is named for who was visited, so
+			// the subjects are resolved in one pass and each row takes its own.
+			const rows = await listVisits(supabase, orgId);
+			const subjects = await resolveVisitSubjects(supabase, orgId, rows);
+			return rows.map((row) => ({
+				id: row.id,
+				name: visitName(subjects.get(visitSubjectKey(row.entity_type, row.entity_id))?.name)
+			}));
+		}
 	}
 }
 
@@ -979,6 +1048,86 @@ export async function resolveProposalParent(
 			return parent && { kind, id: parent.id, name: parent.title };
 		}
 	}
+}
+
+/**
+ * Who a visit was to, read through that kind's own module — the visits
+ * version of `resolveProposalParent()`, over the five kinds you can go and
+ * see (`VISIT_SUBJECT_KINDS`, which mirrors the database's own constraint).
+ *
+ * Null when RLS hides the record or it went in the moment between the two
+ * reads. Never null because the link is unset: the column pair is not
+ * nullable, unlike a proposal's.
+ */
+export async function resolveVisitSubject(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	visit: { entity_type: CrmEntityType; entity_id: string }
+): Promise<VisitSubject | null> {
+	if (!isVisitSubjectKind(visit.entity_type)) return null;
+	const kind = visit.entity_type;
+	switch (kind) {
+		case 'company': {
+			const subject = await getCompany(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'contact': {
+			const subject = await getContact(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'deal': {
+			const subject = await getDeal(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.title };
+		}
+		case 'property': {
+			const subject = await getProperty(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'asset': {
+			const subject = await getAsset(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+	}
+}
+
+/**
+ * Who many visits were to, one query per kind present rather than one per row
+ * — the list page's version of `resolveVisitSubject()`, and the same shape as
+ * `resolveProposalParents()`.
+ */
+export async function resolveVisitSubjects(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	rows: readonly { entity_type: CrmEntityType; entity_id: string }[]
+): Promise<ReadonlyMap<string, VisitSubject>> {
+	const idsByKind = new Map<VisitSubjectKind, string[]>();
+	for (const row of rows) {
+		if (!isVisitSubjectKind(row.entity_type)) continue;
+		const ids = idsByKind.get(row.entity_type) ?? [];
+		ids.push(row.entity_id);
+		idsByKind.set(row.entity_type, ids);
+	}
+
+	const idsFor = (kind: VisitSubjectKind) => idsByKind.get(kind) ?? [];
+	const [companies, contacts, deals, properties, assets] = await Promise.all([
+		idsFor('company').length ? listCompanies(supabase, orgId, { ids: idsFor('company') }) : [],
+		idsFor('contact').length ? listContacts(supabase, orgId, { ids: idsFor('contact') }) : [],
+		idsFor('deal').length ? listDeals(supabase, orgId, { ids: idsFor('deal') }) : [],
+		idsFor('property').length ? listProperties(supabase, orgId, { ids: idsFor('property') }) : [],
+		idsFor('asset').length ? listAssets(supabase, orgId, { ids: idsFor('asset') }) : []
+	]);
+
+	const subjects = new Map<string, VisitSubject>();
+	const put = (kind: VisitSubjectKind, id: string, name: string) =>
+		subjects.set(visitSubjectKey(kind, id), { kind, id, name });
+
+	for (const row of companies) put('company', row.id, row.name);
+	for (const row of contacts) put('contact', row.id, row.name);
+	// A deal is named by its title, exactly as `listRecordNames()` names one.
+	for (const row of deals) put('deal', row.id, row.title);
+	for (const row of properties) put('property', row.id, row.name);
+	for (const row of assets) put('asset', row.id, row.name);
+	return subjects;
 }
 
 /** The lookup key `resolveProposalParents()` fills and the proposals list reads. */
