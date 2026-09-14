@@ -18,7 +18,7 @@ import { isMailSyncConfigured, mailSyncConfig } from '$lib/server/mail-sync/conf
 import { enqueueJob } from '$lib/server/mail-sync/jobs';
 import { drain } from '$lib/server/mail-sync/worker';
 import { getDisplayNames } from '$lib/server/profiles';
-import { exclusionSchema, mailboxIdSchema, mailboxVisibilitySchema } from '$lib/schemas/email';
+import { exclusionSchema, FORM_IDS, mailboxIdSchema, mailboxVisibilitySchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -31,14 +31,6 @@ import type { Actions, PageServerLoad } from './$types';
  * for the org and the caller may manage it; a locked feature says so with
  * the upgrade prompt, a hidden one is not mentioned.
  */
-
-export const FORM_IDS = {
-	visibility: 'mailbox-visibility',
-	exclusion: 'mailbox-exclusion',
-	removeExclusion: 'remove-mailbox-exclusion',
-	disconnect: 'disconnect-mailbox',
-	syncNow: 'sync-mailbox'
-} as const;
 
 /** "Sync now" runs the queue inline for this long — a page action, not a cron. */
 const SYNC_NOW_BUDGET_MS = 20_000;
