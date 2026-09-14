@@ -98,6 +98,8 @@ describe('kind-addressed access', () => {
 			'company',
 			'contact',
 			'deal',
+			'order',
+			'shipment',
 			'task',
 			'ticket'
 		]);

@@ -219,6 +219,7 @@ describe('streamAssistantTurn', () => {
 			'findRecords',
 			'getCompany',
 			'getRecord',
+			'listRecords',
 			'listRelationshipTypes',
 			'searchCompanies'
 		]);

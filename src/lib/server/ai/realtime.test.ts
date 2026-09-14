@@ -13,12 +13,23 @@ import { orgContext, ORG_ID, toolContext } from './test-support';
 const TASK_ID = '50000000-0000-0000-0000-000000000001';
 
 describe('voiceToolNames', () => {
-	it('leaves out the tool that would ask for approval, because a call has no card to ask on', () => {
+	it('leaves out the tools that would ask for approval, because a call has no card to ask on', () => {
 		const names = voiceToolNames(orgContext());
 
 		expect(names).toContain('listTasks');
 		expect(names).toContain('createTask');
 		expect(names).not.toContain('deleteTask');
+		expect(names).not.toContain('updateRecord');
+	});
+
+	it('leaves out the tools that answer with a card, for the same reason', () => {
+		const names = voiceToolNames(orgContext());
+
+		expect(names).toContain('findRecords');
+		expect(names).toContain('listEvents');
+		expect(names).not.toContain('listRecords');
+		expect(names).not.toContain('findOpenSlots');
+		expect(names).not.toContain('packableLines');
 	});
 
 	it('is gated exactly as a typed turn is', () => {

@@ -173,11 +173,13 @@ three, in the one place that already expresses them for every tool — seventeen
 endpoints repeating that would be seventeen chances to leave one out. That is the
 deviation, and this paragraph is it being surfaced rather than quietly taken.
 
-**A call offers fewer tools than a thread**, by exactly one: anything in
-`TOOL_APPROVAL` is withheld (`voiceToolNames()`). Approval is a card with Approve and
-Deny on it and a call has no cards; a spoken "yes" is not a decision this app can
-evidence afterwards, and the tool behind that gate deletes data. Deleting is what the
-typed thread is for.
+**A call offers fewer tools than a thread**: anything in `TOOL_APPROVAL` is withheld,
+and so is anything in `CARD_TOOLS` (`voiceToolNames()`). A call has no cards. Approval
+is a card with Approve and Deny on it — a spoken "yes" is not a decision this app can
+evidence afterwards, and the tools behind that gate delete data or change a record —
+and an artifact tool's result is a card too (a table to filter, a slot to click, a
+line to tick; see "Artifacts"), which spoken would be a list of ids nobody asked to
+hear. Deleting, editing and packing are what the typed thread is for.
 
 **The screen is `Assistant.Call`** — `ui/dialog` rather than `Modal`, which is the
 documented exception (`Modal` is a tray holding a card; a call is a room you step
@@ -307,6 +309,9 @@ needs there, on the same `read < manage < delete` ladder the rest of the app is 
 | `listTickets`     | tickets   | read   |          |
 | `listEvents`      | calendar  | read   |          |
 | `exploreGraph`    | graph     | read   |          |
+| `listRecords`     | the kind  | read   |          |
+| `findOpenSlots`   | calendar  | read   |          |
+| `packableLines`   | shipments | manage |          |
 
 `activeToolNames(org)` (`tools/index.ts`) keeps a tool only when the feature's mode for
 the org is `enabled` **and** the caller holds the level — the same intersection the hook
@@ -358,12 +363,59 @@ The `assistant` feature itself grants nothing beyond the page. Opening it is a `
 grant on `assistant`; what the assistant can _do_ for you is your grants on everything
 else.
 
-`deleteTask` is listed under `toolApproval` as `'user-approval'`: the model's call pauses
-as an `approval-requested` part, the card shows Approve and Deny, and
-`addToolApprovalResponse` plus `sendAutomaticallyWhen:
+`deleteTask` and `updateRecord` are listed under `toolApproval` as `'user-approval'`:
+the model's call pauses as an `approval-requested` part, the card shows Approve and Deny,
+and `addToolApprovalResponse` plus `sendAutomaticallyWhen:
 lastAssistantMessageIsCompleteWithApprovalResponses` resumes the turn. On the server,
 the browser's copy of the assistant message is **not** trusted: only its approval
-decisions are copied onto the stored message, by approval id.
+decisions are copied onto the stored message, by approval id. An edit earns its pause
+because the card can show it — see "Artifacts" below.
+
+## Artifacts
+
+Some answers are not sentences. A set of records is a table, free time is something
+to pick from, what is left to ship is something to tick into a box — and a tool whose
+result is one of those is drawn in the thread as a component rather than folded into
+the activity line. This is the SDK's generative UI, done the SDK's way: the tool's
+`outputSchema` **is** the artifact's data, the page renders the `tool-<name>` part on
+`part.type` once it is `output-available`, and nothing is streamed beside the message
+for it. So a stored thread draws the same artifacts on reload as it did live, and the
+sources rail keeps reading them through `sourcesOf()` like any other tool part. (Data
+parts — UI that is not a tool result — stay on the "not here yet" list; every artifact
+so far has a tool behind it.)
+
+Two rules hold them together. **An artifact is an existing app component fed by a tool
+result, never a bespoke chat widget**: the list is `createListTable()` over the same
+spec and rows a list page draws (`DataTable`, the one toolbar, a fixed `pageSize`
+because a thread has no viewport to fill), the map is `RelationshipGraph.Root`, the
+record card is the record page's header in miniature, every one inside the same
+`Assistant.Artifact` frame — a card on a hairline with one header row (a mark, a name,
+a quiet count, the reader's actions on the end side) — so the thread reads as one
+column of things the assistant made. And **an artifact that writes does it the page's
+way**: a slot picked on the pick-a-time card and a box opened from the packing card are
+mutations born in a gesture on `/assistant`, so each is a form action there (`book`,
+`pack` in `[[id]]/+page.server.ts`, schemas in `$lib/schemas/assistant.ts`), posted
+through a hidden form the way the calendar's drag-to-move posts `move` — the card hands
+the values up, the page fills the form from script and submits it; never a `fetch` of
+the card's own. Each action opens with the grant the same act takes on its own page
+(`book` the calendar's `manage`; `pack` the shipments' plus the order's, since packing
+part of a line splits it), and the tool says up front whether the caller holds it
+(`canBook`, `canPack`) so a card never offers a button the action would refuse.
+
+| tool            | draws                                                                                                                                                                                                                                                                        | component              |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `getRecord`     | The record's header in miniature: square tile, name, pills, tags, the first fields, how many records point at it, a door to its page when `terms` says the session may open the kind.                                                                                        | `Assistant.RecordCard` |
+| `listRecords`   | A list page's table over a kind — for companies and contacts narrowed by a filter in the view's own shape (`VIEW_FILTER_SCHEMAS`, run through `runView()`), so what the assistant composes is what a saved view will store; the model reads a text copy via `toModelOutput`. | `Assistant.List`       |
+| `exploreGraph`  | The walk as the graph page draws it, opened on the record it started from so its own connections are lit; a legend in the industry's words.                                                                                                                                  | `Assistant.Graph`      |
+| `findOpenSlots` | Free slots of one length inside the working day, found by `openSlots()` (`src/lib/server/ai/slots.ts`, pure, in the zone the model was told), in piles by day; a click posts `book`.                                                                                         | `Assistant.Slots`      |
+| `packableLines` | The order's lines in no box yet (`packableLines()`), each ticked into a new `preparing` shipment with all or part of its quantity — part is a `splitOrderLine()`, the order page's rule; the button posts `pack`.                                                            | `Assistant.Packing`    |
+| `updateRecord`  | Inside the approval card: the change field by field, the current value beside the proposed one, read from the record as the thread last saw it — `recordSnapshots()` over the thread's `getRecord` parts (`src/lib/ai/snapshots.ts`), never a second fetch.                  | `Assistant.Diff`       |
+
+Adding an artifact: the tool as above, a component under `src/lib/components/assistant/`
+composed of the parts the rest of the app draws that thing with, wrapped in
+`Assistant.Artifact`, and one branch in `Assistant.Message`'s part loop. If it writes,
+a schema in `$lib/schemas/assistant.ts`, an action on the page, and a hidden form beside
+the others — the card gets a handler and what it has already done, as props.
 
 Adding a tool: a new file exporting the `tool()` and its `ToolAccess`, one line in each of
 the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`, and a case in
@@ -395,7 +447,11 @@ itself: `createdAt`, `model`, `inputTokens`, `outputTokens`. The endpoint attach
 ## What is deliberately not here yet
 
 - **Data parts** (`createUIMessageStream` + `writer.write({ type: 'data-…' })`) for UI that
-  is not a tool result. The message type's second parameter is `never` until one exists.
+  is not a tool result. The message type's second parameter is `never` until one exists;
+  every artifact so far is a tool result rendered by `part.type`.
+- **Saving a list the assistant composed as a view** — the filter `listRecords` takes is a
+  view's own shape, so the "Save as view" the card wants is the per-org saved view
+  docs/views.md names as the next phase, and nothing more.
 - **Attachments**, **retrieval** (needs pgvector and an ingest path), **stream
   resumption** (`resumeStream` needs a stream store), and an embedded assistant on other
   pages.

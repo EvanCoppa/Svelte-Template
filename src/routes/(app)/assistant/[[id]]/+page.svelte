@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
@@ -6,6 +8,7 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import { recordSnapshots } from '$lib/ai/snapshots';
 	import { threadDialogs } from '$lib/assistant.svelte';
 	import * as Assistant from '$lib/components/assistant/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
@@ -13,8 +16,14 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { recordHref } from '$lib/crm/records';
 	import { QUERY } from '$lib/queries';
-	import { renameConversationSchema } from '$lib/schemas/assistant';
+	import {
+		bookSlotSchema,
+		packOrderSchema,
+		packResultSchema,
+		renameConversationSchema
+	} from '$lib/schemas/assistant';
 
 	let { data } = $props();
 
@@ -32,7 +41,9 @@
 	const SUGGESTIONS = [
 		'Which companies are still leads?',
 		'What is open in the ticket queue?',
-		'Summarize the pipeline by stage'
+		'Summarize the pipeline by stage',
+		'Show me every supplier as a table',
+		'Find an hour free next week for a site visit'
 	];
 
 	/**
@@ -101,7 +112,95 @@
 		if (!renaming) return;
 		renameReset({ data: { conversation_id: renaming.id, title: renaming.title ?? '' } });
 	});
+
+	// --- the artifacts' writes -------------------------------------------
+	//
+	// A slot picked on a pick-a-time card and a box opened from a packing card
+	// are mutations born in a gesture on this page, so each is a form action
+	// here, posted through a hidden form the way the calendar's drag-to-move
+	// posts `move`: the card hands the values up, the page fills the form
+	// from script and submits it, and the answer comes back the superforms
+	// road — a toast on success, the message on refusal.
+
+	/** The `startsAt` of every slot booked this session, so a card draws it as taken. */
+	const booked = new SvelteSet<string>();
+	let bookFormEl = $state<HTMLFormElement | null>(null);
+
+	const { form: bookData, enhance: bookEnhance } = superForm(data.bookForm, {
+		id: 'book-slot',
+		validators: zod4Client(bookSlotSchema),
+		invalidateAll: false,
+		onUpdated({ form }) {
+			if (form.valid) {
+				booked.add(form.data.starts_at);
+				toast.success('Booked', {
+					action: { label: 'Open calendar', onClick: () => goto('/calendar') }
+				});
+			} else {
+				toast.error(form.message ?? 'Could not book the slot.');
+			}
+		},
+		onError() {
+			toast.error('Could not book the slot.');
+		}
+	});
+
+	async function book(slot: { title: string; startsAt: string; endsAt: string }) {
+		$bookData = { title: slot.title, starts_at: slot.startsAt, ends_at: slot.endsAt };
+		// The hidden inputs take the store's values on the next flush.
+		await tick();
+		bookFormEl?.requestSubmit();
+	}
+
+	/** The box each packing card opened, by order id, so the card can point at it. */
+	const shipments = new SvelteMap<string, string>();
+	let packFormEl = $state<HTMLFormElement | null>(null);
+
+	const {
+		form: packData,
+		submitting: packing,
+		enhance: packEnhance
+	} = superForm(data.packForm, {
+		id: 'pack-order',
+		// The lines are an array: the document is posted, not the inputs.
+		dataType: 'json',
+		validators: zod4Client(packOrderSchema),
+		invalidateAll: false,
+		onResult({ result }) {
+			if (result.type !== 'success') return;
+			// The action answers with the box it opened beside the form.
+			const opened = packResultSchema.safeParse(result.data);
+			if (!opened.success) return;
+			const { shipmentId } = opened.data;
+			shipments.set($packData.order_id, shipmentId);
+			toast.success('Box opened', {
+				action: { label: 'Pack it', onClick: () => goto(recordHref('shipment', shipmentId)) }
+			});
+		},
+		onUpdated({ form }) {
+			if (!form.valid) toast.error(form.message ?? 'Could not open a box.');
+		},
+		onError() {
+			toast.error('Could not open a box.');
+		}
+	});
+
+	async function pack(orderId: string, lines: { id: string; quantity: string }[]) {
+		$packData = { order_id: orderId, lines };
+		await tick();
+		packFormEl?.requestSubmit();
+	}
 </script>
+
+<!-- What a picked slot posts: the title and the two instants, nothing else. -->
+<form method="POST" action="?/book" class="hidden" bind:this={bookFormEl} use:bookEnhance>
+	<input type="hidden" name="title" value={$bookData.title} />
+	<input type="hidden" name="starts_at" value={$bookData.starts_at} />
+	<input type="hidden" name="ends_at" value={$bookData.ends_at} />
+</form>
+
+<!-- What a packed box posts: the whole document, as `dataType: 'json'` sends it. -->
+<form method="POST" action="?/pack" class="hidden" bind:this={packFormEl} use:packEnhance></form>
 
 <!--
 	The conversation, and nothing else: the strip of open threads is in the app
@@ -147,6 +246,7 @@
 					messages={chat.messages}
 					class="relative z-10 {started ? '' : 'pointer-events-none opacity-0'}"
 				>
+					{@const snapshots = recordSnapshots(chat.messages)}
 					{#each chat.messages as message, index (message.id)}
 						<Assistant.Message
 							{message}
@@ -154,6 +254,12 @@
 							last={index === chat.messages.length - 1}
 							onApprove={(id) => chat.addToolApprovalResponse({ id, approved: true })}
 							onDeny={(id) => chat.addToolApprovalResponse({ id, approved: false })}
+							{snapshots}
+							{booked}
+							onBook={book}
+							{shipments}
+							packing={$packing}
+							onPack={pack}
 						/>
 					{/each}
 

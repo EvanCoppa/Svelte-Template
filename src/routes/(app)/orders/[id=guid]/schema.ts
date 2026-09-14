@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LINE_FULFILLMENT_STATUSES } from '$lib/crm/orders';
+import { quantityField as quantity } from '$lib/schemas/fields';
 
 /**
  * An order's own forms: its lines, where each of them stands, splitting one,
@@ -19,12 +20,6 @@ const amount = z
 	.string()
 	.trim()
 	.regex(/^$|^\d{1,12}(\.\d{1,2})?$/, 'Enter an amount like 8.50');
-
-/** A count of things, which may be fractional (a length, a weight). */
-const quantity = z
-	.string()
-	.trim()
-	.regex(/^\d{1,9}(\.\d{1,4})?$/, 'Enter a quantity like 24 or 2.5');
 
 export const orderLineSchema = z.object({
 	product_id: z.guid().or(z.literal('')).default(''),

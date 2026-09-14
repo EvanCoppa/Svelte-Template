@@ -899,6 +899,18 @@ version; read them before the website. The full account is `docs/assistant.md`.
   `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
   its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
   line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- **An artifact is a tool result drawn as a component** (docs/assistant.md, "Artifacts"):
+  `Assistant.Message` renders `tool-getRecord`, `tool-listRecords`, `tool-exploreGraph`,
+  `tool-findOpenSlots` and `tool-packableLines` in place once `output-available`, and
+  `tool-updateRecord`'s approval card shows the change field by field (`Assistant.Diff`,
+  from `recordSnapshots()` over the thread). The tool's `outputSchema` is the artifact's
+  data — no data part, nothing streamed beside the message — and **an artifact is an
+  existing app component inside the `Assistant.Artifact` frame, never a bespoke chat
+  widget** (`createListTable()` + `DataTable`, `RelationshipGraph.Root`, the record
+  page's header). One that writes posts a form action on the assistant page through a
+  hidden form (`book`, `pack`; schemas in `$lib/schemas/assistant.ts`), the calendar's
+  drag-to-move road — never a `fetch` of its own — and its tool says whether the caller
+  holds the grant (`canBook`, `canPack`) so no card offers a button the action refuses.
 - Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
   opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives

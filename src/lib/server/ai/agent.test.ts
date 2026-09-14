@@ -27,6 +27,7 @@ describe('createAssistantAgent', () => {
 			'getCompany',
 			'getRecord',
 			'linkRecords',
+			'listRecords',
 			'listRelationshipTypes',
 			'listTasks',
 			'searchCompanies',

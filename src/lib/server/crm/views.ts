@@ -35,10 +35,21 @@ import { listTaggedEntityIds } from './tags';
 /** A view's rows: a list result of the kind the view lists. */
 export type ViewResult = Extract<ListResult, { kind: 'company' | 'contact' }>;
 
+/**
+ * What running a view needs of it: the source and the filter — a stored
+ * view's, or an ad-hoc one the assistant composed. Spelled as the same
+ * union `ViewDefinition` is, so the source still narrows the filter.
+ */
+export type ViewQuery = ViewDefinition extends infer V
+	? V extends { source: infer S; filter: infer F }
+		? { source: S; filter: F }
+		: never
+	: never;
+
 export async function runView(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	view: ViewDefinition
+	view: ViewQuery
 ): Promise<ViewResult> {
 	switch (view.source) {
 		case 'company': {

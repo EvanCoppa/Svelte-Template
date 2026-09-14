@@ -12,7 +12,13 @@ import type { OrgContext } from '$lib/server/org-context';
 import type { AssistantToolContext } from './context';
 import { buildVoiceInstructions } from './prompts';
 import { realtimeToken, realtimeVoice, type AiEnv } from './provider';
-import { assistantTools, activeToolNames, TOOL_APPROVAL, type AssistantToolName } from './tools';
+import {
+	assistantTools,
+	activeToolNames,
+	CARD_TOOLS,
+	TOOL_APPROVAL,
+	type AssistantToolName
+} from './tools';
 import { recordKindAccess } from './tools/access';
 
 /**
@@ -28,16 +34,21 @@ import { recordKindAccess } from './tools/access';
 
 /**
  * The tools a call may use: everything a typed turn could use, less anything
- * that pauses for the reader's approval.
+ * that pauses for the reader's approval, and less anything that answers with
+ * a card.
  *
- * Approval is a card with Approve and Deny on it, and a call has no cards. A
+ * A call has no cards. Approval is a card with Approve and Deny on it — a
  * spoken "yes" is not a decision this app can evidence afterwards, and the
- * one tool behind that gate deletes data — so it is simply not offered on a
- * call, and the model is told nothing about it. The typed thread is where you
- * delete things.
+ * tools behind that gate delete data or change a record — so neither is
+ * offered on a call, and the model is told nothing about them. An artifact
+ * tool's result is a card too (a table to filter, a slot to click, a line to
+ * tick — `CARD_TOOLS`), and spoken it would be a list of ids nobody asked to
+ * hear. The typed thread is where you delete, edit and pack things.
  */
 export function voiceToolNames(org: OrgContext): AssistantToolName[] {
-	return activeToolNames(org).filter((name) => !Object.hasOwn(TOOL_APPROVAL, name));
+	return activeToolNames(org).filter(
+		(name) => !Object.hasOwn(TOOL_APPROVAL, name) && !CARD_TOOLS.some((card) => card === name)
+	);
 }
 
 /** Those tools, as the set the SDK reads schemas off. */
