@@ -8,6 +8,8 @@ import {
 import { toolLabel } from '$lib/ai/labels';
 import {
 	callState,
+	idleStatus,
+	isConversationEvent,
 	voiceSession,
 	type CallState,
 	type VoiceToolCall,
@@ -103,6 +105,18 @@ export class VoiceCall {
 	#stopMeter: (() => void) | null = null;
 
 	#starting = $state(false);
+	/** Why the call ended on its own, or null while it is live or never opened. */
+	#ended = $state<string | null>(null);
+	/** True while the call is about to hang up for want of anyone talking. */
+	#idleWarning = $state(false);
+	/**
+	 * When the conversation last moved, and the timer that watches it. A plain
+	 * number rather than state: it is written on every audio chunk, and nothing
+	 * draws it — what the screen reads is `idleWarning`, which changes twice a
+	 * call at most.
+	 */
+	#lastHeard = 0;
+	#idleTimer: ReturnType<typeof setInterval> | null = null;
 	/**
 	 * Set the moment the call is hung up, and checked after every await in
 	 * `start()`. Opening a call is three round trips — the microphone, the
@@ -125,6 +139,7 @@ export class VoiceCall {
 	/** What the orb is doing. */
 	get state(): CallState {
 		if (this.#failure) return 'failed';
+		if (this.#ended !== null) return 'idle';
 		if (this.#starting || !this.#session) return 'connecting';
 		return callState({
 			status: this.#session.status,
@@ -145,6 +160,16 @@ export class VoiceCall {
 
 	get muted(): boolean {
 		return this.#muted;
+	}
+
+	/** Why the call hung up on its own, or null while it is still going. */
+	get ended(): string | null {
+		return this.#ended;
+	}
+
+	/** Whether the call is about to hang up because nobody is saying anything. */
+	get idleWarning(): boolean {
+		return this.#idleWarning;
 	}
 
 	/** Why the call could not start or could not continue, in words for the reader. */
@@ -168,6 +193,8 @@ export class VoiceCall {
 		this.#starting = true;
 		this.#hungUp = false;
 		this.#failure = null;
+		this.#ended = null;
+		this.#idleWarning = false;
 
 		let stream: MediaStream;
 		try {
@@ -190,6 +217,12 @@ export class VoiceCall {
 				api: { token: this.#options.tokenEndpoint },
 				sessionConfig: voiceSession(),
 				maxEvents: KEPT_EVENTS,
+				// Anything that is part of the conversation keeps the call alive —
+				// stated as what does NOT count, so an event type a later SDK maps
+				// reads as talking. See `isConversationEvent`.
+				onEvent: (event) => {
+					if (isConversationEvent(event.type)) this.#heard();
+				},
 				// The SDK hands a tool call's arguments over as they came off the
 				// wire, so they are parsed here as what they must be — JSON — and
 				// as nothing more: whether they are valid arguments for the named
@@ -215,6 +248,7 @@ export class VoiceCall {
 			this.#stopMeter = meterInput(stream, (level) => {
 				this.#level = level;
 			});
+			this.#watchForSilence();
 		} catch (cause) {
 			stream.getTracks().forEach((track) => track.stop());
 			this.#failure = cause instanceof Error ? cause.message : 'The call could not be started.';
@@ -223,9 +257,15 @@ export class VoiceCall {
 		}
 	}
 
-	/** Hang up: the socket, the microphone and the level meter all go together. */
-	end(): void {
+	/**
+	 * Hang up: the socket, the microphone, the level meter and the idle watch
+	 * all go together. A reason is given when the call ended itself, and is
+	 * what the screen says in place of the status line.
+	 */
+	end(reason: string | null = null): void {
 		this.#hungUp = true;
+		if (this.#idleTimer !== null) clearInterval(this.#idleTimer);
+		this.#idleTimer = null;
 		this.#stopMeter?.();
 		this.#stopMeter = null;
 		this.#session?.dispose();
@@ -236,6 +276,43 @@ export class VoiceCall {
 		this.#muted = false;
 		this.#running = 0;
 		this.#tool = null;
+		this.#idleWarning = false;
+		this.#ended = reason;
+	}
+
+	/**
+	 * The conversation moved, so the call is not idle. Called many times a
+	 * second while anyone is talking, which is why the timestamp is plain and
+	 * the one piece of state here is only written when it actually changes.
+	 */
+	#heard(): void {
+		this.#lastHeard = Date.now();
+		if (this.#idleWarning) this.#idleWarning = false;
+	}
+
+	/**
+	 * Watch for dead air. One interval reading a timestamp rather than a timer
+	 * reset on every event: the conversation moves many times a second while
+	 * anyone is talking, and rescheduling a timeout that often is a lot of work
+	 * to answer a question a second's resolution already answers.
+	 *
+	 * A tool still running counts as the call being alive — a lookup that
+	 * outlasts the limit is the assistant working, not a room nobody is in.
+	 */
+	#watchForSilence(): void {
+		this.#heard();
+		this.#idleTimer = setInterval(() => {
+			if (this.#running > 0) {
+				this.#heard();
+				return;
+			}
+			const status = idleStatus(Date.now() - this.#lastHeard);
+			if (status === 'expired') {
+				this.end('The call ended because nobody was talking.');
+			} else {
+				this.#idleWarning = status === 'warning';
+			}
+		}, 1000);
 	}
 
 	/** Hang up and dial again — what the screen offers after a call that failed. */

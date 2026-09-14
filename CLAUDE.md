@@ -874,8 +874,13 @@ version; read them before the website. The full account is `docs/assistant.md`.
   browser is a relay, not the thing with the permissions. A call offers one tool fewer
   than a thread — anything in `TOOL_APPROVAL` is withheld, because a spoken "yes" is not
   an approval this app can evidence. `Assistant.Orb` is what you talk to, and it knows
-  only how loud and how fast. The transcript is not saved: a thread you want to keep is
-  the typed one.
+  only how loud and how fast. **A call hangs up on its own** after two minutes of
+  nobody talking (`IDLE_LIMIT_MS`, warning for the last thirty seconds), because an
+  open socket with a live microphone is metered; `isConversationEvent()` says what
+  keeps one alive by naming what does not, so an event type a later SDK maps counts
+  as talking rather than cutting a call off mid-sentence. The secret is minted with a
+  two-minute life as the server-side half of the same bound. The transcript is not
+  saved: a thread you want to keep is the typed one.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
   (`page.data.conversations`) with New chat, Home and a "Chats" label that gives

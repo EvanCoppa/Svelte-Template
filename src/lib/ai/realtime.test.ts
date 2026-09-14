@@ -4,10 +4,14 @@ import {
 	callState,
 	callStatusLabel,
 	captionOf,
+	idleStatus,
+	isConversationEvent,
 	lastTurn,
 	messageText,
 	realtimeOrigins,
-	voiceSession
+	voiceSession,
+	IDLE_LIMIT_MS,
+	IDLE_WARNING_MS
 } from './realtime';
 
 /** A message the way the SDK assembles one from a call's transcripts. */
@@ -93,5 +97,47 @@ describe('captionOf', () => {
 		expect(caption).toHaveLength(241);
 		expect(captionOf({ role: 'user', text: 'short' })).toBe('short');
 		expect(captionOf(null)).toBe('');
+	});
+});
+
+describe('idleStatus', () => {
+	it('warns before it hangs up, so a call never drops without saying so', () => {
+		expect(idleStatus(0)).toBe('live');
+		expect(idleStatus(IDLE_LIMIT_MS - IDLE_WARNING_MS - 1)).toBe('live');
+		expect(idleStatus(IDLE_LIMIT_MS - IDLE_WARNING_MS)).toBe('warning');
+		expect(idleStatus(IDLE_LIMIT_MS - 1)).toBe('warning');
+		expect(idleStatus(IDLE_LIMIT_MS)).toBe('expired');
+		expect(idleStatus(IDLE_LIMIT_MS * 10)).toBe('expired');
+	});
+
+	it('leaves enough silence for a pause and not enough for a night', () => {
+		expect(IDLE_LIMIT_MS).toBeGreaterThan(60_000);
+		expect(IDLE_LIMIT_MS).toBeLessThanOrEqual(5 * 60_000);
+		expect(IDLE_WARNING_MS).toBeLessThan(IDLE_LIMIT_MS);
+	});
+});
+
+describe('isConversationEvent', () => {
+	it('counts anyone talking, and a tool being called, as the call being alive', () => {
+		expect(isConversationEvent('speech-started')).toBe(true);
+		expect(isConversationEvent('input-transcription-completed')).toBe(true);
+		expect(isConversationEvent('audio-delta')).toBe(true);
+		expect(isConversationEvent('response-created')).toBe(true);
+		expect(isConversationEvent('function-call-arguments-done')).toBe(true);
+	});
+
+	it('does not let the session being set up, an error, or an unmapped event hold a call open', () => {
+		expect(isConversationEvent('session-created')).toBe(false);
+		expect(isConversationEvent('session-updated')).toBe(false);
+		expect(isConversationEvent('error')).toBe(false);
+		// `custom` is whatever the provider sent that the SDK does not map —
+		// rate-limit notices and the like, which arrive on their own schedule.
+		expect(isConversationEvent('custom')).toBe(false);
+	});
+
+	it('treats an event type it has never seen as somebody talking', () => {
+		// Stated as what does NOT count, so a mapping the SDK adds later fails
+		// towards keeping a live call rather than cutting one off mid-sentence.
+		expect(isConversationEvent('some-event-a-later-sdk-maps')).toBe(true);
 	});
 });

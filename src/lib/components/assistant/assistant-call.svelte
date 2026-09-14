@@ -122,6 +122,18 @@
 	    assistant is talking the microphone is hearing an echo-cancelled room,
 	    and a swell from that would be the orb reacting to itself. */
 	const level = $derived(phase === 'listening' && call ? call.level : 0);
+
+	/**
+	 * The one line under the orb. A call that hung up itself says why, a call
+	 * about to says so while there is still time to speak up, and otherwise it
+	 * is what the assistant is doing.
+	 */
+	const status = $derived(
+		call?.ended ??
+			(call?.idleWarning
+				? 'Still there? The call will end in a moment.'
+				: (call?.activity ?? callStatusLabel(phase)))
+	);
 </script>
 
 <Dialog.Root
@@ -161,9 +173,7 @@
 			</div>
 
 			<div class="flex max-w-xl flex-col items-center gap-3 text-center">
-				<p class="text-muted-foreground text-sm" aria-live="polite">
-					{call?.activity ?? callStatusLabel(phase)}
-				</p>
+				<p class="text-muted-foreground text-sm" aria-live="polite">{status}</p>
 
 				<!-- The transcript, one turn deep: enough to check a name, not
 				     enough to read instead of listening. -->
@@ -187,31 +197,40 @@
 			</div>
 		</div>
 
+		<!-- A call that has hung up has nothing to mute and nothing to end: the
+		     one thing left to do with it is start another. -->
 		<div class="flex w-full items-center justify-center gap-4 px-6 pt-4 pb-10">
-			<Button
-				variant="secondary"
-				size="icon"
-				class="size-14 rounded-full"
-				aria-label={call?.muted ? 'Unmute' : 'Mute'}
-				aria-pressed={call?.muted ?? false}
-				disabled={!call}
-				onclick={() => call?.toggleMute()}
-			>
-				{#if call?.muted}
-					<MicOffIcon class="size-5" />
-				{:else}
-					<MicIcon class="size-5" />
-				{/if}
-			</Button>
-			<Button
-				variant="destructive"
-				size="icon"
-				class="size-14 rounded-full"
-				aria-label="End call"
-				onclick={onClose}
-			>
-				<PhoneIcon class="size-5 rotate-[135deg]" />
-			</Button>
+			{#if call?.ended}
+				<Button variant="secondary" class="h-12 rounded-full px-6" onclick={() => call?.retry()}>
+					<PhoneIcon class="size-4" />
+					Call again
+				</Button>
+			{:else}
+				<Button
+					variant="secondary"
+					size="icon"
+					class="size-14 rounded-full"
+					aria-label={call?.muted ? 'Unmute' : 'Mute'}
+					aria-pressed={call?.muted ?? false}
+					disabled={!call}
+					onclick={() => call?.toggleMute()}
+				>
+					{#if call?.muted}
+						<MicOffIcon class="size-5" />
+					{:else}
+						<MicIcon class="size-5" />
+					{/if}
+				</Button>
+				<Button
+					variant="destructive"
+					size="icon"
+					class="size-14 rounded-full"
+					aria-label="End call"
+					onclick={onClose}
+				>
+					<PhoneIcon class="size-5 rotate-[135deg]" />
+				</Button>
+			{/if}
 		</div>
 	</Dialog.Content>
 </Dialog.Root>

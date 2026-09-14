@@ -188,6 +188,31 @@ one line of transcript is there so you can check a name you half-heard. Closing 
 hanging up — the `$effect` that opens the call tears it down, so the button, Escape, a
 click outside and navigating away all release the microphone through the same line.
 
+**A call hangs up on its own.** It is metered — an open socket with a live
+microphone costs money for every minute of dead air, and a tab left in the
+background would spend it all night — so `VoiceCall` watches for silence and ends
+a call after two minutes of it (`IDLE_LIMIT_MS`), saying so for the last thirty
+seconds (`IDLE_WARNING_MS`) rather than dropping without warning. What counts as
+"somebody is still here" is the SDK's normalized server events, and
+`isConversationEvent()` states it as what does **not** count — the session being
+set up, an error, and `custom` (whatever the provider sent that the SDK does not
+map, which arrives on its own schedule). Stated that way round, an event type a
+later SDK maps counts as talking rather than being silently ignored: an event
+that failed to reset the clock would cut a call off mid-sentence, while one that
+resets it needlessly only costs a call that was going to end anyway. A tool still
+running counts too — a lookup that outlasts the limit is the assistant working,
+not a room nobody is in. One interval reading a timestamp, not a timeout
+rescheduled on every audio chunk. The ended call stays on screen with what
+happened and a **Call again** button, because a screen that vanished would look
+like a crash.
+
+Beside it, a server-side bound that does not depend on the browser behaving:
+the client secret is minted with `expiresAfterSeconds` of two minutes rather than
+the API's default ten. That bounds _starting_ a call — the browser connects the
+moment it has the secret, so this only has to survive a slow handshake — and it is
+the window a leaked one would be worth anything in. The length of a call is the
+idle timeout's business.
+
 **`Assistant.Orb`** is what you talk to: six conic gradients turning at different
 rates behind a blur and a contrast curve, which is what makes the colours look like
 they move through a liquid rather than cross-fade, grained with a dot grid in the

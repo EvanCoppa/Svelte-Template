@@ -45,6 +45,18 @@ export const DEFAULT_REALTIME_MODEL_ID = 'gpt-realtime-2.1';
 export const DEFAULT_VOICE = 'marin';
 
 /**
+ * How long a minted client secret stays usable. The browser connects with it
+ * the moment it has it, so this only has to survive a slow handshake — two
+ * minutes is generous for that and a good deal tighter than the ten the API
+ * would give it, which is the window a leaked one would otherwise be worth
+ * something in.
+ *
+ * It bounds starting a call, not the length of one: the idle timeout in
+ * `$lib/ai/realtime` is what ends a call nobody is on.
+ */
+const TOKEN_TTL_SECONDS = 120;
+
+/**
  * The env vars the provider reads, injectable so tests can vary them. The
  * index signature keeps this from being a TS "weak type" — see `EmailEnv`.
  */
@@ -161,6 +173,7 @@ export function realtimeToken(
 	}
 	return provider(config.apiKey).experimental_realtime.getToken({
 		model: realtimeModelId(source),
-		sessionConfig
+		sessionConfig,
+		expiresAfterSeconds: TOKEN_TTL_SECONDS
 	});
 }

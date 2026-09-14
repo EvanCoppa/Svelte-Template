@@ -65,6 +65,48 @@ export function voiceSession() {
 }
 
 /**
+ * How long a call may go with nobody saying anything before it hangs up
+ * itself, and how long before that it says so.
+ *
+ * A call is metered: an open socket with a live microphone costs money for
+ * every minute of dead air, and a tab left open in the background would spend
+ * it all night. Two minutes is well past a pause for thought and well short
+ * of a bill nobody meant to run up, and the last thirty seconds of it are
+ * spent saying so rather than going quiet and then hanging up — a call that
+ * drops with no warning reads as a bug.
+ */
+export const IDLE_LIMIT_MS = 120_000;
+export const IDLE_WARNING_MS = 30_000;
+
+export type IdleStatus = 'live' | 'warning' | 'expired';
+
+/** Where a call stands, given how long it has been since anybody said anything. */
+export function idleStatus(silentForMs: number): IdleStatus {
+	if (silentForMs >= IDLE_LIMIT_MS) return 'expired';
+	if (silentForMs >= IDLE_LIMIT_MS - IDLE_WARNING_MS) return 'warning';
+	return 'live';
+}
+
+/**
+ * The normalized server events that say nothing about whether anyone is still
+ * on the call: the session being set up, an error, and whatever the provider
+ * sent that the SDK does not map (`custom` — rate-limit notices and the like,
+ * which arrive on their own schedule).
+ *
+ * Stated as what does NOT count on purpose. A call is kept alive by anything
+ * else, so an event type the SDK maps in a future version counts as somebody
+ * talking rather than being silently ignored — a new event that failed to
+ * reset the clock would hang up a call mid-sentence, and one that resets it
+ * needlessly only costs a call that was going to be hung up anyway.
+ */
+const QUIET_EVENTS = new Set(['session-created', 'session-updated', 'error', 'custom']);
+
+/** Whether one server event means the conversation moved. */
+export function isConversationEvent(type: string): boolean {
+	return !QUIET_EVENTS.has(type);
+}
+
+/**
  * What the model asked for during a call: a tool by name, and arguments that
  * only that tool's own schema can judge — so they travel as the JSON they
  * arrived as, and the server validates them against the named tool before
