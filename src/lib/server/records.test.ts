@@ -4,10 +4,13 @@ import type { Database } from '$lib/database.types';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './crm/test-support';
 import {
 	CREATE_FORM_ID,
+	DELETE_FORM_ID,
 	EDIT_FORM_ID,
 	createRecord,
+	deleteRecord,
 	isEditableRecordType,
 	loadCreateRecord,
+	loadDeleteRecord,
 	loadEditRecord,
 	updateRecord
 } from './records';
@@ -28,6 +31,11 @@ const MANAGER: UserAccess = {
 	role: 'member',
 	roles: [],
 	grants: new Map([['companies', 'manage' as const]])
+};
+const DELETER: UserAccess = {
+	role: 'member',
+	roles: [],
+	grants: new Map([['companies', 'delete' as const]])
 };
 
 function localsFor(supabase: SupabaseClient<Database>, access: UserAccess): App.Locals {
@@ -65,6 +73,10 @@ function save(
 		type,
 		RECORD_ID
 	);
+}
+
+function remove(supabase: SupabaseClient<Database>, access: UserAccess, id: string) {
+	return deleteRecord({ request: post({ id }), locals: localsFor(supabase, access) }, 'company');
 }
 
 describe('loadCreateRecord', () => {
@@ -493,5 +505,68 @@ describe('updateRecord', () => {
 		const result = await save(supabase, OWNER, 'ticket', { subject: 'Terminal offline' });
 		expect(result).toMatchObject({ status: 400 });
 		expect(result).toHaveProperty('data.form.message', 'new row violates row-level security');
+	});
+});
+
+/**
+ * Every list page's row menu: the same generic action for every deletable
+ * kind, pinned here on a company. `manage` is not enough — deleting needs the
+ * `delete` level, one rung above what creates and edits.
+ */
+describe('loadDeleteRecord', () => {
+	it('hands the page an empty form under the shared id', async () => {
+		const { supabase } = supabaseMock();
+
+		const { deleteForm } = await loadDeleteRecord(localsFor(supabase, OWNER), 'company');
+		expect(deleteForm.id).toBe(DELETE_FORM_ID);
+		expect(deleteForm.data).toMatchObject({ id: '' });
+	});
+
+	it('offers the row menu only to a user who holds delete, not merely manage', async () => {
+		const { supabase } = supabaseMock();
+
+		await expect(loadDeleteRecord(localsFor(supabase, OWNER), 'company')).resolves.toMatchObject({
+			canDelete: true
+		});
+		await expect(loadDeleteRecord(localsFor(supabase, DELETER), 'company')).resolves.toMatchObject({
+			canDelete: true
+		});
+		await expect(loadDeleteRecord(localsFor(supabase, MANAGER), 'company')).resolves.toMatchObject({
+			canDelete: false
+		});
+		await expect(loadDeleteRecord(localsFor(supabase, MEMBER), 'company')).resolves.toMatchObject({
+			canDelete: false
+		});
+	});
+});
+
+describe('deleteRecord', () => {
+	it('refuses a member who only holds manage, and writes nothing', async () => {
+		const { supabase, from } = supabaseMock({ data: [] });
+
+		await expect(remove(supabase, MANAGER, RECORD_ID)).rejects.toMatchObject({ status: 403 });
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('deletes the row, scoped to this org', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [{ id: RECORD_ID }] });
+
+		const result = await remove(supabase, OWNER, RECORD_ID);
+		expect(result).toHaveProperty('form.valid', true);
+		expect(from).toHaveBeenCalledWith('companies');
+		expect(builder.delete).toHaveBeenCalled();
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', RECORD_ID);
+	});
+
+	it('refuses a row RLS filtered out, rather than reporting success over nothing deleted', async () => {
+		const { supabase } = supabaseMock({ data: [] });
+
+		const result = await remove(supabase, OWNER, RECORD_ID);
+		expect(result).toMatchObject({ status: 400 });
+		expect(result).toHaveProperty(
+			'data.form.message',
+			'Company was not deleted: it does not exist, or you are not allowed to.'
+		);
 	});
 });

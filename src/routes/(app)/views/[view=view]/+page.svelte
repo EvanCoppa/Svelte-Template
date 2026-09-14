@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import DeleteRecord from '$lib/components/delete-record.svelte';
 	import { SegmentedControl } from '$lib/components/enhanced/segmented-control/index.js';
 	import * as MapView from '$lib/components/map-view/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
@@ -9,6 +10,7 @@
 	import { featureTerms } from '$lib/features/terms';
 	import { capitalize } from '$lib/utils.js';
 	import { createListTable } from '$lib/lists/table';
+	import { QUERY } from '$lib/queries';
 	import { VIEW_LAYOUTS, type ViewLayout } from '$lib/views/types';
 
 	let { data } = $props();
@@ -17,11 +19,18 @@
 	// feature words it ("3 vendors"), not the source's.
 	const terms = $derived(featureTerms(page.data.terms, data.view.id));
 
+	let removing = $state<{ id: string; name: string } | null>(null);
+
+	/** The list this removes a row from — a company view or a contact view. */
+	const deleteQuery = $derived(data.view.source === 'company' ? QUERY.companies : QUERY.contacts);
+
 	// The view's list: its columns, search and filters are its own list_fields
 	// rows, resolved like any list page's (docs/lists.md).
 	const table = createListTable(
 		() => data.list,
-		() => page.data.terms
+		() => page.data.terms,
+		undefined,
+		() => (data.canDelete ? { canDelete: true, onDelete: (row) => (removing = row) } : undefined)
 	);
 
 	let layout: ViewLayout = $state(data.view.defaultLayout);
@@ -85,3 +94,5 @@
 		</DataTable.Root>
 	{/if}
 </div>
+
+<DeleteRecord type={data.view.source} form={data.deleteForm} query={deleteQuery} bind:removing />

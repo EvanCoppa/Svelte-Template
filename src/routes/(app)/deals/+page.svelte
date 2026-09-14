@@ -12,6 +12,7 @@
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import DeleteRecord from '$lib/components/delete-record.svelte';
 	import * as Kanban from '$lib/components/kanban/index.js';
 	import type { KanbanStatus } from '$lib/components/kanban/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
@@ -52,13 +53,18 @@
 	 */
 	const view = createViewPreference('deals.view', ['board', 'list'] as const);
 
+	/** The list view's row menu — the board's own cards link to the record instead. */
+	let removing = $state<{ id: string; name: string } | null>(null);
+
 	// The list's columns, its search and its filters are the fields the org's
 	// industry put on it (docs/lists.md); the page only composes the parts. Both
 	// views are the same rows, read once: the list takes them described, the
 	// board takes the columns themselves.
 	const table = createListTable(
 		() => data.list,
-		() => page.data.terms
+		() => page.data.terms,
+		undefined,
+		() => (data.canDelete ? { canDelete: true, onDelete: (row) => (removing = row) } : undefined)
 	);
 
 	/**
@@ -396,3 +402,5 @@
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 {/snippet}
+
+<DeleteRecord type="deal" form={data.deleteForm} query={QUERY.deals} bind:removing />

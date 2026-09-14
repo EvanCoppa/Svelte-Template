@@ -6,7 +6,12 @@ import { RECORD_KIND_META } from '$lib/crm/records';
 import { QUERY } from '$lib/queries';
 import { listDeals, moveDeal } from '$lib/server/crm/deals';
 import { listPipelines } from '$lib/server/crm/pipelines';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
 import { loadList } from '$lib/server/lists';
 import { can, requirePermission } from '$lib/server/roles';
 import { listStaff } from '$lib/server/staff';
@@ -97,14 +102,17 @@ export const load: PageServerLoad = async ({ locals, depends, url }) => {
 		members: staff.map((member) => ({ userId: member.userId, name: memberName(member) })),
 		canMove,
 		moveForm: await superValidate(zod4(moveDealSchema), { id: MOVE_FORM_ID }),
-		...(await loadCreateRecord(locals, 'deal'))
+		...(await loadCreateRecord(locals, 'deal')),
+		...(await loadDeleteRecord(locals, 'deal'))
 	};
 };
 
 export const actions: Actions = {
-	// Creating goes through the generic record form ($lib/server/records.ts), which
-	// opens with requirePermission(locals.org.access, 'deals', 'manage').
+	// Creating and deleting go through the generic record form/row menu
+	// ($lib/server/records.ts), which open with
+	// requirePermission(locals.org.access, 'deals', <level>).
 	create: (event) => createRecord(event, 'deal'),
+	deleteRecord: (event) => deleteRecord(event, 'deal'),
 
 	/**
 	 * A card was dropped on another stage, or carried there with the arrow keys.
