@@ -591,10 +591,49 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   items — a limit nothing counts against reads as enforced, a column nothing writes is
   dead weight, and a return line that claimed to restock would be the defect the orders
   migration already names about `quantity_reserved`. They arrive with the redemption
-  table, the Orders feature and inventory movement respectively; a credit for a return
-  is a `refund` payment on the ledger, never a second copy of an amount. All three are
-  `hidden` for the verticals that quote work rather than ship goods — a vertical joins
-  with one `industry_features` row.
+  table and inventory movement respectively; a credit for a return is a `refund`
+  payment on the ledger, never a second copy of an amount. **An RMA's `order_id` stays
+  absent now that Orders exists**, on its own merits rather than for want of a table: a
+  return is a fact about goods, and plenty of them are for goods this org never wrote an
+  order for. It lands when something actually reads it — a restock, or a credit that
+  must find the invoice — not because the target now exists. All three are `hidden` for
+  the verticals that quote work rather than ship goods — a vertical joins with one
+  `industry_features` row.
+- **The supply spine is four documents, and each says what it derives** (the
+  `orders_and_shipments` and `vendors_and_purchasing` migrations + their `*_feature`
+  migrations + `src/lib/server/crm/orders.ts`, `shipments.ts`, `purchases.ts`,
+  `product-categories.ts`). An **order** is what a customer asked for, a **shipment** a
+  box against one order, a **purchase** what the org buys from a vendor, and
+  **categories** the tree the catalog hangs on. Each of the first three is a DOCUMENT,
+  so each takes its own record page under `(app)/<kind>/[id=guid]/` — the list, the
+  header form and the row menu stay generic, and only what the generic page has no
+  frame for is written by hand.
+  **A status is either an act or derived, never both.** Confirming, cancelling and
+  placing are acts, each scoped to the state it is legal from so a second click reports
+  a refusal rather than success over nothing. Everything else falls out:
+  `orders.fulfillment_status` from its lines, a purchase's
+  `ordered → partially_received → received` from what has arrived, and an order line's
+  `shipped` / `delivered` from the carrier status of the box carrying it. So a receive
+  is a line write, and the one write that reaches an order is a shipment's
+  `delivery_status` — never a status typed onto the header.
+  **The carrier owns two of a line's states and a person owns the rest**
+  (`LINE_FULFILLMENT_STATUSES` in `$lib/crm/orders.ts`): a scan never overwrites a
+  `cancelled` or `returned` a person decided, and no form offers `shipped` or
+  `delivered`, because typing one would claim a box moved.
+  **A partial shipment is a line SPLIT.** A packing row carries no quantity — a line is
+  in the box or it is not — so four of ten cases going out is `splitOrderLine()` making
+  a four and a six, each with the original's snapshots. One line lives in one box, so
+  `packableLines()` offers only what is in no box yet rather than what the unique index
+  would refuse, and moving a line is an unpack and a pack.
+  **A shipment is the one kind the generic record form cannot create**: `order_id` is
+  not null and insert-only, so "Ship this order" on the order's page is the one door —
+  taking the `shipments` grant, not the order's. It is a `RECORD_KIND` and a
+  `ListKind` without being a `RecordType`, which is what that distinction is for.
+  A **category tree is not a table**, so `/categories` is indented rows rather than a
+  `DataTable`, with no `list_fields`: PostgREST cannot embed a self-referencing
+  composite foreign key, so the tree is one flat read and a pure fold (`categoryTree()`
+  in `$lib/crm/categories.ts`) that surfaces a cycle or an orphan as a root rather than
+  dropping it.
 
 ## Database
 
