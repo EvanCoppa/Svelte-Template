@@ -10,6 +10,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { messageMetadataSchema } from '$lib/ai/schemas';
 	import type { AssistantUIMessage } from '$lib/ai/types';
+	import { assistantThread } from '$lib/assistant.svelte';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	/**
@@ -71,6 +72,11 @@
 		onFinish,
 		onError
 	});
+
+	// The context rail beside the conversation is the shell's, not this page's
+	// (the `(app)` layout mounts it), so the thread has to reach outside the
+	// tree that owns it. A getter, not a copy — see `$lib/assistant.svelte`.
+	$effect(() => assistantThread.publish(() => chat.messages));
 </script>
 
 <div bind:this={ref} data-slot="assistant" class={cn('flex min-h-0', className)} {...restProps}>

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { browser } from '$app/environment';
+import type { AssistantUIMessage } from '$lib/ai/types';
 import type { ConversationSummary } from '$lib/server/ai/conversations';
 
 /**
@@ -121,3 +122,36 @@ function createOpenThreads() {
 }
 
 export const openThreads = createOpenThreads();
+
+/**
+ * The conversation on screen, as whatever is drawn beside it needs to read
+ * it. The thread lives in the SDK `Chat` that `Assistant.Root` owns, and the
+ * context rail the `(app)` layout mounts is not inside that page — so Root
+ * hands over a **getter** rather than a copy (the reason `ui/sidebar` crosses
+ * its context the same way: a copied value goes stale, a getter stays the
+ * Chat's own state).
+ *
+ * The third use of the module-rune pattern in this file, and the mirror of
+ * the first two: `threadDialogs` carries the sidebar's question to the page's
+ * forms, this carries the page's thread to the shell's rail.
+ */
+function createAssistantThread() {
+	let read = $state<(() => AssistantUIMessage[]) | null>(null);
+
+	return {
+		/** The messages of the conversation on screen; empty where there is none. */
+		get messages() {
+			return read?.() ?? [];
+		},
+		/** Publish a thread, and hand back the teardown that unpublishes it. */
+		publish(source: () => AssistantUIMessage[]) {
+			read = source;
+			return () => {
+				// Only if nothing else has taken over in the meantime.
+				if (read === source) read = null;
+			};
+		}
+	};
+}
+
+export const assistantThread = createAssistantThread();

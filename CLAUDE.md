@@ -748,12 +748,15 @@ version; read them before the website. The full account is `docs/assistant.md`.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
   (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
-  way to a search field. The screen is the conversation's own card — a `TabStrip` of the
-  threads this browser tab has open across its top, which is why it has no `PageHeader` —
-  beside a `ContextPanel` of what the answer drew on (`sourcesOf()`, filtered to the
-  kinds `terms` says this session may open). The conversation is one column with two
-  states — the composer centred under "How can I help you today?" over `Assistant.Aura`,
-  then travelling to the foot of the pane once the thread starts. A tool call the reader must answer keeps
+  way to a search field. **The shell carries the screen's furniture, not the page**:
+  `AppHeader` mounts a `TabStrip` of the threads this browser tab has open (so the
+  breadcrumb trail stands down beside it and the page has no `PageHeader`), and the
+  layout docks a `ContextPanel` of what the answer drew on (`sourcesOf()`, filtered to
+  the kinds `terms` says this session may open) beside `Sidebar.Inset`, the same height
+  as the body — never a card inside the page. The thread reaches the rail as a getter
+  `Assistant.Root` publishes through `assistantThread`. The conversation is one column
+  with two states — the composer centred under "How can I help you today?" over
+  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
   its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
   line. See docs/assistant.md, "The screen"; never build a second thread rail.
 - Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
@@ -931,14 +934,23 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and
   can close, and each is a **link**, so ⌘-click and browser history work and
   `aria-current` marks the one you are on. The assistant's open conversations are the
-  worked example. A strip is its screen's own navigation, so a tab pairs
-  `breadcrumbs.startAt()` with its href the way a sidebar entry does.
+  worked example, and it lives in the app header rather than in a bar of its own: a
+  screen whose open documents are tabs composes them into a component the header mounts
+  on the same pathname branch the layout swaps the sidebar on (`AssistantTabs`), and the
+  breadcrumb trail stands down there, because a page is named once. A strip is its
+  screen's own navigation, so a tab pairs `breadcrumbs.startAt()` with its href the way
+  a sidebar entry does.
 - **A panel of context docked beside the thing it is about is `ContextPanel`**
   (`src/lib/components/context-panel/`): its own card on its own hairline, a `Header`
   with a `Title` and its `Actions`, a `Body` that scrolls, and `Section` / `Item` rows.
   The panel is only the frame — what it shows is the page's, passed in where it renders
   — and an `Item` is a link when it goes somewhere and plain text when it does not, so a
   record the reader may not open is still listed without being a door it cannot use.
+  Docked **beside the body, not inside the page**: the `(app)` layout renders it as a
+  sibling of `Sidebar.Inset` on the same pathname branch, `sticky` and the panel's own
+  height, so it stands on the shell's ground like the sidebar on the other side. Data
+  that lives in the page reaches it the way the assistant's thread does — a getter
+  published through a module-rune store, never a copy.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and

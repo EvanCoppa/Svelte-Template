@@ -47,17 +47,36 @@ module-rune pattern `showUpgrade()` and `showSearch()` established. The sidebar 
 threads themselves off `page.data.conversations`, like every shell sidebar reads
 `page.data`.
 
-The screen is two panes: the conversation in its own card, and a **context panel**
-docked beside it (`src/lib/components/context-panel/`). Across the top of the
-conversation's card is a **tab strip** (`src/lib/components/tab-strip/`) — one tab per
-thread this browser tab has open, closeable, with a `+` for another. Which threads are
-open is `sessionStorage`, ids only, so a rename renames its tab and a delete drops it
-with nothing to keep in step (`openThreads` in `$lib/assistant.svelte`). The strip is
-the screen's own navigation, so a tab **starts** the breadcrumb trail rather than
-deepening it — and because the strip names the thread on screen, this page has **no
-`PageHeader`**: a page is named once, and here its tab is the name.
+The shell does two more things for this screen, and both are the shell's rather
+than the page's — a strip of tabs in the app header, and a rail of context docked
+beside the body — so the page below them is only ever the conversation.
 
-The context panel shows **what the answer drew on** — the records the tools actually
+The **tab strip** (`src/lib/components/tab-strip/`) goes in the one header that
+every screen already has, composed for this feature by `AssistantTabs`
+(`src/lib/components/assistant-tabs.svelte`), which `AppHeader` mounts while the
+pathname is under `/assistant` — the branch the `(app)` layout makes to swap the
+sidebar, made once more. One tab per thread this browser tab has open, closeable,
+with a `+` for another; which threads are open is `sessionStorage`, ids only, so a
+rename renames its tab and a delete drops it with nothing to keep in step
+(`openThreads` in `$lib/assistant.svelte`). The strip is the screen's own
+navigation, so a tab **starts** the breadcrumb trail rather than deepening it —
+and because the strip names the thread on screen, the breadcrumb trail stands down
+beside it and this page has **no `PageHeader`**: a page is named once, and here its
+tab is the name. The way out of the shell is the sidebar's Home, as it is under
+`/settings`.
+
+The **context rail** (`src/lib/components/context-panel/`, composed by
+`AssistantContext`) is a panel of its own on the end side of the body, mounted by
+the `(app)` layout beside `Sidebar.Inset` and standing the same height as it — not
+a card inside the page, which would sit inside the content panel's padding and
+scroll with it. It hides itself below `lg`, where the conversation needs the width.
+
+Being outside the page is what the thread has to cross: the `Chat` lives in
+`Assistant.Root`, so Root publishes a **getter** for its messages through
+`assistantThread` (`$lib/assistant.svelte`) and the rail reads them from there —
+the mirror of `threadDialogs`, which carries the sidebar's question the other way.
+
+The rail shows **what the answer drew on** — the records the tools actually
 returned, read back out of the message parts by `sourcesOf()` (`$lib/ai/sources`)
 rather than tracked separately, so a stored thread shows the same sources on reload as
 it did while it streamed. A kind is named as the org's industry names it and appears at

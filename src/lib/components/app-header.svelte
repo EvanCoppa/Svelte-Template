@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import AssistantTabs from '$lib/components/assistant-tabs.svelte';
 	import Breadcrumbs from '$lib/components/breadcrumbs.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
@@ -15,6 +17,13 @@
 	// the exception — the sidebar is a sheet there, with nothing to hover, so
 	// the header keeps the one way in while the sheet is closed.
 	const needsTrigger = $derived(sidebar.isMobile && !sidebar.openMobile);
+
+	// A screen whose open documents are a strip of tabs puts them here, in the
+	// one header, rather than growing a bar of its own inside the page — the
+	// same branch the (app) layout makes to swap the sidebar for that shell.
+	const inAssistant = $derived(
+		page.url.pathname === '/assistant' || page.url.pathname.startsWith('/assistant/')
+	);
 </script>
 
 <header class="header">
@@ -24,11 +33,16 @@
 		{/if}
 
 		<!-- Where you have just been; hidden on narrow screens, where the
-		     header has no room for it. Still mounted there, so the trail keeps
-		     recording. -->
-		<div class="trail">
+		     header has no room for it, and where a strip of tabs has taken over
+		     the naming of the screen. Still mounted in both cases, so the trail
+		     keeps recording while it is out of sight. -->
+		<div class="trail" class:named-elsewhere={inAssistant}>
 			<Breadcrumbs />
 		</div>
+
+		{#if inAssistant}
+			<AssistantTabs />
+		{/if}
 
 		<div class="header-right">
 			<button class="icon-btn" aria-label="Toggle theme" onclick={() => theme.toggle()}>
@@ -70,6 +84,13 @@
 	.trail {
 		min-width: 0;
 		overflow: hidden;
+	}
+
+	/* A page is named once. Where the header carries a strip of open documents,
+	   the strip is the name and a crumb beside it would be a second copy of it —
+	   the way out of that shell is its sidebar's Home, as it is under /settings. */
+	.trail.named-elsewhere {
+		display: none;
 	}
 
 	.header-right {
