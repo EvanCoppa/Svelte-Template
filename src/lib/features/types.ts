@@ -31,6 +31,10 @@ export const FEATURE_IDS = [
 	'coupons',
 	'rmas',
 	'assets',
+	// The rental portfolio (the properties_and_leases migration). Real-estate
+	// only — every other industry resolves both `hidden` for want of a row.
+	'properties',
+	'leases',
 	'notes',
 	'tasks',
 	'tickets',
@@ -47,7 +51,6 @@ export const FEATURE_IDS = [
 	'partner-contacts',
 	'patient-map',
 	'homeowner-map',
-	'merchant-map',
 	'prospects',
 	'referral-partners'
 ] as const;

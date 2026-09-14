@@ -15,8 +15,10 @@ import {
 	dealRecordSchema,
 	deleteRecordSchema,
 	invoiceRecordSchema,
+	leaseRecordSchema,
 	productRecordSchema,
 	rmaRecordSchema,
+	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
 	RECORD_FORMS,
@@ -48,10 +50,18 @@ import {
 import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
 import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
+import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
-import { deleteProposal } from './crm/proposals';
 import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
 import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
+import {
+	createProperty,
+	deleteProperty,
+	getProperty,
+	listProperties,
+	updateProperty
+} from './crm/properties';
+import { deleteProposal } from './crm/proposals';
 import { createTask, getTask, updateTask } from './crm/tasks';
 import { createTicket, deleteTicket, getTicket, updateTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
@@ -162,6 +172,21 @@ async function pickerOptions(
 					sublabel: pipeline.name
 				}))
 			);
+		case 'property': {
+			// Buildings and units in one list, because they are one table — and
+			// a unit is shown under the building it belongs to, so two
+			// "Unit 1"s tell apart. One pass builds the name index, so the
+			// sublabel costs no extra query.
+			const rows = await listProperties(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id
+					? (names.get(row.parent_id) ?? undefined)
+					: (row.property_type ?? undefined)
+			}));
+		}
 	}
 }
 
@@ -353,6 +378,12 @@ async function removeRecord(
 			return deleteBillable(supabase, orgId, id);
 		case 'asset':
 			return deleteAsset(supabase, orgId, id);
+		case 'property':
+			// A building's units go with it (`parent_id` cascades), which is the
+			// depth cap earning its keep: there is no third level to orphan.
+			return deleteProperty(supabase, orgId, id);
+		case 'lease':
+			return deleteLease(supabase, orgId, id);
 		case 'proposal':
 			return deleteProposal(supabase, orgId, id);
 		case 'ticket':
@@ -472,6 +503,25 @@ async function recordFormValues(
 					}
 				: {};
 		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						parent_id: str(row.parent_id),
+						property_type: str(row.property_type),
+						identifier: str(row.identifier),
+						status: row.status,
+						bedrooms: str(row.bedrooms),
+						bathrooms: str(row.bathrooms),
+						square_feet: str(row.square_feet),
+						market_rent: str(row.market_rent),
+						acquired_on: str(row.acquired_on),
+						purchase_price: str(row.purchase_price),
+						description: str(row.description)
+					}
+				: {};
+		}
 		case 'rma': {
 			const row = await getRma(supabase, orgId, id);
 			return row
@@ -482,6 +532,24 @@ async function recordFormValues(
 						requested_on: str(row.requested_on),
 						reason: str(row.reason),
 						resolution: str(row.resolution)
+					}
+				: {};
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row
+				? {
+						property_id: row.property_id,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						starts_on: row.starts_on,
+						// Blank for a month-to-month tenancy, which is what a
+						// null end date means.
+						ends_on: str(row.ends_on),
+						rent_amount: str(row.rent_amount),
+						rent_due_day: str(row.rent_due_day),
+						security_deposit: str(row.security_deposit),
+						notes: str(row.notes)
 					}
 				: {};
 		}
@@ -628,6 +696,56 @@ async function writeRecord(
 			await (id
 				? updateAsset(supabase, orgId, id, columns)
 				: createAsset(supabase, orgId, columns));
+			return;
+		}
+		case 'property': {
+			const data = propertyRecordSchema.parse(values);
+			// A blank parent is a building (or a single-family, which is its
+			// own unit); a picked one makes this a unit inside it. The
+			// database refuses a unit of a unit on either path, so neither
+			// creating nor re-parenting can build a deeper tree.
+			const columns = {
+				name: data.name,
+				parent_id: text(data.parent_id),
+				property_type: text(data.property_type),
+				identifier: text(data.identifier),
+				status: data.status,
+				bedrooms: integer(data.bedrooms),
+				bathrooms: amount(data.bathrooms),
+				square_feet: integer(data.square_feet),
+				market_rent: amount(data.market_rent),
+				acquired_on: text(data.acquired_on),
+				purchase_price: amount(data.purchase_price),
+				description: text(data.description)
+			};
+			await (id
+				? updateProperty(supabase, orgId, id, columns)
+				: createProperty(supabase, orgId, columns));
+			return;
+		}
+		case 'lease': {
+			const data = leaseRecordSchema.parse(values);
+			// A blank end date is month-to-month, so it stays null rather than
+			// being invented — and ending a lease early is moving this date,
+			// not a status change, because there is no status column.
+			const columns = {
+				property_id: data.property_id,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				starts_on: data.starts_on,
+				ends_on: text(data.ends_on),
+				rent_amount: Number(data.rent_amount),
+				// Blank is the column's own default (the 1st), written out
+				// rather than omitted: on an edit, leaving it out would mean
+				// "as it was", and a blank field means the empty value on both
+				// paths.
+				rent_due_day: data.rent_due_day === '' ? 1 : Number(data.rent_due_day),
+				security_deposit: amount(data.security_deposit),
+				notes: text(data.notes)
+			};
+			await (id
+				? updateLease(supabase, orgId, id, columns)
+				: createLease(supabase, orgId, columns));
 			return;
 		}
 		case 'invoice': {

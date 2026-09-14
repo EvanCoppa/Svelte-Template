@@ -181,7 +181,7 @@
 					<ActivityIcon />Activity
 					{@render count(data.activities.length)}
 				</Tabs.Trigger>
-				{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+				{#if data.hasAddresses}
 					<Tabs.Trigger value="addresses">
 						<MapPinIcon />Addresses
 						{@render count(data.addresses.length)}
@@ -190,7 +190,7 @@
 				{#if data.billing}
 					<Tabs.Trigger value="billing"><ReceiptIcon />Billing</Tabs.Trigger>
 				{/if}
-				{#if data.record.kind === 'asset'}
+				{#if data.hasImages}
 					<Tabs.Trigger value="photos">
 						<ImageIcon />Photos
 						{@render count(data.images.length)}
@@ -227,7 +227,7 @@
 					</Card.Root>
 				{/if}
 			</Tabs.Content>
-			{#if data.record.kind === 'company' || data.record.kind === 'contact'}
+			{#if data.hasAddresses}
 				<Tabs.Content value="addresses">
 					{#if tab === 'addresses'}
 						<Detail.Addresses
@@ -288,7 +288,7 @@
 					{/if}
 				</Tabs.Content>
 			{/if}
-			{#if data.record.kind === 'asset'}
+			{#if data.hasImages}
 				<Tabs.Content value="photos">
 					{#if tab === 'photos'}
 						<Detail.Images

@@ -9,6 +9,7 @@
 	import SettingsSidebar from '$lib/components/settings-sidebar.svelte';
 	import UpgradePrompt from '$lib/components/upgrade-prompt.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { sourcesPanel } from '$lib/assistant.svelte';
 	import { titleFor } from '$lib/features/pages';
 
 	let { data, children } = $props();
@@ -71,7 +72,7 @@
 		content panel — not a card inside the page, which would sit inside the
 		panel's padding and scroll with it.
 	-->
-	{#if inAssistant}
+	{#if inAssistant && sourcesPanel.open}
 		<AssistantContext />
 	{/if}
 	<!-- The one ⌘K palette; the sidebar's search button opens it with `showSearch()`. -->

@@ -35,6 +35,10 @@ export const QUERY = {
 	coupons: 'app:coupons',
 	/** Returns coming back from customers. */
 	rmas: 'app:rmas',
+	/** The portfolio — buildings and the units inside them, which are rows in the same list. */
+	properties: 'app:properties',
+	/** The rent roll: every tenancy, running, upcoming or ended. */
+	leases: 'app:leases',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	/** The bell's inbox — reading, dismissing or restoring one changes it. */

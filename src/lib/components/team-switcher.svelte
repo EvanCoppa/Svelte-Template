@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
-	import { page } from '$app/state';
-	import { breadcrumbs } from '$lib/breadcrumbs.svelte';
+	import { invalidate } from '$app/navigation';
 	import AppLogo from '$lib/components/app-logo.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -11,24 +9,12 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 	import { toast } from 'svelte-sonner';
 
 	let { organizations, activeOrg }: { organizations: OrgMembership[]; activeOrg: OrgMembership } =
 		$props();
 
 	const sidebar = useSidebar();
-
-	const canInvite = $derived(
-		(page.data.nav ?? []).some((item) => item.href === '/staff' && !item.locked)
-	);
-
-	// A shell surface, so its jumps start a trail rather than deepening one.
-	function jumpTo(href: string) {
-		breadcrumbs.startAt(href);
-		goto(href);
-	}
 
 	async function switchOrg(org: OrgMembership) {
 		if (org.id === activeOrg.id) return;
@@ -92,23 +78,6 @@
 						</DropdownMenu.Item>
 					{/each}
 				</div>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Group>
-					<!-- Part of the shell, so these jump the way the sidebar does. -->
-					<DropdownMenu.Item onclick={() => jumpTo('/settings/features')}>
-						<SettingsIcon />
-						Workspace settings
-					</DropdownMenu.Item>
-					<!-- Only where this session has the roster at all; the nav lists
-					     exactly the features it may open, so a gated one is never a
-					     door that would bounce. -->
-					{#if canInvite}
-						<DropdownMenu.Item onclick={() => jumpTo('/staff')}>
-							<UserPlusIcon />
-							Invite people
-						</DropdownMenu.Item>
-					{/if}
-				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
 				<!--
 					The way out, here as well as in the user menu: this is the row people

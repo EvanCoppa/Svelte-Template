@@ -110,6 +110,8 @@ function mock() {
 		contacts: { data: [] },
 		coupons: { data: [] },
 		products: { data: [] },
+		properties: { data: [] },
+		leases: { data: [] },
 		deals: { data: [] },
 		proposals: { data: [] },
 		relationship_types: { data: [] },

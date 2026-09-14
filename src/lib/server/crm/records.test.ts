@@ -763,7 +763,10 @@ describe('listRelatedRecords', () => {
 			invoices: { data: [siteWork] },
 			tasks: { data: [renewal] },
 			support_tickets: { data: [exportBug] },
-			rmas: { data: [damagedGloves] }
+			rmas: { data: [damagedGloves] },
+			// A company with no tenancies: the group is dropped, so the six
+			// below are unchanged. A tenant's leases have their own test.
+			leases: { data: [] }
 		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'company', COMPANY_ID, openAll);

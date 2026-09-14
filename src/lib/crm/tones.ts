@@ -29,6 +29,12 @@ export const ASSET_STATUS_TONE = {
 	retired: 'warning'
 } satisfies Record<Enums<'asset_status'>, BadgeTone>;
 
+export const PROPERTY_STATUS_TONE = {
+	active: 'success',
+	inactive: 'neutral',
+	sold: 'info'
+} satisfies Record<Enums<'property_status'>, BadgeTone>;
+
 export const PRODUCT_KIND_TONE = {
 	good: 'cyan',
 	service: 'violet'

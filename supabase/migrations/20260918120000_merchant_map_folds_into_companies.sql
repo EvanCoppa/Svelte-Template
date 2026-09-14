@@ -1,0 +1,15 @@
+-- The merchant-services industry shipped two sidebar links over the same
+-- book: "Merchants" (`/companies`, every company) and "Merchant map"
+-- (`/views/merchant-map`, a company view filtered to relationship = customer,
+-- with layouts {map,table}) — in Gold Standard Processing, whose companies
+-- are all customers, those are the same list, once as a table and once as a
+-- map. Two links for one thing.
+--
+-- The fix keeps one link doing both jobs instead: the plain Merchants page
+-- (`/companies`) now carries the table/map toggle itself
+-- (src/routes/(app)/companies/), the way a view already can (docs/views.md),
+-- so `merchant-map` the view/feature goes. `on delete cascade` from
+-- `features.id` takes its `industry_features` row, its `list_fields` rows,
+-- its `pages` row, its `tier_features` row, its `role_permissions` grants and
+-- the `views` row itself with it — nothing else to clean up by hand.
+delete from public.features where id = 'merchant-map';
