@@ -1475,7 +1475,12 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_label: string | null
+          actor_id: string | null
+          archived_at: string | null
           body: string | null
+          channel: Database["public"]["Enums"]["notification_channel"]
+          context: string | null
           created_at: string
           id: string
           link: string | null
@@ -1486,7 +1491,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1497,7 +1507,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1508,6 +1523,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_org_id_fkey"
             columns: ["org_id"]
@@ -3827,6 +3849,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "returned"
+      notification_channel: "inbox" | "general"
       order_status: "draft" | "confirmed" | "cancelled"
       org_role: "owner" | "admin" | "member"
       party_status: "lead" | "prospect" | "active" | "inactive"
@@ -4059,6 +4082,7 @@ export const Constants = {
         "cancelled",
         "returned",
       ],
+      notification_channel: ["inbox", "general"],
       order_status: ["draft", "confirmed", "cancelled"],
       org_role: ["owner", "admin", "member"],
       party_status: ["lead", "prospect", "active", "inactive"],

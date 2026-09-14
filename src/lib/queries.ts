@@ -32,6 +32,8 @@ export const QUERY = {
 	assets: 'app:assets',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
+	/** The bell's inbox — reading, dismissing or restoring one changes it. */
+	notifications: 'app:notifications',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
 	/** One CRM record of any kind, as the generic record page shows it. */

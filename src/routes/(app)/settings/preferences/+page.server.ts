@@ -5,6 +5,7 @@ import { passesFeatureGate } from '$lib/features/gate';
 import type { FeatureId } from '$lib/features/types';
 import {
 	isPreferenceKey,
+	preferenceFeature,
 	PREFERENCES,
 	PREFERENCE_KEYS,
 	type PreferenceKey,
@@ -40,7 +41,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		);
 	};
 
-	const rows = PREFERENCE_KEYS.filter((key) => offered(PREFERENCES[key].feature)).map((key) => ({
+	const rows = PREFERENCE_KEYS.filter((key) => offered(preferenceFeature(key))).map((key) => ({
 		key,
 		kind: PREFERENCES[key].kind,
 		label: PREFERENCES[key].label,
