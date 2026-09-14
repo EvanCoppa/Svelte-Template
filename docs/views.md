@@ -123,10 +123,13 @@ origin (true of OpenFreeMap and of the MapLibre demo style).
 Coordinates come from `geocode()` in `src/lib/server/geocode.ts`, called by the record
 page's address action when an address is saved. `GEOCODER_URL` is a template with
 `{query}` (and `{key}` for `GEOCODER_API_KEY`) answering Nominatim-style JSON, so one
-variable picks the provider; `GEOCODER_USER_AGENT` names the app to public Nominatim.
-Unconfigured, down or stumped, the geocoder reports failure and the address still saves
-with null coordinates — a pin is a courtesy the map needs, never a condition of saving.
-The seed carries coordinates for its fixtures so the maps have pins with no provider set.
+variable picks the provider; unset, it defaults to public Nominatim, whose usage policy
+caps requests at one per second and wants a real, contact-identifying `GEOCODER_USER_AGENT`
+before relying on this at any volume — point `GEOCODER_URL` at a hosted provider
+(LocationIQ, Geoapify) with a key instead when that matters. Down or stumped, the
+geocoder reports failure and the address still saves with null coordinates — a pin is a
+courtesy the map needs, never a condition of saving. The seed carries coordinates for
+its fixtures directly, since SQL cannot call the TS geocoder.
 
 ## Later: per-org saved views
 

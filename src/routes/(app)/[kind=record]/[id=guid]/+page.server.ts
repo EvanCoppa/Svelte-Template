@@ -17,6 +17,7 @@ import { listActivities } from '$lib/server/crm/activities';
 import {
 	createAddress,
 	deleteAddress,
+	getAddress,
 	listAddresses,
 	updateAddress
 } from '$lib/server/crm/addresses';
@@ -46,7 +47,7 @@ import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
 import { billingActions, loadBilling } from './billing.server';
 import { loadRelationshipPickers, relationshipActions } from './relationships.server';
-import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
+import { addressSchema, locateAddressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
 import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
 
@@ -80,6 +81,7 @@ import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-co
 const FORM_IDS = {
 	address: 'address',
 	removeAddress: 'remove-address',
+	locateAddress: 'locate-address',
 	image: 'entity-image',
 	removeImage: 'remove-entity-image',
 	comment: 'comment',
@@ -206,6 +208,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		edit,
 		addressForm,
 		removeAddressForm,
+		locateAddressForm,
 		imageForm,
 		removeImageForm,
 		commentForm,
@@ -216,6 +219,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 			: null,
 		superValidate(zod4(addressSchema), { id: FORM_IDS.address }),
 		superValidate(zod4(removeAddressSchema), { id: FORM_IDS.removeAddress }),
+		superValidate(zod4(locateAddressSchema), { id: FORM_IDS.locateAddress }),
 		superValidate(zod4(imageUploadSchema), { id: FORM_IDS.image }),
 		superValidate(zod4(removeImageSchema), { id: FORM_IDS.removeImage }),
 		superValidate(zod4(taskCommentSchema), { id: FORM_IDS.comment }),
@@ -233,6 +237,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		addresses,
 		addressForm,
 		removeAddressForm,
+		locateAddressForm,
 		// Whether this KIND can carry one at all, shipped rather than
 		// re-derived in the page: the rule mirrors a database constraint, and
 		// a second copy in the markup is how a widened constraint silently
@@ -404,6 +409,52 @@ export const actions: Actions = {
 				form,
 				cause instanceof Error ? cause.message : 'Could not remove the message.',
 				{ status: 400 }
+			);
+		}
+		return { form };
+	},
+
+	// Re-geocode a saved address — the "Locate" chip an address with no pin
+	// wears. Re-reads the row rather than trusting posted lines, then writes
+	// only the coordinates a fresh geocode() found.
+	locateAddress: async ({ request, locals, params }) => {
+		const { supabase, orgId, entity } = addressableOf(locals, params);
+		const form = await superValidate(request, zod4(locateAddressSchema), {
+			id: FORM_IDS.locateAddress
+		});
+		if (!form.valid) return fail(400, { form });
+
+		try {
+			const address = await getAddress(supabase, orgId, form.data.id);
+			const geo = await geocode({
+				line1: address.line1,
+				line2: address.line2,
+				city: address.city,
+				region: address.region,
+				postal_code: address.postal_code,
+				country: address.country
+			});
+			if (!geo.ok) return message(form, geo.error, { status: 400 });
+			await updateAddress(supabase, orgId, entity, address.id, {
+				kind: address.kind,
+				label: address.label,
+				line1: address.line1,
+				line2: address.line2,
+				city: address.city,
+				region: address.region,
+				postal_code: address.postal_code,
+				country: address.country,
+				latitude: geo.latitude,
+				longitude: geo.longitude,
+				is_primary: address.is_primary
+			});
+		} catch (cause) {
+			return message(
+				form,
+				cause instanceof Error ? cause.message : 'Could not locate the address.',
+				{
+					status: 400
+				}
 			);
 		}
 		return { form };

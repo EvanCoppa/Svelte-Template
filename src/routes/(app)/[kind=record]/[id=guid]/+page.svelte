@@ -233,6 +233,7 @@
 							addresses={data.addresses}
 							form={data.addressForm}
 							removeForm={data.removeAddressForm}
+							locateForm={data.locateAddressForm}
 							canManage={data.canManageAddresses}
 							noun={terms.noun}
 							{queryKey}

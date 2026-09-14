@@ -8,19 +8,28 @@
  * is where the view page's map reads them from. The schema stores
  * coordinates; nothing else in the app knows a provider exists.
  *
- * Configuration is entirely env-driven, like email (`src/lib/server/email.ts`):
+ * Configuration is env-driven, like email (`src/lib/server/email.ts`), with a
+ * working default so geocoding is on out of the box:
  *
  *   GEOCODER_URL         a URL template with `{query}` where the address goes
  *                        and, optionally, `{key}` where GEOCODER_API_KEY goes —
  *                        any provider answering Nominatim-style JSON
  *                        (`[{ "lat": "…", "lon": "…" }]`): Nominatim itself,
  *                        LocationIQ, Geoapify's nominatim-compatible endpoint.
+ *                        Defaults to public Nominatim (`DEFAULT_GEOCODER_URL`)
+ *                        when unset.
  *   GEOCODER_API_KEY     optional, substituted into the template
- *   GEOCODER_USER_AGENT  optional; public Nominatim requires one that names the app
+ *   GEOCODER_USER_AGENT  optional; public Nominatim requires one that names the
+ *                        app, so this falls back to `DEFAULT_GEOCODER_USER_AGENT`
+ *                        rather than sending no header.
  *
- * When `GEOCODER_URL` is unset nothing is fetched: the call logs once and
- * reports failure, so an address still saves — with no coordinates — and
- * every flow stays exercisable without an account anywhere.
+ * Public Nominatim's usage policy caps requests at one per second and asks
+ * for a real, contact-identifying user agent — fine for a template running
+ * as one org, but set `GEOCODER_URL`/`GEOCODER_USER_AGENT` to your own
+ * provider (or a real contact) before relying on this at any volume.
+ *
+ * A template with no `{query}` placeholder, or a provider that fails, logs
+ * once and reports failure: an address still saves — with no coordinates.
  *
  * `geocode()` never throws: every outcome is a `GeocodeResult`. The address
  * form treats failure as "no pin yet", never as a reason to refuse the save.
@@ -47,17 +56,22 @@ export interface GeocodeEnv {
 	[key: string]: string | undefined;
 }
 
-/** Resolve the geocoder, or `null` when geocoding is off. A template that never uses `{query}` is refused loudly. */
+/** Public Nominatim — used when `GEOCODER_URL` is unset, per its usage policy (nominatim.org/release-docs/latest/api/Search/). */
+export const DEFAULT_GEOCODER_URL =
+	'https://nominatim.openstreetmap.org/search?format=json&limit=1&q={query}';
+/** Nominatim's usage policy requires a user agent identifying the app when none is configured. */
+export const DEFAULT_GEOCODER_USER_AGENT = 'sveltekit-supabase-template/1.0';
+
+/** Resolve the geocoder — defaults to public Nominatim. A template that never uses `{query}` is refused loudly. */
 export function geocoderConfig(source: GeocodeEnv = env): GeocoderConfig | null {
-	const urlTemplate = (source.GEOCODER_URL ?? '').trim();
-	if (!urlTemplate) return null;
+	const urlTemplate = (source.GEOCODER_URL ?? '').trim() || DEFAULT_GEOCODER_URL;
 	if (!urlTemplate.includes('{query}')) {
 		console.error('[geocode] GEOCODER_URL has no {query} placeholder — geocoding disabled.');
 		return null;
 	}
 	const apiKey = (source.GEOCODER_API_KEY ?? '').trim();
-	const userAgent = (source.GEOCODER_USER_AGENT ?? '').trim();
-	return { urlTemplate, apiKey: apiKey || null, userAgent: userAgent || null };
+	const userAgent = (source.GEOCODER_USER_AGENT ?? '').trim() || DEFAULT_GEOCODER_USER_AGENT;
+	return { urlTemplate, apiKey: apiKey || null, userAgent };
 }
 
 export function isGeocodingEnabled(source: GeocodeEnv = env): boolean {

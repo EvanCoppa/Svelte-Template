@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	DEFAULT_GEOCODER_URL,
+	DEFAULT_GEOCODER_USER_AGENT,
 	addressQuery,
 	geocode,
 	geocoderConfig,
@@ -37,9 +39,13 @@ afterEach(() => {
 });
 
 describe('geocoderConfig', () => {
-	it('is disabled by default, and with a template that has nowhere to put the address', () => {
-		expect(geocoderConfig({})).toBeNull();
-		expect(isGeocodingEnabled({})).toBe(false);
+	it('falls back to public Nominatim when unset, and is disabled by a template with nowhere to put the address', () => {
+		expect(geocoderConfig({})).toEqual({
+			urlTemplate: DEFAULT_GEOCODER_URL,
+			apiKey: null,
+			userAgent: DEFAULT_GEOCODER_USER_AGENT
+		});
+		expect(isGeocodingEnabled({})).toBe(true);
 		expect(geocoderConfig({ GEOCODER_URL: 'https://geo.test/search' })).toBeNull();
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('{query}'));
 	});
@@ -52,7 +58,7 @@ describe('geocoderConfig', () => {
 		});
 		expect(geocoderConfig({ GEOCODER_URL: 'https://geo.test/?q={query}' })).toMatchObject({
 			apiKey: null,
-			userAgent: null
+			userAgent: DEFAULT_GEOCODER_USER_AGENT
 		});
 	});
 });
@@ -67,9 +73,23 @@ describe('addressQuery', () => {
 });
 
 describe('geocode', () => {
-	it('reports failure without fetching when unconfigured', async () => {
-		const fetchSpy = fetchAnswering(200, '[]');
+	it('geocodes against public Nominatim when unconfigured', async () => {
+		const fetchSpy = fetchAnswering(200, '[{"lat":"40.5806","lon":"-74.2854"}]');
 		await expect(geocode(address, { fetch: fetchSpy, envSource: {} })).resolves.toEqual({
+			ok: true,
+			latitude: 40.5806,
+			longitude: -74.2854
+		});
+		const [url, init] = fetchSpy.mock.calls[0] ?? [];
+		expect(url).toContain('nominatim.openstreetmap.org');
+		expect(new Headers(init?.headers).get('user-agent')).toBe(DEFAULT_GEOCODER_USER_AGENT);
+	});
+
+	it('reports failure without fetching when a bad template disables it', async () => {
+		const fetchSpy = fetchAnswering(200, '[]');
+		await expect(
+			geocode(address, { fetch: fetchSpy, envSource: { GEOCODER_URL: 'https://geo.test/search' } })
+		).resolves.toEqual({
 			ok: false,
 			error: 'Geocoding is not configured.'
 		});
