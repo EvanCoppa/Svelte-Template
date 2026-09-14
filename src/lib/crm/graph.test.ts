@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
 	edgeLabelFrom,
+	egoGraph,
 	filterGraph,
 	graphNodeId,
 	neighbourhoodOf,
 	swatchAt,
+	type GraphData,
 	type GraphEdge,
 	type GraphNode
 } from './graph';
@@ -127,5 +129,103 @@ describe('edgeLabelFrom', () => {
 		expect(edgeLabelFrom(owns, wayne.id)).toBe('owns');
 		expect(edgeLabelFrom(owns, truck.id)).toBe('owned by');
 		expect(edgeLabelFrom(owns, dev.id)).toBeNull();
+	});
+});
+
+/**
+ * The whole map with its legend, as `describeGraph()` hands it over — the
+ * shape `egoGraph()` narrows. Wayne owns a truck, the truck is held by Dev,
+ * and Lucius worked at Wayne (ended). Alone stands in no relationship.
+ */
+const alone: GraphNode = {
+	id: 'product:5',
+	kind: 'product',
+	name: 'Grapple gun',
+	href: '/products/5'
+};
+
+const whole: GraphData = {
+	nodes: [wayne, truck, dev, lucius, alone],
+	edges: [owns, holds, workedAt],
+	kinds: [
+		{ kind: 'company', label: 'Companies', count: 1 },
+		{ kind: 'contact', label: 'People', count: 1 },
+		{ kind: 'product', label: 'Products', count: 1 },
+		{ kind: 'asset', label: 'Assets', count: 1 },
+		{ kind: 'member', label: 'Team', count: 1 }
+	],
+	types: [
+		{ id: 'assigned_to', label: 'assigned to', count: 1 },
+		{ id: 'owns', label: 'owns', count: 1 },
+		{ id: 'works_at', label: 'works at', count: 1 }
+	]
+};
+
+describe('egoGraph', () => {
+	it('draws one hop: the record, who it deals with, and the edges between them', () => {
+		const around = egoGraph(whole, wayne.id, 1);
+		expect(around.nodes.map((node) => node.id).sort()).toEqual(
+			['company:1', 'asset:2', 'contact:4'].sort()
+		);
+		// The truck and Lucius are both one hop out; Dev is two and is left off.
+		expect(around.edges.map((edge) => edge.id).sort()).toEqual(['e1', 'e3']);
+	});
+
+	it('reaches the second hop at depth 2', () => {
+		const around = egoGraph(whole, wayne.id, 2);
+		expect(around.nodes.map((node) => node.id)).toContain(dev.id);
+		expect(around.edges.map((edge) => edge.id).sort()).toEqual(['e1', 'e2', 'e3']);
+	});
+
+	it('keeps every edge BETWEEN the records reached, not only the ones walked', () => {
+		// Lucius also holds the truck, so the one-hop map around Wayne closes
+		// the triangle even though that edge was never walked to get there.
+		const alsoHolds: GraphEdge = {
+			id: 'e4',
+			source: lucius.id,
+			target: truck.id,
+			typeId: 'assigned_to',
+			label: 'assigned to',
+			inverseLabel: 'holds',
+			ended: false
+		};
+		const around = egoGraph({ ...whole, edges: [...whole.edges, alsoHolds] }, wayne.id, 1);
+		expect(around.edges.map((edge) => edge.id).sort()).toEqual(['e1', 'e3', 'e4']);
+	});
+
+	it('draws a record in no relationship as the single dot it is', () => {
+		const around = egoGraph(whole, alone.id, 2);
+		expect(around.nodes).toEqual([alone]);
+		expect(around.edges).toEqual([]);
+		expect(around.kinds).toEqual([{ kind: 'product', label: 'Products', count: 1 }]);
+		expect(around.types).toEqual([]);
+	});
+
+	it('recounts the legend from what survived, keeping the resolved labels and their order', () => {
+		const around = egoGraph(whole, wayne.id, 1);
+		expect(around.kinds).toEqual([
+			{ kind: 'company', label: 'Companies', count: 1 },
+			{ kind: 'contact', label: 'People', count: 1 },
+			{ kind: 'asset', label: 'Assets', count: 1 }
+		]);
+		expect(around.types).toEqual([
+			{ id: 'owns', label: 'owns', count: 1 },
+			{ id: 'works_at', label: 'works at', count: 1 }
+		]);
+	});
+
+	it('draws nothing for a node the map does not hold', () => {
+		expect(egoGraph(whole, 'company:missing', 2)).toEqual({
+			nodes: [],
+			edges: [],
+			kinds: [],
+			types: []
+		});
+	});
+
+	it('draws the record alone at depth 0', () => {
+		const around = egoGraph(whole, wayne.id, 0);
+		expect(around.nodes).toEqual([wayne]);
+		expect(around.edges).toEqual([]);
 	});
 });
