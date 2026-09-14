@@ -957,14 +957,16 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
-  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
-  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
-  for a column that groups several states, not for every board. It draws one pipeline at a
-  time (a stage only means something inside its own board, so which one is in the query
-  string like the ledger's account filter), the stage's `probability` as the ring's fill,
-  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
-  `$lib/crm/tasks.ts` does for the task board.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board, with
+  `pipeline_stages` rows as its columns** (docs/deals.md): an open stage IS the state a deal
+  is in, so it gets a column of its own and a release lands straight away — but every stage
+  whose outcome closes the deal (`won`, `lost`, and any more an org adds) shares one `Closed`
+  column, split into a drop zone per stage exactly like a grouped task column, so the funnel
+  does not grow a column per terminal stage. `buildDealColumns()` (`$lib/crm/deals.ts`) is the
+  one place that groups them. It draws one pipeline at a time (a stage only means something
+  inside its own board, so which one is in the query string like the ledger's account filter),
+  the stage's `probability` as the ring's fill, and `$lib/crm/deals.ts` answers what a column
+  holds and adds up to the way `$lib/crm/tasks.ts` does for the task board.
 - **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
   not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
   `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and
