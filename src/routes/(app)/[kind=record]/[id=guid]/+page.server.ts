@@ -45,6 +45,7 @@ import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { capitalize } from '$lib/utils.js';
 import type { Actions, PageServerLoad } from './$types';
 import { billingActions, loadBilling } from './billing.server';
+import { emailActions, loadEmail } from './email.server';
 import { addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
 import { imageUploadSchema, removeImageSchema } from '$lib/schemas/entity-images';
 import { removeTaskCommentSchema, taskCommentSchema } from '$lib/schemas/task-comments';
@@ -147,7 +148,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		relationships,
 		notes,
 		messages,
-		billing
+		billing,
+		email
 	] = await Promise.all([
 		getRecord(supabase, activeOrgId, kind, id, canOpen, vocabulary),
 		listActivities(supabase, activeOrgId, { entity }),
@@ -163,7 +165,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		notesShown ? listNotes(supabase, activeOrgId, { entity, archived: false }) : [],
 		threaded ? listTaskComments(supabase, activeOrgId, id) : [],
 		// Null for every kind but an invoice; the block's own module decides.
-		loadBilling(locals, params)
+		loadBilling(locals, params),
+		// Null unless the kind carries mail and this session has the feature.
+		loadEmail(locals, params)
 	]);
 	// RLS hides other orgs' rows, so "missing" and "not yours" are the same
 	// 404 — never a 403 that confirms the id is real.
@@ -253,6 +257,8 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 			: null,
 		// An invoice's lines and money, with the forms that change them.
 		billing,
+		// The conversations filed on this record, and the compose form.
+		email,
 		people,
 		// The record's name titles the page and names its crumb — see
 		// `titleFor()` in $lib/features/pages.
@@ -297,6 +303,8 @@ function assetOf(locals: App.Locals, params: { kind: RecordSegment; id: string }
 export const actions: Actions = {
 	// The invoice block's nine actions — lines, header, lifecycle, money.
 	...billingActions,
+	// The email block's two: send (or reply), and flag a message private.
+	...emailActions,
 
 	/**
 	 * The record's own fields, through the same registry, schema and switch

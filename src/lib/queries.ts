@@ -34,6 +34,8 @@ export const QUERY = {
 	notes: 'app:notes',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
+	/** The org's connected mailboxes, their state and the reader's exclusions — a connection, a switch or a disconnect changes it. */
+	email: 'app:email',
 	/** One CRM record of any kind, as the generic record page shows it. */
 	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */

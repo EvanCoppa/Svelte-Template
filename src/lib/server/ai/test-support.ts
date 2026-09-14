@@ -23,7 +23,8 @@ const FEATURE_IDS = [
 	'tasks',
 	'tickets',
 	'staff',
-	'assistant'
+	'assistant',
+	'email'
 ] as const;
 
 function featureRow(id: string): Feature {

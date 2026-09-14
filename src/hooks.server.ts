@@ -55,7 +55,15 @@ export const handleError: HandleServerError = ({ error: err, event, status, mess
  * `$lib/features/gate` and the features migration. A page is gated by being
  * registered, not by remembering a check in its load.
  */
-const PUBLIC_PATHS = ['/login', '/auth'];
+const PUBLIC_PATHS = [
+	'/login',
+	'/auth',
+	// Machine callers with their own bearer checks: Gmail's push notifications
+	// (a Google-signed OIDC token) and Vercel's cron (CRON_SECRET). Neither
+	// has a session; each refuses anything without its credential.
+	'/api/integrations/google/notifications',
+	'/api/cron'
+];
 
 /**
  * The only pages a session that is mid password-recovery may reach: the form

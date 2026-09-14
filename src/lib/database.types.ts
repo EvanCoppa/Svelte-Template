@@ -809,6 +809,301 @@ export type Database = {
           },
         ]
       }
+      email_message_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          message_id: string
+          org_id: string
+          source: Database["public"]["Enums"]["email_link_source"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          message_id: string
+          org_id: string
+          source: Database["public"]["Enums"]["email_link_source"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          message_id?: string
+          org_id?: string
+          source?: Database["public"]["Enums"]["email_link_source"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_message_links_message_id_org_id_fkey"
+            columns: ["message_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "email_message_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_messages: {
+        Row: {
+          attachment_count: number
+          body_text: string | null
+          created_at: string
+          from_address: string
+          from_name: string | null
+          id: string
+          in_reply_to: string | null
+          org_id: string
+          reference_ids: string[]
+          rfc_message_id: string
+          sent_at: string
+          size_estimate: number | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_count?: number
+          body_text?: string | null
+          created_at?: string
+          from_address: string
+          from_name?: string | null
+          id?: string
+          in_reply_to?: string | null
+          org_id: string
+          reference_ids?: string[]
+          rfc_message_id: string
+          sent_at: string
+          size_estimate?: number | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_count?: number
+          body_text?: string | null
+          created_at?: string
+          from_address?: string
+          from_name?: string | null
+          id?: string
+          in_reply_to?: string | null
+          org_id?: string
+          reference_ids?: string[]
+          rfc_message_id?: string
+          sent_at?: string
+          size_estimate?: number | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_thread_id_org_id_fkey"
+            columns: ["thread_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "email_threads"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      email_outbox: {
+        Row: {
+          bcc_addresses: string[]
+          body_text: string
+          cc_addresses: string[]
+          created_at: string
+          error: string | null
+          gmail_message_id: string | null
+          id: string
+          idempotency_key: string
+          in_reply_to_message_id: string | null
+          mailbox_id: string
+          org_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["email_outbox_status"]
+          subject: string
+          to_addresses: string[]
+          user_id: string
+        }
+        Insert: {
+          bcc_addresses?: string[]
+          body_text: string
+          cc_addresses?: string[]
+          created_at?: string
+          error?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          idempotency_key: string
+          in_reply_to_message_id?: string | null
+          mailbox_id: string
+          org_id: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_outbox_status"]
+          subject: string
+          to_addresses: string[]
+          user_id?: string
+        }
+        Update: {
+          bcc_addresses?: string[]
+          body_text?: string
+          cc_addresses?: string[]
+          created_at?: string
+          error?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          idempotency_key?: string
+          in_reply_to_message_id?: string | null
+          mailbox_id?: string
+          org_id?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_outbox_status"]
+          subject?: string
+          to_addresses?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_outbox_in_reply_to_message_id_fkey"
+            columns: ["in_reply_to_message_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_outbox_mailbox_id_org_id_fkey"
+            columns: ["mailbox_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "email_outbox_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_participants: {
+        Row: {
+          address: string
+          contact_id: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          message_id: string
+          org_id: string
+          role: Database["public"]["Enums"]["email_participant_role"]
+        }
+        Insert: {
+          address: string
+          contact_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          message_id: string
+          org_id: string
+          role: Database["public"]["Enums"]["email_participant_role"]
+        }
+        Update: {
+          address?: string
+          contact_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          message_id?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["email_participant_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_participants_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "email_participants_message_id_org_id_fkey"
+            columns: ["message_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "email_participants_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_threads: {
+        Row: {
+          created_at: string
+          first_message_at: string | null
+          id: string
+          last_message_at: string | null
+          message_count: number
+          org_id: string
+          subject: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          first_message_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          org_id: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          first_message_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          org_id?: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_threads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_images: {
         Row: {
           caption: string | null
@@ -1374,6 +1669,273 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "features"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailbox_credentials: {
+        Row: {
+          access_token_expires_at: string | null
+          access_token_sealed: string | null
+          key_version: number
+          mailbox_id: string
+          refresh_token_sealed: string
+          scopes: string[]
+          updated_at: string
+        }
+        Insert: {
+          access_token_expires_at?: string | null
+          access_token_sealed?: string | null
+          key_version?: number
+          mailbox_id: string
+          refresh_token_sealed: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          access_token_expires_at?: string | null
+          access_token_sealed?: string | null
+          key_version?: number
+          mailbox_id?: string
+          refresh_token_sealed?: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailbox_credentials_mailbox_id_fkey"
+            columns: ["mailbox_id"]
+            isOneToOne: true
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailbox_exclusions: {
+        Row: {
+          created_at: string
+          id: string
+          mailbox_id: string
+          org_id: string
+          pattern: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mailbox_id: string
+          org_id: string
+          pattern: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mailbox_id?: string
+          org_id?: string
+          pattern?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailbox_exclusions_mailbox_id_org_id_fkey"
+            columns: ["mailbox_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "mailbox_exclusions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailbox_messages: {
+        Row: {
+          gmail_message_id: string
+          gmail_thread_id: string
+          id: string
+          is_private: boolean
+          is_sent: boolean
+          label_ids: string[]
+          mailbox_id: string
+          message_id: string
+          org_id: string
+          synced_at: string
+        }
+        Insert: {
+          gmail_message_id: string
+          gmail_thread_id: string
+          id?: string
+          is_private?: boolean
+          is_sent?: boolean
+          label_ids?: string[]
+          mailbox_id: string
+          message_id: string
+          org_id: string
+          synced_at?: string
+        }
+        Update: {
+          gmail_message_id?: string
+          gmail_thread_id?: string
+          id?: string
+          is_private?: boolean
+          is_sent?: boolean
+          label_ids?: string[]
+          mailbox_id?: string
+          message_id?: string
+          org_id?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailbox_messages_mailbox_id_org_id_fkey"
+            columns: ["mailbox_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "mailbox_messages_message_id_org_id_fkey"
+            columns: ["message_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "mailbox_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailbox_sync_jobs: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["mailbox_sync_kind"]
+          last_error: string | null
+          mailbox_id: string | null
+          next_run_at: string
+          org_id: string | null
+          payload: Json
+          status: Database["public"]["Enums"]["mailbox_sync_status"]
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["mailbox_sync_kind"]
+          last_error?: string | null
+          mailbox_id?: string | null
+          next_run_at?: string
+          org_id?: string | null
+          payload?: Json
+          status?: Database["public"]["Enums"]["mailbox_sync_status"]
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["mailbox_sync_kind"]
+          last_error?: string | null
+          mailbox_id?: string | null
+          next_run_at?: string
+          org_id?: string | null
+          payload?: Json
+          status?: Database["public"]["Enums"]["mailbox_sync_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailbox_sync_jobs_mailbox_id_org_id_fkey"
+            columns: ["mailbox_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "mailbox_sync_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailboxes: {
+        Row: {
+          backfilled_at: string | null
+          created_at: string
+          email_address: string
+          history_id: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          org_id: string
+          provider: Database["public"]["Enums"]["mailbox_provider"]
+          status: Database["public"]["Enums"]["mailbox_status"]
+          updated_at: string
+          user_id: string
+          visibility: Database["public"]["Enums"]["mailbox_visibility"]
+          watch_expires_at: string | null
+        }
+        Insert: {
+          backfilled_at?: string | null
+          created_at?: string
+          email_address: string
+          history_id?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          org_id: string
+          provider?: Database["public"]["Enums"]["mailbox_provider"]
+          status?: Database["public"]["Enums"]["mailbox_status"]
+          updated_at?: string
+          user_id: string
+          visibility?: Database["public"]["Enums"]["mailbox_visibility"]
+          watch_expires_at?: string | null
+        }
+        Update: {
+          backfilled_at?: string | null
+          created_at?: string
+          email_address?: string
+          history_id?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          org_id?: string
+          provider?: Database["public"]["Enums"]["mailbox_provider"]
+          status?: Database["public"]["Enums"]["mailbox_status"]
+          updated_at?: string
+          user_id?: string
+          visibility?: Database["public"]["Enums"]["mailbox_visibility"]
+          watch_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailboxes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailboxes_org_id_user_id_fkey"
+            columns: ["org_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
           },
         ]
       }
@@ -3771,6 +4333,30 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      claim_mailbox_sync_jobs: {
+        Args: { batch: number; worker: string }
+        Returns: {
+          attempts: number
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["mailbox_sync_kind"]
+          last_error: string | null
+          mailbox_id: string | null
+          next_run_at: string
+          org_id: string | null
+          payload: Json
+          status: Database["public"]["Enums"]["mailbox_sync_status"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mailbox_sync_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
@@ -3811,6 +4397,9 @@ export type Database = {
         | "ticket"
       custom_field_value_type: "text" | "numeric" | "boolean" | "select"
       duration_unit: "visits" | "days" | "weeks" | "months" | "sec"
+      email_link_source: "participant" | "domain" | "manual"
+      email_outbox_status: "queued" | "sent" | "failed"
+      email_participant_role: "from" | "to" | "cc" | "bcc" | "reply_to"
       execution_type:
         | "appointment_schedule"
         | "work_order"
@@ -3827,6 +4416,16 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "returned"
+      mailbox_provider: "google"
+      mailbox_status: "active" | "reauthorize" | "paused"
+      mailbox_sync_kind:
+        | "backfill"
+        | "incremental"
+        | "address_backfill"
+        | "renew_watch"
+        | "revoke"
+      mailbox_sync_status: "queued" | "running" | "done" | "failed"
+      mailbox_visibility: "shared" | "private"
       order_status: "draft" | "confirmed" | "cancelled"
       org_role: "owner" | "admin" | "member"
       party_status: "lead" | "prospect" | "active" | "inactive"
@@ -4041,6 +4640,9 @@ export const Constants = {
       ],
       custom_field_value_type: ["text", "numeric", "boolean", "select"],
       duration_unit: ["visits", "days", "weeks", "months", "sec"],
+      email_link_source: ["participant", "domain", "manual"],
+      email_outbox_status: ["queued", "sent", "failed"],
+      email_participant_role: ["from", "to", "cc", "bcc", "reply_to"],
       execution_type: [
         "appointment_schedule",
         "work_order",
@@ -4059,6 +4661,17 @@ export const Constants = {
         "cancelled",
         "returned",
       ],
+      mailbox_provider: ["google"],
+      mailbox_status: ["active", "reauthorize", "paused"],
+      mailbox_sync_kind: [
+        "backfill",
+        "incremental",
+        "address_backfill",
+        "renew_watch",
+        "revoke",
+      ],
+      mailbox_sync_status: ["queued", "running", "done", "failed"],
+      mailbox_visibility: ["shared", "private"],
       order_status: ["draft", "confirmed", "cancelled"],
       org_role: ["owner", "admin", "member"],
       party_status: ["lead", "prospect", "active", "inactive"],

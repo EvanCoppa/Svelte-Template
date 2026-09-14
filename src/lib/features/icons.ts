@@ -11,7 +11,9 @@ import FileTextIcon from '@lucide/svelte/icons/file-text';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
+import LinkIcon from '@lucide/svelte/icons/link';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+import MailIcon from '@lucide/svelte/icons/mail';
 import MapIcon from '@lucide/svelte/icons/map';
 import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
@@ -47,7 +49,9 @@ export const ICONS = {
 	handshake: HandshakeIcon,
 	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,
+	link: LinkIcon,
 	'list-checks': ListChecksIcon,
+	mail: MailIcon,
 	map: MapIcon,
 	'map-pin': MapPinIcon,
 	package: PackageIcon,

@@ -547,6 +547,32 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   payment form carries an idempotency key the load minted, so a double submit collides
   on the table instead of recording money twice.
 
+- **Email is synced per member and deduplicated per org** (`email_sync` migration +
+  `src/lib/server/mail-sync/` + `src/lib/server/integrations/google/` +
+  `src/lib/server/crm/mailboxes.ts`, `emails.ts`; docs/email.md). A member connects
+  their own Google mailbox at `/settings/integrations` (a settings page, so its load
+  hand-checks the `email` feature's mode and the `manage` grant through
+  `emailAccess()` — the gate does not cover it); the worker keeps **only mail that
+  matches a record** — a contact's address, a company's domain — and files each
+  message through the shared entity link (`email_message_links`), so the record
+  page's Emails tab and `/email` are reads of the same rows. Synced mail is **not**
+  `activities`: it dedupes on its RFC `Message-ID` across mailboxes
+  (`email_messages` + per-mailbox `mailbox_messages`), and who reads it is one RLS
+  rule, `private.mailbox_link_visible()` — the holder, the org's owners and admins,
+  and everyone else only when the mailbox is `shared` and the message not flagged
+  private. Tokens are sealed by `tokens.ts` under `MAILBOX_TOKEN_KEY` into a table
+  with no policies and no grants. The queue is `mailbox_sync_jobs`, drained by
+  `/api/cron/mail-sync` every minute and fed by Gmail's push at
+  `/api/integrations/google/notifications` (both in `PUBLIC_PATHS`, each with its own
+  bearer); every job is one page of work, requeued for the next, so nothing outlives
+  a Vercel function. Sending is the record page's `sendEmail` action: through Gmail
+  **as the member**, from one of their own active mailboxes, guarded by
+  `email_outbox` (an idempotency key the load minted, the payments rule), and
+  ingested at once with a `manual` link to the record. The OAuth start is the one
+  GET-endpoint mutation on purpose — `form-action 'self'` in the CSP refuses a form
+  action's redirect to Google — and the callback writes only what Google answered,
+  through the service role, like `/invite/[token]`.
+
 ## Database
 
 - Schema changes are SQL migrations in `supabase/migrations/` (see the `profiles`

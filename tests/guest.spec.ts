@@ -84,6 +84,30 @@ test.describe('unauthenticated visitor', () => {
 	});
 });
 
+test.describe('machine endpoints', () => {
+	// Two public paths exist for callers that have no session — Gmail's push
+	// and Vercel's cron — and each refuses anything without its own bearer.
+	// A visitor, or a bot that found the paths, learns nothing.
+	test('refuse a Pub/Sub push that carries no Google token', async ({ request }) => {
+		const response = await request.post('/api/integrations/google/notifications', {
+			data: { message: { data: '' } }
+		});
+		expect([401, 503]).toContain(response.status());
+	});
+
+	test('refuse a cron tick that carries no secret', async ({ request }) => {
+		const response = await request.get('/api/cron/mail-sync');
+		expect(response.status()).toBe(401);
+	});
+
+	test('send the OAuth start through login like any page', async ({ page }) => {
+		await page.goto('/api/integrations/google/start');
+		// An API path with no session answers 401, never a redirect that leaks
+		// the consent URL.
+		await expect(page.locator('body')).toContainText(/not signed in/i);
+	});
+});
+
 test.describe('security headers', () => {
 	test('are set on every response', async ({ page }) => {
 		const response = await page.goto('/login');
