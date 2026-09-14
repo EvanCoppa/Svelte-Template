@@ -53,11 +53,18 @@ jobs:
       - name: Link production project
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
+      # --include-all: two migrations were pushed to production out of band
+      # (see the notification_inbox drift fix), which left two
+      # still-pending files (roofing_industry_depth, roofing_custom_fields)
+      # timestamped earlier than the last migration remote now has recorded.
+      # Without the flag the CLI refuses to insert a migration "into the
+      # past". It only lifts that refusal — migrations still apply in
+      # version order, and already-applied versions are still skipped.
       - name: What would be applied
-        run: npx supabase db push --dry-run
+        run: npx supabase db push --dry-run --include-all
 
       - name: Apply
-        run: npx supabase db push
+        run: npx supabase db push --include-all
 
       - name: Summary
         if: always()

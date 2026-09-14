@@ -1,6 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
 import { loadRecordList } from '$lib/server/lists';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -11,12 +16,15 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 
 	return {
 		...(await loadRecordList(locals, 'rma')),
-		...(await loadCreateRecord(locals, 'rma'))
+		...(await loadCreateRecord(locals, 'rma')),
+		...(await loadDeleteRecord(locals, 'rma'))
 	};
 };
 
-// Creating goes through the generic record form ($lib/server/records.ts), which
-// opens with requirePermission(locals.org.access, 'rmas', 'manage').
+// Creating and deleting go through the generic record form/row menu
+// ($lib/server/records.ts), which open with
+// requirePermission(locals.org.access, 'rmas', <level>).
 export const actions: Actions = {
-	create: (event) => createRecord(event, 'rma')
+	create: (event) => createRecord(event, 'rma'),
+	deleteRecord: (event) => deleteRecord(event, 'rma')
 };

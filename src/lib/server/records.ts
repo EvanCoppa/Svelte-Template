@@ -4,7 +4,8 @@ import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
-import type { RecordKind } from '$lib/crm/records';
+import { RECORD_KIND_META, type RecordKind } from '$lib/crm/records';
+import type { ListKind } from '$lib/lists/types';
 import {
 	assetRecordSchema,
 	billableRecordSchema,
@@ -12,6 +13,7 @@ import {
 	contactRecordSchema,
 	couponRecordSchema,
 	dealRecordSchema,
+	deleteRecordSchema,
 	invoiceRecordSchema,
 	productRecordSchema,
 	rmaRecordSchema,
@@ -27,18 +29,31 @@ import {
 	type RecordPickers,
 	type RecordType
 } from '$lib/schemas/records';
-import { createAsset, getAsset, updateAsset } from './crm/assets';
-import { createBillable, getBillable, updateBillable } from './crm/billables';
-import { createCompany, getCompany, listCompanies, updateCompany } from './crm/companies';
-import { createContact, getContact, listContacts, updateContact } from './crm/contacts';
-import { createCoupon, getCoupon, updateCoupon } from './crm/coupons';
-import { createDeal, dealPlacement, getDeal, updateDeal } from './crm/deals';
+import { createAsset, deleteAsset, getAsset, updateAsset } from './crm/assets';
+import { createBillable, deleteBillable, getBillable, updateBillable } from './crm/billables';
+import {
+	createCompany,
+	deleteCompany,
+	getCompany,
+	listCompanies,
+	updateCompany
+} from './crm/companies';
+import {
+	createContact,
+	deleteContact,
+	getContact,
+	listContacts,
+	updateContact
+} from './crm/contacts';
+import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
+import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
 import { listPipelines } from './crm/pipelines';
-import { createProduct, getProduct, updateProduct } from './crm/products';
-import { createRma, getRma, updateRma } from './crm/rmas';
+import { deleteProposal } from './crm/proposals';
+import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
 import { createTask, getTask, updateTask } from './crm/tasks';
-import { createTicket, getTicket, updateTicket } from './crm/tickets';
+import { createTicket, deleteTicket, getTicket, updateTicket } from './crm/tickets';
 import { can, requirePermission } from './roles';
 
 /**
@@ -258,6 +273,95 @@ export async function updateRecord(
 	}
 
 	return { form };
+}
+
+// ---------------------------------------------------------------------------
+// Deleting one — every list page's row menu
+// ---------------------------------------------------------------------------
+
+/**
+ * The kinds a list page's row menu may delete: every kind with a list page
+ * but an invoice, which is a document with a lifecycle (draft → issued →
+ * void) rather than a row to discard — voiding is how an issued one goes
+ * away, and a draft is removed from its own page, never a table.
+ */
+export type DeletableListKind = Exclude<ListKind, 'invoice'>;
+
+/** One id for every delete form, distinct from the create and edit forms'. */
+export const DELETE_FORM_ID = 'delete-record';
+
+/** An empty delete form — every list page's load builds one for its row menu. */
+export function deleteRecordForm(): Promise<SuperValidated<{ id: string }>> {
+	return superValidate(zod4(deleteRecordSchema), { id: DELETE_FORM_ID, errors: false });
+}
+
+/** What a list page's load adds for its row menu's Delete: the form, and whether this reader may use it. */
+export async function loadDeleteRecord(
+	locals: App.Locals,
+	kind: DeletableListKind
+): Promise<{ deleteForm: SuperValidated<{ id: string }>; canDelete: boolean }> {
+	const { org } = locals;
+	if (!org) throw redirect(303, '/login');
+	return {
+		deleteForm: await deleteRecordForm(),
+		canDelete: can(org.access, RECORD_KIND_META[kind].feature, 'delete')
+	};
+}
+
+/** The `deleteRecord` action every list page delegates to. */
+export async function deleteRecord(
+	event: Pick<RequestEvent, 'request' | 'locals'>,
+	kind: DeletableListKind
+) {
+	const { request, locals } = event;
+	const { supabase, activeOrgId, org } = locals;
+	if (!activeOrgId || !org) throw redirect(303, '/login');
+
+	requirePermission(org.access, RECORD_KIND_META[kind].feature, 'delete');
+
+	const form = await superValidate(request, zod4(deleteRecordSchema), { id: DELETE_FORM_ID });
+	if (!form.valid) return fail(400, { form });
+
+	try {
+		await removeRecord(supabase, activeOrgId, kind, form.data.id);
+	} catch (cause) {
+		return message(form, cause instanceof Error ? cause.message : 'Could not delete the record.', {
+			status: 400
+		});
+	}
+
+	return { form };
+}
+
+/** The one place a deletable kind becomes the crm module that removes its row. */
+async function removeRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	kind: DeletableListKind,
+	id: string
+): Promise<void> {
+	switch (kind) {
+		case 'company':
+			return deleteCompany(supabase, orgId, id);
+		case 'contact':
+			return deleteContact(supabase, orgId, id);
+		case 'deal':
+			return deleteDeal(supabase, orgId, id);
+		case 'product':
+			return deleteProduct(supabase, orgId, id);
+		case 'billable':
+			return deleteBillable(supabase, orgId, id);
+		case 'asset':
+			return deleteAsset(supabase, orgId, id);
+		case 'proposal':
+			return deleteProposal(supabase, orgId, id);
+		case 'ticket':
+			return deleteTicket(supabase, orgId, id);
+		case 'coupon':
+			return deleteCoupon(supabase, orgId, id);
+		case 'rma':
+			return deleteRma(supabase, orgId, id);
+	}
 }
 
 /**
