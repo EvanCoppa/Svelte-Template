@@ -36,6 +36,8 @@ export const FEATURE_IDS = [
 	'assistant',
 	// The relationship graph, read whole (the relationship_graph migration).
 	'graph',
+	// The whiteboard — one canvas, kept on the device (the whiteboard migration).
+	'whiteboard',
 	// Views — each a features row at /views/<id> (the views migration).
 	'suppliers',
 	'partner-contacts',
