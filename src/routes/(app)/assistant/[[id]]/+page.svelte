@@ -138,7 +138,6 @@
 
 				<Assistant.Thread
 					messages={chat.messages}
-					status={chat.status}
 					class="relative z-10 {started ? '' : 'pointer-events-none opacity-0'}"
 				>
 					{#each chat.messages as message, index (message.id)}
@@ -180,7 +179,7 @@
 					<div class="mx-auto flex w-full max-w-3xl flex-col items-center xl:max-w-4xl">
 						{#if !started}
 							<h2
-								class="fade-in-up text-foreground mb-10 text-center text-4xl font-normal tracking-tight md:text-5xl"
+								class="text-foreground mb-10 animate-[fade-up_var(--duration-page)_var(--ease-out-strong)_both] text-center text-4xl font-normal tracking-tight md:text-5xl"
 							>
 								How can I help you today?
 							</h2>
@@ -286,22 +285,3 @@
 		{/if}
 	</Modal.Content>
 </Modal.Root>
-
-<style>
-	.fade-in-up {
-		animation: fade-in-up 0.5s ease-out forwards;
-	}
-
-	@keyframes fade-in-up {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.fade-in-up {
-			animation: none;
-		}
-	}
-</style>

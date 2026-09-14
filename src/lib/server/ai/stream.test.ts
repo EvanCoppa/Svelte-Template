@@ -25,6 +25,8 @@ type Tables = {
 	conversation?: { title: string | null };
 	messages?: IncomingMessage[];
 	tasks?: QueryResult;
+	/** Stands in for the title call — a slow one proves it does not hold the answer up. */
+	generateTitle?: () => Promise<string | null>;
 };
 
 /** A row as `saveMessages` writes it. */
@@ -36,11 +38,23 @@ type SavedRow = {
 	metadata: AssistantMessageMetadata | null;
 };
 
+/**
+ * The answer as the browser rebuilds it, from the stream's text deltas —
+ * `smoothStream` paces the text one word at a time, so no single delta carries
+ * the whole sentence.
+ */
+function streamedText(sse: string): string {
+	return [...sse.matchAll(/"type":"text-delta"[^}]*"delta":"([^"]*)"/g)]
+		.map(([, delta]) => delta)
+		.join('');
+}
+
 /** A client whose three tables answer as the test says, and the turn's inputs around it. */
 function harness({
 	conversation = { title: null },
 	messages = [],
-	tasks = { data: [] }
+	tasks = { data: [] },
+	generateTitle: titleWith = async () => 'A short title'
 }: Tables = {}) {
 	const db = supabaseTablesMock({
 		assistant_conversations: {
@@ -50,7 +64,7 @@ function harness({
 		tasks
 	});
 	const model = streamingModel('Two of them are leads.');
-	const generateTitle = vi.fn(async () => 'A short title');
+	const generateTitle = vi.fn(titleWith);
 
 	function turn(request: StreamRequest, org = orgContext()) {
 		return streamAssistantTurn({
@@ -90,7 +104,7 @@ beforeEach(() => {
 });
 
 describe('streamAssistantTurn', () => {
-	it('streams the answer, titles a new thread first, and saves the thread with metadata', async () => {
+	it('streams the answer, titles a new thread, and saves the thread with metadata', async () => {
 		const h = harness();
 
 		const response = await h.turn({
@@ -102,7 +116,9 @@ describe('streamAssistantTurn', () => {
 
 		expect(response.headers.get('content-type')).toContain('text/event-stream');
 		const { sse, saved } = await h.finish(response);
-		expect(sse).toContain('Two of them are leads.');
+		expect(streamedText(sse)).toBe('Two of them are leads.');
+		// Paced a word at a time, rather than in whatever bursts the provider sent.
+		expect(sse).toContain('"delta":"Two "');
 
 		expect(h.generateTitle).toHaveBeenCalledWith(h.model, 'Which companies are leads?');
 		expect(h.db.builders.assistant_conversations.update).toHaveBeenCalledWith({
@@ -123,6 +139,56 @@ describe('streamAssistantTurn', () => {
 			inputTokens: 3,
 			outputTokens: 4
 		});
+	});
+
+	it('streams the answer while the thread is still being titled', async () => {
+		let nameIt: (() => void) | undefined;
+		const named = new Promise<void>((resolve) => {
+			nameIt = resolve;
+		});
+		const h = harness({
+			generateTitle: async () => {
+				await named;
+				return 'A short title';
+			}
+		});
+
+		const response = await h.turn({
+			trigger: 'submit-message',
+			id: CONVERSATION_ID,
+			message: userMessage,
+			timeZone: 'UTC'
+		});
+
+		const body = response.body;
+		if (!body) throw new Error('the turn returned no stream');
+		const reader = body.getReader();
+		const decoder = new TextDecoder();
+
+		let seen = '';
+		while (!streamedText(seen).includes('leads.')) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			seen += decoder.decode(value, { stream: true });
+		}
+
+		// The whole answer has arrived with the title call still unresolved. Were
+		// the turn awaiting the title, there would be nothing to read yet — which
+		// is exactly the wait this buys back on every new conversation.
+		expect(streamedText(seen)).toBe('Two of them are leads.');
+		expect(h.db.builders.assistant_conversations.update).not.toHaveBeenCalled();
+
+		// It still lands before the turn ends, so the rail finds it on reload.
+		nameIt?.();
+		for (;;) {
+			const { done } = await reader.read();
+			if (done) break;
+		}
+		await vi.waitFor(() =>
+			expect(h.db.builders.assistant_conversations.update).toHaveBeenCalledWith({
+				title: 'A short title'
+			})
+		);
 	});
 
 	it('leaves a titled thread alone and does not touch the conversation row', async () => {

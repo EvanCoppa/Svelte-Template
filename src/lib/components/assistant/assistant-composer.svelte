@@ -222,7 +222,7 @@
 							variant="ghost"
 							size="icon"
 							class={cn(
-								'text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground size-8 shrink-0 justify-self-start rounded-[9px] active:scale-[0.94]',
+								'text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground size-8 shrink-0 justify-self-start rounded-[9px]',
 								wide ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
 							)}
 							aria-label="Openers"
@@ -272,7 +272,7 @@
 					aria-label={listening ? 'Stop dictation' : 'Start dictation'}
 					aria-pressed={listening}
 					class={cn(
-						'size-8 shrink-0 rounded-[9px] active:scale-[0.94]',
+						'size-8 shrink-0 rounded-[9px]',
 						listening
 							? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
 							: 'text-muted-foreground hover:text-foreground',
@@ -298,6 +298,7 @@
 					size="icon"
 					class={cn(
 						'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))]',
+						'transition-[opacity,transform] duration-200 hover:opacity-90',
 						wide ? 'col-start-4 row-start-2' : 'col-start-4 row-start-1'
 					)}
 					onclick={onStop}
@@ -314,7 +315,20 @@
 					type="submit"
 					size="icon"
 					class={cn(
-						'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))] transition-opacity enabled:hover:opacity-90 enabled:active:scale-[0.94] disabled:opacity-30',
+						'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))]',
+						// `transform` has to be named here. This used to say
+						// `transition-opacity`, which is the same tailwind-merge group as
+						// the base recipe's `transition-all` and so quietly replaced it —
+						// taking the button's press with it, which snapped down and
+						// snapped back instead of animating.
+						// 200ms where the rest of the bar is 150: the commit action is the
+						// one control that should charge up rather than only light up.
+						'transition-[opacity,transform,background-color] duration-200',
+						'enabled:hover:opacity-90',
+						// Disabled is its own colour, not the enabled fill at 30%: a washed
+						// out gradient reads as a broken button rather than as one that is
+						// not ready yet.
+						'disabled:bg-secondary disabled:text-muted-foreground disabled:bg-none',
 						wide ? 'col-start-4 row-start-2' : 'col-start-4 row-start-1'
 					)}
 					disabled={!canSend}
