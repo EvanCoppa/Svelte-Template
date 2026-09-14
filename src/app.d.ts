@@ -7,6 +7,7 @@ import type { NavItem } from '$lib/navigation';
 import type { NoteDeck } from '$lib/notes';
 import type { Preferences } from '$lib/preferences';
 import type { OrgMembership } from '$lib/org';
+import type { ConversationSummary } from '$lib/server/ai/conversations';
 import type { InboxNotification } from '$lib/server/crm/notifications';
 import type { OrgContext } from '$lib/server/org-context';
 
@@ -68,6 +69,13 @@ declare global {
 			 * docs/user-preferences.md.
 			 */
 			preferences?: Preferences;
+			/**
+			 * The member's assistant threads, from the assistant page's load.
+			 * Declared here because the sidebar that draws them is a shell
+			 * surface the (app) layout mounts — the same reason `noteDock` is.
+			 * Absent everywhere but `/assistant`.
+			 */
+			conversations?: ConversationSummary[];
 			/** Every page this session may see, with its title, from the (app) layout. */
 			pages?: PageMeta[];
 			/**
@@ -93,6 +101,16 @@ declare global {
 			message: string;
 			code?: string;
 		}
+	}
+
+	/**
+	 * The Web Speech API is still prefixed in most engines and absent from
+	 * some, so TypeScript's DOM lib does not declare it. Declared optional on
+	 * purpose: `$lib/speech` has to check for it either way.
+	 */
+	interface Window {
+		SpeechRecognition?: new () => import('$lib/speech').Recognition;
+		webkitSpeechRecognition?: new () => import('$lib/speech').Recognition;
 		// interface PageState {}
 		// interface Platform {}
 	}

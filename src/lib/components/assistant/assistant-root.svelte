@@ -10,6 +10,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { messageMetadataSchema } from '$lib/ai/schemas';
 	import type { AssistantUIMessage } from '$lib/ai/types';
+	import { assistantThread } from '$lib/assistant.svelte';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	/**
@@ -18,6 +19,11 @@
 	 * component the page keys on the conversation id, and handed to the page's
 	 * markup as the `children` snippet's argument — the page still owns every
 	 * handler and every part it renders.
+	 *
+	 * The frame itself only holds what the page puts in it — the conversation's
+	 * pane, and whatever else that screen shows beside it — because where the
+	 * thread sits relative to anything else is the page's composition, not the
+	 * Chat's.
 	 *
 	 * The transport sends the last message only (the server owns the thread —
 	 * see the stream endpoint) plus the SDK's trigger, and the client's time
@@ -66,16 +72,13 @@
 		onFinish,
 		onError
 	});
+
+	// The context rail beside the conversation is the shell's, not this page's
+	// (the `(app)` layout mounts it), so the thread has to reach outside the
+	// tree that owns it. A getter, not a copy — see `$lib/assistant.svelte`.
+	$effect(() => assistantThread.publish(() => chat.messages));
 </script>
 
-<div
-	bind:this={ref}
-	data-slot="assistant"
-	class={cn(
-		'grid min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:grid-rows-1',
-		className
-	)}
-	{...restProps}
->
+<div bind:this={ref} data-slot="assistant" class={cn('flex min-h-0', className)} {...restProps}>
 	{@render children(chat)}
 </div>
