@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import type { FeatureMode } from '$lib/features/types';
@@ -11,10 +12,12 @@ import { loadEmail } from './email.server';
  * what it offers a reader who may write.
  */
 
-vi.mock('$lib/server/mail-sync/config', () => ({
-	isMailSyncConfigured: () => true,
-	mailSyncConfig: () => null
-}));
+/** A deployment with sync set up, handed to the load the way the env would be. */
+const CONFIGURED = {
+	GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+	GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret',
+	MAILBOX_TOKEN_KEY: randomBytes(32).toString('base64')
+};
 
 const USER_ID = '00000000-0000-0000-0000-000000000001';
 const CONTACT_ID = '30000000-0000-0000-0000-000000000001';
@@ -106,7 +109,11 @@ describe('loadEmail', () => {
 			// the contact's address
 			{ data: [{ email: 'lucius@wayne.example.com' }] }
 		]);
-		const email = await loadEmail(localsFor(supabase, OWNER), { kind: 'contacts', id: CONTACT_ID });
+		const email = await loadEmail(
+			localsFor(supabase, OWNER),
+			{ kind: 'contacts', id: CONTACT_ID },
+			CONFIGURED
+		);
 		expect(email).not.toBeNull();
 		expect(email?.threads).toEqual([]);
 		expect(email?.mailboxes).toEqual([{ id: mailboxRow.id, emailAddress: 'dev@example.com' }]);
@@ -120,12 +127,21 @@ describe('loadEmail', () => {
 
 	it('invites a writer with no mailbox to connect one', async () => {
 		const { supabase } = supabaseMockSequence([{ data: [] }, { data: [] }, { data: [] }]);
-		const email = await loadEmail(localsFor(supabase, OWNER), {
-			kind: 'companies',
-			id: CONTACT_ID
-		});
+		const email = await loadEmail(
+			localsFor(supabase, OWNER),
+			{ kind: 'companies', id: CONTACT_ID },
+			CONFIGURED
+		);
 		expect(email?.canSend).toBe(false);
 		expect(email?.canConnect).toBe(true);
+	});
+
+	it('offers nothing to send with while the deployment has no Google client', async () => {
+		const { supabase } = supabaseMockSequence([{ data: [] }, { data: [mailboxRow] }, { data: [] }]);
+		const email = await loadEmail(localsFor(supabase, OWNER), { kind: 'contacts', id: CONTACT_ID });
+		expect(email?.configured).toBe(false);
+		expect(email?.canSend).toBe(false);
+		expect(email?.canConnect).toBe(false);
 	});
 
 	it('lets a reader read and nothing more', async () => {

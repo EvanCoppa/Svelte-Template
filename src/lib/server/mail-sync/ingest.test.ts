@@ -55,6 +55,11 @@ function gmailMessage(
 	};
 }
 
+/** The tables `.from()` was called with, in order. */
+function tablesQueried(from: { mock: { calls: unknown[][] } }): unknown[] {
+	return from.mock.calls.map((call) => call[0]);
+}
+
 const FROM_LUCIUS = {
 	From: 'Lucius Fox <lucius@wayne.example.com>',
 	To: 'dev@example.com',
@@ -128,8 +133,7 @@ describe('ingestMessage — a new message becomes rows', () => {
 			'stored'
 		);
 
-		const tables = from.mock.calls.map(([table]) => table);
-		expect(tables).toEqual([
+		expect(tablesQueried(from)).toEqual([
 			'email_messages',
 			'mailbox_messages',
 			'email_threads',
@@ -192,7 +196,7 @@ describe('ingestMessage — a new message becomes rows', () => {
 		]);
 		const sent = gmailMessage(FROM_LUCIUS, { labelIds: ['SENT'] });
 		expect(await ingestMessage(supabase, MAILBOX, sent, INDEX, [])).toBe('stored');
-		expect(from.mock.calls.map(([table]) => table)).toEqual([
+		expect(tablesQueried(from)).toEqual([
 			'email_messages',
 			'email_message_links',
 			'mailbox_messages'

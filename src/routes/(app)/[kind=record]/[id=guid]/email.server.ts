@@ -16,7 +16,11 @@ import {
 import { getMailbox, listOwnMailboxes } from '$lib/server/crm/mailboxes';
 import { unwrap } from '$lib/server/crm/unwrap';
 import { emailAccess } from '$lib/server/mail-sync/access';
-import { isMailSyncConfigured, mailSyncConfig } from '$lib/server/mail-sync/config';
+import {
+	isMailSyncConfigured,
+	mailSyncConfig,
+	type MailSyncEnv
+} from '$lib/server/mail-sync/config';
 import { accessTokenFor } from '$lib/server/mail-sync/credentials';
 import { buildMatchIndex, ingestMessage, loadExclusions } from '$lib/server/mail-sync/ingest';
 import { getDisplayNames } from '$lib/server/profiles';
@@ -69,9 +73,15 @@ export type RecordEmail = {
 	isOrgManager: boolean;
 };
 
+/**
+ * `source` is the deployment's environment, injectable so a test can stand
+ * up a configured deployment without touching the process — the
+ * `geocoderConfig(source)` convention.
+ */
 export async function loadEmail(
 	locals: App.Locals,
-	params: { kind: RecordSegment; id: string }
+	params: { kind: RecordSegment; id: string },
+	source?: MailSyncEnv
 ): Promise<RecordEmail | null> {
 	const { supabase, org, activeOrgId, user } = locals;
 	if (!org || !activeOrgId || !user) throw redirect(303, '/login');
@@ -80,7 +90,7 @@ export async function loadEmail(
 
 	const access = emailAccess(org);
 	if (!access.canRead) return null;
-	const configured = isMailSyncConfigured();
+	const configured = isMailSyncConfigured(source);
 
 	const [threads, own, recipient] = await Promise.all([
 		listEmailThreadsFor(supabase, activeOrgId, { entityType: kind, entityId: params.id }),
