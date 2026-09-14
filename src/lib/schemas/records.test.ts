@@ -21,6 +21,15 @@ function messagesOf(result: { error?: { issues: { message: string }[] } }) {
 
 /** Something the field would legally hold, so a whole form can be filled in. */
 function sampleFor(field: RecordField): string {
+	// Every picker holds a row id, so they are answered together rather than
+	// case by case — a kind added to RECORD_PICKER_KINDS is covered here
+	// without a second edit, which is the bug this line exists to stop.
+	// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` to ask
+	// `includes` about an arbitrary field type. Widening only — no value is
+	// created or narrowed by it.
+	if ((RECORD_PICKER_KINDS as readonly string[]).includes(field.type)) {
+		return '20000000-0000-0000-0000-000000000001';
+	}
 	switch (field.type) {
 		case 'select':
 			return field.options?.[0]?.value ?? '';
@@ -30,10 +39,6 @@ function sampleFor(field: RecordField): string {
 			return '1200.50';
 		case 'integer':
 			return '30';
-		case 'company':
-		case 'contact':
-		case 'stage':
-			return '20000000-0000-0000-0000-000000000001';
 		case 'date':
 			return '2026-09-10';
 		case 'datetime':
@@ -68,6 +73,18 @@ describe('the record registry', () => {
 				if (!isPickerKind(field.type)) continue;
 				// The picker's column is the id of the row it points at, named
 				// after the kind: `company_id`, `contact_id`, `stage_id`.
+				//
+				// A form that picks its OWN kind is the exception, and the
+				// column says the ROLE instead: a property's `parent_id` is
+				// the building it is a unit of. Calling that `property_id` on
+				// a property form would name the record itself rather than
+				// the one it points at — so the rule there is only that it is
+				// an id column, and the schema test above already proves it
+				// matches the schema key.
+				if (field.type === type) {
+					expect(field.name).toMatch(/_id$/);
+					continue;
+				}
 				expect(field.name).toBe(`${field.type}_id`);
 			}
 		}

@@ -28,6 +28,8 @@ export const RECORD_KINDS = [
 	'company',
 	'contact',
 	'product',
+	'property',
+	'lease',
 	'deal',
 	'proposal',
 	'invoice',
@@ -54,6 +56,10 @@ export const RECORD_KIND_META = {
 	company: { feature: 'companies', segment: 'companies' },
 	contact: { feature: 'contacts', segment: 'contacts' },
 	product: { feature: 'products', segment: 'products' },
+	// A unit is a `properties` row with a parent, so both levels of the
+	// portfolio open under the same route — there is no separate units list.
+	property: { feature: 'properties', segment: 'properties' },
+	lease: { feature: 'leases', segment: 'leases' },
 	deal: { feature: 'deals', segment: 'deals' },
 	proposal: { feature: 'proposals', segment: 'proposals' },
 	invoice: { feature: 'invoices', segment: 'invoices' },

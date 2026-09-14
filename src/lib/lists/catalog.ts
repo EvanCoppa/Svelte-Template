@@ -7,6 +7,7 @@ import {
 	PAYMENT_STATE_TONE,
 	PRIORITY_TONE,
 	PRODUCT_KIND_TONE,
+	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
@@ -56,7 +57,13 @@ const enumOf = (label: string, tones: Record<string, BadgeTone>): FieldMeta => (
 	options: enumOptions(tones)
 });
 /** A field naming another kind of record, labelled by that kind's word. */
-const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, type: 'record' });
+const record = (kind: 'company' | 'contact' | 'property'): FieldMeta => ({
+	label: { kind },
+	type: 'record'
+});
+/** A field naming another record under a label of its own — a role, not a kind. */
+const namedRecord = (label: string): FieldMeta => ({ label: { text: label }, type: 'record' });
+const number = (label: string): FieldMeta => ({ label: { text: label }, type: 'number' });
 /**
  * The record's picture, as a thumbnail beside its name. A column like any
  * other — an industry that does not sell things people look at hides it with
@@ -66,6 +73,17 @@ const record = (kind: 'company' | 'contact'): FieldMeta => ({ label: { kind }, t
 const image = (label: string): FieldMeta => ({ label: { text: label }, type: 'image' });
 /** A member's name, labelled by a word that belongs to no feature (a proposal's presenter). */
 const person = (id: TermId): FieldMeta => ({ label: { term: id }, type: 'text' });
+
+/**
+ * Whether a tenancy runs to a date or rolls on. A STORED fact (`ends_on` null
+ * or not), and deliberately not "is it running today" — that is a question
+ * about the viewer's date, and a server-described cell would be wrong at
+ * midnight. `leaseStateOn()` is that question, in the browser.
+ */
+export const LEASE_TERM_TONE = {
+	'fixed term': 'neutral',
+	'month-to-month': 'info'
+} as const satisfies Record<string, BadgeTone>;
 
 /** A yes/no field's two values, as `cellText()` reads them. */
 export const BOOLEAN_OPTIONS: readonly FilterOption[] = [
@@ -123,6 +141,36 @@ export const LIST_FIELD_CATALOG = {
 		purchase_price: money('Purchase price'),
 		created_at: created
 	},
+	property: {
+		name: text('Name'),
+		// The building this row is a unit of. Labelled for the ROLE, not the
+		// kind: "Property" would name the record itself, and what the column
+		// shows is its parent.
+		parent: namedRecord('Part of'),
+		property_type: text('Type'),
+		identifier: text('Identifier'),
+		status: enumOf('Status', PROPERTY_STATUS_TONE),
+		bedrooms: number('Beds'),
+		bathrooms: number('Baths'),
+		square_feet: number('Sq ft'),
+		market_rent: money('Market rent'),
+		acquired_on: date('Acquired'),
+		purchase_price: money('Purchase price'),
+		created_at: created
+	},
+	lease: {
+		name: text('Lease'),
+		property: record('property'),
+		// A contact or a company — the party model — so the label is the role.
+		tenant: namedRecord('Tenant'),
+		term: enumOf('Term', LEASE_TERM_TONE),
+		starts_on: date('Starts'),
+		ends_on: date('Ends'),
+		rent_amount: money('Rent'),
+		rent_due_day: number('Due on'),
+		security_deposit: money('Deposit'),
+		created_at: created
+	},
 	product: {
 		name: text('Name'),
 		image: image('Image'),
@@ -130,7 +178,7 @@ export const LIST_FIELD_CATALOG = {
 		category: text('Category'),
 		sku: text('SKU'),
 		unit_price: money('Price'),
-		quantity_on_hand: { label: { text: 'On hand' }, type: 'number' },
+		quantity_on_hand: number('On hand'),
 		created_at: created
 	},
 	deal: {
@@ -144,7 +192,7 @@ export const LIST_FIELD_CATALOG = {
 		created_at: created
 	},
 	ticket: {
-		number: { label: { text: '#' }, type: 'number' },
+		number: number('#'),
 		name: text('Subject'),
 		company: record('company'),
 		contact: record('contact'),
@@ -168,7 +216,7 @@ export const LIST_FIELD_CATALOG = {
 		// The record it hangs off — a company, a contact, or a deal — whichever
 		// it is (docs/proposals.md, "the record it hangs off"); an unattached
 		// draft reads blank.
-		contact: { label: { text: 'Contact' }, type: 'record' },
+		contact: namedRecord('Contact'),
 		owner: person('proposal_responsible'),
 		presenter: person('proposal_presenter'),
 		status: enumOf('Status', PROPOSAL_STATUS_TONE),

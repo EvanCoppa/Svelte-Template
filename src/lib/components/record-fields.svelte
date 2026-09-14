@@ -7,6 +7,7 @@
 	import { toLocalDateTimeInput } from '$lib/calendar';
 	import {
 		RECORD_FORMS,
+		RECORD_PICKER_KINDS,
 		type RecordField,
 		type RecordFormValues,
 		type RecordPickerKind,
@@ -69,9 +70,16 @@
 		return field.type === 'datetime' && value !== '' ? toLocalDateTimeInput(value) : value;
 	}
 
-	/** A field that picks one of the org's own rows — its options came with the form. */
+	/**
+	 * A field that picks one of the org's own rows — its options came with the
+	 * form. Derived from `RECORD_PICKER_KINDS` rather than listed, so a kind
+	 * added to the registry renders here without a second edit.
+	 */
 	function isPicker(field: RecordField): field is RecordField & { type: RecordPickerKind } {
-		return field.type === 'company' || field.type === 'contact' || field.type === 'stage';
+		// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` so
+		// `includes` accepts the broader field-type union. Widening only, and
+		// the predicate's narrowing is what the return type asserts.
+		return (RECORD_PICKER_KINDS as readonly string[]).includes(field.type);
 	}
 
 	function inputType(field: RecordField) {
