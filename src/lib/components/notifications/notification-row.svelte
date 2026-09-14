@@ -90,8 +90,14 @@
 			onclick={() => onopen(notification)}
 			class="focus-visible:ring-ring/50 block w-full rounded-sm text-left text-sm leading-snug after:absolute after:inset-0 focus-visible:ring-2 focus-visible:outline-none"
 		>
-			{#if name}<span class="font-semibold">{name}</span>
-			{/if}{notification.title}
+			<!-- The break has to sit OUTSIDE the if-block: whitespace at the end of a
+			     block is trimmed, which runs the name into the title ("Dev Userasked
+			     you to…"), while whitespace between the block and the title is
+			     interior and survives as the one space that makes it a sentence. With
+			     no actor it is leading whitespace at the start of the element, and is
+			     trimmed — which is what we want there. -->
+			{#if name}<span class="font-semibold">{name}</span>{/if}
+			{notification.title}
 		</Button>
 
 		{#if notification.body}

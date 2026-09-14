@@ -788,6 +788,58 @@ test.describe('preferences', () => {
 	});
 });
 
+test.describe('the notifications bell', () => {
+	const bellOf = (page: Page) => page.getByRole('button', { name: /^Notifications/ });
+	const panelOf = (page: Page) => page.locator('[data-slot="popover-content"]');
+
+	async function openBell(page: Page) {
+		const panel = panelOf(page);
+		await clickWhenLive(bellOf(page), () => expect(panel).toBeVisible());
+		return panel;
+	}
+
+	test('reads a notification as a sentence, and dismissing files it away', async ({ page }) => {
+		await signIn(page);
+		// signIn() posts the form; the shell (and so the bell) only exists once
+		// the redirect has landed.
+		await expect(page).toHaveURL('/');
+
+		// The dot, not a count: the bell says there is something, the tabs say
+		// how much and which pile.
+		await expect(bellOf(page)).toHaveAccessibleName(/unread/);
+
+		const panel = await openBell(page);
+
+		// The row is "<actor> <title>" — one sentence, one space. Rendered as
+		// two nodes (the name is bold), which is exactly how the space between
+		// them got lost once: whitespace at the end of an {#if} block is
+		// trimmed, and "Evan Coppaassigned you a ticket" is what that looks
+		// like. The fixtures are this user's rows in supabase/seed.sql.
+		const ask = panel.getByRole('listitem').filter({ hasText: 'assigned you a ticket' });
+		await expect(ask).toContainText('Evan Coppa assigned you a ticket');
+		// Its context line, and the button an actionable row carries.
+		await expect(ask).toContainText('Support');
+		await expect(ask.getByRole('button', { name: 'Review' })).toBeVisible();
+
+		// Archived starts empty for this user and says so rather than showing
+		// a blank pane.
+		await panel.getByRole('tab', { name: /Archived/ }).click();
+		await expect(panel).toContainText('Notifications you dismiss are kept here.');
+
+		// Dismissing moves it between piles, through the endpoint and back via
+		// QUERY.notifications — no reload in between.
+		await panel.getByRole('tab', { name: /Inbox/ }).click();
+		await ask.getByRole('button', { name: 'Dismiss' }).click();
+		await expect(ask).toHaveCount(0);
+
+		await panel.getByRole('tab', { name: /Archived/ }).click();
+		const archived = panel.getByRole('listitem').filter({ hasText: 'assigned you a ticket' });
+		await expect(archived).toBeVisible();
+		// Put away is not a dead end.
+		await expect(archived.getByRole('button', { name: 'Restore' })).toBeVisible();
+	});
+});
+
 test.describe('signing out', () => {
 	test('ends the session and re-arms the guard', async ({ page }) => {
 		await signIn(page);
