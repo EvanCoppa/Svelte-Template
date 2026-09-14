@@ -373,6 +373,30 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **A notification is addressed to a person, so it is not a feature**
+  (`notification_inbox` migration + `src/lib/server/notifications.ts` +
+  `src/lib/components/notifications/` + `src/routes/api/notifications/`;
+  docs/notifications.md). The bell in the app header is shell chrome like the
+  theme toggle beside it — no `features` row, no `pages` row, no grant, nothing
+  for the gate to answer — and the boundary is the policies, which are all
+  `user_id = auth.uid()` with column grants narrowing an update to `read_at` and
+  `archived_at`. Five columns turn a row into something readable: `actor_id`
+  (who, via `profiles`, so the panel names and pictures them and the `title` is
+  written as the rest of that sentence — "assigned you a ticket"), `channel`
+  (`inbox`, what is addressed to you, vs `general`, what merely happened around
+  you — an enum, not a lookup table), `context` (the word after the timestamp),
+  `action_label` (the button's words, null for a statement, and the database
+  refuses it without a `link`) and `archived_at`. **`read_at` and `archived_at`
+  are not the same fact**: seen is not dealt with, exactly as a task's `status`
+  and `completed_at` are not, and the one rule tying them — dismissing marks it
+  read — lives in `notificationColumns()`. `type` stays the free-text
+  discriminator it always was and **nothing on screen reads it**, so a new kind
+  of notification is neither a migration nor a `switch`. The shell's load owns
+  the rows (`loadInbox()`, two capped queries, `QUERY.notifications`), the
+  writes are a `PATCH` pair under `/api/notifications` — the cross-page
+  exception the note dock takes, since the bell floats over every screen — and
+  the panel is one row component for all three piles, which starts the
+  breadcrumb trail over when it navigates, like every other shell surface.
 - **The party model is two tables, split by what a row IS** (`crm_party_model`
   migration). `companies` are organizations you deal with — `relationship` says
   customer, supplier or partner, so a vendor is not a second table — and `contacts`
@@ -835,7 +859,10 @@ flickers on load. The full account is `docs/user-preferences.md`; the rules:
 - The notes rail (`notes.dock`) is the worked example, and it hides **chrome, not the
   feature**: the dock component stays mounted with the preference off so `⌥⌘L` still
   opens every note. A preference that quietly takes a shortcut away is how people
-  stop trusting preferences.
+  stop trusting preferences. `notifications.general` is the same rule for a switch
+  that belongs to no feature (the bell is shell chrome, so it is offered to every
+  org): off, the General tab is not drawn and its unread stops counting on the bell,
+  and nothing is deleted or left unfetched.
 
 ## Navigation
 

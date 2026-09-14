@@ -37,6 +37,19 @@ const day = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'U
 const money = (value: number, currency: string) =>
 	new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
 
+/** What a list page's row menu does — every generic list's Delete. */
+export type ListRowActions = {
+	canDelete: boolean;
+	onDelete: (row: { id: string; name: string }) => void;
+};
+
+/** The row's primary column — its name, and the record page it links to (null when the reader may not open it). */
+function primaryCell(row: ListRow) {
+	return row.cells.find(
+		(cell): cell is Extract<ListCell, { type: 'link' }> => cell.type === 'link'
+	);
+}
+
 /**
  * A column's heading: its text, the word for the kind it names as the org's
  * industry says it (read from the terms the layout shipped — a kind whose
@@ -110,7 +123,8 @@ export function listColumns(
 	spec: ListSpec,
 	terms: TermsMap | undefined,
 	vocabulary: Vocabulary | undefined,
-	today: string
+	today: string,
+	actions?: ListRowActions
 ) {
 	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, ListRow>();
 	return columnHelper.columns([
@@ -145,7 +159,20 @@ export function listColumns(
 					}
 				}
 			);
-		})
+		}),
+		...(actions
+			? [
+					DataTable.actionsColumn(columnHelper, ({ row }) => {
+						const primary = primaryCell(row.original);
+						return DataTable.recordActionsCell(
+							primary?.text ?? '',
+							primary?.href ?? null,
+							actions.canDelete,
+							() => actions.onDelete({ id: row.original.id, name: primary?.text ?? '' })
+						);
+					})
+				]
+			: [])
 	]);
 }
 
@@ -161,7 +188,10 @@ export function createListTable(
 	terms: () => TermsMap | undefined,
 	// Only a proposals-shaped list has a term-labelled column today; every
 	// other page's call site leaves this out.
-	vocabulary: () => Vocabulary | undefined = () => undefined
+	vocabulary: () => Vocabulary | undefined = () => undefined,
+	// The row menu — undefined for a list with no Delete to offer (an
+	// invoice's own page).
+	actions?: () => ListRowActions | undefined
 ) {
 	// "Overdue" is decided by the viewer's own date, once per page.
 	const today = localDate(new Date());
@@ -176,7 +206,7 @@ export function createListTable(
 			return list().rows;
 		},
 		get columns() {
-			return listColumns(list().spec, terms(), vocabulary(), today);
+			return listColumns(list().spec, terms(), vocabulary(), today, actions?.());
 		},
 		initialState: { columnVisibility: hidden },
 		globalFilterFn: 'includesString',

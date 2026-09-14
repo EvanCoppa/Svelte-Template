@@ -284,6 +284,12 @@ export const ticketRecordSchema = z.object({
 });
 
 /**
+ * Every list page's row menu: the id of the record to delete. One schema for
+ * every kind — deleting needs nothing about the record but which row it is.
+ */
+export const deleteRecordSchema = z.object({ id: z.guid() });
+
+/**
  * The schema behind each record type, as the generic form and its action use
  * it: widened to "an object of strings", because neither knows which type it
  * is handling at compile time. The concrete schemas above are how the server
