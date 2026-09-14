@@ -36,7 +36,10 @@ function sampleFor(field: RecordField): string {
 		case 'email':
 			return 'someone@example.com';
 		case 'number':
-			return '1200.50';
+			// Valid for every `number` field in the registry, a coupon's
+			// percentage included — the sample only has to parse, so it is the
+			// one that parses everywhere rather than the biggest.
+			return '20.50';
 		case 'integer':
 			return '30';
 		case 'date':

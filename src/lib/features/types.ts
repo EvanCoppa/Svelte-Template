@@ -26,6 +26,15 @@ export const FEATURE_IDS = [
 	'quick-plans',
 	'invoices',
 	'ledger',
+	// Commerce: what a customer asked for, what you shelve, what you knock off
+	// it, and what comes back.
+	'orders',
+	'shipments',
+	'featured-groups',
+	'categories',
+	'coupons',
+	'purchases',
+	'rmas',
 	'assets',
 	// The rental portfolio (the properties_and_leases migration). Real-estate
 	// only — every other industry resolves both `hidden` for want of a row.

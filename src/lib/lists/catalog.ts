@@ -2,6 +2,7 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
@@ -9,6 +10,11 @@ import {
 	PRODUCT_KIND_TONE,
 	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
+	RMA_STATUS_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
 import type { TermId } from '$lib/features/vocabulary';
@@ -104,8 +110,12 @@ export const PAYMENT_OPTIONS: readonly FilterOption[] = [
 	{ value: 'overdue', label: 'Overdue', tone: 'error' }
 ];
 
-/** A billable's on/off switch, read as a status so it filters like one. */
-export const BILLABLE_STATUS_TONE = {
+/**
+ * An on/off switch read as a status so it filters like one — a billable's
+ * `is_active`, a coupon's. Not an enum in the database, which is why it is
+ * here beside the catalog rather than in `$lib/crm/tones`.
+ */
+export const ACTIVE_STATUS_TONE = {
 	active: 'success',
 	inactive: 'neutral'
 } as const satisfies Record<string, BadgeTone>;
@@ -230,7 +240,74 @@ export const LIST_FIELD_CATALOG = {
 		unit_price: money('Unit price'),
 		unit_choices: text('Units'),
 		is_featured: boolean('Featured'),
-		status: enumOf('Status', BILLABLE_STATUS_TONE),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		created_at: created
+	},
+	coupon: {
+		name: text('Code'),
+		discount_type: enumOf('Type', COUPON_DISCOUNT_TYPE_TONE),
+		/**
+		 * What the coupon takes off, already read against its type — "20%" or
+		 * "$15.00". Text rather than money or a number because the two types
+		 * print in different units, and a cell is typed by how it renders.
+		 */
+		discount: text('Discount'),
+		starts_on: date('Starts'),
+		ends_on: date('Ends'),
+		status: enumOf('Status', ACTIVE_STATUS_TONE),
+		description: text('Description'),
+		created_at: created
+	},
+	order: {
+		name: text('Number'),
+		// Both sides of the party model: an order names the company, and the
+		// person at it who asked when there is one.
+		company: record('company'),
+		contact: record('contact'),
+		// The two axes a fulfillment queue reads together — what a person
+		// committed to, and what the lines have folded into.
+		status: enumOf('Status', ORDER_STATUS_TONE),
+		fulfillment_status: enumOf('Fulfillment', FULFILLMENT_STATE_TONE),
+		customer_po: text('Customer PO'),
+		total: money('Total'),
+		estimated_ship_date: date('Est. ship'),
+		confirmed_at: datetime('Confirmed'),
+		created_at: created
+	},
+	shipment: {
+		// A shipment has no name of its own — the tracking number is what a
+		// row is known by, so the catalog's `name` key is that.
+		name: text('Tracking number'),
+		order: namedRecord('Order'),
+		delivery_status: enumOf('Status', SHIPMENT_DELIVERY_TONE),
+		carrier: text('Carrier'),
+		// Who shipped it, when it was not the org itself.
+		supplier: record('company'),
+		ship_date: date('Shipped'),
+		estimated_delivery_date: date('Due'),
+		delivered_at: datetime('Delivered'),
+		created_at: created
+	},
+	purchase: {
+		name: text('Number'),
+		// The vendor. A purchase names a company and never a person: you buy
+		// from an organisation, and the table's column is not nullable.
+		company: record('company'),
+		status: enumOf('Status', PURCHASE_STATUS_TONE),
+		reference: text('Reference'),
+		total: money('Total'),
+		expected_at: datetime('Expected'),
+		ordered_at: datetime('Ordered'),
+		created_at: created
+	},
+	rma: {
+		name: text('Number'),
+		company: record('company'),
+		contact: record('contact'),
+		status: enumOf('Status', RMA_STATUS_TONE),
+		requested_on: date('Requested'),
+		reason: text('Reason'),
+		resolution: text('Resolution'),
 		created_at: created
 	}
 } as const satisfies Record<ListKind, { name: FieldMeta } & Record<string, FieldMeta>>;

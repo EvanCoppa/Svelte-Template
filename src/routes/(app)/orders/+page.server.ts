@@ -1,0 +1,31 @@
+import { redirect } from '@sveltejs/kit';
+import { QUERY } from '$lib/queries';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
+import { loadRecordList } from '$lib/server/lists';
+import type { Actions, PageServerLoad } from './$types';
+
+// Gated by the hook on the `orders` feature + read grant; see companies.
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	if (!locals.activeOrgId) throw redirect(303, '/login');
+	depends(QUERY.orders);
+
+	return {
+		...(await loadRecordList(locals, 'order')),
+		...(await loadCreateRecord(locals, 'order')),
+		...(await loadDeleteRecord(locals, 'order'))
+	};
+};
+
+// Creating and deleting go through the generic record form/row menu
+// ($lib/server/records.ts), which open with
+// requirePermission(locals.org.access, 'orders', <level>). Confirming and
+// cancelling are acts on the order's own page, not list-page actions.
+export const actions: Actions = {
+	create: (event) => createRecord(event, 'order'),
+	deleteRecord: (event) => deleteRecord(event, 'order')
+};

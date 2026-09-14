@@ -11,11 +11,15 @@ import {
 	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
+	couponRecordSchema,
 	dealRecordSchema,
 	deleteRecordSchema,
 	invoiceRecordSchema,
 	leaseRecordSchema,
 	productRecordSchema,
+	orderRecordSchema,
+	purchaseRecordSchema,
+	rmaRecordSchema,
 	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
@@ -45,11 +49,16 @@ import {
 	listContacts,
 	updateContact
 } from './crm/contacts';
+import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
 import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
 import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
 import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
+import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
+import { deleteShipment } from './crm/shipments';
+import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
 import {
 	createProperty,
 	deleteProperty,
@@ -384,6 +393,19 @@ async function removeRecord(
 			return deleteProposal(supabase, orgId, id);
 		case 'ticket':
 			return deleteTicket(supabase, orgId, id);
+		case 'coupon':
+			return deleteCoupon(supabase, orgId, id);
+		case 'order':
+			return deleteOrder(supabase, orgId, id);
+		// A shipment is deletable but not creatable or editable through the
+		// generic form: `order_id` is not null and insert-only, so a box is
+		// packed on the order it ships.
+		case 'shipment':
+			return deleteShipment(supabase, orgId, id);
+		case 'purchase':
+			return deletePurchase(supabase, orgId, id);
+		case 'rma':
+			return deleteRma(supabase, orgId, id);
 	}
 }
 
@@ -481,6 +503,20 @@ async function recordFormValues(
 					}
 				: {};
 		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row
+				? {
+						code: row.code,
+						discount_type: row.discount_type,
+						discount_value: str(row.discount_value),
+						starts_on: str(row.starts_on),
+						ends_on: str(row.ends_on),
+						is_active: row.is_active ? 'true' : 'false',
+						description: str(row.description)
+					}
+				: {};
+		}
 		case 'property': {
 			const row = await getProperty(supabase, orgId, id);
 			return row
@@ -497,6 +533,47 @@ async function recordFormValues(
 						acquired_on: str(row.acquired_on),
 						purchase_price: str(row.purchase_price),
 						description: str(row.description)
+					}
+				: {};
+		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						contact_id: str(row.contact_id),
+						customer_po: str(row.customer_po),
+						estimated_ship_date: str(row.estimated_ship_date),
+						shipping: str(row.shipping),
+						discount: str(row.discount),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						reference: str(row.reference),
+						expected_at: str(row.expected_at),
+						due_date: str(row.due_date),
+						freight: str(row.freight),
+						tax: str(row.tax),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row
+				? {
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						status: row.status,
+						requested_on: str(row.requested_on),
+						reason: str(row.reason),
+						resolution: str(row.resolution)
 					}
 				: {};
 		}
@@ -731,6 +808,74 @@ async function writeRecord(
 				billing_email: text(data.billing_email),
 				memo: text(data.memo)
 			});
+			return;
+		}
+		case 'coupon': {
+			const data = couponRecordSchema.parse(values);
+			const columns = {
+				code: data.code,
+				discount_type: data.discount_type,
+				// A not-null money column: blank is zero, the products rule.
+				discount_value: price(data.discount_value),
+				starts_on: text(data.starts_on),
+				ends_on: text(data.ends_on),
+				is_active: data.is_active === 'true',
+				description: text(data.description)
+			};
+			await (id
+				? updateCoupon(supabase, orgId, id, columns)
+				: createCoupon(supabase, orgId, columns));
+			return;
+		}
+		case 'order': {
+			const data = orderRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				contact_id: text(data.contact_id),
+				customer_po: text(data.customer_po),
+				estimated_ship_date: text(data.estimated_ship_date),
+				// Not-null money columns: blank is zero, the products rule.
+				shipping: price(data.shipping),
+				discount: price(data.discount),
+				notes: text(data.notes)
+			};
+			await (id
+				? updateOrder(supabase, orgId, id, columns)
+				: createOrder(supabase, orgId, columns));
+			return;
+		}
+		case 'purchase': {
+			const data = purchaseRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				reference: text(data.reference),
+				expected_at: instant(data.expected_at),
+				due_date: text(data.due_date),
+				// Not-null money columns: blank is zero, the products rule.
+				freight: price(data.freight),
+				tax: price(data.tax),
+				notes: text(data.notes)
+			};
+			await (id
+				? updatePurchase(supabase, orgId, id, columns)
+				: createPurchase(supabase, orgId, columns));
+			return;
+		}
+		case 'rma': {
+			const data = rmaRecordSchema.parse(values);
+			const columns = {
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				status: data.status,
+				reason: text(data.reason),
+				resolution: text(data.resolution)
+			};
+			// `requested_on` is not null with a default of today, so a blank
+			// field means today rather than a null the column would refuse.
+			const requested = data.requested_on === '' ? {} : { requested_on: data.requested_on };
+			await (id
+				? updateRma(supabase, orgId, id, { ...columns, ...requested })
+				: createRma(supabase, orgId, { ...columns, ...requested }));
 			return;
 		}
 		case 'task': {

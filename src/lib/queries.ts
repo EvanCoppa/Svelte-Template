@@ -30,6 +30,19 @@ export const QUERY = {
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',
 	assets: 'app:assets',
+	/** What customers asked for — a line, a split or a shipment moves the header. */
+	orders: 'app:orders',
+	/** Boxes going out — packing one or a carrier scan moves its order too. */
+	shipments: 'app:shipments',
+	/** The org's merchandising shelves — a group's members change with the group. */
+	featuredGroups: 'app:featured-groups',
+	/** The catalog tree — a category added, moved or removed changes it. */
+	categories: 'app:categories',
+	coupons: 'app:coupons',
+	/** What the org buys from its vendors — a line received moves the header too. */
+	purchases: 'app:purchases',
+	/** Returns coming back from customers. */
+	rmas: 'app:rmas',
 	/** The portfolio — buildings and the units inside them, which are rows in the same list. */
 	properties: 'app:properties',
 	/** The rent roll: every tenancy, running, upcoming or ended. */

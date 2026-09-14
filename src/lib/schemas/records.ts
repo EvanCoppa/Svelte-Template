@@ -46,6 +46,10 @@ export const RECORD_TYPES = [
 	'property',
 	'lease',
 	'invoice',
+	'coupon',
+	'order',
+	'purchase',
+	'rma',
 	'task',
 	'ticket'
 ] as const;
@@ -334,6 +338,98 @@ export const invoiceRecordSchema = z
 		path: ['company_id']
 	});
 
+/**
+ * The offer: a code, what it takes off, and how long for. No redemption
+ * limit — nothing counts one yet, and the coupons migration says why a limit
+ * nothing counts against is worse than none.
+ */
+export const couponRecordSchema = z
+	.object({
+		code: z
+			.string()
+			.trim()
+			.min(2, 'A code is at least 2 characters.')
+			.max(40, 'A code is 40 characters or fewer.')
+			.regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, dashes and underscores only.'),
+		discount_type: z.enum(['percent', 'amount']).default('percent'),
+		discount_value: optionalAmount,
+		starts_on: optionalDate,
+		ends_on: optionalDate,
+		is_active: z.enum(['true', 'false']).default('true'),
+		description: optionalLongText
+	})
+	// The table's own check, said in the form so it lands on the field rather
+	// than coming back as a database message.
+	.refine((data) => data.discount_type !== 'percent' || Number(data.discount_value || 0) <= 100, {
+		error: 'A percentage cannot be over 100.',
+		path: ['discount_value']
+	})
+	.refine(
+		(data) => data.starts_on === '' || data.ends_on === '' || data.ends_on >= data.starts_on,
+		{
+			error: 'The end date is before the start date.',
+			path: ['ends_on']
+		}
+	);
+
+/**
+ * A customer order's header: who asked, their own reference for it, when it
+ * is expected to leave and what rides on top of the lines. The LINES are not
+ * here — they are added on the order's own page, the way an invoice's are —
+ * and neither is either status: confirming and cancelling are acts on that
+ * page, and how much has shipped is folded from the lines.
+ */
+export const orderRecordSchema = z.object({
+	// Not optional: `orders.company_id` is NOT NULL. The CONTACT is, by the
+	// party model — an order can be taken from a company rather than a person.
+	company_id: z.guid({ error: 'Pick the customer this order is for.' }),
+	contact_id: optionalPick,
+	customer_po: optionalText,
+	estimated_ship_date: optionalDate,
+	shipping: optionalAmount,
+	discount: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
+ * A purchase order's header: who it is placed with, what it is called, when
+ * it is wanted and what rides on top of the lines. The LINES are not here —
+ * they are added on the purchase's own page, the way an invoice's are — and
+ * neither is the status: placing and cancelling are acts on that page, and
+ * everything between is derived from what has arrived.
+ */
+export const purchaseRecordSchema = z.object({
+	// Not optional: `purchases.company_id` is NOT NULL — you buy FROM someone.
+	company_id: z.guid({ error: 'Pick the vendor this order goes to.' }),
+	reference: optionalText,
+	expected_at: optionalInstant,
+	due_date: optionalDate,
+	freight: optionalAmount,
+	tax: optionalAmount,
+	notes: optionalLongText
+});
+
+/**
+ * A return: who it is from, why, how far along, and what was decided. The
+ * number is the database's, and which units are coming back waits for
+ * inventory movement (the rmas migration).
+ */
+export const rmaRecordSchema = z
+	.object({
+		company_id: optionalPick,
+		contact_id: optionalPick,
+		status: z
+			.enum(['requested', 'approved', 'received', 'closed', 'rejected'])
+			.default('requested'),
+		requested_on: optionalDate,
+		reason: optionalLongText,
+		resolution: optionalLongText
+	})
+	.refine((data) => data.company_id !== '' || data.contact_id !== '', {
+		error: 'Pick the company or the person the return is from.',
+		path: ['company_id']
+	});
+
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
@@ -371,6 +467,10 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 	property: propertyRecordSchema,
 	lease: leaseRecordSchema,
 	invoice: invoiceRecordSchema,
+	coupon: couponRecordSchema,
+	order: orderRecordSchema,
+	purchase: purchaseRecordSchema,
+	rma: rmaRecordSchema,
 	task: taskRecordSchema,
 	ticket: ticketRecordSchema
 };
@@ -582,6 +682,91 @@ export const RECORD_FORMS: RecordFormRegistry = {
 				placeholder: 'Shown on the invoice',
 				wide: true
 			}
+		]
+	},
+	coupon: {
+		feature: 'coupons',
+		query: QUERY.coupons,
+		fields: [
+			{ name: 'code', label: 'Code', type: 'text', placeholder: 'SPRING20' },
+			{
+				name: 'discount_type',
+				label: 'Type',
+				type: 'select',
+				options: [
+					{ value: 'percent', label: 'Percent off' },
+					{ value: 'amount', label: 'Amount off' }
+				]
+			},
+			{ name: 'discount_value', label: 'Discount', type: 'number', placeholder: '20' },
+			{ name: 'starts_on', label: 'Starts', type: 'date' },
+			{ name: 'ends_on', label: 'Ends', type: 'date' },
+			{
+				name: 'is_active',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'true', label: 'Active' },
+					{ value: 'false', label: 'Inactive' }
+				]
+			},
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+		]
+	},
+	order: {
+		feature: 'orders',
+		query: QUERY.orders,
+		// No status field, and no fulfillment either: `draft` is where every
+		// order starts, confirming and cancelling are acts on the record page,
+		// and how much has shipped is the lines' to say.
+		fields: [
+			{ name: 'company_id', label: 'Customer', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'customer_po', label: 'Customer PO', type: 'text', placeholder: 'PO-4471' },
+			{ name: 'estimated_ship_date', label: 'Est. ship', type: 'date' },
+			{ name: 'shipping', label: 'Shipping', type: 'number', placeholder: '25.00' },
+			{ name: 'discount', label: 'Discount', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
+	purchase: {
+		feature: 'purchases',
+		query: QUERY.purchases,
+		// No status field: `draft` is where every purchase starts, and moving
+		// it is an act on the record page, never a picked value.
+		fields: [
+			{ name: 'company_id', label: 'Vendor', type: 'company' },
+			{ name: 'reference', label: 'Reference', type: 'text', placeholder: 'Spring restock' },
+			{ name: 'expected_at', label: 'Expected', type: 'datetime' },
+			{ name: 'due_date', label: 'Payment due', type: 'date' },
+			{ name: 'freight', label: 'Freight', type: 'number', placeholder: '120.00' },
+			{ name: 'tax', label: 'Tax', type: 'number', placeholder: '0.00' },
+			{ name: 'notes', label: 'Notes', type: 'textarea', wide: true }
+		]
+	},
+	rma: {
+		feature: 'rmas',
+		query: QUERY.rmas,
+		// The order the goods came off is deliberately not a field: nothing can
+		// pick an order until the Orders feature has a page (the rmas migration).
+		fields: [
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{
+				name: 'status',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'requested', label: 'Requested' },
+					{ value: 'approved', label: 'Approved' },
+					{ value: 'received', label: 'Received' },
+					{ value: 'closed', label: 'Closed' },
+					{ value: 'rejected', label: 'Rejected' }
+				]
+			},
+			{ name: 'requested_on', label: 'Requested', type: 'date' },
+			{ name: 'reason', label: 'Reason', type: 'textarea', wide: true },
+			{ name: 'resolution', label: 'Resolution', type: 'textarea', wide: true }
 		]
 	},
 	task: {

@@ -33,7 +33,8 @@ import type { FeatureMap } from '$lib/features/types';
  * never the place you configure them.
  */
 
-export type NavCategoryKey = 'general' | 'crm' | 'tools' | 'library' | 'workspace' | 'other';
+export type NavCategoryKey =
+	'general' | 'crm' | 'commerce' | 'finances' | 'tools' | 'library' | 'workspace' | 'other';
 
 /** Which surface a section renders on: the sidebar, or the user menu under it. */
 export type NavSurface = 'sidebar' | 'user-menu';
@@ -49,6 +50,8 @@ export type NavSurface = 'sidebar' | 'user-menu';
 export const NAV_CATEGORIES: { key: NavCategoryKey; label: string; surface: NavSurface }[] = [
 	{ key: 'general', label: 'General', surface: 'sidebar' },
 	{ key: 'crm', label: 'CRM', surface: 'sidebar' },
+	{ key: 'commerce', label: 'Commerce', surface: 'sidebar' },
+	{ key: 'finances', label: 'Finances', surface: 'sidebar' },
 	{ key: 'tools', label: 'Tools', surface: 'sidebar' },
 	{ key: 'library', label: 'Library', surface: 'sidebar' },
 	{ key: 'workspace', label: 'Workspace', surface: 'user-menu' },
