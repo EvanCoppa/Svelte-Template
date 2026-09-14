@@ -32,6 +32,8 @@ export const QUERY = {
 	assets: 'app:assets',
 	/** The org's merchandising shelves — a group's members change with the group. */
 	featuredGroups: 'app:featured-groups',
+	/** The catalog tree — a category added, moved or removed changes it. */
+	categories: 'app:categories',
 	coupons: 'app:coupons',
 	/** Returns coming back from customers. */
 	rmas: 'app:rmas',

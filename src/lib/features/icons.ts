@@ -9,6 +9,7 @@ import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
 import FileSignatureIcon from '@lucide/svelte/icons/file-signature';
 import FileTextIcon from '@lucide/svelte/icons/file-text';
+import Grid3x3Icon from '@lucide/svelte/icons/grid-3x3';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
@@ -50,6 +51,7 @@ export const ICONS = {
 	contact: ContactIcon,
 	'file-signature': FileSignatureIcon,
 	'file-text': FileTextIcon,
+	'grid-3x3': Grid3x3Icon,
 	handshake: HandshakeIcon,
 	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,

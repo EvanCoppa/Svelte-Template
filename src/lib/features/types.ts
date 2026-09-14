@@ -28,6 +28,7 @@ export const FEATURE_IDS = [
 	'ledger',
 	// Commerce: what you shelve, what you knock off it, and what comes back.
 	'featured-groups',
+	'categories',
 	'coupons',
 	'rmas',
 	'assets',
