@@ -1,0 +1,22 @@
+-- Assistant: let the endpoint actually save a thread.
+--
+-- `saveMessages()` (src/lib/server/ai/conversations.ts) writes the whole
+-- thread as one upsert keyed on (conversation_id, id) — an existing message
+-- updated in place, a new one appended. An upsert writes every column it was
+-- given on BOTH paths, so the update path touches `conversation_id` and `id`
+-- as well, and the assistant migration granted update on neither: every save
+-- was refused for want of a column privilege. The turn still streamed (the
+-- endpoint logs that failure rather than turning an answered question into an
+-- error) and the thread was still titled — a different table — so a
+-- conversation appeared in the history rail and opened empty. This is the
+-- same rule the user_preferences migration already states for the same
+-- reason; the assistant's grants are brought in line with it.
+--
+-- What keeps a message yours is not this list, it is RLS: the update policy
+-- names the caller's own conversation in USING *and* WITH CHECK, so a row can
+-- be moved neither out of someone else's thread nor into one. Within your own
+-- threads the worst a forged request achieves is scrambling your own chat
+-- history. `created_at` stays off the list: the column has a default and
+-- nothing should rewrite when a message was written.
+
+grant update (conversation_id, id) on table public.assistant_messages to authenticated;
