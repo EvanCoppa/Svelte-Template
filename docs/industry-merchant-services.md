@@ -111,19 +111,26 @@ Both are Q7. A word that is not a feature's name is never a constant in `src/` �
 ## Roles
 
 The ladder mirrors medical-supplies' six, which is the closest existing shape (a sales org
-with a support desk and a coordinator) — plus a seventh, the Prospector, added once a real
-brief showed that every office in this vertical has someone who works the list and never
-closes (the merchant_services_terminology migration):
+with a support desk and a coordinator). The payment-processing model keeps those existing
+rungs and adds canonical titles for outbound prospecting, combined onboarding/support and
+senior full-cycle sales (the payment_processing_roles migration):
 
-| id suffix | role                   | holds                                                                                                               |
-| --------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `…0001`   | Viewer                 | `read` on everything in the industry                                                                                |
-| `…0002`   | Sales Rep              | `manage` merchants, contacts, applications, proposals, tasks, schedule; `read` fees, programs, equipment, terminals |
-| `…0003`   | Merchant Support       | `manage` support cases and tasks; `read` merchants, contacts, terminals                                             |
-| `…0004`   | Onboarding Coordinator | `manage` applications, tasks, terminals, equipment; `read` the rest                                                 |
-| `…0005`   | Sales Manager          | `manage` everything                                                                                                 |
-| `…0006`   | Principal              | `manage` + `delete` everything                                                                                      |
-| `…0007`   | Prospector             | `manage` merchants, contacts, tasks, schedule; `read` deals — the phone list, not the close                         |
+| id suffix | role                                       | holds                                                                                                                     |
+| --------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `…0001`   | Viewer                                     | `read` on everything in the industry                                                                                      |
+| `…0002`   | Sales Representative                       | `manage` merchants, contacts, applications, proposals, tasks, schedule; `read` fees, programs, equipment, terminals       |
+| `…0003`   | Merchant Support                           | `manage` support cases and tasks; `read` merchants, contacts, terminals                                                   |
+| `…0004`   | Onboarding Coordinator                     | `manage` applications, tasks, terminals, equipment; `read` the rest                                                       |
+| `…0005`   | Sales Manager                              | `manage` everything                                                                                                       |
+| `…0006`   | Principal                                  | `manage` + `delete` everything                                                                                            |
+| `…0007`   | Business Development Representative        | `manage` merchants, contacts, tasks, schedule; `read` deals — the phone list, not the close                               |
+| `…0008`   | Merchant Onboarding and Support Specialist | `manage` applications, installations, equipment, support issues, tasks and schedule; `read` the surrounding context       |
+| `…0009`   | Account Executive                          | `manage` the full sales cycle plus pricing programs, equipment, terminals and referral partners; `read` support and staff |
+
+`Owner` is the organization's structural role (`organization_members.role = 'owner'`),
+not an industry catalog row. It already has the highest access through the shared role
+model. The two existing support/onboarding roles remain for organizations that want that
+work split; the new combined specialist is the canonical one-role mapping for the brief.
 
 **And this is where the design stops being free.** See Gap 1 immediately below: a role
 grants a level on a _feature_, for the whole org. There is no role in this catalog, or any
