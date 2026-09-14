@@ -41,6 +41,9 @@ export const FEATURE_IDS = [
 	'properties',
 	'leases',
 	'notes',
+	// Long-form writing that links to the records it is about (the documents
+	// migration). "Pages" by default; every vertical renames it.
+	'documents',
 	'tasks',
 	'tickets',
 	'staff',

@@ -7,8 +7,10 @@ import { listAddressesFor } from './crm/addresses';
 import { listCustomFieldDefinitions, listCustomFieldValuesFor } from './crm/custom-fields';
 import { describeListRows, listNeeds, listRecords, resultIds, type ListResult } from './crm/lists';
 import {
+	resolveDocumentSubjects,
 	resolveProposalParents,
 	resolveVisitSubjects,
+	type DocumentSubject,
 	type ProposalParent,
 	type VisitSubject
 } from './crm/records';
@@ -72,19 +74,30 @@ export async function loadList(
 	// Only what the spec draws: a list with no city column reads no addresses.
 	const needs = listNeeds(spec);
 	const ids = resultIds(result);
-	const [addresses, customValues, proposalParents, memberNames, visitSubjects] = await Promise.all([
-		needs.addresses ? listAddressesFor(supabase, activeOrgId, result.kind, ids) : [],
-		needs.customValues ? listCustomFieldValuesFor(supabase, activeOrgId, result.kind, ids) : [],
-		needs.proposalParents && result.kind === 'proposal'
-			? resolveProposalParents(supabase, activeOrgId, result.rows)
-			: new Map<string, ProposalParent>(),
-		needs.memberNames && result.kind === 'proposal'
-			? getDisplayNames(supabase, proposalMemberIds(result.rows))
-			: new Map<string, string>(),
-		needs.visitSubjects && result.kind === 'visit'
-			? resolveVisitSubjects(supabase, activeOrgId, result.rows)
-			: new Map<string, VisitSubject>()
-	]);
+	const [addresses, customValues, proposalParents, memberNames, visitSubjects, documentSubjects] =
+		await Promise.all([
+			needs.addresses ? listAddressesFor(supabase, activeOrgId, result.kind, ids) : [],
+			needs.customValues ? listCustomFieldValuesFor(supabase, activeOrgId, result.kind, ids) : [],
+			needs.proposalParents && result.kind === 'proposal'
+				? resolveProposalParents(supabase, activeOrgId, result.rows)
+				: new Map<string, ProposalParent>(),
+			needs.memberNames
+				? getDisplayNames(
+						supabase,
+						result.kind === 'proposal'
+							? proposalMemberIds(result.rows)
+							: result.kind === 'document'
+								? authorIds(result.rows)
+								: []
+					)
+				: new Map<string, string>(),
+			needs.visitSubjects && result.kind === 'visit'
+				? resolveVisitSubjects(supabase, activeOrgId, result.rows)
+				: new Map<string, VisitSubject>(),
+			needs.documentSubjects && result.kind === 'document'
+				? resolveDocumentSubjects(supabase, activeOrgId, result.rows, canOpen)
+				: new Map<string, DocumentSubject>()
+		]);
 
 	return {
 		list: {
@@ -94,10 +107,20 @@ export async function loadList(
 				customValues,
 				proposalParents,
 				memberNames,
-				visitSubjects
+				visitSubjects,
+				documentSubjects
 			})
 		}
 	};
+}
+
+/** Who wrote each page, deduped and with the unattributed ones dropped. */
+function authorIds(rows: readonly { created_by: string | null }[]): string[] {
+	const ids = new Set<string>();
+	for (const row of rows) {
+		if (row.created_by) ids.add(row.created_by);
+	}
+	return [...ids];
 }
 
 /** A proposal's presenter and owner ids, deduped and with the unset ones dropped. */

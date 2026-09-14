@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import { couponDiscountText } from '$lib/crm/coupons';
 import { leaseName } from '$lib/crm/leases';
-import { recordHref, type RecordKind } from '$lib/crm/records';
+import { recordHref, recordKey, type RecordKind } from '$lib/crm/records';
+import { documentTitle } from '$lib/crm/documents';
 import { visitName, visitSubjectKey } from '$lib/crm/visits';
 import {
 	ASSET_STATUS_TONE,
@@ -49,7 +50,14 @@ import { listPurchases, type PurchaseWithVendor } from './purchases';
 import { listShipments, type ShipmentWithOrder } from './shipments';
 import { listRmas, type RmaWithParties } from './rmas';
 import { listVisits, type VisitWithOutcome } from './visits';
-import { proposalParentKey, type CanOpen, type ProposalParent, type VisitSubject } from './records';
+import { listDocuments, type Document as DocumentRow } from './documents';
+import {
+	proposalParentKey,
+	type CanOpen,
+	type DocumentSubject,
+	type ProposalParent,
+	type VisitSubject
+} from './records';
 import { listTickets, type TicketWithParties } from './tickets';
 
 /**
@@ -85,7 +93,8 @@ export type ListResult =
 	| { kind: 'shipment'; rows: ShipmentWithOrder[] }
 	| { kind: 'purchase'; rows: PurchaseWithVendor[] }
 	| { kind: 'rma'; rows: RmaWithParties[] }
-	| { kind: 'visit'; rows: VisitWithOutcome[] };
+	| { kind: 'visit'; rows: VisitWithOutcome[] }
+	| { kind: 'document'; rows: DocumentRow[] };
 
 /** Every row of the kind the org has — a kind's own list page. */
 export async function listRecords(
@@ -128,6 +137,10 @@ export async function listRecords(
 			return { kind, rows: await listRmas(supabase, orgId) };
 		case 'visit':
 			return { kind, rows: await listVisits(supabase, orgId) };
+		case 'document':
+			// Open pages only: the archive is somewhere a page goes to stop
+			// being in the way, so a list that still showed it would not be one.
+			return { kind, rows: await listDocuments(supabase, orgId, { archived: false }) };
 	}
 }
 
@@ -150,6 +163,8 @@ export type ListNeeds = {
 	memberNames: boolean;
 	/** Who each visit was to — a visit has no name of its own. */
 	visitSubjects: boolean;
+	/** What each page is about — its link can name any kind, so it is resolved per kind. */
+	documentSubjects: boolean;
 };
 
 export function listNeeds(spec: ListSpec): ListNeeds {
@@ -159,11 +174,13 @@ export function listNeeds(spec: ListSpec): ListNeeds {
 		proposalParents:
 			spec.kind === 'proposal' && spec.fields.some((field) => field.key === 'contact'),
 		memberNames:
-			spec.kind === 'proposal' &&
-			spec.fields.some((field) => field.key === 'owner' || field.key === 'presenter'),
+			(spec.kind === 'proposal' &&
+				spec.fields.some((field) => field.key === 'owner' || field.key === 'presenter')) ||
+			(spec.kind === 'document' && spec.fields.some((field) => field.key === 'author')),
 		// Unconditional for visits, unlike the others: `name` is the subject,
 		// and the resolver puts `name` first whatever the rows say.
-		visitSubjects: spec.kind === 'visit'
+		visitSubjects: spec.kind === 'visit',
+		documentSubjects: spec.kind === 'document' && spec.fields.some((field) => field.key === 'about')
 	};
 }
 
@@ -173,6 +190,7 @@ export type ListExtras = {
 	proposalParents: ReadonlyMap<string, ProposalParent>;
 	memberNames: ReadonlyMap<string, string>;
 	visitSubjects: ReadonlyMap<string, VisitSubject>;
+	documentSubjects: ReadonlyMap<string, DocumentSubject>;
 };
 
 /** The first address listed for each record — the primary one, the way `listAddressesFor()` orders them. */
@@ -236,6 +254,16 @@ export function describeListRows(
 	};
 	const memberName = (userId: string | null): string | undefined =>
 		userId ? extras.memberNames.get(userId) : undefined;
+	// What a page is about — whichever kind — from the batch
+	// `resolveDocumentSubjects()` fetched. Blank for a loose page, and blank
+	// for one whose kind the reader's gate hides, which is the same answer on
+	// purpose: neither is a door this reader can be offered.
+	const documentSubject = (
+		row: Pick<DocumentRow, 'entity_type' | 'entity_id'>
+	): DocumentSubject | null => {
+		if (!row.entity_type || !row.entity_id) return null;
+		return extras.documentSubjects.get(recordKey(row.entity_type, row.entity_id)) ?? null;
+	};
 
 	// Each kind's cell for one of its catalog keys. The switch is on the
 	// result and the spec together: a spec of companies can only ever have
@@ -678,6 +706,27 @@ export function describeListRows(
 						return text(rma.resolution);
 					case 'created_at':
 						return datetime(rma.created_at);
+				}
+			});
+		case 'document':
+			return describe(result.kind, result.rows, (document, key) => {
+				switch (key) {
+					case 'name':
+						return link('document', document.id, documentTitle(document));
+					case 'about': {
+						const subject = documentSubject(document);
+						return {
+							type: 'record',
+							text: subject?.name ?? '',
+							href: subject && canOpen(subject.kind) ? recordHref(subject.kind, subject.id) : null
+						};
+					}
+					case 'author':
+						return text(memberName(document.created_by));
+					case 'updated_at':
+						return datetime(document.updated_at);
+					case 'created_at':
+						return datetime(document.created_at);
 				}
 			});
 		case 'visit':

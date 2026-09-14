@@ -16,6 +16,7 @@ import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 import MapIcon from '@lucide/svelte/icons/map';
 import MapPinIcon from '@lucide/svelte/icons/map-pin';
+import NotebookTextIcon from '@lucide/svelte/icons/notebook-text';
 import PackageIcon from '@lucide/svelte/icons/package';
 import PencilRulerIcon from '@lucide/svelte/icons/pencil-ruler';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
@@ -61,6 +62,7 @@ export const ICONS = {
 	'list-checks': ListChecksIcon,
 	map: MapIcon,
 	'map-pin': MapPinIcon,
+	'notebook-text': NotebookTextIcon,
 	package: PackageIcon,
 	'pencil-ruler': PencilRulerIcon,
 	receipt: ReceiptIcon,
