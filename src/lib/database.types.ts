@@ -4332,7 +4332,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_default_pipeline: { Args: { org: string }; Returns: string }
       claim_mailbox_sync_jobs: {
         Args: { batch: number; worker: string }
         Returns: {
@@ -4357,6 +4356,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_default_pipeline: { Args: { org: string }; Returns: string }
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
