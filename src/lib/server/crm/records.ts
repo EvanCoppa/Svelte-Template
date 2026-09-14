@@ -19,9 +19,9 @@ import {
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
-import { getAsset, type Asset } from './assets';
-import { getBillable, type Billable } from './billables';
-import { getCompany, type CompanyWithContacts } from './companies';
+import { getAsset, listAssets, type Asset } from './assets';
+import { getBillable, listBillables, type Billable } from './billables';
+import { getCompany, listCompanies, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
@@ -31,7 +31,7 @@ import {
 	type InvoiceWithDetails,
 	type InvoiceWithParties
 } from './invoices';
-import { getProduct, type ProductWithCategory } from './products';
+import { getProduct, listProducts, type ProductWithCategory } from './products';
 import {
 	getProposal,
 	listProposals,
@@ -584,6 +584,50 @@ export async function getRecord(
 	}
 }
 
+/** A record by id and the one word for it: what a map or a picker needs. */
+export type RecordName = { id: string; name: string };
+
+/**
+ * Every record of one kind, named the way `getRecord()` names it and
+ * nothing else — the cheap half of a record, for a surface that draws all
+ * of them at once (the graph page).
+ *
+ * One branch per kind like `getRecord()`, each going through that kind's
+ * own list module, so the name a row carries here is the same string the
+ * record page puts at the top of it. RLS decides what is in the list, so a
+ * reader sees exactly the records they could open by clicking through — the
+ * caller still asks `canOpen()` first, because a kind the feature gate
+ * hides is not fetched at all.
+ */
+export async function listRecordNames(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	kind: RecordKind
+): Promise<RecordName[]> {
+	switch (kind) {
+		case 'asset':
+			return (await listAssets(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'billable':
+			return (await listBillables(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'company':
+			return (await listCompanies(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'contact':
+			return (await listContacts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'product':
+			return (await listProducts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'deal':
+			return (await listDeals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'proposal':
+			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'invoice':
+			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'task':
+			return (await listTasks(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
+		case 'ticket':
+			return (await listTickets(supabase, orgId)).map((row) => ({ id: row.id, name: row.subject }));
+	}
+}
+
 /**
  * The record a proposal hangs off (or is about to), read through that
  * kind's own module — one branch per parent kind, the way
@@ -614,6 +658,65 @@ export async function resolveProposalParent(
 			return parent && { kind, id: parent.id, name: parent.title };
 		}
 	}
+}
+
+/** The lookup key `resolveProposalParents()` fills and the proposals list reads. */
+export function proposalParentKey(kind: ProposalParentKind, id: string): string {
+	return `${kind}:${id}`;
+}
+
+/**
+ * The records many proposals hang off, in three queries rather than one per
+ * row — the proposals list's version of `resolveProposalParent()` above.
+ * Grouped by kind first, so a page of a hundred proposals against a dozen
+ * companies still reads each company once.
+ */
+export async function resolveProposalParents(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	rows: readonly { entity_type: CrmEntityType | null; entity_id: string | null }[]
+): Promise<ReadonlyMap<string, ProposalParent>> {
+	const idsByKind = new Map<ProposalParentKind, string[]>();
+	for (const row of rows) {
+		const kind = proposalParentKind(row.entity_type);
+		if (kind === null || row.entity_id === null) continue;
+		const ids = idsByKind.get(kind) ?? [];
+		ids.push(row.entity_id);
+		idsByKind.set(kind, ids);
+	}
+	const companyIds = idsByKind.get('company') ?? [];
+	const contactIds = idsByKind.get('contact') ?? [];
+	const dealIds = idsByKind.get('deal') ?? [];
+
+	const [companies, contacts, deals] = await Promise.all([
+		companyIds.length ? listCompanies(supabase, orgId, { ids: companyIds }) : [],
+		contactIds.length ? listContacts(supabase, orgId, { ids: contactIds }) : [],
+		dealIds.length ? listDeals(supabase, orgId, { ids: dealIds }) : []
+	]);
+
+	const parents = new Map<string, ProposalParent>();
+	for (const company of companies) {
+		parents.set(proposalParentKey('company', company.id), {
+			kind: 'company',
+			id: company.id,
+			name: company.name
+		});
+	}
+	for (const contact of contacts) {
+		parents.set(proposalParentKey('contact', contact.id), {
+			kind: 'contact',
+			id: contact.id,
+			name: contact.name
+		});
+	}
+	for (const deal of deals) {
+		parents.set(proposalParentKey('deal', deal.id), {
+			kind: 'deal',
+			id: deal.id,
+			name: deal.title
+		});
+	}
+	return parents;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { listContacts } from '$lib/server/crm/contacts';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
+import { loadRecordList } from '$lib/server/lists';
 import type { Actions, PageServerLoad } from './$types';
 
 // Gated by the hook on the `contacts` feature + read grant; see companies.
@@ -10,13 +15,16 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	depends(QUERY.contacts);
 
 	return {
-		contacts: await listContacts(locals.supabase, locals.activeOrgId),
-		...(await loadCreateRecord(locals, 'contact'))
+		...(await loadRecordList(locals, 'contact')),
+		...(await loadCreateRecord(locals, 'contact')),
+		...(await loadDeleteRecord(locals, 'contact'))
 	};
 };
 
-// Creating goes through the generic record form ($lib/server/records.ts), which
-// opens with requirePermission(locals.org.access, 'contacts', 'manage').
+// Creating and deleting go through the generic record form/row menu
+// ($lib/server/records.ts), which open with
+// requirePermission(locals.org.access, 'contacts', <level>).
 export const actions: Actions = {
-	create: (event) => createRecord(event, 'contact')
+	create: (event) => createRecord(event, 'contact'),
+	deleteRecord: (event) => deleteRecord(event, 'contact')
 };

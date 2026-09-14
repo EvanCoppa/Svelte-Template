@@ -73,14 +73,14 @@
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as GroupList from '$lib/components/group-list/index.js';
 	import * as Kanban from '$lib/components/kanban/index.js';
+	import type { KanbanRingFill } from '$lib/components/kanban/index.js';
 	import * as MapView from '$lib/components/map-view/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import * as UpgradeModal from '$lib/components/upgrade-modal/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Badge, type BadgeTone } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Calendar } from '$lib/components/ui/calendar/index.js';
@@ -100,6 +100,8 @@
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as ContextPanel from '$lib/components/context-panel/index.js';
+	import * as TabStrip from '$lib/components/tab-strip/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { showUpgrade } from '$lib/upgrade.svelte';
@@ -141,6 +143,11 @@
 		grape: 'Grape'
 	} satisfies Record<string, string>;
 	const FRUIT_OPTIONS = Object.entries(FRUIT_LABELS);
+	let demoTab = $state('tab-1');
+	let demoTabs = $state([
+		{ id: 'tab-1', label: 'Overdue work at Acme' },
+		{ id: 'tab-2', label: 'Pipeline by stage' }
+	]);
 	let fruit = $state('');
 	let fruitLabel = $derived(
 		FRUIT_OPTIONS.find(([value]) => value === fruit)?.[1] ?? 'Pick a fruit'
@@ -260,21 +267,68 @@
 
 	// Board and grouped list — the page owns the columns, the cards and what a
 	// move means, exactly as a real screen does. `/tasks` is the worked example.
+	/**
+	 * A board's two axes: the column is a status GROUP, and the statuses under
+	 * it are what a card is actually in. "In progress" holds two, so dragging
+	 * onto it splits it into a drop zone each.
+	 */
 	const boardColumns = [
-		{ value: 'todo', label: 'To do', tone: 'neutral' },
-		{ value: 'doing', label: 'In progress', tone: 'info' },
-		{ value: 'done', label: 'Done', tone: 'success' }
+		{
+			value: 'todo',
+			label: 'To do',
+			tone: 'neutral',
+			statuses: [{ value: 'todo', label: 'To do' }]
+		},
+		{
+			value: 'doing',
+			label: 'In progress',
+			tone: 'info',
+			statuses: [
+				{ value: 'in_progress', label: 'In progress' },
+				{ value: 'blocked', label: 'Blocked' }
+			]
+		},
+		{
+			value: 'done',
+			label: 'Done',
+			tone: 'success',
+			statuses: [{ value: 'done', label: 'Done' }]
+		}
 	] as const;
 
-	let boardCards = $state([
-		{ id: 'k1', title: 'Draft the retainer', column: 'todo', meta: 'Friday' },
-		{ id: 'k2', title: 'Site survey photos', column: 'todo', meta: 'Next week' },
-		{ id: 'k3', title: 'Chase the signature', column: 'doing', meta: 'Today' },
-		{ id: 'k4', title: 'Send the invoice', column: 'done', meta: 'Yesterday' }
+	type BoardStatus = 'todo' | 'in_progress' | 'blocked' | 'done';
+
+	const boardStatusTone = {
+		todo: 'neutral',
+		in_progress: 'info',
+		blocked: 'warning',
+		done: 'success'
+	} satisfies Record<BoardStatus, BadgeTone>;
+
+	const boardStatusRing = {
+		todo: 'empty',
+		in_progress: 0.5,
+		blocked: 0.5,
+		done: 'done'
+	} satisfies Record<BoardStatus, KanbanRingFill>;
+
+	let boardCards = $state<{ id: string; title: string; status: BoardStatus; meta: string }[]>([
+		{ id: 'k1', title: 'Draft the retainer', status: 'todo', meta: 'Friday' },
+		{ id: 'k2', title: 'Site survey photos', status: 'todo', meta: 'Next week' },
+		{ id: 'k3', title: 'Chase the signature', status: 'in_progress', meta: 'Today' },
+		{ id: 'k4', title: 'Waiting on the survey', status: 'blocked', meta: 'Today' },
+		{ id: 'k5', title: 'Send the invoice', status: 'done', meta: 'Yesterday' }
 	]);
 
-	function moveBoardCard(id: string, column: string) {
-		boardCards = boardCards.map((card) => (card.id === id ? { ...card, column } : card));
+	function isBoardStatus(value: string): value is BoardStatus {
+		return value in boardStatusTone;
+	}
+
+	function moveBoardCard(id: string, status: string) {
+		// The board hands a status back as a string, so it is checked rather
+		// than cast — the same guard the real page uses.
+		if (!isBoardStatus(status)) return;
+		boardCards = boardCards.map((card) => (card.id === id ? { ...card, status } : card));
 	}
 
 	const shelvedFiles = [
@@ -333,15 +387,24 @@
 
 	const paymentColumns = paymentColumnHelper.columns([
 		DataTable.selectColumn(paymentColumnHelper),
+		// The search box scans this column only; the status is a filter over
+		// whatever values the rows hold (`options: null`).
 		paymentColumnHelper.accessor('email', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' }),
+			enableGlobalFilter: true,
+			meta: { title: 'Email' }
 		}),
 		paymentColumnHelper.accessor('status', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
+			enableGlobalFilter: false,
+			filterFn: 'oneOf',
+			meta: { title: 'Status', filter: { options: null } }
 		}),
 		paymentColumnHelper.accessor('amount', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Amount' }),
-			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.amount })
+			cell: ({ row }) => renderSnippet(amountCell, { amount: row.original.amount }),
+			enableGlobalFilter: false,
+			meta: { title: 'Amount' }
 		})
 	]);
 
@@ -362,12 +425,7 @@
 		onRowSelectionChange: setPaymentSelection
 	});
 
-	const paymentEmailFilter = $derived(
-		String(paymentsTable.getColumn('email')?.getFilterValue() ?? '')
-	);
-
 	// Map — the page owns the pins and the style; the compound draws them.
-	// The style is env-only (`.env.example`), so the card says so when unset.
 	const map = mapConfig();
 	const demoPins: MapView.MapPin[] = [
 		{ id: 'p1', label: 'Wayne Enterprises', href: null, latitude: 40.5806, longitude: -74.2854 },
@@ -1979,6 +2037,35 @@
 
 		<Card.Root class="lg:col-span-2">
 			<Card.Header>
+				<Card.Title>Tabs — underline</Card.Title>
+				<Card.Description>
+					<code>variant="underline"</code> on <code>Tabs.Root</code>: a full-width strip on a
+					hairline, for a screen whose tabs are its own navigation rather than a control inside a
+					card. The record page is the worked example.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Tabs.Root value="overview" variant="underline">
+					<Tabs.List>
+						<Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+						<Tabs.Trigger value="activity">Activity</Tabs.Trigger>
+						<Tabs.Trigger value="files">Files</Tabs.Trigger>
+					</Tabs.List>
+					<Tabs.Content value="overview" class="text-muted-foreground pt-3 text-sm">
+						The active tab is marked by the rule under it.
+					</Tabs.Content>
+					<Tabs.Content value="activity" class="text-muted-foreground pt-3 text-sm">
+						Nothing happened, which is its own kind of news.
+					</Tabs.Content>
+					<Tabs.Content value="files" class="text-muted-foreground pt-3 text-sm">
+						Three spreadsheets and a photo of a whiteboard.
+					</Tabs.Content>
+				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
 				<Card.Title>Tabs</Card.Title>
 				<Card.Description>Switch between related views without navigation.</Card.Description>
 			</Card.Header>
@@ -2000,6 +2087,93 @@
 						a dialog.
 					</Tabs.Content>
 				</Tabs.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Tab strip</Card.Title>
+				<Card.Description>
+					The other kind of tabs: things the reader has <em>opened</em>, each closeable, with a
+					control that opens another. Its tabs are links — ⌘-click and browser history work, and
+					<code>aria-current</code> marks the one you are on — so reach for it when a tab is
+					somewhere you can go, and for <code>ui/tabs</code> above when they switch panels of one screen.
+					The assistant's open conversations are the worked example.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="border-border overflow-hidden rounded-xl border">
+					<TabStrip.Root aria-label="Demo tabs">
+						{#each demoTabs as tab (tab.id)}
+							<TabStrip.Tab
+								href="#tab-strip"
+								label={tab.label}
+								active={tab.id === demoTab}
+								onclick={(event) => {
+									event.preventDefault();
+									demoTab = tab.id;
+								}}
+							>
+								<TabStrip.Close
+									label={tab.label}
+									onclick={() => (demoTabs = demoTabs.filter((open) => open.id !== tab.id))}
+								/>
+							</TabStrip.Tab>
+						{/each}
+						<TabStrip.Add
+							href="#tab-strip"
+							label="Open another"
+							onclick={(event) => {
+								event.preventDefault();
+								const id = `tab-${demoTabs.length + 1}`;
+								demoTabs = [...demoTabs, { id, label: 'New conversation' }];
+								demoTab = id;
+							}}
+						/>
+					</TabStrip.Root>
+					<p class="text-muted-foreground p-4 text-sm">
+						{demoTabs.find((tab) => tab.id === demoTab)?.label ?? 'Nothing open.'}
+					</p>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Panels</h2>
+		</div>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Context panel</Card.Title>
+				<Card.Description>
+					A panel of context docked beside the thing it is about — its own card, a header that names
+					it, a body that scrolls. The panel is only the frame: what goes in it is the page's, as
+					<code>Section</code> and <code>Item</code> rows or anything else. A row is a link when it goes
+					somewhere and plain text when it does not, so a record the reader may not open is still listed
+					without being a door.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<ContextPanel.Root class="flex h-80 w-full max-w-90">
+					<ContextPanel.Header>
+						<ContextPanel.Title>Sources</ContextPanel.Title>
+						<ContextPanel.Actions>
+							<span class="text-xs tabular-nums">4</span>
+						</ContextPanel.Actions>
+					</ContextPanel.Header>
+					<ContextPanel.Body>
+						<ContextPanel.Section label="Companies" count={2}>
+							<ContextPanel.Item href="#context-panel">Acme Inc</ContextPanel.Item>
+							<ContextPanel.Item href="#context-panel">Globex</ContextPanel.Item>
+						</ContextPanel.Section>
+						<ContextPanel.Section label="Tasks" count={2}>
+							<ContextPanel.Item href="#context-panel" detail="overdue">
+								Send the revised quote
+							</ContextPanel.Item>
+							<ContextPanel.Item detail="no access">Chase the change order</ContextPanel.Item>
+						</ContextPanel.Section>
+					</ContextPanel.Body>
+				</ContextPanel.Root>
 			</Card.Content>
 		</Card.Root>
 
@@ -2043,27 +2217,62 @@
 			<Card.Header>
 				<Card.Title>Kanban board</Card.Title>
 				<Card.Description>
-					Drag a card between columns, or focus its handle and move it with the arrow keys after
-					Space. The page owns the columns and the cards and decides what a move means — here it
-					only rearranges the array.
+					Two axes: a column is a status group, and the statuses under it are what a card is
+					actually in. Drag onto "In progress" and it splits into a zone per status; drag onto a
+					column holding one and it lands straight away. The arrow keys walk the statuses after
+					Space. The page owns the groups, the cards and what a move means — here it only rearranges
+					the array.
 				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<Kanban.Root onmove={moveBoardCard}>
 					{#each boardColumns as column (column.value)}
-						{@const cards = boardCards.filter((card) => card.column === column.value)}
-						<Kanban.Column value={column.value} label={column.label}>
+						{@const cards = boardCards.filter((card) =>
+							column.statuses.some((status) => status.value === card.status)
+						)}
+						<Kanban.Column value={column.value} label={column.label} statuses={column.statuses}>
 							<Kanban.ColumnHeader tone={column.tone} count={cards.length}>
+								{#snippet lead()}
+									<Kanban.Ring
+										tone={column.tone}
+										fill={boardStatusRing[column.statuses[0].value]}
+										class="size-4"
+									/>
+								{/snippet}
 								{column.label}
 							</Kanban.ColumnHeader>
-							{#each cards as card (card.id)}
-								<Kanban.Card id={card.id} column={column.value} label={card.title}>
-									<p class="font-medium">{card.title}</p>
-									<p class="text-muted-foreground text-xs">{card.meta}</p>
-								</Kanban.Card>
-							{:else}
-								<Kanban.Empty>Nothing here</Kanban.Empty>
-							{/each}
+							<Kanban.Zones>
+								{#each column.statuses as status (status.value)}
+									<Kanban.DropZone status={status.value} tone={boardStatusTone[status.value]}>
+										<Kanban.Ring
+											tone={boardStatusTone[status.value]}
+											fill={boardStatusRing[status.value]}
+											class="size-5"
+										/>
+										{status.label}
+									</Kanban.DropZone>
+								{/each}
+							</Kanban.Zones>
+							<Kanban.Cards>
+								{#each cards as card (card.id)}
+									<Kanban.Card id={card.id} status={card.status} label={card.title}>
+										<Kanban.CardHeader>
+											<Kanban.Ring
+												tone={boardStatusTone[card.status]}
+												fill={boardStatusRing[card.status]}
+												class="size-3.5"
+											/>
+											<span class="truncate">
+												{column.statuses.find((status) => status.value === card.status)?.label}
+											</span>
+										</Kanban.CardHeader>
+										<p class="font-medium">{card.title}</p>
+										<p class="text-muted-foreground text-xs">{card.meta}</p>
+									</Kanban.Card>
+								{:else}
+									<Kanban.Empty>Nothing here</Kanban.Empty>
+								{/each}
+							</Kanban.Cards>
 						</Kanban.Column>
 					{/each}
 				</Kanban.Root>
@@ -3282,27 +3491,28 @@
 				<code>@tanstack/svelte-table</code> and the table primitives above. The page owns the rows,
 				builds its columns with <code>createColumnHelper</code> and creates the table with
 				<code>createTable</code> against the shared <code>DataTable.features</code> preset; the
-				parts render it. The toolbar row here is page markup — search inputs and
-				<code>ViewOptions</code> compose per page — and the checkbox column is
+				parts render it. <code>DataTable.Toolbar</code> is the row over the table:
+				<code>Search</code> scans the columns that opt in with <code>enableGlobalFilter</code>,
+				<code>Filters</code> draws a multi-select for every column whose <code>meta.filter</code> is
+				set, and <code>ViewOptions</code> sits at the end. A list page gets all of that from its
+				fields (docs/lists.md); the checkbox column is
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
-				<code>pageSize</code>.
+				<code>pageSize</code>. A table wider than its screen scrolls sideways;
+				<code>&lt;DataTable.Content pinFirstColumn /&gt;</code> keeps the first column (and the checkbox
+				in front of it) in place while the rest scroll — narrow the window to see it.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
-			<DataTable.Root table={paymentsTable} pageSize={5}>
-				<div class="flex items-center gap-2">
-					<Input
-						placeholder="Filter emails…"
-						value={paymentEmailFilter}
-						oninput={(e) => paymentsTable.getColumn('email')?.setFilterValue(e.currentTarget.value)}
-						class="max-w-sm"
-					/>
+			<DataTable.Root table={paymentsTable} pageSize={5} pinFirstColumn>
+				<DataTable.Toolbar>
+					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
+					<DataTable.Filters />
 					<DataTable.ViewOptions class="ms-auto" />
-				</div>
+				</DataTable.Toolbar>
 				<DataTable.Content />
 				<DataTable.Pagination noun="payment" />
 			</DataTable.Root>
@@ -3315,30 +3525,19 @@
 			<Card.Description>
 				The <code>MapView</code> compound in <code>src/lib/components/map-view/</code>, MapLibre GL
 				drawn from one clustered layer. The page owns the pins (<code>MapPin[]</code> — on a view
-				page, made server-side from the records' addresses) and the style (<code>mapConfig()</code>
-				in <code>$lib/map</code>, from <code>PUBLIC_MAP_STYLE_URL</code>); the root frames them,
-				zooms into a cluster on click and opens <code>MapView.Popup</code> on a pin. Colours are the
+				page, made server-side from the records' addresses) and the style (the constants in
+				<code>mapConfig()</code>, <code>$lib/map</code>); the root frames them, zooms into a cluster
+				on click and opens <code>MapView.Popup</code> on a pin. Colours are the
 				<code>app.css</code> tokens and the style follows the theme.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if map}
-				<MapView.Root
-					pins={demoPins}
-					styleUrl={map.styleUrl}
-					darkStyleUrl={map.darkStyleUrl}
-					class="h-80"
-				/>
-			{:else}
-				<Empty.Root class="border">
-					<Empty.Header>
-						<Empty.Title>The map is not configured</Empty.Title>
-						<Empty.Description>
-							Set <code>PUBLIC_MAP_STYLE_URL</code> to a MapLibre style URL to draw one here.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
-			{/if}
+			<MapView.Root
+				pins={demoPins}
+				styleUrl={map.styleUrl}
+				darkStyleUrl={map.darkStyleUrl}
+				class="h-80"
+			/>
 		</Card.Content>
 	</Card.Root>
 

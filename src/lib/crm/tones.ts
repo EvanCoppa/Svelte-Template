@@ -1,3 +1,4 @@
+import type { KanbanRingFill } from '$lib/components/kanban/index.js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import type { Enums, Tables } from '$lib/database.types';
 
@@ -77,6 +78,7 @@ export const TASK_STATUS_TONE = {
 	todo: 'neutral',
 	in_progress: 'info',
 	blocked: 'warning',
+	in_review: 'violet',
 	done: 'success'
 } satisfies Record<Enums<'task_status'>, BadgeTone>;
 
@@ -90,16 +92,93 @@ export const TASK_STATUS_LABEL = {
 	todo: 'To do',
 	in_progress: 'In progress',
 	blocked: 'Blocked',
+	in_review: 'In review',
 	done: 'Done'
 } satisfies Record<Enums<'task_status'>, string>;
 
-/** The board's columns, left to right: not started, moving, stuck, finished. */
+/**
+ * Every state a task can be in, in workflow order: not started, moving, stuck,
+ * waiting on a reader, finished. The board draws them grouped
+ * (`TASK_STATUS_GROUPS` below) — this is the list of values, which is what the
+ * move schema and the list view want.
+ */
 export const TASK_STATUSES = [
 	'todo',
 	'in_progress',
 	'blocked',
+	'in_review',
 	'done'
 ] as const satisfies readonly Enums<'task_status'>[];
+
+/**
+ * How full a status's ring is drawn, so the states read as a workflow filling
+ * up rather than a handful of colours. `blocked` shares `in_progress`'s
+ * fraction on purpose: being stuck is not progress, and a board that showed it
+ * as more would reward getting stuck. `in_review` is nearly full and not full:
+ * the work is out of the doer's hands, and it can still come back.
+ */
+export const TASK_STATUS_RING = {
+	todo: 'empty',
+	in_progress: 0.5,
+	blocked: 0.5,
+	in_review: 0.75,
+	done: 'done'
+} satisfies Record<Enums<'task_status'>, KanbanRingFill>;
+
+/**
+ * The board's columns — **status groups**. The four statuses are the states a
+ * task is in; a group is how the board is read, and the two are not the same
+ * question. Nobody scanning a board wants four columns to find the one piece
+ * of work that is moving: "in progress" and "blocked" are one place on the
+ * wall and two different things to know about a card, so they share a column
+ * and the card says which it is.
+ *
+ * A group is **not** a state — nothing is ever stored as `doing`. Dropping a
+ * card on a column holding one status writes that status; dropping on a column
+ * holding several asks which, through the board's drop zones.
+ */
+export type TaskStatusGroup = {
+	/** Names the column to the board. Never written to a record. */
+	id: string;
+	label: string;
+	tone: BadgeTone;
+	/** The states under it, in the order they are shown, with their own words. */
+	statuses: readonly { value: Enums<'task_status'>; label: string }[];
+};
+
+function statusGroup(
+	id: string,
+	label: string,
+	tone: BadgeTone,
+	...statuses: Enums<'task_status'>[]
+): TaskStatusGroup {
+	return {
+		id,
+		label,
+		tone,
+		// Named from the one label map, so a status is never called two things.
+		statuses: statuses.map((value) => ({ value, label: TASK_STATUS_LABEL[value] }))
+	};
+}
+
+/**
+ * Left to right: not started, on the wall, waiting on somebody else, finished.
+ * A module-level constant rather than something the page builds, because the
+ * board registers the statuses of each column and an array rebuilt every
+ * render would churn that registration.
+ *
+ * `in_review` gets a column of its own rather than sharing "In progress" the
+ * way `blocked` does, because the question a column answers is "whose is
+ * this?" — everything under In progress is the doer's, and a task in review is
+ * the reader's. Work waiting on somebody who is not looking at the board is
+ * exactly what a board exists to make visible.
+ */
+export const TASK_STATUS_GROUPS: readonly TaskStatusGroup[] = [
+	statusGroup('todo', 'To do', TASK_STATUS_TONE.todo, 'todo'),
+	statusGroup('doing', 'In progress', TASK_STATUS_TONE.in_progress, 'in_progress', 'blocked'),
+	statusGroup('review', 'In review', TASK_STATUS_TONE.in_review, 'in_review'),
+	statusGroup('done', 'Done', TASK_STATUS_TONE.done, 'done')
+];
 
 /** Whether a task is finished, asked of the column rather than the timestamp. */
 export function taskIsDone(task: Pick<Tables<'tasks'>, 'status'>): boolean {

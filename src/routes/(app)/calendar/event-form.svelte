@@ -30,14 +30,9 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { recordTerms, type RecordKind } from '$lib/crm/records';
 	import { motionCollapse } from '$lib/motion.js';
+	import { recordRef, type LinkableRecord } from '$lib/schemas/record-ref';
 	import { cn } from '$lib/utils.js';
-	import {
-		createEventSchema,
-		recordRef,
-		type Assignee,
-		type EventFormValues,
-		type LinkableRecord
-	} from './schema';
+	import { createEventSchema, type Assignee, type EventFormValues } from './schema';
 
 	/**
 	 * The one event form, worn twice: as the booking popover a click on the
@@ -68,8 +63,9 @@
 		data: SuperValidated<EventFormValues>;
 		/**
 		 * What the form opens on: the slot that was clicked, the event being
-		 * edited. The form is born with them — a popover's content exists only
-		 * while it is open, so every open is a fresh form.
+		 * edited. The form is born with them, and `openOn()` below puts the
+		 * next slot or event in when the page reuses a surface it already
+		 * mounted.
 		 */
 		values?: Partial<EventFormValues> | null;
 		/** The superforms id, shared with the load and the action. */
@@ -87,22 +83,42 @@
 		class?: string;
 	} = $props();
 
-	// Wired once, like `CreateRecord`: a surface shows one form for its lifetime.
-	// The popover and the modal mount their content fresh on every open, so the
-	// values the page hands over are simply what the form is born with.
-	const { form, errors, message, constraints, submitting, enhance } = superForm(
-		values ? { ...data, data: { ...data.data, ...values } } : data,
-		{
-			id,
-			validators: zod4Client(schema),
-			// Only the grid is stale after a save (docs/data-invalidation.md).
-			invalidateAll: false,
-			resetForm: false,
-			onUpdated({ form: result }) {
-				if (result.valid) onSaved();
-			}
+	// Wired once, like `CreateRecord`, and handed the load's own form object:
+	// superforms remembers the object it was given, and applies every OTHER
+	// `SuperValidated` of this id that the page store publishes over what is in
+	// the form. Hand it a `{ ...data, data: seed }` wrapper of its own and the
+	// load's blank copy becomes one of those — applied before the popover has
+	// even drawn, which is how a click on 2:30 used to open an empty form. So
+	// the slot goes in right after, through superforms' `reset`.
+	const { form, errors, message, constraints, reset, submitting, enhance } = superForm(data, {
+		id,
+		validators: zod4Client(schema),
+		// Only the grid is stale after a save (docs/data-invalidation.md).
+		invalidateAll: false,
+		resetForm: false,
+		onUpdated({ form: result }) {
+			if (result.valid) onSaved();
 		}
-	);
+	});
+
+	/** What the form shows: the load's empty form with the slot or event in it. */
+	const seed = $derived(values ? { ...data.data, ...values } : data.data);
+
+	/**
+	 * Open the form on the slot or event the page is showing. The page calls it
+	 * for every open rather than trusting a fresh mount, because a surface
+	 * being opened is not always a form being born: a popover and a dialog both
+	 * keep their content mounted while they animate out, and the popover stays
+	 * mounted outright when the next click lands on another slot with it still
+	 * open. What goes in is the new slot, with no errors and no message left
+	 * over from the last one.
+	 */
+	export function openOn() {
+		reset({ data: seed });
+	}
+
+	// Born with the slot it opens on, by the same road a reopen takes.
+	openOn();
 
 	let titleEl = $state<HTMLInputElement | null>(null);
 	let more = $state(false);

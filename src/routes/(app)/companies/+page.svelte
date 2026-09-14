@@ -1,52 +1,28 @@
 <script lang="ts">
-	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import CreateRecord from '$lib/components/create-record.svelte';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import DeleteRecord from '$lib/components/delete-record.svelte';
 	import * as PageHeader from '$lib/components/page-header/index.js';
-	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { COMPANY_RELATIONSHIP_TONE, PARTY_STATUS_TONE } from '$lib/crm/tones';
-	import type { Company } from '$lib/server/crm/companies';
+	import { recordTerms } from '$lib/crm/records';
+	import { createListTable } from '$lib/lists/table';
+	import { QUERY } from '$lib/queries';
 
 	let { data } = $props();
 
 	const terms = $derived(recordTerms(page.data.terms, 'company'));
 
-	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, Company>();
-	const columns = columnHelper.columns([
-		DataTable.selectColumn(columnHelper),
-		columnHelper.accessor('name', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Name' }),
-			cell: ({ getValue, row }) =>
-				DataTable.linkCell(getValue(), recordHref('company', row.original.id))
-		}),
-		columnHelper.accessor('relationship', {
-			header: ({ column }) =>
-				renderComponent(DataTable.ColumnHeader, { column, title: 'Relationship' }),
-			cell: ({ getValue }) =>
-				DataTable.statusCell(getValue(), COMPANY_RELATIONSHIP_TONE[getValue()])
-		}),
-		columnHelper.accessor('email', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Email' }),
-			cell: ({ getValue }) => getValue() ?? '—'
-		}),
-		columnHelper.accessor('website', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Website' }),
-			cell: ({ getValue }) => getValue() ?? '—'
-		}),
-		columnHelper.accessor('status', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), PARTY_STATUS_TONE[getValue()])
-		})
-	]);
+	/** The row menu's Delete — the record page's own way in is `recordHref()`, so this needs no href of its own. */
+	let removing = $state<{ id: string; name: string } | null>(null);
 
-	const table = createTable({
-		features: DataTable.features,
-		get data() {
-			return data.companies;
-		},
-		columns
-	});
+	// The columns, the search and the filters are the list's fields as the
+	// org's industry has them (docs/lists.md); the page only composes the parts.
+	const table = createListTable(
+		() => data.list,
+		() => page.data.terms,
+		undefined,
+		() => (data.canDelete ? { canDelete: true, onDelete: (row) => (removing = row) } : undefined)
+	);
 </script>
 
 <div class="space-y-6">
@@ -60,7 +36,14 @@
 	</PageHeader.Root>
 
 	<DataTable.Root {table}>
-		<DataTable.Content />
+		<DataTable.Toolbar>
+			<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+			<DataTable.Filters />
+			<DataTable.ViewOptions class="ms-auto" />
+		</DataTable.Toolbar>
+		<DataTable.Content emptyMessage="No {terms.plural} match." />
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>
+
+<DeleteRecord type="company" form={data.deleteForm} query={QUERY.companies} bind:removing />

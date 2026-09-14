@@ -34,10 +34,18 @@ export const FEATURE_IDS = [
 	'components',
 	'best-practices',
 	'assistant',
+	// The relationship graph, read whole (the relationship_graph migration).
+	'graph',
+	// The whiteboard — one canvas, kept on the device (the whiteboard migration).
+	'whiteboard',
 	// Views — each a features row at /views/<id> (the views migration).
 	'suppliers',
 	'partner-contacts',
-	'patient-map'
+	'patient-map',
+	'homeowner-map',
+	'merchant-map',
+	'prospects',
+	'referral-partners'
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];

@@ -5,8 +5,9 @@
 	import { useKanban } from './context.svelte.js';
 
 	/**
-	 * One card. The page fills it with whatever the record is; the shell
-	 * handles being picked up.
+	 * One card. The page fills it with whatever the record is — the shell
+	 * handles being picked up, and `Kanban.CardHeader` / `CardTitle` /
+	 * `CardFooter` are there for the parts of it every card has.
 	 *
 	 * The card itself is not a control — it holds links and buttons, and a
 	 * focusable box wrapped around those is a tab stop that announces nothing
@@ -17,21 +18,24 @@
 	 *
 	 * While it is in the air the same content is drawn a second time under the
 	 * pointer, so what you are carrying is the card rather than an outline of
-	 * it.
+	 * it. `Kanban.Root` draws it, from the snippet handed over on the press: a
+	 * grouped column unmounts its cards while it asks which status a release
+	 * means, and the card you are holding must not vanish because of where you
+	 * carried it.
 	 */
 	let {
 		ref = $bindable(null),
 		class: className,
 		id,
-		column,
+		status,
 		label,
 		children,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		/** The record's id — what `onmove` is called with. */
 		id: string;
-		/** The column it sits in now, so a release can tell a move from a drop back. */
-		column: string;
+		/** The status it is in now, so a release can tell a move from a drop back. */
+		status: string;
 		/** What to call it out loud while the keyboard is carrying it. */
 		label: string;
 	} = $props();
@@ -47,14 +51,14 @@
 	data-dragging={dragging ? '' : undefined}
 	data-grabbed={grabbed ? '' : undefined}
 	class={cn(
-		'group/card bg-card text-card-foreground relative flex touch-none flex-col gap-2 rounded-lg border p-3 text-sm shadow-xs',
-		kanban.disabled ? 'cursor-default' : 'cursor-grab',
+		'group/card bg-card text-card-foreground relative flex touch-none flex-col gap-2 rounded-lg border p-3 text-sm shadow-xs transition-shadow',
+		kanban.disabled ? 'cursor-default' : 'cursor-grab hover:shadow-md',
 		// The original stays in place as the hole the card came out of.
 		'data-[dragging]:cursor-grabbing data-[dragging]:opacity-40',
 		'data-[grabbed]:border-primary data-[grabbed]:ring-primary/40 data-[grabbed]:ring-2',
 		className
 	)}
-	onpointerdown={(event) => kanban.press(event, id, column)}
+	onpointerdown={(event) => kanban.press(event, id, status, children)}
 	{...restProps}
 >
 	{#if !kanban.disabled}
@@ -65,24 +69,10 @@
 			aria-label="Move {label}"
 			aria-roledescription="Drag handle"
 			aria-keyshortcuts="Space ArrowLeft ArrowRight Escape"
-			onkeydown={(event) => kanban.keydown(event, id, column, label)}
+			onkeydown={(event) => kanban.keydown(event, id, status, label)}
 		>
 			<GripVerticalIcon class="size-4" />
 		</button>
 	{/if}
 	{@render children?.()}
 </div>
-
-{#if dragging}
-	<!-- The card under the pointer. `fixed` and inert: it is a picture of the
-	     card, and every handler on it belongs to the one left behind. -->
-	<div
-		aria-hidden="true"
-		data-slot="kanban-card-ghost"
-		class="bg-card text-card-foreground pointer-events-none fixed z-50 flex w-64 flex-col gap-2 rounded-lg border p-3 text-sm shadow-lg"
-		style="left: {kanban.pointer.x}px; top: {kanban.pointer
-			.y}px; transform: translate(-50%, -50%) rotate(2deg)"
-	>
-		{@render children?.()}
-	</div>
-{/if}

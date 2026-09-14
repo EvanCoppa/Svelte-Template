@@ -166,7 +166,8 @@ test.describe('the app shell', () => {
 		// and the library pages at read). Tasks is switched off by the org,
 		// and Deals and Products carry no grant for Support, so none of the
 		// three may appear. Settings is not here either: it is a shell of its
-		// own, entered from the user menu (see $lib/navigation).
+		// own, entered from the user menu — and neither is Staff, which is
+		// filed on that same surface (see $lib/navigation, and the test below).
 		// Vendors is a view (the views migration): its read grant is derived
 		// from companies', and a CRM org calls the suppliers view "Vendors".
 		for (const label of [
@@ -175,7 +176,6 @@ test.describe('the app shell', () => {
 			'Contacts',
 			'Vendors',
 			'Tickets',
-			'Staff',
 			'Components',
 			'Best Practices'
 		]) {
@@ -184,6 +184,25 @@ test.describe('the app shell', () => {
 		await expect(page.getByRole('button', { name: 'Tasks' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Deals' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Products' })).toHaveCount(0);
+	});
+
+	test('reaches Staff from the user menu, directly under Settings', async ({ page }) => {
+		// Staff is filed under `workspace`, the one category whose section
+		// renders in the user menu instead of the sidebar ($lib/navigation):
+		// the sidebar lists the places you work, this menu is where the
+		// workspace itself is administered.
+		await expect(page.getByRole('button', { name: 'Staff' })).toHaveCount(0);
+
+		const trigger = page.locator('[data-slot="sidebar-footer"]').getByRole('button').first();
+		await clickWhenLive(trigger, () => expect(page.getByRole('menu')).toBeVisible());
+
+		// Settings first, then the features on this surface, then Log out.
+		const items = page.getByRole('menu').getByRole('menuitem');
+		await expect(items.nth(0)).toHaveText('Settings');
+		await expect(items.nth(1)).toHaveText('Staff');
+
+		await items.nth(1).click();
+		await expect(page).toHaveURL('/staff');
 	});
 
 	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
@@ -848,6 +867,58 @@ test.describe('preferences', () => {
 		await setRail(page, true);
 		await page.goto('/');
 		await expect(dock).toHaveCount(1);
+	});
+});
+
+test.describe('the notifications bell', () => {
+	const bellOf = (page: Page) => page.getByRole('button', { name: /^Notifications/ });
+	const panelOf = (page: Page) => page.locator('[data-slot="popover-content"]');
+
+	async function openBell(page: Page) {
+		const panel = panelOf(page);
+		await clickWhenLive(bellOf(page), () => expect(panel).toBeVisible());
+		return panel;
+	}
+
+	test('reads a notification as a sentence, and dismissing files it away', async ({ page }) => {
+		await signIn(page);
+		// signIn() posts the form; the shell (and so the bell) only exists once
+		// the redirect has landed.
+		await expect(page).toHaveURL('/');
+
+		// The dot, not a count: the bell says there is something, the tabs say
+		// how much and which pile.
+		await expect(bellOf(page)).toHaveAccessibleName(/unread/);
+
+		const panel = await openBell(page);
+
+		// The row is "<actor> <title>" — one sentence, one space. Rendered as
+		// two nodes (the name is bold), which is exactly how the space between
+		// them got lost once: whitespace at the end of an {#if} block is
+		// trimmed, and "Evan Coppaassigned you a ticket" is what that looks
+		// like. The fixtures are this user's rows in supabase/seed.sql.
+		const ask = panel.getByRole('listitem').filter({ hasText: 'assigned you a ticket' });
+		await expect(ask).toContainText('Evan Coppa assigned you a ticket');
+		// Its context line, and the button an actionable row carries.
+		await expect(ask).toContainText('Support');
+		await expect(ask.getByRole('button', { name: 'Review' })).toBeVisible();
+
+		// Archived starts empty for this user and says so rather than showing
+		// a blank pane.
+		await panel.getByRole('tab', { name: /Archived/ }).click();
+		await expect(panel).toContainText('Notifications you dismiss are kept here.');
+
+		// Dismissing moves it between piles, through the endpoint and back via
+		// QUERY.notifications — no reload in between.
+		await panel.getByRole('tab', { name: /Inbox/ }).click();
+		await ask.getByRole('button', { name: 'Dismiss' }).click();
+		await expect(ask).toHaveCount(0);
+
+		await panel.getByRole('tab', { name: /Archived/ }).click();
+		const archived = panel.getByRole('listitem').filter({ hasText: 'assigned you a ticket' });
+		await expect(archived).toBeVisible();
+		// Put away is not a dead end.
+		await expect(archived.getByRole('button', { name: 'Restore' })).toBeVisible();
 	});
 });
 

@@ -1,7 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import { QUERY } from '$lib/queries';
-import { listBillables } from '$lib/server/crm/billables';
-import { createRecord, loadCreateRecord } from '$lib/server/records';
+import {
+	createRecord,
+	deleteRecord,
+	loadCreateRecord,
+	loadDeleteRecord
+} from '$lib/server/records';
+import { loadRecordList } from '$lib/server/lists';
 import type { Actions, PageServerLoad } from './$types';
 
 // Gated by the hook on the `billables` feature + read grant; see companies.
@@ -11,13 +16,16 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	depends(QUERY.billables);
 
 	return {
-		billables: await listBillables(locals.supabase, locals.activeOrgId),
-		...(await loadCreateRecord(locals, 'billable'))
+		...(await loadRecordList(locals, 'billable')),
+		...(await loadCreateRecord(locals, 'billable')),
+		...(await loadDeleteRecord(locals, 'billable'))
 	};
 };
 
-// Creating goes through the generic record form ($lib/server/records.ts), which
-// opens with requirePermission(locals.org.access, 'billables', 'manage').
+// Creating and deleting go through the generic record form/row menu
+// ($lib/server/records.ts), which open with
+// requirePermission(locals.org.access, 'billables', <level>).
 export const actions: Actions = {
-	create: (event) => createRecord(event, 'billable')
+	create: (event) => createRecord(event, 'billable'),
+	deleteRecord: (event) => deleteRecord(event, 'billable')
 };

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createDeal, deleteDeal, getDeal, listDeals, updateDeal } from './deals';
+import {
+	createDeal,
+	dealPlacement,
+	deleteDeal,
+	getDeal,
+	listDeals,
+	moveDeal,
+	updateDeal
+} from './deals';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './test-support';
 
 const DEAL_ID = '40000000-0000-0000-0000-000000000001';
@@ -103,6 +111,40 @@ describe('deals data access', () => {
 		expect(builder.update).toHaveBeenCalledWith({ stage_id: STAGE_ID });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
+	});
+
+	it('writes the board with the stage when a card is dropped on one', async () => {
+		// The board is never taken from the browser: the stage names it, which is
+		// also what proves the stage is this org's — `listPipelines` reads through
+		// RLS, so a forged id is simply not in the list.
+		const boards = [
+			{
+				id: PIPELINE_ID,
+				pipeline_stages: [{ id: STAGE_ID }, { id: 'other' }]
+			}
+		];
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: boards },
+			{ data: { id: DEAL_ID } }
+		]);
+
+		await moveDeal(supabase, ORG_ID, DEAL_ID, STAGE_ID);
+		expect(builder.update).toHaveBeenCalledWith({
+			pipeline_id: PIPELINE_ID,
+			stage_id: STAGE_ID
+		});
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
+	});
+
+	it('refuses a stage that is on no board of this org, writing nothing', async () => {
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: [{ id: PIPELINE_ID, pipeline_stages: [{ id: 'elsewhere' }] }] }
+		]);
+
+		await expect(dealPlacement(supabase, ORG_ID, STAGE_ID)).rejects.toThrow('not on any board');
+		await expect(moveDeal(supabase, ORG_ID, DEAL_ID, STAGE_ID)).rejects.toThrow('not on any board');
+		expect(builder.update).not.toHaveBeenCalled();
 	});
 
 	it('deletes scoped to org and id, with evidence, throwing on zero rows', async () => {

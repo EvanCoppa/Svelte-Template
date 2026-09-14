@@ -39,7 +39,11 @@ const STAMPS = {
 const openAll = () => true;
 const openNone = () => false;
 /** A dental practice's words for the two people on a proposal. */
-const VOCABULARY = { proposal_presenter: 'Presenter', proposal_responsible: 'Provider' };
+const VOCABULARY = {
+	proposal_presenter: 'Presenter',
+	proposal_responsible: 'Provider',
+	graph_member: 'Staff'
+};
 
 const wayne: CompanyWithContacts = {
 	id: COMPANY_ID,
@@ -86,6 +90,19 @@ const fixings: ProductWithCategory = {
 	is_active: true,
 	track_inventory: true,
 	quantity_on_hand: 120,
+	// The storefront columns, unset: this fixture is a proposal-builder line,
+	// not a storefront listing (the product_storefront_fields migration).
+	long_description: null,
+	image_url: null,
+	additional_images: [],
+	tags: null,
+	metadata: {},
+	msrp: null,
+	is_subscription: false,
+	subscription_interval: null,
+	subscription_interval_count: null,
+	stripe_product_id: null,
+	stripe_price_id: null,
 	product_categories: { id: 'b1000000-0000-0000-0000-000000000002', name: 'Fixings' },
 	...STAMPS
 };
@@ -486,6 +503,9 @@ describe('describing a record', () => {
 			label: 'Preferred channel',
 			value_type,
 			allowed_values: ['email', 'phone'],
+			list_shown: false,
+			list_searchable: false,
+			list_filterable: false,
 			created_at: STAMPS.created_at,
 			updated_at: STAMPS.updated_at
 		});

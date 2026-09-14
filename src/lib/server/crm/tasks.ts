@@ -5,6 +5,7 @@ import type { CrmEntityRef } from './entity';
 import {
 	createRelationship,
 	listRelationships,
+	listRelationshipsFrom,
 	orientRelationship,
 	updateRelationship,
 	RELATIONSHIP_TYPE
@@ -115,6 +116,51 @@ export async function listTaskAssignees(
 			? [{ id: row.id, userId, name, startedOn: row.started_on, endedOn: row.ended_on }]
 			: [];
 	});
+}
+
+/**
+ * Who holds each of a page of tasks, one query for the lot — what
+ * `listTaskAssignees()` answers for one task, answered for a board. Only open
+ * assignments: a card shows who is on it, and a handover belongs on the record
+ * page where there is room to say when it happened.
+ *
+ * A task with nobody on it is absent from the map rather than present with an
+ * empty list, so a caller falls back to the same "nobody" either way.
+ */
+export async function listAssigneesByTask(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	taskIds: readonly string[]
+): Promise<Map<string, TaskAssignee[]>> {
+	const rows = await listRelationshipsFrom(supabase, orgId, 'task', taskIds, {
+		typeId: RELATIONSHIP_TYPE.assignedTo,
+		openOnly: true
+	});
+
+	// The task is the `from` side of an assignment and the member the `to`
+	// side, but the row is oriented rather than read directly, so the one rule
+	// about which side is which stays in the relationships module.
+	const oriented = rows.flatMap((row) => {
+		const { other } = orientRelationship(row, { entityType: 'task', entityId: row.from_id });
+		return other.entityType === 'member' ? [{ row, userId: other.entityId }] : [];
+	});
+
+	const names = await getDisplayNames(
+		supabase,
+		oriented.map(({ userId }) => userId)
+	);
+
+	const byTask = new Map<string, TaskAssignee[]>();
+	for (const { row, userId } of oriented) {
+		const name = names.get(userId);
+		// Someone whose profile this reader cannot see is left out rather than
+		// shown as a uuid — the rule the thread's authors follow.
+		if (!name) continue;
+		const held = byTask.get(row.from_id) ?? [];
+		held.push({ id: row.id, userId, name, startedOn: row.started_on, endedOn: row.ended_on });
+		byTask.set(row.from_id, held);
+	}
+	return byTask;
 }
 
 /**

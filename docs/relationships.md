@@ -123,6 +123,82 @@ the reader may not open (`canOpen`, the feature gate) is omitted rather than sho
 unlinked, the record page's rule for a related group. The generic record page draws
 the result in its Relationships card (`Detail.Relationship`).
 
+## The graph page
+
+`/graph` (feature `graph`, the relationship_graph migration; `src/lib/server/crm/graph.ts`,
+`src/lib/crm/graph.ts`, `src/lib/components/relationship-graph/`, `src/routes/(app)/graph/`)
+reads the graph whole: **every record the reader may open is a node** — related or not,
+so a record with no relationship yet is a dot of its own that still opens its page and
+the map is a way into the data rather than a picture of the lines alone — and every
+`relationships` row is an edge, laid out by a force simulation on a canvas the reader can
+pan, zoom and pull nodes around on — the Obsidian-style map of the org's records. A
+member joins the map only where a relationship names one: the roster, not this page, is
+where people who work here are read. Resting on a
+node lights up its neighbourhood and puts on each edge the words that read from that
+node ("owns" from the owner, "owned by" from the asset); a click opens the record. A
+record's Relationships card links to the map opened on it (`?focus=<kind>:<id>`).
+
+Three rules keep it one page for every industry:
+
+- **Naming is the record page's.** `describeGraph()` names nodes through the kinds' own
+  list modules (`listRecordNames()` — the same strings `getRecord()` puts at the top of a
+  record) and `getDisplayNames()` for members, one query per kind rather than one per
+  node. The feature gate decides the kinds: a kind the reader may not open is not fetched
+  and not drawn, and every edge touching it goes with it. Nothing about a record the
+  reader cannot open reaches the browser.
+- **Every word is the industry's.** The legend names each kind of record through its
+  feature's terms (`recordTerms()`: "Patients", "Merchants") and the member kind through
+  the `graph_member` term ("Staff", "Crew", "Agents"); an edge is labelled by its
+  relationship type, system or the org's own. There is no per-industry table for the
+  graph: whatever kinds an industry's features draw, and whatever types its orgs use,
+  is what appears.
+- **The page owns the map; the component lays it out.** `GraphData` (nodes, edges, and
+  the legend's kinds and types with counts) is described server-side; the page keeps
+  which kinds and types are shown and whether ended relationships are drawn, folds them
+  with the pure `filterGraph()`, and hands `RelationshipGraph.Root` the result and a
+  swatch per kind (`swatchAt()`, the `--chart-*` tokens). The component decides nothing
+  about where a node leads (`onopen`) or what it is called.
+
+- **The names are the hard part, and they are decluttered, not drawn.**
+  `src/lib/components/relationship-graph/labels.ts` is the pure pass, and it follows the
+  rule every dense map settles on: **draw as many names as fit, and no more.** Each name
+  asks for a box in screen pixels; the boxes are offered in priority order — the record
+  under the pointer first, then by degree — each trying four anchors around its dot
+  (below, above, right, left) before it is left off, and a name that would land on a box
+  already taken is not drawn at all. Before that, `namesAt()` decides whether a record has
+  earned a name at this zoom from zoom × degree together, so the map prints its hubs from
+  across the room and the rest as the reader comes in; `truncate()` cuts a long one to
+  `NAME_MAX_WIDTH`; and the component draws each over a halo of `--background`, so a name
+  crossing a line is still a name. Resting on a node narrows the whole pass to its
+  neighbourhood, with the edge words queued behind every record name. Everything is
+  measured in **screen pixels**, never map units — overlap is something that happens on
+  the reader's screen — which is why the name pass runs with the canvas transform reset
+  rather than inside the zoom. Never reintroduce a pass that draws every name: that is
+  the state the page was unreadable in.
+- **The layout is the other half of legibility.** A node's radius is the square root of
+  its degree (area, not length, carries standing), and both its push on its neighbours
+  and the length of its links grow with that degree — the degree-scaled repulsion a force
+  layout needs to keep a hub's spokes apart. A record everything points at otherwise
+  pulls its neighbours into a disc one link wide, which no amount of label work can
+  rescue. The caps in `rebuild()` keep a very large hub from throwing the rest of the map
+  off the canvas.
+
+`d3-force` is the one dependency, for the layout only; the drawing, the pointer and the
+sr-only list of nodes (the map's accessibility rule) are the component's.
+
+**Three of a proposal's facts are drawn as edges without ever becoming `relationships`
+rows.** `proposals.presenter_id`, `responsible_id` and the `entity_type`/`entity_id`
+parent link (proposal_graph_edges migration) stay plain columns — each is genuinely
+single-valued per proposal, the same reason `deals.assigned_to` is a column and not a
+relationship — but `describeGraph()` reads them directly and synthesizes edges for
+them at request time, labelled from the same `presents` / `responsible_for` /
+`proposed_to` `relationship_types` rows a stored edge would use. They are never
+written to `relationships`: that table's uniqueness index only dedupes an exact
+`(type, from, to)` triple, not "at most one of this type from this record," so a
+real row would let the generic Relationships card silently edit or delete it with no
+path back to resync the column — a permanent drift the read-time approach can't
+have. A future reader should not "fix" this by inserting real rows for them.
+
 ## Assets
 
 `assets` holds only what every asset has: `name`, `asset_type` (free text, the org's
@@ -171,7 +247,8 @@ than overwritten. Two consequences worth copying:
 ## Not built yet
 
 - A general UI to draw a relationship (a type picker plus a record picker across
-  kinds) and to remove one. The read side is complete everywhere, and the write
+  kinds) and to remove one. The read side is complete everywhere (the record page's
+  card and the graph page), and the write
   side now has one real caller in the task helpers above; the rest is called from
   tests only.
 - A settings page for an org's own relationship types (RLS already allows

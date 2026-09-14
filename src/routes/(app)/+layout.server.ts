@@ -9,6 +9,7 @@ import { QUERY } from '$lib/queries';
 import { DOCK_NOTE_LIMIT, listNotes } from '$lib/server/crm/notes';
 import { listTiersWithFeatures, loadPageRegistry, loadVocabulary } from '$lib/server/features';
 import { noteAccess } from '$lib/server/notes';
+import { loadInbox } from '$lib/server/notifications';
 import { loadPreferences } from '$lib/server/preferences';
 import { hasGrant } from '$lib/server/roles';
 import type { LayoutServerLoad } from './$types';
@@ -30,6 +31,9 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// The dock hangs off the shell, not off a page, so its notes are loaded
 	// once here and refreshed by the one key every note surface invalidates.
 	depends(QUERY.notes);
+	// Same story for the bell in the header: the panel floats over every
+	// screen, so the shell owns its rows and the API invalidates this key.
+	depends(QUERY.notifications);
 	// The reader's own switches, one of which decides whether the rail above
 	// is drawn at all (docs/user-preferences.md).
 	depends(QUERY.preferences);
@@ -52,7 +56,7 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// decides whether to draw them: one round trip for everyone, and the only
 	// waste is a capped, indexed query for a reader who has notes and hides the
 	// rail. Serialising it would slow the common case to spare the rare one.
-	const [tiers, pages, vocabulary, preferences, openNotes] = await Promise.all([
+	const [tiers, pages, vocabulary, preferences, openNotes, notifications] = await Promise.all([
 		listTiersWithFeatures(locals.supabase),
 		loadPageRegistry(locals.supabase),
 		loadVocabulary(locals.supabase, activeOrg.industryId),
@@ -63,7 +67,12 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 					archived: false,
 					limit: DOCK_NOTE_LIMIT
 				})
-			: []
+			: [],
+		// Not gated on anything: a notification is addressed to a person, not
+		// filed under a feature, so there is no mode to ask about. Both
+		// channels are fetched whatever the reader's General switch says —
+		// hiding a tab hides the tab ($lib/server/notifications).
+		loadInbox(locals.supabase, activeOrg.id)
 	]);
 
 	// Hiding the rail hides the rail: the dock still mounts, so ⌥⌘L still
@@ -95,6 +104,10 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 		noteDock: notesShown
 			? { open: docked ? openNotes : [], docked, ...noteAccess(locals.org, locals.user.id) }
 			: null,
+		// What the bell draws: the open notifications for the active org, then
+		// the archived ones. The panel splits them by pile and counts the
+		// unread itself — both are wall-clock readings of the same rows.
+		notifications,
 		// Every account preference, resolved: any page reads them from
 		// `page.data.preferences` without a round trip of its own.
 		preferences,

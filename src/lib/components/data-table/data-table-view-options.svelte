@@ -12,7 +12,7 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger
 		data-slot="data-table-view-options"
-		class={buttonVariants({ variant: 'outline', size: 'sm', class: className })}
+		class={buttonVariants({ variant: 'outline', size: 'default', class: className })}
 	>
 		<Settings2Icon />
 		View
@@ -24,13 +24,27 @@
 			{#each dataTable.table
 				.getAllColumns()
 				.filter((col) => typeof col.accessorFn !== 'undefined' && col.getCanHide()) as column (column.id)}
+				<!-- A column's `meta.title` is the heading it was drawn with; a column
+				     without one (a hand-written page's) reads as its id. -->
 				<DropdownMenu.CheckboxItem
-					class="capitalize"
+					class={column.columnDef.meta?.title ? undefined : 'capitalize'}
 					bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
 				>
-					{column.id}
+					{column.columnDef.meta?.title ?? column.id}
 				</DropdownMenu.CheckboxItem>
 			{/each}
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			<DropdownMenu.Label>Layout</DropdownMenu.Label>
+			<DropdownMenu.Separator />
+			<!-- Remembered per device for this page (`DataTable.Root`), like a board
+			     versus list choice: a wide screen and a narrow one want different answers. -->
+			<DropdownMenu.CheckboxItem
+				bind:checked={() => dataTable.pinFirstColumn, (v) => (dataTable.pinFirstColumn = !!v)}
+			>
+				Pin first column
+			</DropdownMenu.CheckboxItem>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

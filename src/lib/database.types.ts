@@ -607,6 +607,9 @@ export type Database = {
           id: string
           key: string
           label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
           org_id: string
           updated_at: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -618,6 +621,9 @@ export type Database = {
           id?: string
           key: string
           label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id: string
           updated_at?: string
           value_type: Database["public"]["Enums"]["custom_field_value_type"]
@@ -629,6 +635,9 @@ export type Database = {
           id?: string
           key?: string
           label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
           org_id?: string
           updated_at?: string
           value_type?: Database["public"]["Enums"]["custom_field_value_type"]
@@ -951,6 +960,53 @@ export type Database = {
         }
         Relationships: []
       }
+      industry_custom_fields: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable: boolean
+          list_searchable: boolean
+          list_shown: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id: string
+          key: string
+          label: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          industry_id?: string
+          key?: string
+          label?: string
+          list_filterable?: boolean
+          list_searchable?: boolean
+          list_shown?: boolean
+          value_type?: Database["public"]["Enums"]["custom_field_value_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_custom_fields_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_features: {
         Row: {
           created_at: string
@@ -986,6 +1042,57 @@ export type Database = {
           },
           {
             foreignKeyName: "industry_features_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_list_fields: {
+        Row: {
+          created_at: string
+          feature_id: string
+          field: string
+          filterable: boolean | null
+          industry_id: string
+          label: string | null
+          searchable: boolean | null
+          shown: boolean | null
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          field: string
+          filterable?: boolean | null
+          industry_id: string
+          label?: string | null
+          searchable?: boolean | null
+          shown?: boolean | null
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          field?: string
+          filterable?: boolean | null
+          industry_id?: string
+          label?: string | null
+          searchable?: boolean | null
+          shown?: boolean | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_list_fields_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "industry_list_fields_industry_id_fkey"
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "industries"
@@ -1224,6 +1331,47 @@ export type Database = {
           },
         ]
       }
+      list_fields: {
+        Row: {
+          created_at: string
+          feature_id: string
+          field: string
+          filterable: boolean
+          label: string | null
+          searchable: boolean
+          shown: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          field: string
+          filterable?: boolean
+          label?: string | null
+          searchable?: boolean
+          shown?: boolean
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          field?: string
+          filterable?: boolean
+          label?: string | null
+          searchable?: boolean
+          shown?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_fields_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_roles: {
         Row: {
           created_at: string
@@ -1322,7 +1470,12 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_label: string | null
+          actor_id: string | null
+          archived_at: string | null
           body: string | null
+          channel: Database["public"]["Enums"]["notification_channel"]
+          context: string | null
           created_at: string
           id: string
           link: string | null
@@ -1333,7 +1486,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1344,7 +1502,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_label?: string | null
+          actor_id?: string | null
+          archived_at?: string | null
           body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          context?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -1355,6 +1518,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_org_id_fkey"
             columns: ["org_id"]
@@ -2017,18 +2187,29 @@ export type Database = {
       }
       products: {
         Row: {
+          additional_images: Json
           category_id: string | null
           created_at: string
           created_by: string | null
           currency: string
           description: string | null
           id: string
+          image_url: string | null
           is_active: boolean
+          is_subscription: boolean
           kind: Database["public"]["Enums"]["product_kind"]
+          long_description: string | null
+          metadata: Json
+          msrp: number | null
           name: string
           org_id: string
           quantity_on_hand: number | null
           sku: string | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          subscription_interval: string | null
+          subscription_interval_count: number | null
+          tags: string[] | null
           track_inventory: boolean
           unit: string | null
           unit_cost: number | null
@@ -2036,18 +2217,29 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          additional_images?: Json
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          is_subscription?: boolean
           kind?: Database["public"]["Enums"]["product_kind"]
+          long_description?: string | null
+          metadata?: Json
+          msrp?: number | null
           name: string
           org_id: string
           quantity_on_hand?: number | null
           sku?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscription_interval?: string | null
+          subscription_interval_count?: number | null
+          tags?: string[] | null
           track_inventory?: boolean
           unit?: string | null
           unit_cost?: number | null
@@ -2055,18 +2247,29 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          additional_images?: Json
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          is_subscription?: boolean
           kind?: Database["public"]["Enums"]["product_kind"]
+          long_description?: string | null
+          metadata?: Json
+          msrp?: number | null
           name?: string
           org_id?: string
           quantity_on_hand?: number | null
           sku?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscription_interval?: string | null
+          subscription_interval_count?: number | null
+          tags?: string[] | null
           track_inventory?: boolean
           unit?: string | null
           unit_cost?: number | null
@@ -3546,7 +3749,6 @@ export type Database = {
       }
       views: {
         Row: {
-          columns: string[]
           created_at: string
           default_layout: string
           filter: Json
@@ -3555,7 +3757,6 @@ export type Database = {
           source: Database["public"]["Enums"]["crm_entity_type"]
         }
         Insert: {
-          columns: string[]
           created_at?: string
           default_layout?: string
           filter?: Json
@@ -3564,7 +3765,6 @@ export type Database = {
           source: Database["public"]["Enums"]["crm_entity_type"]
         }
         Update: {
-          columns?: string[]
           created_at?: string
           default_layout?: string
           filter?: Json
@@ -3588,6 +3788,10 @@ export type Database = {
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      create_industry_custom_fields: {
+        Args: { org: string }
+        Returns: undefined
+      }
     }
     Enums: {
       activity_direction: "inbound" | "outbound"
@@ -3640,6 +3844,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "returned"
+      notification_channel: "inbox" | "general"
       order_status: "draft" | "confirmed" | "cancelled"
       org_role: "owner" | "admin" | "member"
       party_status: "lead" | "prospect" | "active" | "inactive"
@@ -3689,7 +3894,7 @@ export type Database = {
         | "cancelled"
         | "unknown"
       stage_outcome: "open" | "won" | "lost"
-      task_status: "todo" | "in_progress" | "blocked" | "done"
+      task_status: "todo" | "in_progress" | "blocked" | "in_review" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -3872,6 +4077,7 @@ export const Constants = {
         "cancelled",
         "returned",
       ],
+      notification_channel: ["inbox", "general"],
       order_status: ["draft", "confirmed", "cancelled"],
       org_role: ["owner", "admin", "member"],
       party_status: ["lead", "prospect", "active", "inactive"],
@@ -3926,7 +4132,7 @@ export const Constants = {
         "unknown",
       ],
       stage_outcome: ["open", "won", "lost"],
-      task_status: ["todo", "in_progress", "blocked", "done"],
+      task_status: ["todo", "in_progress", "blocked", "in_review", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
     },
   },

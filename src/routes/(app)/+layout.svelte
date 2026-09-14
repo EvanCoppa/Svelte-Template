@@ -2,6 +2,8 @@
 	import { page } from '$app/state';
 	import AppHeader from '$lib/components/app-header.svelte';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import AssistantContext from '$lib/components/assistant-context.svelte';
+	import AssistantSidebar from '$lib/components/assistant-sidebar.svelte';
 	import NoteDock from '$lib/components/note-dock.svelte';
 	import SearchDialog from '$lib/components/search-dialog.svelte';
 	import SettingsSidebar from '$lib/components/settings-sidebar.svelte';
@@ -23,6 +25,14 @@
 	let inSettings = $derived(
 		page.url.pathname === '/settings' || page.url.pathname.startsWith('/settings/')
 	);
+
+	// The assistant is a shell of its own for the same reason: while you are in
+	// a conversation the thing to navigate is your threads, not the app nav —
+	// Home is how you leave, exactly as "Back to app" is in settings. It is
+	// also the first shell to dock a rail on the other side of the body.
+	let inAssistant = $derived(
+		page.url.pathname === '/assistant' || page.url.pathname.startsWith('/assistant/')
+	);
 </script>
 
 <svelte:head>
@@ -31,18 +41,39 @@
 	{#if title && !page.error}<title>{title}</title>{/if}
 </svelte:head>
 
-<Sidebar.Provider open={data.sidebarOpen}>
+<!-- The wrapper is the ground the content panel sits on, so it wears the
+     sidebar's colour: what shows through the gap around the panel. -->
+<Sidebar.Provider class="bg-sidebar" open={data.sidebarOpen}>
 	{#if inSettings}
 		<SettingsSidebar />
+	{:else if inAssistant}
+		<AssistantSidebar />
 	{:else}
 		<AppSidebar />
 	{/if}
-	<Sidebar.Inset>
+	<!--
+		The content panel: inset by `--shell-gap` on every side and rounded, so the
+		sidebar's ground shows around it. `overflow-clip` — not `hidden` — is what
+		rounds the corners: it clips to the rounded box without becoming a scroll
+		container, so the header inside keeps sticking to the viewport and the page
+		keeps scrolling at the document level (which is what `fitPageSize()` and the
+		scroll spy measure against).
+	-->
+	<Sidebar.Inset class="border-border m-(--shell-gap) overflow-clip rounded-xl border shadow-sm">
 		<AppHeader />
 		<div class="app-content">
 			{@render children()}
 		</div>
 	</Sidebar.Inset>
+	<!--
+		The context rail: a panel of its own to the end side of the body, on the
+		shell's ground like the sidebar and standing the same height as the
+		content panel — not a card inside the page, which would sit inside the
+		panel's padding and scroll with it.
+	-->
+	{#if inAssistant}
+		<AssistantContext />
+	{/if}
 	<!-- The one ⌘K palette; the sidebar's search button opens it with `showSearch()`. -->
 	<SearchDialog />
 	<!-- The note dock, docked to the edge of every screen in the shell. It

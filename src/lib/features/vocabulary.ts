@@ -21,7 +21,7 @@ import type { Tables } from '$lib/database.types';
  * table: the migration adding a term adds its id here, so a typo'd key is
  * a `check` error rather than a blank label.
  */
-export const TERM_IDS = ['proposal_presenter', 'proposal_responsible'] as const;
+export const TERM_IDS = ['proposal_presenter', 'proposal_responsible', 'graph_member'] as const;
 
 export type TermId = (typeof TERM_IDS)[number];
 

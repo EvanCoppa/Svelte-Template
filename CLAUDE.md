@@ -78,7 +78,11 @@ npm run format         # prettier (svelte + tailwind plugins)
 - Every response carries the security headers from
   `src/lib/server/security-headers.ts`. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
-  as a parameter or documented constant, never a hardcoded project ref.
+  as a parameter or documented constant, never a hardcoded project ref. Hosts
+  that only serve **images** (a product's `image_url` on a storefront CDN) are the
+  one deployment-configured set: `PUBLIC_IMAGE_ORIGINS`, parsed by
+  `imageOrigins()` and added to `img-src` alone — never `connect-src`, never a
+  wildcard, and unset by default.
 - The auth surface has unit tests (`src/routes/auth/confirm/server.test.ts`,
   `src/routes/reset-password/page.server.test.ts`, `src/routes/login/page.server.test.ts`,
   plus `src/lib/server/*.test.ts`). Changes to those routes must keep the tests
@@ -219,24 +223,78 @@ application data is scoped to an organization, never to a bare user. The
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
+  **The page is a header, then tabs with a record rail beside them**, never a
+  wall of cards: the header is the way back (one `←` icon button, since the
+  breadcrumb trail is the way back on a wide screen), a **square** record tile
+  of initials (round reads as a person, and a product is not one), the name
+  with its pills and tags, and the `link` fields as a row of quick facts. Under
+  it, `ui/tabs` in the `underline` variant — the strip is the page's own
+  navigation, not a control inside a card — are the page — Overview (highlights that jump to a tab,
+  relationships, the latest activity), Activity, the sections only some kinds
+  have (Addresses, Billing, Photos, Conversation) and one tab per
+  related-records group — with the rail on the end side holding what the
+  record IS whichever tab is open: a panel on a hairline rather than a card,
+  carrying two `ui/collapsible` sections — "<Kind> details" (its fields as
+  label-and-value rows, then its custom fields, then created / updated / id),
+  with `EditRecord compact` beside that heading, and Notes. A value that names
+  another record or a member wears a chip (`Detail.Value`), so a rail row reads
+  as a thing rather than a sentence. A new section is a tab, drawn only while
+  active; a new fact about the record is a row in the rail; never a card
+  outside the two.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
-  `VIEW_FILTER_SCHEMAS`, its columns and its layouts (`table`, `map`), and its id
-  is a `features` row at `/views/<id>` — so the nav, the gate, the title, the
-  industry's name for it and the role grants need nothing new; adding a view for
+  `VIEW_FILTER_SCHEMAS` and its layouts (`table`, `map`), and its id is a
+  `features` row at `/views/<id>` — so the nav, the gate, the title, the
+  industry's name for it and the role grants need nothing new; its columns are its
+  `list_fields` rows like any list page's (next bullet). Adding a view for
   an industry is one migration inserting rows (that file's closing comment is the
   checklist), never a route. Filters compile through `listCompanies()` /
   `listContacts()` (`conditions`, `ids`, `sort`), the hops (a tag, a contact's
   company's relationship) resolving to an id list first — never a second query
-  builder. The page draws `ViewRow`s and `MapPin`s the server described
-  (`describeViewRows()`, `pinsFor()`), never a source's columns; "Add …" is the
+  builder. The page draws the list the server described (`loadList()`) and the
+  `MapPin`s (`pinsFor()`), never a source's columns; "Add …" is the
   generic `CreateRecord` pre-filled from the filter. The map is `MapView`
-  (`src/lib/components/map-view/`, MapLibre GL) over `PUBLIC_MAP_STYLE_URL`
-  (`src/lib/map.ts`; the CSP derives its origin like Supabase's), and coordinates
+  (`src/lib/components/map-view/`, MapLibre GL) over the style URLs hardcoded in
+  `src/lib/map.ts` (the CSP derives their origins like Supabase's), and coordinates
   come from `geocode()` (`src/lib/server/geocode.ts`, `GEOCODER_URL`) when the
   record page's address form saves. Per-org saved views are a later phase and
   reuse the same filter shape.
+- **A list is its fields, and the industry chooses them** (`list_fields` migration +
+  `src/lib/lists/` + `src/lib/server/crm/lists.ts` + `src/lib/server/lists.ts`;
+  docs/lists.md). Every list page — a kind's own and every view — is the heading, a
+  toolbar and a table, and which columns it has, which of them the search box scans
+  and which get a filter are **rows**, never column definitions in a page file:
+  `list_fields` (the defaults, keyed by the feature that owns the page) and
+  `industry_list_fields` (an industry's own say, null inheriting column by column
+  exactly as `industry_features` does, and a row for a field the defaults do not
+  list adding it) — the **built-in** columns, each a key from the kind's catalog
+  (`LIST_FIELD_CATALOG`, which says what each renders as). **Custom fields are
+  never named there: the industry ships them, and each one says how it sits**
+  (`industry_custom_fields` migration) — `industry_custom_fields` is what a
+  vertical's records carry (a beverage asset's location and serial number, a
+  merchant's MID and MCC), copied into every org in the industry as its own
+  `custom_field_definitions` by trigger on creation and by backfill, and every
+  definition — shipped or the org's own — carries `list_shown`,
+  `list_searchable`, `list_filterable`, so every custom field of a kind is a column
+  of its list, after the built-ins, drawn as its flags say. `resolveList()` folds them into a `ListSpec`
+  (throwing with the list's id on a key the catalog lacks or a filter on an amount or
+  a date — only text, enum, boolean, record and payment fields filter);
+  `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);
+  a picture is one of those types — `image`, the products list's thumbnail, drawn by
+  `DataTable.imageCell()` and never searched, filtered or sorted, because a picture is
+  not a value (docs/lists.md, "A picture is a field, not a second table"); a kind that
+  wants one adds `image` to its catalog entry, a describer branch and a `list_fields`
+  row, never a second table component;
+  `loadRecordList(locals, kind)` is a list page's whole load and
+  `createListTable(() => data.list, () => page.data.terms)` its whole script. The
+  toolbar is `DataTable.Toolbar` holding `DataTable.Search` (the table's global
+  filter, over the columns that opt in with `enableGlobalFilter`) and
+  `DataTable.Filters` (a multi-select per column with `meta.filter`, its values fixed
+  or read off the rows), then `ViewOptions` — the one toolbar, on every list. Never
+  hand-write a list page's columns, a second search box or a filter of your own;
+  a column that is genuinely special (the staff roster's) still opts into the same
+  toolbar through `enableGlobalFilter` and `meta.filter`.
 - **Roles grant read/manage on features** (`roles_permissions` migration +
   `src/lib/server/roles.ts`; the old `permissions` catalog is gone — features
   are the keys). Roles are industry-scoped reference data: `industries`, `roles`
@@ -316,6 +374,30 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   browser. Data access for these tables lives in `src/lib/server/crm/` — loads and
   actions go through those modules (passing `locals.supabase` + `locals.activeOrgId`),
   never through ad-hoc `.from()` chains in routes.
+- **A notification is addressed to a person, so it is not a feature**
+  (`notification_inbox` migration + `src/lib/server/notifications.ts` +
+  `src/lib/components/notifications/` + `src/routes/api/notifications/`;
+  docs/notifications.md). The bell in the app header is shell chrome like the
+  theme toggle beside it — no `features` row, no `pages` row, no grant, nothing
+  for the gate to answer — and the boundary is the policies, which are all
+  `user_id = auth.uid()` with column grants narrowing an update to `read_at` and
+  `archived_at`. Five columns turn a row into something readable: `actor_id`
+  (who, via `profiles`, so the panel names and pictures them and the `title` is
+  written as the rest of that sentence — "assigned you a ticket"), `channel`
+  (`inbox`, what is addressed to you, vs `general`, what merely happened around
+  you — an enum, not a lookup table), `context` (the word after the timestamp),
+  `action_label` (the button's words, null for a statement, and the database
+  refuses it without a `link`) and `archived_at`. **`read_at` and `archived_at`
+  are not the same fact**: seen is not dealt with, exactly as a task's `status`
+  and `completed_at` are not, and the one rule tying them — dismissing marks it
+  read — lives in `notificationColumns()`. `type` stays the free-text
+  discriminator it always was and **nothing on screen reads it**, so a new kind
+  of notification is neither a migration nor a `switch`. The shell's load owns
+  the rows (`loadInbox()`, two capped queries, `QUERY.notifications`), the
+  writes are a `PATCH` pair under `/api/notifications` — the cross-page
+  exception the note dock takes, since the bell floats over every screen — and
+  the panel is one row component for all three piles, which starts the
+  breadcrumb trail over when it navigates, like every other shell surface.
 - **The party model is two tables, split by what a row IS** (`crm_party_model`
   migration). `companies` are organizations you deal with — `relationship` says
   customer, supplier or partner, so a vendor is not a second table — and `contacts`
@@ -342,7 +424,11 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   roofer do not run the same board — a deal's `stage_id` is pinned to its own
   pipeline by a composite foreign key, every org gets a default board by trigger, and
   an unplaced deal lands in it. `stage_outcome` (open/won/lost) stays an enum: every
-  board has exactly those three. Custom fields follow the same rule and now apply to
+  board has exactly those three. A board is therefore also a screen: `/deals` draws
+  the stages as a `Kanban` funnel beside its table, and a card dropped on a stage
+  posts the page's `move` action, which writes the pair through `dealPlacement()` —
+  the one place that says which board a stage is on, and so the one place that proves
+  it is this org's (docs/deals.md). Custom fields follow the same rule and now apply to
   **any** kind of record — a definition declares its `entity_type` and values
   reference `(field_definition_id, entity_type)`, so a contact's field cannot be
   filled in on a product. That is where industry specifics belong: a column if two
@@ -377,7 +463,10 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   "Estimator" / "Project manager" on a roof), the `(app)` layout ships the resolved
   `vocabulary` next to `terms`, and `term(page.data.vocabulary, id)` is the one
   accessor. A word that is not a feature's name is never a constant in `src/` — it is
-  a `terms` row and an id in `TERM_IDS`; nothing is settable per org.
+  a `terms` row and an id in `TERM_IDS`; nothing is settable per org. Both, plus the
+  entity link below, also draw as edges on `/graph`, computed at read time from these
+  columns rather than stored as `relationships` rows (see the graph bullet below and
+  `proposal_graph_edges` migration).
 - **Relationships are one table, not a junction table per pair of kinds**
   (`relationships` migration + `src/lib/server/crm/relationships.ts`; docs/relationships.md).
   A `relationships` row names two records through the shared entity link
@@ -397,6 +486,20 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   that would have to pick a kind (`owner_id`: a contact or a company?).
   `'member'` is the kind for someone who works here (keyed by `organization_members.user_id`,
   existing only while the membership does), distinct from a contact and an auth user.
+  **The graph is also drawn whole**: `/graph` (feature `graph`, `src/lib/server/crm/graph.ts`
+  - `src/lib/components/relationship-graph/`; docs/relationships.md, "The graph page") is
+    an Obsidian-style force-directed map of every record the reader may open — one in no
+    relationship yet is a dot of its own that still opens its page — over the
+    relationships between them, named through each kind's own list module (so the gate
+    applies kind by kind, and a member is on the map only where a relationship names
+    one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
+    people who work here) and its edges labelled by their types. Nothing per industry is
+    stored for it; a kind or a type joins the map by existing. A proposal's presenter,
+    responsible member and parent link are drawn too, even though they stay plain
+    columns on `proposals` — `describeGraph()` reads them directly and synthesizes
+    edges at request time, never writing a `relationships` row (they are genuinely
+    single-valued per proposal, and that table's uniqueness index cannot enforce
+    that, so a real row could drift from the column with no way back).
 - **Assets hold only universal columns** (`assets` migration + `src/lib/server/crm/assets.ts`):
   name, type, identifier, status, dates, price. Who owns, holds, sold or leases one is
   a relationship; a serial number or a VIN is a custom field (`entity_type = 'asset'`).
@@ -420,20 +523,33 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   is named by the industry ("Schedule" / "appointment" in a practice).
 - **A task has a column AND a finishing time, and a trigger holds them together**
   (`task_board` migration + `src/lib/crm/tasks.ts` + `src/routes/(app)/tasks/`).
-  `tasks.status` (`task_status`: todo / in_progress / blocked / done) says WHERE the
-  task sits; `completed_at` says WHEN it was finished. They are not two ways to say
-  the same thing, and `private.tasks_sync_completion()` keeps the one relationship
-  between them — `status = 'done'` exactly when the timestamp is set — so the board
-  writes `status`, the checkbox writes `completed_at`, and neither knows the other
-  column exists. An enum rather than rows, unlike `pipeline_stages`: "not started,
-  underway, stuck, finished" is the same four states in every vertical, and what a
-  task is CALLED is already the industry's through the feature's terms. There is no
-  `cancelled` state on purpose — it would be a second closed state and the timestamp
-  can only be honest about one. **The page is not a table**: a `Kanban` board by
-  status and a `GroupList` by due-date bucket, the choice remembered per device
+  `tasks.status` (`task_status`: todo / in_progress / blocked / in_review / done)
+  says WHERE the task sits; `completed_at` says WHEN it was finished. They are not
+  two ways to say the same thing, and `private.tasks_sync_completion()` keeps the one
+  relationship between them — `status = 'done'` exactly when the timestamp is set —
+  so the board writes `status`, the checkbox writes `completed_at`, and neither knows
+  the other column exists. An enum rather than rows, unlike `pipeline_stages`: "not
+  started, underway, stuck, waiting on a reader, finished" is the same shape of day
+  in every vertical, and what a task is CALLED is already the industry's through the
+  feature's terms. There is no `cancelled` state on purpose — it would be a second
+  closed state and the timestamp can only be honest about one. **The board groups
+  those statuses rather than adding to them**: `TASK_STATUS_GROUPS`
+  (`src/lib/crm/tones.ts`) is the columns — To do, In progress (holding
+  `in_progress` AND `blocked`), In review, Done — and a group is a way of reading the
+  wall, never a value written to a row, so a drop on a grouped column asks which
+  status it meant and a card wears its own status on its eyebrow. Adding a column
+  means grouping differently; adding a _status_ is a migration and a change to the
+  states above — `in_review` is the one that earned it (`task_in_review` migration):
+  a task nobody is working on and nobody has finished had been parked in `blocked`,
+  which says it is stuck when it is only waiting. **The page is not a table**: a
+  `Kanban` board by status
+  group and a `GroupList` by due-date bucket, the choice remembered per device
   (`$lib/list-view.svelte`), with one `move` action behind the drag, the arrow keys
-  and the checkbox alike. Bucketing is pure and local (`taskBucket()`, `dueLabel()`)
-  for the reason the calendar's dates are: "overdue" and "today" are wall-clock words.
+  and the checkbox alike, and `schedule` / `prioritize` / `assign` / `unassign`
+  behind the chips and the menus a card carries — every one a form action posted
+  through a hidden form, never a `fetch`. Bucketing is pure and local
+  (`taskBucket()`, `dueLabel()`) for the reason the calendar's dates are: "overdue"
+  and "today" are wall-clock words.
 - **An invoice is a document and the ledger is the account it lands on** (`ledger`
   migration + `src/lib/server/crm/invoices.ts`, `payments.ts`, `ledger.ts` + the pure
   fold in `src/lib/crm/ledger.ts` + `src/routes/(app)/invoices/`, `(app)/ledger/`;
@@ -630,7 +746,7 @@ page, nested data, and how to test actions, is the `sveltekit-superforms` skill
 (`.claude/skills/sveltekit-superforms/SKILL.md`); /login, /reset-password and
 /settings/profile are the reference implementations.
 
-### Creating a record is one form, not one per page
+### Creating and editing a record is one form, not one per page
 
 Adding a row of any kind goes through the **generic record form**: the registry in
 `src/lib/schemas/records.ts` (the feature that owns each kind of object — whose terms
@@ -646,21 +762,36 @@ return { companies: …, ...(await loadCreateRecord(locals, 'company')) };
 export const actions: Actions = { create: (event) => createRecord(event, 'company') };
 ```
 
+**The record page edits with the same form.** `loadEditRecord()` fills it in from the
+row and `updateRecord()` saves it, behind the `EditRecord` button on the generic record
+page — so a kind is described once and is creatable, editable and validated the same
+way, and `writeRecord()` is one switch for both (a blank field therefore means the
+column's empty value on both paths, never "leave it as it was", or clearing one would
+silently do nothing). **A deal's stage is a field in that list**, which is how a deal
+moves down the funnel. An invoice is the exception and says why: it is a document with
+a lifecycle — draft, issue, void — that its own record-page actions own
+(`billing.server.ts`), so it is not an `EditableRecordType`.
+
 Every field posts a **string** — that is what lets one component render them all — and
-the server's insert switch is the one place strings become columns (blank → null, an
+`writeRecord()` is the one place strings become columns (blank → null, an
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
-schema so the enum unions come back without a cast). A record that points at a party
-(an invoice's customer) uses the `company` / `contact` **picker field types**: still a
+schema so the enum unions come back without a cast), with `recordFormValues()` its
+mirror on the way back into the form. A record that points at another row — an
+invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
+field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
-one `case` in that switch; never a second create modal, action or field-rendering loop. A screen whose creation is genuinely special
+one `case` in each of those two functions; never a second create or edit modal, action
+or field-rendering loop (the inputs are `RecordFields`, once, for both frames). A screen whose creation is genuinely special
 (the staff page's invite, which sends an email and mints a token; the proposal
 builder at `/proposals/new`, which writes the two people, the options and their
 billable and product lines with the row — docs/proposals.md, "The page"; the quick
 plans page, whose one field is a multi-select; the calendar, whose booking form is
 two instants behind wall-clock inputs, an all-day switch that changes what they mean,
-a colour and a record — docs/calendar.md) keeps its own form and says why.
+a colour and a record — docs/calendar.md; the task modal at `(app)/tasks/`, which
+writes the row and its `assigned_to` relationships in one post and links a party
+from one picker — docs/tasks.md, "The task modal") keeps its own form and says why.
 
 ## Data loading & invalidation
 
@@ -720,7 +851,22 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
-- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+- **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
+  swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
+  (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
+  way to a search field. **The shell carries the screen's furniture, not the page**:
+  `AppHeader` mounts a `TabStrip` of the threads this browser tab has open (so the
+  breadcrumb trail stands down beside it and the page has no `PageHeader`), and the
+  layout docks a `ContextPanel` of what the answer drew on (`sourcesOf()`, filtered to
+  the kinds `terms` says this session may open) beside `Sidebar.Inset`, the same height
+  as the body — never a card inside the page. The thread reaches the rail as a getter
+  `Assistant.Root` publishes through `assistantThread`. The conversation is one column
+  with two states — the composer centred under "How can I help you today?" over
+  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
+  its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
+  line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
+  opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
   the real agent with `MockLanguageModelV4` from `ai/test`.
 
@@ -760,7 +906,10 @@ flickers on load. The full account is `docs/user-preferences.md`; the rules:
 - The notes rail (`notes.dock`) is the worked example, and it hides **chrome, not the
   feature**: the dock component stays mounted with the preference off so `⌥⌘L` still
   opens every note. A preference that quietly takes a shortcut away is how people
-  stop trusting preferences.
+  stop trusting preferences. `notifications.general` is the same rule for a switch
+  that belongs to no feature (the bell is shell chrome, so it is offered to every
+  org): off, the General tab is not drawn and its unread stops counting on the bell,
+  and nothing is deleted or left unfetched.
 
 ## Navigation
 
@@ -785,6 +934,14 @@ read, because these pages exist for every org and are exempt from the feature ga
 route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
+**The assistant is the second shell of that kind**, and the last one a screen gets for
+free: under `/assistant` the same layout swaps in `AssistantSidebar`, whose nav is the
+member's own threads rather than a list of pages (docs/assistant.md, "The screen"). It
+stays a nav entry, because the feature registry is what puts it there. A third such shell
+needs a reason as good — a screen whose navigation is genuinely its own content — and it
+copies these two: the same header row, the same `NavUser` footer, `breadcrumbs.startAt()`
+paired with every jump.
 
 The header carries a **breadcrumb trail**: how deep this tab has gone since it last
 jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
@@ -858,12 +1015,51 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   a plan, and never build a second upsell surface. `/components` → Overlays → Upgrade modal is
   the reference.
 - **A board is `Kanban`** (`src/lib/components/kanban/`), the app-level compound for "cards in
-  columns you can move one between": `Kanban.Root` owns the drag state, `Kanban.Column` registers
-  its own drop zone, `Kanban.Card` is the draggable shell with a real handle button on it. The page
-  owns the columns, the cards and what a move means — the board hands back a card id and the
-  column it was released over, and nothing else. Moving works from the keyboard as well as under a
-  pointer (Space to grab, ← → to move, Escape to drop), so never build a drag-only board.
-  `/tasks` is the worked example and `/components` → Boards & grouped lists the reference.
+  columns you can move one between", and it has **two axes**: a `Kanban.Column` is a **status
+  group** — the coarse state a reader scans for — and the `statuses` it declares are the states a
+  record is actually in. A column holding one status takes a release straight away; a column
+  holding several shows `Kanban.Zones` (a `Kanban.DropZone` each) in place of its `Kanban.Cards`
+  while a card is over it, and asks which. **A group is never a state**: `onmove` is always called
+  with a status, because a group is a way of reading the board and not something a record can be
+  stored as. `Kanban.Root` owns the drag state and draws the card under the pointer (from the
+  lifted card's own snippet, so a column that splits cannot unmount what you are carrying) and
+  freezes the board's height for the length of the drag; `Kanban.Card` is the draggable shell with
+  a real handle button on it, and `Kanban.CardHeader` / `CardTitle` / `CardFooter` / `Ring` are
+  the regions every card has. The page owns the groups, the statuses, the cards and what a move
+  means — the board hands back a card id and the status it was released over, and nothing else.
+  Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
+  status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
+  and never leave a status the arrows cannot reach. `/tasks` is the worked example and
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
+  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
+  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
+  for a column that groups several states, not for every board. It draws one pipeline at a
+  time (a stage only means something inside its own board, so which one is in the query
+  string like the ledger's account filter), the stage's `probability` as the ring's fill,
+  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
+  `$lib/crm/tasks.ts` does for the task board.
+- **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
+  not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
+  `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and
+  can close, and each is a **link**, so ⌘-click and browser history work and
+  `aria-current` marks the one you are on. The assistant's open conversations are the
+  worked example, and it lives in the app header rather than in a bar of its own: a
+  screen whose open documents are tabs composes them into a component the header mounts
+  on the same pathname branch the layout swaps the sidebar on (`AssistantTabs`), and the
+  breadcrumb trail stands down there, because a page is named once. A strip is its
+  screen's own navigation, so a tab pairs `breadcrumbs.startAt()` with its href the way
+  a sidebar entry does.
+- **A panel of context docked beside the thing it is about is `ContextPanel`**
+  (`src/lib/components/context-panel/`): its own card on its own hairline, a `Header`
+  with a `Title` and its `Actions`, a `Body` that scrolls, and `Section` / `Item` rows.
+  The panel is only the frame — what it shows is the page's, passed in where it renders
+  — and an `Item` is a link when it goes somewhere and plain text when it does not, so a
+  record the reader may not open is still listed without being a door it cannot use.
+  Docked **beside the body, not inside the page**: the `(app)` layout renders it as a
+  sibling of `Sidebar.Inset` on the same pathname branch, `sticky` and the panel's own
+  height, so it stands on the shell's ground like the sidebar on the other side. Data
+  that lives in the page reaches it the way the assistant's thread does — a getter
+  published through a module-rune store, never a copy.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and
@@ -900,8 +1096,10 @@ rendered only when the load says `canCreate`. See "Creating a record is one form
 
 `DataTable.Content` already draws its own bordered, rounded frame around the rows, so wrapping
 one in `ui/card` stacks two borders around the same table and buys nothing. **A list page is the
-page heading, then the toolbar, then the table** — `/clients`, `/deals`, `/tickets`, `/tasks` and
-`/staff` are all built that way, and a new one copies them. (The `/components` showcase is not an
+page heading, then the toolbar, then the table** — `/companies`, `/deals`, `/tickets` and
+`/staff` are all built that way, and a new one copies them. The toolbar is `DataTable.Toolbar`
+(`Search`, `Filters`, `ViewOptions`), and on a list of records its contents come from the
+list's fields (docs/lists.md); never a bare `<div class="flex">` with an `Input` in it. (The `/components` showcase is not an
 exception to fix: there the card is the demo frame around a primitive, not a page layout.)
 
 Cards still earn their place around everything that is _not_ the table: a form, and the summary
@@ -916,6 +1114,12 @@ re-measuring when that changes (`page-size.ts`; `DataTable.Content` marks its em
 page size — no `initialState.pagination` — and the one screen that wants a fixed number, because a
 card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
 That prop is the only way to set a page size; never reintroduce a picker or a second knob.
+A table with more columns than the screen has room for scrolls sideways inside its frame, and
+"Pin first column" in `ViewOptions` keeps the first column (with the selection checkbox in
+front of it) in place while the rest scroll — a per-device choice remembered per page in
+`localStorage` (`$lib/list-view.svelte`, the device axis of docs/user-preferences.md);
+`<DataTable.Root pinFirstColumn>` only sets the default a fresh device opens on. That is the
+one way to pin a column; never a second sticky-cell class or a second switch in a page.
 `DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
 holding **page of pages** and the four controls (first, previous, next, last).
 

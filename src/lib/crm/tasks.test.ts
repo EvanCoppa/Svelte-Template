@@ -8,7 +8,7 @@ import {
 	taskIsOverdue,
 	type TaskLike
 } from './tasks';
-import { TASK_STATUSES } from './tones';
+import { TASK_STATUS_GROUPS, TASK_STATUS_LABEL, TASK_STATUS_RING, TASK_STATUSES } from './tones';
 
 /**
  * Local noon on a Tuesday, so every case below is a whole number of days from
@@ -44,6 +44,14 @@ describe('which pile a task falls in', () => {
 		expect(taskBucket({ due_at: null, status: 'done' }, NOW)).toBe('done');
 		expect(taskIsOverdue(due(-30, 'done'), NOW)).toBe(false);
 		expect(taskIsOverdue(due(-1), NOW)).toBe(true);
+	});
+
+	it('keeps a task in review on the timeline — it is waiting, not finished', () => {
+		// The one state that could be mistaken for done: the work is out of the
+		// doer's hands, and until somebody says so it is still late if it is late.
+		expect(taskBucket(due(-1, 'in_review'), NOW)).toBe('overdue');
+		expect(taskBucket(due(3, 'in_review'), NOW)).toBe('week');
+		expect(taskIsOverdue(due(-1, 'in_review'), NOW)).toBe(true);
 	});
 
 	it('groups into every bucket, so the page renders a stable set of headings', () => {
@@ -96,5 +104,36 @@ describe('how a due date reads', () => {
 
 	it('says nothing at all when there is no due date', () => {
 		expect(dueLabel({ due_at: null, status: 'todo' }, NOW)).toBeNull();
+	});
+});
+
+/**
+ * The board's two axes have to agree with each other, and nothing in the type
+ * system says they do: a status left out of every group is a card that never
+ * appears, and a status in two groups is a card drawn twice.
+ */
+describe('the board’s status groups', () => {
+	const grouped = TASK_STATUS_GROUPS.flatMap((group) =>
+		group.statuses.map((status) => status.value)
+	);
+
+	it('covers every status exactly once', () => {
+		expect([...grouped].sort()).toEqual([...TASK_STATUSES].sort());
+	});
+
+	it('keeps the statuses in workflow order, so the arrow keys walk it', () => {
+		expect(grouped).toEqual([...TASK_STATUSES]);
+	});
+
+	it('names a status the same in a group as everywhere else', () => {
+		for (const group of TASK_STATUS_GROUPS) {
+			for (const status of group.statuses) {
+				expect(status.label).toBe(TASK_STATUS_LABEL[status.value]);
+			}
+		}
+	});
+
+	it('has a ring for every status, so no card draws an unmarked one', () => {
+		for (const status of TASK_STATUSES) expect(TASK_STATUS_RING[status]).toBeDefined();
 	});
 });

@@ -3,7 +3,9 @@ import {
 	createRelationship,
 	getRelationships,
 	listRelationshipTypes,
+	listOrgRelationships,
 	listRelationships,
+	listRelationshipsFrom,
 	orientRelationship,
 	removeRelationship,
 	updateRelationship,
@@ -83,7 +85,11 @@ const wayneRow = {
 };
 
 const openAll = () => true;
-const vocabulary = { proposal_presenter: 'Presenter', proposal_responsible: 'Responsible' };
+const vocabulary = {
+	proposal_presenter: 'Presenter',
+	proposal_responsible: 'Responsible',
+	graph_member: 'Staff'
+};
 
 describe('listRelationshipTypes', () => {
 	it('reads the system types and the org’s own, by forward label', async () => {
@@ -117,6 +123,54 @@ describe('listRelationships', () => {
 		await listRelationships(supabase, ORG_ID, laptop, { typeId: OWNS, openOnly: true });
 		expect(builder.eq).toHaveBeenCalledWith('relationship_type_id', OWNS);
 		expect(builder.is).toHaveBeenCalledWith('ended_on', null);
+	});
+});
+
+describe('listOrgRelationships', () => {
+	it('reads the whole org\u2019s graph in one query, oldest first', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [wayneOwnsLaptop] });
+
+		await expect(listOrgRelationships(supabase, ORG_ID)).resolves.toEqual([wayneOwnsLaptop]);
+		expect(from).toHaveBeenCalledWith('relationships');
+		expect(builder.select).toHaveBeenCalledWith('*, relationship_types(*)');
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: true });
+		// No record to orient around, so no `or`; and every row, so no `is`.
+		expect(builder.or).not.toHaveBeenCalled();
+		expect(builder.is).not.toHaveBeenCalled();
+	});
+
+	it('narrows to the open ones only when asked', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+		await listOrgRelationships(supabase, ORG_ID, { openOnly: true });
+		expect(builder.is).toHaveBeenCalledWith('ended_on', null);
+	});
+});
+
+describe('listRelationshipsFrom', () => {
+	it('reads a page of records\u2019 rows in one query, from side only', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [wayneOwnsLaptop] });
+
+		await expect(
+			listRelationshipsFrom(supabase, ORG_ID, 'asset', [ASSET_ID], { typeId: OWNS, openOnly: true })
+		).resolves.toEqual([wayneOwnsLaptop]);
+		expect(from).toHaveBeenCalledWith('relationships');
+		expect(builder.eq).toHaveBeenCalledWith('from_type', 'asset');
+		expect(builder.in).toHaveBeenCalledWith('from_id', [ASSET_ID]);
+		expect(builder.eq).toHaveBeenCalledWith('relationship_type_id', OWNS);
+		expect(builder.is).toHaveBeenCalledWith('ended_on', null);
+		// No `or`: this side is known, which is what makes one query enough.
+		expect(builder.or).not.toHaveBeenCalled();
+	});
+
+	it('de-duplicates the ids, and asks nothing when there are none', async () => {
+		const repeated = supabaseMock({ data: [] });
+		await listRelationshipsFrom(repeated.supabase, ORG_ID, 'asset', [ASSET_ID, ASSET_ID]);
+		expect(repeated.builder.in).toHaveBeenCalledWith('from_id', [ASSET_ID]);
+
+		const empty = supabaseMock({ data: [] });
+		await expect(listRelationshipsFrom(empty.supabase, ORG_ID, 'asset', [])).resolves.toEqual([]);
+		expect(empty.builder.select).not.toHaveBeenCalled();
 	});
 });
 

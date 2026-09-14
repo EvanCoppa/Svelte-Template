@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
 	import { page } from '$app/state';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import * as DataTable from '$lib/components/data-table/index.js';
+	import DeleteRecord from '$lib/components/delete-record.svelte';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { recommendedOption } from '$lib/crm/proposals';
-	import { recordHref, recordTerms } from '$lib/crm/records';
-	import { PROPOSAL_STATUS_TONE } from '$lib/crm/tones';
-	import type { ProposalWithOptions } from '$lib/server/crm/proposals';
-	import { capitalize } from '$lib/utils.js';
+	import { recordTerms } from '$lib/crm/records';
+	import { createListTable } from '$lib/lists/table';
+	import { QUERY } from '$lib/queries';
 
 	let { data } = $props();
 
@@ -17,65 +15,19 @@
 	// "treatment plan" in a dental practice.
 	const terms = $derived(recordTerms(page.data.terms, 'proposal'));
 
-	// Both are instants (`timestamptz`), so they read in the viewer's zone.
-	const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-	// An option carries its own currency; format in it rather than assuming USD.
-	const money = (value: number, currency: string) =>
-		new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+	let removing = $state<{ id: string; name: string } | null>(null);
 
-	const columnHelper = createColumnHelper<DataTable.DataTableFeatures, ProposalWithOptions>();
-	const columns = columnHelper.columns([
-		DataTable.selectColumn(columnHelper),
-		columnHelper.accessor('title', {
-			header: ({ column }) =>
-				renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) }),
-			cell: ({ getValue, row }) =>
-				DataTable.linkCell(getValue(), recordHref('proposal', row.original.id))
-		}),
-		columnHelper.accessor('status', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
-			cell: ({ getValue }) => DataTable.statusCell(getValue(), PROPOSAL_STATUS_TONE[getValue()])
-		}),
-		columnHelper.accessor((row) => row.proposal_options.length, {
-			id: 'options',
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Options' })
-		}),
-		// The figure a client is steered to; a proposal with no recommended
-		// option (or one not yet priced) shows nothing rather than a guess.
-		columnHelper.accessor(
-			(row) => recommendedOption(row.proposal_options)?.computed_total ?? null,
-			{
-				id: 'recommended',
-				header: ({ column }) =>
-					renderComponent(DataTable.ColumnHeader, { column, title: 'Recommended' }),
-				cell: ({ getValue, row }) => {
-					const total = getValue();
-					const option = recommendedOption(row.original.proposal_options);
-					return total === null || option === null ? '—' : money(total, option.currency);
-				}
-			}
-		),
-		columnHelper.accessor('valid_until', {
-			header: ({ column }) =>
-				renderComponent(DataTable.ColumnHeader, { column, title: 'Valid until' }),
-			cell: ({ getValue }) => {
-				const value = getValue();
-				return value ? date.format(new Date(value)) : '—';
-			}
-		}),
-		columnHelper.accessor('created_at', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Created' }),
-			cell: ({ getValue }) => date.format(new Date(getValue()))
-		})
-	]);
-
-	const table = createTable({
-		features: DataTable.features,
-		get data() {
-			return data.proposals;
-		},
-		columns
-	});
+	// The columns, the search and the filters are the list's fields as the
+	// org's industry has them (docs/lists.md); the page only composes the parts.
+	// The owner / presenter columns are labelled from the vocabulary, not a
+	// constant, so the industry's own words ("Project manager", "Estimator")
+	// show up here too.
+	const table = createListTable(
+		() => data.list,
+		() => page.data.terms,
+		() => page.data.vocabulary,
+		() => (data.canDelete ? { canDelete: true, onDelete: (row) => (removing = row) } : undefined)
+	);
 </script>
 
 <div class="space-y-6">
@@ -93,7 +45,14 @@
 	</PageHeader.Root>
 
 	<DataTable.Root {table}>
-		<DataTable.Content />
+		<DataTable.Toolbar>
+			<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+			<DataTable.Filters />
+			<DataTable.ViewOptions class="ms-auto" />
+		</DataTable.Toolbar>
+		<DataTable.Content emptyMessage="No {terms.plural} match." />
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>
+
+<DeleteRecord type="proposal" form={data.deleteForm} query={QUERY.proposals} bind:removing />

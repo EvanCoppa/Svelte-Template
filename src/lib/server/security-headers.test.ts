@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySecurityHeaders, buildContentSecurityPolicy } from './security-headers';
+import { applySecurityHeaders, buildContentSecurityPolicy, imageOrigins } from './security-headers';
 
 const SUPABASE_URL = 'https://myproject.supabase.co';
 
@@ -31,9 +31,36 @@ describe('buildContentSecurityPolicy', () => {
 		expect(buildContentSecurityPolicy(SUPABASE_URL)).not.toContain('tiles.test');
 	});
 
+	it('admits configured image hosts for images only, and nothing when unset', () => {
+		const csp = buildContentSecurityPolicy(SUPABASE_URL, {
+			imageOrigins: ['https://cdn.test']
+		});
+		const directive = (name: string) => csp.split('; ').find((part) => part.startsWith(name));
+
+		expect(directive('img-src')).toContain('https://cdn.test');
+		expect(directive('connect-src')).not.toContain('https://cdn.test');
+		expect(buildContentSecurityPolicy(SUPABASE_URL)).not.toContain('cdn.test');
+	});
+
 	it('relaxes connect-src for Vite only in dev', () => {
 		expect(buildContentSecurityPolicy(SUPABASE_URL)).not.toContain('ws:');
 		expect(buildContentSecurityPolicy(SUPABASE_URL, { dev: true })).toContain('ws:');
+	});
+});
+
+describe('imageOrigins', () => {
+	it('reads a comma-separated list as distinct origins', () => {
+		expect(
+			imageOrigins('https://cdn.test/images/, https://cdn.test/other, https://b.test')
+		).toEqual(['https://cdn.test', 'https://b.test']);
+	});
+
+	it('is empty when unset, and drops an entry that is not a URL', () => {
+		expect(imageOrigins(undefined)).toEqual([]);
+		expect(imageOrigins('')).toEqual([]);
+		expect(imageOrigins('   ,  ')).toEqual([]);
+		// A typo costs one broken thumbnail, never the whole header set.
+		expect(imageOrigins('cdn.test, https://ok.test')).toEqual(['https://ok.test']);
 	});
 });
 

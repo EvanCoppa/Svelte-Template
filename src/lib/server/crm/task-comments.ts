@@ -51,6 +51,32 @@ export async function listTaskComments(
 	}));
 }
 
+/**
+ * How much conversation each of a page of tasks has collected — one query for
+ * the board, where reading each thread would be one per card. The messages
+ * themselves are not fetched: a card shows a number, and a number is all this
+ * counts.
+ *
+ * A task nobody has written on is absent from the map rather than present as
+ * zero, so a caller draws nothing instead of a zero that means nothing.
+ */
+export async function countTaskComments(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	taskIds: readonly string[]
+): Promise<Map<string, number>> {
+	const ids = [...new Set(taskIds)];
+	if (ids.length === 0) return new Map();
+
+	const rows = unwrap(
+		await supabase.from('task_comments').select('task_id').eq('org_id', orgId).in('task_id', ids)
+	);
+
+	const counts = new Map<string, number>();
+	for (const { task_id } of rows) counts.set(task_id, (counts.get(task_id) ?? 0) + 1);
+	return counts;
+}
+
 export async function addTaskComment(
 	supabase: SupabaseClient<Database>,
 	orgId: string,

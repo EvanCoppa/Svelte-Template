@@ -3,12 +3,6 @@ import type { Tables } from '$lib/database.types';
 import type { Feature } from '$lib/features/types';
 import type { RecordFormValues } from '$lib/schemas/records';
 import {
-	isCompanyColumnKey,
-	isContactColumnKey,
-	type CompanyColumnKey,
-	type ContactColumnKey
-} from './columns';
-import {
 	companyFilterSchema,
 	contactFilterSchema,
 	type CompanyFilter,
@@ -20,8 +14,7 @@ import { isViewLayout, isViewSource, type ViewLayout } from './types';
  * From a `views` row to a definition the page and the runner can trust.
  *
  * The database checks what it can (a party source, known layouts, a default
- * among them); the JSON filter and the column keys it cannot, so this is
- * where they are checked — on every load, throwing with the view's id. A
+ * among them); the JSON filter it cannot, so this is where it is checked — on every load, throwing with the view's id. A
  * throw here is a migration that shipped a bad row, and a 500 is the right
  * answer to that, the way `resolveVocabulary()` refuses a missing term.
  */
@@ -29,7 +22,7 @@ import { isViewLayout, isViewSource, type ViewLayout } from './types';
 /** The row as the registry loads it (`loadViewRegistry()` in `$lib/server/features`). */
 export type ViewRegistryRow = Pick<
 	Tables<'views'>,
-	'id' | 'source' | 'filter' | 'columns' | 'layouts' | 'default_layout'
+	'id' | 'source' | 'filter' | 'layouts' | 'default_layout'
 >;
 
 type ViewBase = {
@@ -41,10 +34,7 @@ type ViewBase = {
 };
 
 export type ViewDefinition = ViewBase &
-	(
-		| { source: 'company'; filter: CompanyFilter; columns: CompanyColumnKey[] }
-		| { source: 'contact'; filter: ContactFilter; columns: ContactColumnKey[] }
-	);
+	({ source: 'company'; filter: CompanyFilter } | { source: 'contact'; filter: ContactFilter });
 
 /** Where a view lives — what its `features.route` must be. */
 export function viewHref(id: string): string {
@@ -77,15 +67,13 @@ export function resolveView(row: ViewRegistryRow, feature: Feature): ViewDefinit
 			return {
 				...base,
 				source: 'company',
-				filter: parseFilter(row, companyFilterSchema),
-				columns: columnsOf(row, isCompanyColumnKey)
+				filter: parseFilter(row, companyFilterSchema)
 			};
 		case 'contact':
 			return {
 				...base,
 				source: 'contact',
-				filter: parseFilter(row, contactFilterSchema),
-				columns: columnsOf(row, isContactColumnKey)
+				filter: parseFilter(row, contactFilterSchema)
 			};
 	}
 }
@@ -96,18 +84,6 @@ function parseFilter<F>(row: ViewRegistryRow, schema: z.ZodType<F>): F {
 		throw new Error(`View ${row.id} has an invalid filter: ${parsed.error.message}`);
 	}
 	return parsed.data;
-}
-
-/** The row's columns, checked against the source's catalog, with `name` forced first. */
-function columnsOf<K extends string>(row: ViewRegistryRow, isKey: (key: string) => key is K): K[] {
-	const keys: K[] = [];
-	for (const key of row.columns) {
-		if (!isKey(key)) throw new Error(`View ${row.id} shows a column it does not have: ${key}.`);
-		if (!keys.includes(key)) keys.push(key);
-	}
-	// SAFETY: every catalog has a `name` column — it is the link into the record.
-	const name = 'name' as K;
-	return [name, ...keys.filter((key) => key !== name)];
 }
 
 /**

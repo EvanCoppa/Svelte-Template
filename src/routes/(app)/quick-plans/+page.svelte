@@ -54,7 +54,9 @@
 			DataTable.selectColumn(columnHelper),
 			columnHelper.accessor('name', {
 				header: ({ column }) =>
-					renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) })
+					renderComponent(DataTable.ColumnHeader, { column, title: capitalize(terms.noun) }),
+				enableGlobalFilter: true,
+				meta: { title: capitalize(terms.noun) }
 			}),
 			columnHelper.accessor((plan) => plan.quick_plan_billables.length, {
 				id: 'count',
@@ -62,13 +64,18 @@
 					renderComponent(DataTable.ColumnHeader, {
 						column,
 						title: capitalize(billableTerms.plural)
-					})
+					}),
+				enableGlobalFilter: false,
+				filterFn: 'oneOf',
+				meta: { title: capitalize(billableTerms.plural), filter: { options: null } }
 			}),
 			columnHelper.accessor(members, {
 				id: 'members',
 				header: ({ column }) =>
 					renderComponent(DataTable.ColumnHeader, { column, title: 'Includes' }),
-				enableSorting: false
+				enableSorting: false,
+				enableGlobalFilter: true,
+				meta: { title: 'Includes' }
 			}),
 			DataTable.actionsColumn(columnHelper, ({ row }) =>
 				renderComponent(QuickPlans.RowActions, {
@@ -244,7 +251,12 @@
 	</PageHeader.Root>
 
 	<DataTable.Root {table}>
-		<DataTable.Content emptyMessage="No {terms.plural} yet." />
+		<DataTable.Toolbar>
+			<DataTable.Search placeholder="Search {terms.plural}…" ariaLabel="Search {terms.plural}" />
+			<DataTable.Filters />
+			<DataTable.ViewOptions class="ms-auto" />
+		</DataTable.Toolbar>
+		<DataTable.Content emptyMessage="No {terms.plural} match." />
 		<DataTable.Pagination noun={terms.noun} nounPlural={terms.plural} />
 	</DataTable.Root>
 </div>

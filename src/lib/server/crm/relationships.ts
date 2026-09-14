@@ -45,7 +45,10 @@ import { unwrap, unwrapDeleted } from './unwrap';
  * key, because an org may define a type reusing a system key.
  */
 export const RELATIONSHIP_TYPE = {
-	assignedTo: 'f0000000-0000-0000-0000-000000000012'
+	assignedTo: 'f0000000-0000-0000-0000-000000000012',
+	responsibleFor: 'f0000000-0000-0000-0000-000000000013',
+	presents: 'f0000000-0000-0000-0000-000000000031',
+	proposedTo: 'f0000000-0000-0000-0000-000000000032'
 } as const;
 
 export type RelationshipType = Tables<'relationship_types'>;
@@ -119,6 +122,54 @@ export async function listRelationships(
 			`and(from_type.eq.${entity.entityType},from_id.eq.${entity.entityId}),` +
 				`and(to_type.eq.${entity.entityType},to_id.eq.${entity.entityId})`
 		)
+		.order('created_at', { ascending: false });
+	if (filter.typeId) query = query.eq('relationship_type_id', filter.typeId);
+	if (filter.openOnly) query = query.is('ended_on', null);
+	return unwrap(await query);
+}
+
+/**
+ * Every relationship in the organization, with its type embedded — the
+ * whole graph in one query, for the page that draws it whole
+ * (`describeGraph()` in `./graph`). Oldest first, so a map keeps the same
+ * order between loads and a node added last is drawn last.
+ */
+export async function listOrgRelationships(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	filter: { openOnly?: boolean } = {}
+): Promise<RelationshipWithType[]> {
+	let query = supabase
+		.from('relationships')
+		.select('*, relationship_types(*)')
+		.eq('org_id', orgId)
+		.order('created_at', { ascending: true });
+	if (filter.openOnly) query = query.is('ended_on', null);
+	return unwrap(await query);
+}
+
+/**
+ * Every relationship running FROM a set of records of one kind — one query for
+ * a page of them, where `listRelationships()` would be one query per row. Only
+ * the `from` side, because that is what it is for: a board of tasks asking who
+ * each is assigned to, where the task is always the `from` end.
+ */
+export async function listRelationshipsFrom(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entityType: CrmEntityType,
+	entityIds: readonly string[],
+	filter: { typeId?: string; openOnly?: boolean } = {}
+): Promise<RelationshipWithType[]> {
+	const ids = [...new Set(entityIds)];
+	if (ids.length === 0) return [];
+
+	let query = supabase
+		.from('relationships')
+		.select('*, relationship_types(*)')
+		.eq('org_id', orgId)
+		.eq('from_type', entityType)
+		.in('from_id', ids)
 		.order('created_at', { ascending: false });
 	if (filter.typeId) query = query.eq('relationship_type_id', filter.typeId);
 	if (filter.openOnly) query = query.is('ended_on', null);

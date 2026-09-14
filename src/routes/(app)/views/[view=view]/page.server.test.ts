@@ -56,15 +56,41 @@ const suppliersRow = {
 	id: 'suppliers',
 	source: 'company',
 	filter: { where: [{ field: 'relationship', op: 'in', values: ['supplier'] }] },
-	columns: ['name', 'city'],
 	layouts: ['table', 'map'],
 	default_layout: 'table'
 };
 
+/** The view's own list_fields rows — its columns, as the list_fields migration keys them. */
+const listFields = [
+	{
+		feature_id: 'suppliers',
+		field: 'name',
+		label: null,
+		shown: true,
+		searchable: true,
+		filterable: false,
+		sort_order: 100
+	},
+	{
+		feature_id: 'suppliers',
+		field: 'city',
+		label: null,
+		shown: true,
+		searchable: true,
+		filterable: true,
+		sort_order: 200
+	}
+];
+
 function localsFor(supabase: SupabaseClient<Database>, access: UserAccess): App.Locals {
-	// SAFETY: the load reads `supabase`, `activeOrgId`, `org.features` and
-	// `org.access`; the rest of App.Locals is never touched.
-	return { supabase, activeOrgId: ORG_ID, org: { access, features } } as never;
+	// SAFETY: the load reads `supabase`, `activeOrgId`, `org.features`,
+	// `org.access` and `org.activeOrg.industryId`; the rest of App.Locals is
+	// never touched.
+	return {
+		supabase,
+		activeOrgId: ORG_ID,
+		org: { access, features, activeOrg: { industryId: 'crm' } }
+	} as never;
 }
 
 function run(supabase: SupabaseClient<Database>, access: UserAccess, view: string) {
@@ -76,6 +102,9 @@ describe('the view page load', () => {
 	it('runs the view and describes its rows and pins, pre-filling the create form', async () => {
 		const { supabase, builders } = supabaseTablesMock({
 			views: { data: [suppliersRow] },
+			list_fields: { data: listFields },
+			industry_list_fields: { data: [] },
+			custom_field_definitions: { data: [] },
 			companies: { data: [{ id: STEEL, name: 'Gotham Steel Supply', relationship: 'supplier' }] },
 			addresses: {
 				data: [
@@ -92,14 +121,14 @@ describe('the view page load', () => {
 
 		const data = await run(supabase, OWNER, 'suppliers');
 		if (!data) throw new Error('expected data');
-		expect(data.view).toMatchObject({
-			id: 'suppliers',
-			source: 'company',
-			columns: ['name', 'city']
-		});
+		expect(data.view).toMatchObject({ id: 'suppliers', source: 'company' });
 		expect(builders.companies?.in).toHaveBeenCalledWith('relationship', ['supplier']);
 		expect(builders.addresses?.in).toHaveBeenCalledWith('entity_id', [STEEL]);
-		expect(data.rows).toEqual([
+		expect(data.list.spec.fields.map((field: { key: string }) => field.key)).toEqual([
+			'name',
+			'city'
+		]);
+		expect(data.list.rows).toEqual([
 			{
 				id: STEEL,
 				cells: [
@@ -127,13 +156,16 @@ describe('the view page load', () => {
 	it('shows plain names to a reader who may not open the source, and no Add button', async () => {
 		const { supabase } = supabaseTablesMock({
 			views: { data: [suppliersRow] },
+			list_fields: { data: listFields },
+			industry_list_fields: { data: [] },
+			custom_field_definitions: { data: [] },
 			companies: { data: [{ id: STEEL, name: 'Gotham Steel Supply', relationship: 'supplier' }] },
 			addresses: { data: [] }
 		});
 
 		const data = await run(supabase, READER, 'suppliers');
 		if (!data) throw new Error('expected data');
-		expect(data.rows[0]?.cells[0]).toEqual({
+		expect(data.list.rows[0]?.cells[0]).toEqual({
 			type: 'link',
 			text: 'Gotham Steel Supply',
 			href: null
@@ -149,9 +181,24 @@ describe('the view page load', () => {
 
 	it('fails loudly on a row the app cannot read, naming the view', async () => {
 		const { supabase } = supabaseTablesMock({
-			views: { data: [{ ...suppliersRow, columns: ['name', 'sku'] }] }
+			views: {
+				data: [{ ...suppliersRow, filter: { where: [{ field: 'sku', op: 'ilike', value: 'x' }] } }]
+			}
 		});
 
 		await expect(run(supabase, OWNER, 'suppliers')).rejects.toThrow('View suppliers');
+	});
+
+	it('fails loudly on a list field the view cannot draw, naming the list', async () => {
+		const { supabase } = supabaseTablesMock({
+			views: { data: [suppliersRow] },
+			list_fields: { data: [{ ...listFields[0], field: 'sku' }] },
+			industry_list_fields: { data: [] },
+			custom_field_definitions: { data: [] },
+			companies: { data: [] },
+			addresses: { data: [] }
+		});
+
+		await expect(run(supabase, OWNER, 'suppliers')).rejects.toThrow('List suppliers');
 	});
 });

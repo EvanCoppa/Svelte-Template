@@ -1,7 +1,9 @@
 import { createRawSnippet } from 'svelte';
 import { renderComponent } from '@tanstack/svelte-table';
 import { StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
+import ImageCell from './data-table-image-cell.svelte';
 import LinkCell from './data-table-link-cell.svelte';
+import RecordRowActions from './record-row-actions.svelte';
 
 /**
  * Cell renderers shared by list pages, so an enum value looks the same in
@@ -24,4 +26,25 @@ export function statusCell(value: string, tone: BadgeTone) {
  */
 export function linkCell(label: string, href: string) {
 	return renderComponent(LinkCell, { label, href });
+}
+
+/**
+ * A row's picture as a thumbnail — an `image` field's cell. `url` is null
+ * for a record with none, which draws a placeholder tile of the same size.
+ */
+export function imageCell(url: string | null) {
+	return renderComponent(ImageCell, { url });
+}
+
+/**
+ * The row menu a generic list page's `actionsColumn` renders: Open (when
+ * `href` is not null) and Delete (when `canDelete`).
+ */
+export function recordActionsCell(
+	name: string,
+	href: string | null,
+	canDelete: boolean,
+	onDelete: () => void
+) {
+	return renderComponent(RecordRowActions, { name, href, canDelete, onDelete });
 }

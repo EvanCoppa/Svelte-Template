@@ -29,7 +29,10 @@ import { QUERY } from '$lib/queries';
  * A proposal is not here on purpose: it is a title plus one to five priced
  * options made of catalog lines — more than one row of strings — so it has
  * the builder page at `src/routes/(app)/proposals/new/` instead, the one
- * kind whose creation is a screen rather than this modal.
+ * kind whose creation is a screen rather than this modal. A task is listed
+ * but created elsewhere too: the tasks page's own modal writes the row and
+ * its `assigned_to` relationships in one post (docs/tasks.md), and its entry
+ * here is what the record page EDITS a task with.
  */
 
 /** Kinds of record the generic form can create. */
@@ -52,21 +55,26 @@ export type RecordFormValues = Record<string, string>;
 
 export type RecordFieldOption = { value: string; label: string; sublabel?: string };
 
-/** The kinds of party a record form can point a new record at — each a picker over the org's rows. */
-export const RECORD_PICKER_KINDS = ['company', 'contact'] as const;
+/**
+ * The kinds of row a record form can point at — each a picker whose options
+ * are the org's own rows rather than a vocabulary the registry can hold: the
+ * two parties, and the stage a deal sits in (its board is `pipelines` rows,
+ * so the choices differ per org and per industry).
+ */
+export const RECORD_PICKER_KINDS = ['company', 'contact', 'stage'] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
 
-/** The options behind each party picker on a form, loaded per request by `loadCreateRecord()`. */
+/** The options behind each picker on a form, loaded per request by `loadCreateRecord()`. */
 export type RecordPickers = Partial<Record<RecordPickerKind, readonly RecordFieldOption[]>>;
 
 /**
  * How one field is rendered. `select` is a fixed vocabulary this app owns (an
  * enum column) and renders as a `Combobox`; `number` is money or a measure
  * and `integer` a count (days of terms); `datetime` is a wall-clock pick the
- * browser converts to an instant before posting; `company` and `contact` are
- * pickers over the org's own rows, whose options arrive with the form rather
- * than sitting in the registry.
+ * browser converts to an instant before posting; `company`, `contact` and
+ * `stage` are pickers over the org's own rows, whose options arrive with the
+ * form rather than sitting in the registry.
  */
 export type RecordField = {
 	name: string;
@@ -163,8 +171,12 @@ const optionalDate = z
  * converts `2026-09-10T17:00` to an ISO string with the viewer's offset before
  * posting, so both shapes are legal here — and without JavaScript the naive
  * form still arrives and is read as UTC.
+ *
+ * Exported because a record's date is picked in more than one place — the
+ * create form, and the task board's cards — and two spellings of "what a date
+ * input posts" is how one of them starts rejecting what the other sends.
  */
-const optionalInstant = z
+export const optionalInstant = z
 	.string()
 	.trim()
 	.regex(/^$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/, {
@@ -197,6 +209,13 @@ export const contactRecordSchema = z.object({
 
 export const dealRecordSchema = z.object({
 	title: requiredText('Title'),
+	/**
+	 * Where the deal sits on a board. Blank on create means "the org's default
+	 * board, first stage" (`crm/deals.ts` places it); blank on edit means the
+	 * same, which is why nothing here is required — a deal always has a stage,
+	 * but the form never has to know which one.
+	 */
+	stage_id: optionalPick,
 	amount: optionalAmount,
 	expected_close_date: optionalDate
 });
@@ -265,6 +284,12 @@ export const ticketRecordSchema = z.object({
 });
 
 /**
+ * Every list page's row menu: the id of the record to delete. One schema for
+ * every kind — deleting needs nothing about the record but which row it is.
+ */
+export const deleteRecordSchema = z.object({ id: z.guid() });
+
+/**
  * The schema behind each record type, as the generic form and its action use
  * it: widened to "an object of strings", because neither knows which type it
  * is handling at compile time. The concrete schemas above are how the server
@@ -285,7 +310,7 @@ export const RECORD_SCHEMAS: RecordSchemas = {
 };
 
 /** One vocabulary, shared by tasks and tickets (the `priority` enum). */
-const PRIORITY_OPTIONS = [
+export const PRIORITY_OPTIONS = [
 	{ value: 'low', label: 'Low' },
 	{ value: 'normal', label: 'Normal' },
 	{ value: 'high', label: 'High' },
@@ -338,8 +363,11 @@ export const RECORD_FORMS: RecordFormRegistry = {
 	deal: {
 		feature: 'deals',
 		query: QUERY.deals,
+		// Stage is second because moving one is the commonest edit a deal ever
+		// gets — the funnel is the reason the record exists.
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual renewal' },
+			{ name: 'stage_id', label: 'Stage', type: 'stage' },
 			{ name: 'amount', label: 'Amount', type: 'number', placeholder: '12000' },
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]

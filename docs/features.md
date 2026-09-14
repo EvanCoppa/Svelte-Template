@@ -138,14 +138,20 @@ pickers with them and `describeProposal()` labels the two `person` fields on the
 page with them. Nothing is settable per org: an org that needs its own word asks for a
 migration, exactly like a feature's name.
 
-## Sidebar sections
+## Nav sections
 
-A feature's `category` is the section of the sidebar it is filed under. The values are
-`general`, `crm`, `tools`, `insights`, `library` and `other` — declared once as
-`NAV_CATEGORIES` in `src/lib/navigation.ts`, in the order the sections render, and
-mirrored by the check constraint on `features.category` (the `feature_categories`
-migration). `groupNav()` buckets the entries and drops the empty sections, so a
-category may ship before the features that will live in it (`insights` does today).
+A feature's `category` is the section it is filed under. The values are `general`,
+`crm`, `tools`, `library`, `workspace` and `other` — declared once as `NAV_CATEGORIES`
+in `src/lib/navigation.ts`, in the order the sections render, and mirrored by the check
+constraint on `features.category` (the `feature_categories` migration). `groupNav()`
+buckets the entries and drops the empty sections, so a category may ship before the
+features that will live in it.
+
+A section is not a guess about the future: `insights` was declared empty for pages that
+read across the records, and the only one ever filed under it was the graph — one page
+is a link, not a section, so the category was retired and the graph joined the CRM (the
+`graph_in_crm_staff_in_user_menu` migration). Declare a section when its second page
+exists.
 
 The column is **nullable on purpose**: a feature that says nothing about where it
 belongs is filed under Other rather than under a default the migration had to guess.
@@ -153,9 +159,24 @@ belongs is filed under Other rather than under a default the migration had to gu
 not know both become `other` — and both the sidebar and `/settings/features` group
 with it, so a feature lands in the same section on both screens.
 
-Adding a section = one entry in `NAV_CATEGORIES` and the same value in the check
-constraint, by migration. Nothing else changes: the sidebar, the ⌘K palette and the
-feature settings page all render the list.
+### Which surface a section renders on
+
+A category also declares its `surface`, and there are two. **`sidebar`** is the places
+you work, and every category but one is on it. **`user-menu`** is the menu in the
+sidebar footer, where you administer the workspace itself — Settings is already there —
+and `workspace` is the category on it: its entries render **directly under Settings**
+rather than taking a section of the sidebar. `staff` is the one that moved there, and
+the move was rows: who is in the organization is not a place you work.
+
+`sidebarNav()` and `userMenuNav()` are the two reads (`app-sidebar.svelte` calls both
+and hands the second to `nav-user.svelte`), while the ⌘K palette calls `groupNav()` and
+so lists every surface — a page is findable from it wherever it is drawn. Nothing else
+changes with the surface: the gate, the grants, the industry's word for the feature and
+its `pages` row never asked which section it was in.
+
+Adding a section = one entry in `NAV_CATEGORIES` (with its surface) and the same value
+in the check constraint, by migration. Nothing else changes: the sidebar, the user menu,
+the ⌘K palette and the feature settings page all render the list.
 
 ### Order inside a section
 

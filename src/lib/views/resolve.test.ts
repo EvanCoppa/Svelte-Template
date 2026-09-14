@@ -19,20 +19,18 @@ const suppliers: ViewRegistryRow = {
 	id: 'suppliers',
 	source: 'company',
 	filter: { where: [{ field: 'relationship', op: 'in', values: ['supplier'] }] },
-	columns: ['status', 'name', 'city', 'status'],
 	layouts: ['table', 'map'],
 	default_layout: 'table'
 };
 
 describe('resolveView', () => {
-	it('turns a row into a definition, forcing the name column first and dropping repeats', () => {
+	it('turns a row into a definition', () => {
 		const view = resolveView(suppliers, feature('suppliers'));
 		expect(view).toEqual({
 			id: 'suppliers',
 			href: '/views/suppliers',
 			source: 'company',
 			filter: { where: [{ field: 'relationship', op: 'in', values: ['supplier'] }] },
-			columns: ['name', 'status', 'city'],
 			layouts: ['table', 'map'],
 			defaultLayout: 'table'
 		});
@@ -44,7 +42,6 @@ describe('resolveView', () => {
 				id: 'patient-map',
 				source: 'contact',
 				filter: { where: [{ field: 'has_company', op: 'eq', value: false }] },
-				columns: ['name', 'phone'],
 				layouts: ['map', 'table'],
 				default_layout: 'map'
 			},
@@ -61,9 +58,6 @@ describe('resolveView', () => {
 				feature('suppliers')
 			)
 		).toThrow('View suppliers has an invalid filter');
-		expect(() =>
-			resolveView({ ...suppliers, columns: ['name', 'title'] }, feature('suppliers'))
-		).toThrow('column it does not have: title');
 		expect(() => resolveView({ ...suppliers, source: 'deal' }, feature('suppliers'))).toThrow(
 			'lists deal'
 		);

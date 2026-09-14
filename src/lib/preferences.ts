@@ -54,10 +54,34 @@ export const PREFERENCES = {
 		description:
 			'Dock your notes to the right edge of every screen. Turning this off hides the rail only — the notes page, the sidebar entry and ⌥⌘L all keep working.',
 		feature: 'notes'
+	},
+	// No `feature`: notifications are not one. The bell is shell chrome like
+	// the theme toggle beside it, so this switch is offered to every org.
+	'notifications.general': {
+		kind: 'switch',
+		schema: z.boolean(),
+		fallback: true,
+		label: 'Organization activity',
+		description:
+			'Keep the General tab in the notifications panel: what happened around you, as well as what is addressed to you. Turning it off hides the tab and stops its unread counting on the bell — nothing is deleted, and it all comes back when you switch it on again.'
 	}
 } as const satisfies Record<string, PreferenceDefinition<unknown>>;
 
 export type PreferenceKey = keyof typeof PREFERENCES;
+
+/**
+ * The feature a preference belongs to, or undefined when it belongs to none.
+ *
+ * A function rather than a property read because `as const satisfies` narrows
+ * each entry to its own literal shape: an entry that declares no `feature`
+ * genuinely has no such key, and the settings page asking for one would not
+ * compile. This is the one place that knows that, so the page keeps reading a
+ * single question ("is this offered?") instead of a type.
+ */
+export function preferenceFeature(key: PreferenceKey): FeatureId | undefined {
+	const definition = PREFERENCES[key];
+	return 'feature' in definition ? definition.feature : undefined;
+}
 
 /** Every preference resolved for one session: a value for each key, always. */
 export type Preferences = {

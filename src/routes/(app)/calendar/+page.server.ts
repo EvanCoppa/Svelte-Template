@@ -20,17 +20,16 @@ import { recordLinks } from '$lib/server/crm/links';
 import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
 import { instant } from '$lib/server/records';
+import { parseRecordRef, type LinkableRecord } from '$lib/schemas/record-ref';
 import { can, hasGrant, requirePermission } from '$lib/server/roles';
 import { listStaff } from '$lib/server/staff';
 import {
 	createEventSchema,
 	deleteEventSchema,
 	moveEventSchema,
-	parseRecordRef,
 	updateEventSchema,
 	type Assignee,
-	type EventFormValues,
-	type LinkableRecord
+	type EventFormValues
 } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 

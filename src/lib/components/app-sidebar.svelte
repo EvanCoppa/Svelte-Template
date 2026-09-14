@@ -9,7 +9,7 @@
 	import TeamSwitcher from '$lib/components/team-switcher.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { iconFor } from '$lib/features/icons';
-	import { groupNav, isNavItemActive } from '$lib/navigation';
+	import { isNavItemActive, sidebarNav, userMenuNav } from '$lib/navigation';
 	import { showUpgrade } from '$lib/upgrade.svelte';
 	import type { OrgMembership } from '$lib/org';
 
@@ -26,7 +26,11 @@
 	let activeOrg = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
 	// Already filtered by mode and grant on the server; nothing to check here.
-	let groups = $derived(groupNav(page.data.nav ?? []));
+	// The sidebar draws the sections filed on its own surface; the entries
+	// whose section renders in the user menu go down to NavUser, which sits
+	// them under Settings.
+	let groups = $derived(sidebarNav(page.data.nav ?? []));
+	let userMenuItems = $derived(userMenuNav(page.data.nav ?? []));
 
 	// The sidebar jumps: wherever the reader was, arriving from here is the
 	// start of a walk, not a step in the one before it. Every shell surface
@@ -39,9 +43,10 @@
 </script>
 
 <Sidebar.Root bind:ref {collapsible} {...restProps}>
-	<Sidebar.Header>
-		<!-- One row: logo, workspace name, its dropdown chevron — and the sidebar's
-		     own collapse button, sitting where the switcher's chevrons used to. -->
+	<Sidebar.Header class="pt-4">
+		<!-- Extra top padding lines the workspace switcher and collapse button up
+		     with the main content's page title, which carries its own top padding
+		     from `.app-content` in the `(app)` layout. -->
 		<div class="flex items-center gap-1">
 			{#if activeOrg}
 				<div class="min-w-0 flex-1">
@@ -85,7 +90,7 @@
 		<div
 			class="border-border bg-background flex w-full flex-col rounded-xl border shadow-sm group-data-[collapsible=icon]:hidden"
 		>
-			<NavUser {user} />
+			<NavUser {user} items={userMenuItems} />
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>

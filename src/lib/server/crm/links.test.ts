@@ -25,7 +25,11 @@ const company = {
 const openEverything = () => true;
 
 /** The record labels main's vocabulary supplies; `recordLinks` only passes them through. */
-const vocabulary = { proposal_presenter: 'Presenter', proposal_responsible: 'Responsible' };
+const vocabulary = {
+	proposal_presenter: 'Presenter',
+	proposal_responsible: 'Responsible',
+	graph_member: 'Staff'
+};
 
 describe('recordLinks', () => {
 	it('asks nothing when no row is about anything', async () => {
