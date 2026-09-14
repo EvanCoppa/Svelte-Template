@@ -1,0 +1,14 @@
+-- One more kind of CRM record, shipped alone: Postgres refuses to use an enum
+-- value in the transaction that added it (the party-model migration explains),
+-- so the value lands here and the migration that follows adds the table, the
+-- `private.crm_entity_exists()` branch and everything that makes it
+-- resolvable.
+--
+--   document  writing with a title — the account strategy, the inspection
+--             write-up, the scope of work (the documents migration)
+--
+-- Positioned to keep the enum alphabetical, the order the generated types
+-- list it in. (`member` has sat out of order between `deal` and `invoice`
+-- since the asset_and_member_entity_kinds migration; this row does not make
+-- that worse.)
+alter type public.crm_entity_type add value if not exists 'document' after 'deal';

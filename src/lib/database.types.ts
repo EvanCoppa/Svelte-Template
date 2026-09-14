@@ -860,6 +860,66 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          archived_at: string | null
+          body: Json
+          created_at: string
+          created_by: string | null
+          entity_id: string | null
+          entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
+          icon: string | null
+          id: string
+          org_id: string
+          parent_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          body?: Json
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          icon?: string | null
+          id?: string
+          org_id: string
+          parent_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          body?: Json
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
+          icon?: string | null
+          id?: string
+          org_id?: string
+          parent_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_images: {
         Row: {
           caption: string | null
@@ -894,6 +954,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "entity_images_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_references: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["reference_kind"]
+          org_id: string
+          source_id: string
+          source_type: Database["public"]["Enums"]["crm_entity_type"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["reference_kind"]
+          org_id: string
+          source_id: string
+          source_type: Database["public"]["Enums"]["crm_entity_type"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["reference_kind"]
+          org_id?: string
+          source_id?: string
+          source_type?: Database["public"]["Enums"]["crm_entity_type"]
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["crm_entity_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_references_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4315,6 +4416,7 @@ export type Database = {
         | "contact"
         | "coupon"
         | "deal"
+        | "document"
         | "member"
         | "invoice"
         | "lease"
@@ -4385,6 +4487,7 @@ export type Database = {
         | "partially_received"
         | "received"
         | "cancelled"
+      reference_kind: "mention" | "embed"
       rma_status: "requested" | "approved" | "received" | "closed" | "rejected"
       shipment_delivery_status:
         | "preparing"
@@ -4555,6 +4658,7 @@ export const Constants = {
         "contact",
         "coupon",
         "deal",
+        "document",
         "member",
         "invoice",
         "lease",
@@ -4632,6 +4736,7 @@ export const Constants = {
         "received",
         "cancelled",
       ],
+      reference_kind: ["mention", "embed"],
       rma_status: ["requested", "approved", "received", "closed", "rejected"],
       shipment_delivery_status: [
         "preparing",
