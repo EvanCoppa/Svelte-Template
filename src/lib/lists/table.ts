@@ -67,6 +67,8 @@ function renderCell(cell: ListCell, today: string) {
 			return DataTable.statusCell(cell.text, cell.tone);
 		case 'text':
 			return cell.text === '' ? '—' : cell.text;
+		case 'image':
+			return DataTable.imageCell(cell.url);
 		case 'number':
 			return cell.value === null ? '—' : number.format(cell.value);
 		case 'money': {
@@ -90,6 +92,18 @@ function renderCell(cell: ListCell, today: string) {
 /** Whether the sort compares numbers (an amount, a count) or text (everything else). */
 function sortFn(field: ListField): 'basic' | 'text' {
 	return field.type === 'number' || field.type === 'money' ? 'basic' : 'text';
+}
+
+/**
+ * Extra classes for a column's header and cells. A thumbnail is a fixed
+ * square, so its column takes only the room that square needs rather than an
+ * even share of the table; companies carry more columns than most lists, so a
+ * name there rarely needs the room a full-width column gives it.
+ */
+function columnClass(spec: ListSpec, field: ListField): string | undefined {
+	if (field.type === 'image') return 'w-px';
+	if (spec.kind === 'company' && field.key === 'name') return 'max-w-48 truncate';
+	return undefined;
 }
 
 export function listColumns(
@@ -118,15 +132,16 @@ export function listColumns(
 					sortFn: sortFn(field),
 					// The name is the way into the record; it is never hidden.
 					enableHiding: field.key !== 'name',
+					// A picture holds no value to order rows by, so its header is
+					// the label alone rather than a button that does nothing useful.
+					enableSorting: field.type !== 'image',
 					enableGlobalFilter: field.searchable,
 					enableColumnFilter: field.filterable,
 					filterFn: 'oneOf',
 					meta: {
 						title,
 						filter: field.filterable ? { options: field.options } : null,
-						// Companies carry more columns than most lists; a name rarely
-						// needs the room a full-width column gives it.
-						class: spec.kind === 'company' && field.key === 'name' ? 'max-w-48 truncate' : undefined
+						class: columnClass(spec, field)
 					}
 				}
 			);

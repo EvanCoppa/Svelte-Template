@@ -9,6 +9,10 @@
 	 * The scrolling column of messages. It follows the conversation: whenever
 	 * a message or a streamed part arrives it scrolls to the bottom, so the
 	 * newest text is always in view without the page managing scroll state.
+	 *
+	 * Its foot fades out rather than ending on a hard edge, because the
+	 * composer floats over it — the thread reads as running under the prompt
+	 * box instead of being cut off by it.
 	 */
 	let {
 		ref = $bindable(null),
@@ -49,12 +53,23 @@
 <div
 	bind:this={ref}
 	data-slot="assistant-thread"
-	class={cn('flex min-h-0 flex-1 flex-col', className)}
+	class={cn('thread-fade flex min-h-0 flex-1 flex-col', className)}
 	{...restProps}
 >
 	<ScrollArea bind:viewportRef={viewport} class="min-h-0 flex-1">
-		<div class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-4">
+		<div
+			class="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 pt-14 pb-64 md:gap-12 xl:max-w-4xl"
+		>
 			{@render children?.()}
 		</div>
 	</ScrollArea>
 </div>
+
+<style>
+	/* The composer floats over the foot of the thread, so the last inch of it
+	   dissolves instead of sliding under a hard edge. */
+	.thread-fade {
+		-webkit-mask-image: linear-gradient(to bottom, black 0%, black 60%, transparent 95%);
+		mask-image: linear-gradient(to bottom, black 0%, black 60%, transparent 95%);
+	}
+</style>

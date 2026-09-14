@@ -6,11 +6,19 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
+	import { iconFor } from '$lib/features/icons';
+	import type { NavItem } from '$lib/navigation';
+	import { showUpgrade } from '$lib/upgrade.svelte';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 
-	let { user }: { user: User | null } = $props();
+	// `items` are the nav entries whose section renders here rather than in
+	// the sidebar (`userMenuNav()`): administering the workspace itself, which
+	// is what Settings above them is. Already filtered by mode and grant on
+	// the server, and already in order.
+	let { user, items = [] }: { user: User | null; items?: NavItem[] } = $props();
 
 	// user_metadata is free-form JSON written by auth providers, so its fields
 	// arrive as `any`; this guard is the boundary parse into a usable string.
@@ -37,6 +45,13 @@
 			.join('')
 			.toUpperCase() || 'U'
 	);
+
+	// This menu is a shell surface: arriving from it starts a walk rather than
+	// stepping deeper into the one before it — see `$lib/breadcrumbs.svelte`.
+	function jumpTo(href: string) {
+		breadcrumbs.startAt(href);
+		goto(href);
+	}
 
 	const sidebar = useSidebar();
 	const fallbackClasses =
@@ -90,15 +105,28 @@
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
 					<!-- Part of the shell, so it jumps like the sidebar does. -->
-					<DropdownMenu.Item
-						onclick={() => {
-							breadcrumbs.startAt('/settings');
-							goto('/settings');
-						}}
-					>
+					<DropdownMenu.Item onclick={() => jumpTo('/settings')}>
 						<SettingsIcon />
 						Settings
 					</DropdownMenu.Item>
+					<!-- Under it, the features filed on this surface. A locked one
+					     never navigates: the upgrade prompt opens in place, exactly
+					     as it does in the sidebar. -->
+					{#each items as item (item.href)}
+						{@const Icon = iconFor(item.icon)}
+						<DropdownMenu.Item
+							onclick={() => (item.locked ? showUpgrade(item.featureId) : jumpTo(item.href))}
+						>
+							<Icon />
+							{item.label}
+							{#if item.locked}
+								<LockIcon
+									class="text-muted-foreground ml-auto size-3.5"
+									aria-label="Upgrade required"
+								/>
+							{/if}
+						</DropdownMenu.Item>
+					{/each}
 				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
 				<form method="POST" action="/logout">

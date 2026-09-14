@@ -78,7 +78,11 @@ npm run format         # prettier (svelte + tailwind plugins)
 - Every response carries the security headers from
   `src/lib/server/security-headers.ts`. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
-  as a parameter or documented constant, never a hardcoded project ref.
+  as a parameter or documented constant, never a hardcoded project ref. Hosts
+  that only serve **images** (a product's `image_url` on a storefront CDN) are the
+  one deployment-configured set: `PUBLIC_IMAGE_ORIGINS`, parsed by
+  `imageOrigins()` and added to `img-src` alone — never `connect-src`, never a
+  wildcard, and unset by default.
 - The auth surface has unit tests (`src/routes/auth/confirm/server.test.ts`,
   `src/routes/reset-password/page.server.test.ts`, `src/routes/login/page.server.test.ts`,
   plus `src/lib/server/*.test.ts`). Changes to those routes must keep the tests
@@ -277,6 +281,11 @@ application data is scoped to an organization, never to a bare user. The
   (throwing with the list's id on a key the catalog lacks or a filter on an amount or
   a date — only text, enum, boolean, record and payment fields filter);
   `describeListRows()` types every cell by how it renders (the `RecordDetail` rule);
+  a picture is one of those types — `image`, the products list's thumbnail, drawn by
+  `DataTable.imageCell()` and never searched, filtered or sorted, because a picture is
+  not a value (docs/lists.md, "A picture is a field, not a second table"); a kind that
+  wants one adds `image` to its catalog entry, a describer branch and a `list_fields`
+  row, never a second table component;
   `loadRecordList(locals, kind)` is a list page's whole load and
   `createListTable(() => data.list, () => page.data.terms)` its whole script. The
   toolbar is `DataTable.Toolbar` holding `DataTable.Search` (the table's global
@@ -764,7 +773,22 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
-- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page.
+- **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
+  swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
+  (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
+  way to a search field. **The shell carries the screen's furniture, not the page**:
+  `AppHeader` mounts a `TabStrip` of the threads this browser tab has open (so the
+  breadcrumb trail stands down beside it and the page has no `PageHeader`), and the
+  layout docks a `ContextPanel` of what the answer drew on (`sourcesOf()`, filtered to
+  the kinds `terms` says this session may open) beside `Sidebar.Inset`, the same height
+  as the body — never a card inside the page. The thread reaches the rail as a getter
+  `Assistant.Root` publishes through `assistantThread`. The conversation is one column
+  with two states — the composer centred under "How can I help you today?" over
+  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
+  its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
+  line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
+  opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
   the real agent with `MockLanguageModelV4` from `ai/test`.
 
@@ -829,6 +853,14 @@ read, because these pages exist for every org and are exempt from the feature ga
 route under `(app)/settings/` + one `settingsNav` entry + its `pages` row by migration;
 the settings sidebar and the palette's Settings group both render from that one list.
 Never put Settings back in `staticNavItems`, and never build a second settings nav.
+
+**The assistant is the second shell of that kind**, and the last one a screen gets for
+free: under `/assistant` the same layout swaps in `AssistantSidebar`, whose nav is the
+member's own threads rather than a list of pages (docs/assistant.md, "The screen"). It
+stays a nav entry, because the feature registry is what puts it there. A third such shell
+needs a reason as good — a screen whose navigation is genuinely its own content — and it
+copies these two: the same header row, the same `NavUser` footer, `breadcrumbs.startAt()`
+paired with every jump.
 
 The header carries a **breadcrumb trail**: how deep this tab has gone since it last
 jumped from a shell surface, newest last, capped at `MAX_CRUMBS` (3). It is a **depth
@@ -925,6 +957,28 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   string like the ledger's account filter), the stage's `probability` as the ring's fill,
   and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
   `$lib/crm/tasks.ts` does for the task board.
+- **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
+  not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
+  `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and
+  can close, and each is a **link**, so ⌘-click and browser history work and
+  `aria-current` marks the one you are on. The assistant's open conversations are the
+  worked example, and it lives in the app header rather than in a bar of its own: a
+  screen whose open documents are tabs composes them into a component the header mounts
+  on the same pathname branch the layout swaps the sidebar on (`AssistantTabs`), and the
+  breadcrumb trail stands down there, because a page is named once. A strip is its
+  screen's own navigation, so a tab pairs `breadcrumbs.startAt()` with its href the way
+  a sidebar entry does.
+- **A panel of context docked beside the thing it is about is `ContextPanel`**
+  (`src/lib/components/context-panel/`): its own card on its own hairline, a `Header`
+  with a `Title` and its `Actions`, a `Body` that scrolls, and `Section` / `Item` rows.
+  The panel is only the frame — what it shows is the page's, passed in where it renders
+  — and an `Item` is a link when it goes somewhere and plain text when it does not, so a
+  record the reader may not open is still listed without being a door it cannot use.
+  Docked **beside the body, not inside the page**: the `(app)` layout renders it as a
+  sibling of `Sidebar.Inset` on the same pathname branch, `sticky` and the panel's own
+  height, so it stands on the shell's ground like the sidebar on the other side. Data
+  that lives in the page reaches it the way the assistant's thread does — a getter
+  published through a module-rune store, never a copy.
 - **A list that comes in headings is `GroupList`** (`src/lib/components/group-list/`) — collapsible
   sections of rows, as `/tasks` draws its due-date buckets. Nothing in it groups, sorts, counts or
   names anything: the page arrives with its rows already in piles, because what a pile means and
@@ -979,6 +1033,12 @@ re-measuring when that changes (`page-size.ts`; `DataTable.Content` marks its em
 page size — no `initialState.pagination` — and the one screen that wants a fixed number, because a
 card or a long page gives it no viewport to fill, passes `<DataTable.Root {table} pageSize={5}>`.
 That prop is the only way to set a page size; never reintroduce a picker or a second knob.
+A table with more columns than the screen has room for scrolls sideways inside its frame, and
+"Pin first column" in `ViewOptions` keeps the first column (with the selection checkbox in
+front of it) in place while the rest scroll — a per-device choice remembered per page in
+`localStorage` (`$lib/list-view.svelte`, the device axis of docs/user-preferences.md);
+`<DataTable.Root pinFirstColumn>` only sets the default a fresh device opens on. That is the
+one way to pin a column; never a second sticky-cell class or a second switch in a page.
 `DataTable.Pagination` reads the result: the row count on the left, and on the right one pill
 holding **page of pages** and the four controls (first, previous, next, last).
 
@@ -1043,11 +1103,11 @@ component one route uses goes in a **`components/` folder inside that route**
 (`src/routes/(app)/proposals/slides/components/editor.svelte`), imported relatively
 (`./components/editor.svelte`), so the route folder is the whole feature and deleting
 it deletes everything it owned. The rule is by use, not by size: the proposal builder's
-option fieldset, the assistant's thread parts and the slide builder's panes all live
-beside their pages, and a part moves up to `src/lib/components/` on the day a second
-route imports it — never pre-emptively. A route-level folder may carry an `index.ts`
-namespace like the app-level compounds do (`import * as Builder from
-'./components/index.js'`).
+option fieldset and the slide builder's panes live beside their pages, and a part moves
+up to `src/lib/components/` on the day a second route imports it — never pre-emptively
+(the assistant's thread parts did, once the shell grew its own assistant sidebar). A
+route-level folder may carry an `index.ts` namespace like the app-level compounds do
+(`import * as Builder from './components/index.js'`).
 
 ## Key patterns
 

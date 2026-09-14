@@ -7,7 +7,9 @@ import {
 	isNavItemActive,
 	settingsNav,
 	settingsNavItems,
-	staticNavItems
+	sidebarNav,
+	staticNavItems,
+	userMenuNav
 } from './navigation';
 
 function map(
@@ -112,6 +114,28 @@ describe('buildNav', () => {
 
 	it('returns only the static pages for an empty map', () => {
 		expect(buildNav({}, readAll)).toEqual(staticNavItems);
+	});
+});
+
+describe('nav surfaces', () => {
+	const nav = buildNav(
+		map([
+			['companies', 'enabled'],
+			['staff', 'enabled', { category: 'workspace' }]
+		]),
+		readAll
+	);
+
+	it('keeps a user-menu section out of the sidebar', () => {
+		expect(sidebarNav(nav).map((g) => g.key)).toEqual(['general', 'crm']);
+	});
+
+	it('hands the user menu the entries filed on its surface', () => {
+		expect(userMenuNav(nav).map((i) => i.featureId)).toEqual(['staff']);
+	});
+
+	it('still groups every surface for the palette, which lists them all', () => {
+		expect(groupNav(nav).map((g) => g.label)).toEqual(['General', 'CRM', 'Workspace']);
 	});
 });
 

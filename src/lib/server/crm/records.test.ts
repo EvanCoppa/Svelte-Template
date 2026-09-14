@@ -90,6 +90,19 @@ const fixings: ProductWithCategory = {
 	is_active: true,
 	track_inventory: true,
 	quantity_on_hand: 120,
+	// The storefront columns, unset: this fixture is a proposal-builder line,
+	// not a storefront listing (the product_storefront_fields migration).
+	long_description: null,
+	image_url: null,
+	additional_images: [],
+	tags: null,
+	metadata: {},
+	msrp: null,
+	is_subscription: false,
+	subscription_interval: null,
+	subscription_interval_count: null,
+	stripe_product_id: null,
+	stripe_price_id: null,
 	product_categories: { id: 'b1000000-0000-0000-0000-000000000002', name: 'Fixings' },
 	...STAMPS
 };

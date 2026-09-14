@@ -9,7 +9,7 @@ import Toolbar from './data-table-toolbar.svelte';
 import ViewOptions from './data-table-view-options.svelte';
 
 export { features, type DataTableColumnMeta, type DataTableFeatures } from './features.js';
-export { linkCell, statusCell } from './cells.js';
+export { imageCell, linkCell, statusCell } from './cells.js';
 export { actionsColumn, selectColumn } from './columns.js';
 
 export {

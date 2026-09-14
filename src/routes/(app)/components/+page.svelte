@@ -100,6 +100,8 @@
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as ContextPanel from '$lib/components/context-panel/index.js';
+	import * as TabStrip from '$lib/components/tab-strip/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { showUpgrade } from '$lib/upgrade.svelte';
@@ -141,6 +143,11 @@
 		grape: 'Grape'
 	} satisfies Record<string, string>;
 	const FRUIT_OPTIONS = Object.entries(FRUIT_LABELS);
+	let demoTab = $state('tab-1');
+	let demoTabs = $state([
+		{ id: 'tab-1', label: 'Overdue work at Acme' },
+		{ id: 'tab-2', label: 'Pipeline by stage' }
+	]);
 	let fruit = $state('');
 	let fruitLabel = $derived(
 		FRUIT_OPTIONS.find(([value]) => value === fruit)?.[1] ?? 'Pick a fruit'
@@ -2083,6 +2090,93 @@
 			</Card.Content>
 		</Card.Root>
 
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Tab strip</Card.Title>
+				<Card.Description>
+					The other kind of tabs: things the reader has <em>opened</em>, each closeable, with a
+					control that opens another. Its tabs are links — ⌘-click and browser history work, and
+					<code>aria-current</code> marks the one you are on — so reach for it when a tab is
+					somewhere you can go, and for <code>ui/tabs</code> above when they switch panels of one screen.
+					The assistant's open conversations are the worked example.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="border-border overflow-hidden rounded-xl border">
+					<TabStrip.Root aria-label="Demo tabs">
+						{#each demoTabs as tab (tab.id)}
+							<TabStrip.Tab
+								href="#tab-strip"
+								label={tab.label}
+								active={tab.id === demoTab}
+								onclick={(event) => {
+									event.preventDefault();
+									demoTab = tab.id;
+								}}
+							>
+								<TabStrip.Close
+									label={tab.label}
+									onclick={() => (demoTabs = demoTabs.filter((open) => open.id !== tab.id))}
+								/>
+							</TabStrip.Tab>
+						{/each}
+						<TabStrip.Add
+							href="#tab-strip"
+							label="Open another"
+							onclick={(event) => {
+								event.preventDefault();
+								const id = `tab-${demoTabs.length + 1}`;
+								demoTabs = [...demoTabs, { id, label: 'New conversation' }];
+								demoTab = id;
+							}}
+						/>
+					</TabStrip.Root>
+					<p class="text-muted-foreground p-4 text-sm">
+						{demoTabs.find((tab) => tab.id === demoTab)?.label ?? 'Nothing open.'}
+					</p>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<div class="lg:col-span-2">
+			<h2 class="text-lg font-semibold tracking-tight">Panels</h2>
+		</div>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Context panel</Card.Title>
+				<Card.Description>
+					A panel of context docked beside the thing it is about — its own card, a header that names
+					it, a body that scrolls. The panel is only the frame: what goes in it is the page's, as
+					<code>Section</code> and <code>Item</code> rows or anything else. A row is a link when it goes
+					somewhere and plain text when it does not, so a record the reader may not open is still listed
+					without being a door.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<ContextPanel.Root class="flex h-80 w-full max-w-90">
+					<ContextPanel.Header>
+						<ContextPanel.Title>Sources</ContextPanel.Title>
+						<ContextPanel.Actions>
+							<span class="text-xs tabular-nums">4</span>
+						</ContextPanel.Actions>
+					</ContextPanel.Header>
+					<ContextPanel.Body>
+						<ContextPanel.Section label="Companies" count={2}>
+							<ContextPanel.Item href="#context-panel">Acme Inc</ContextPanel.Item>
+							<ContextPanel.Item href="#context-panel">Globex</ContextPanel.Item>
+						</ContextPanel.Section>
+						<ContextPanel.Section label="Tasks" count={2}>
+							<ContextPanel.Item href="#context-panel" detail="overdue">
+								Send the revised quote
+							</ContextPanel.Item>
+							<ContextPanel.Item detail="no access">Chase the change order</ContextPanel.Item>
+						</ContextPanel.Section>
+					</ContextPanel.Body>
+				</ContextPanel.Root>
+			</Card.Content>
+		</Card.Root>
+
 		<div class="lg:col-span-2">
 			<h2 class="text-lg font-semibold tracking-tight">Navigation</h2>
 		</div>
@@ -3405,13 +3499,15 @@
 				<code>DataTable.selectColumn(columnHelper)</code>, first in every list. There is no
 				rows-per-page picker: a table fits its page to the room it has on screen, and only a table
 				with no viewport to fill (this one, inside a card) is given a
-				<code>pageSize</code>.
+				<code>pageSize</code>. A table wider than its screen scrolls sideways;
+				<code>&lt;DataTable.Content pinFirstColumn /&gt;</code> keeps the first column (and the checkbox
+				in front of it) in place while the rest scroll — narrow the window to see it.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<!-- A card is not a viewport, so this one is told its size; a list page
 			     leaves `pageSize` off and the table fits the screen instead. -->
-			<DataTable.Root table={paymentsTable} pageSize={5}>
+			<DataTable.Root table={paymentsTable} pageSize={5} pinFirstColumn>
 				<DataTable.Toolbar>
 					<DataTable.Search placeholder="Search emails…" ariaLabel="Search payments" />
 					<DataTable.Filters />

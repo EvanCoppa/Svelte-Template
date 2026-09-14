@@ -7,6 +7,7 @@ import type { Company } from './companies';
 import type { CustomFieldValue } from './custom-fields';
 import type { InvoiceWithParties } from './invoices';
 import { describeListRows, listNeeds, listRecords, resultIds, type ListExtras } from './lists';
+import type { ProductWithCategory } from './products';
 import type { ProposalWithOptions } from './proposals';
 import { proposalParentKey } from './records';
 import { ORG_ID, supabaseTablesMock } from './test-support';
@@ -55,6 +56,52 @@ const tap: Asset = {
 	purchase_price: 1850,
 	currency: 'USD',
 	...STAMPS
+};
+
+const ALIGNER = 'c1000000-0000-0000-0021-000000000001';
+const CONSULT = 'c1000000-0000-0000-0021-000000000002';
+
+const productBase = {
+	org_id: ORG_ID,
+	category_id: null,
+	sku: null,
+	description: null,
+	long_description: null,
+	unit_cost: null,
+	currency: 'USD',
+	unit: null,
+	is_active: true,
+	track_inventory: false,
+	quantity_on_hand: null,
+	additional_images: [],
+	tags: null,
+	metadata: {},
+	msrp: null,
+	is_subscription: false,
+	subscription_interval: null,
+	subscription_interval_count: null,
+	stripe_product_id: null,
+	stripe_price_id: null,
+	product_categories: null,
+	...STAMPS
+};
+
+const aligner: ProductWithCategory = {
+	...productBase,
+	id: ALIGNER,
+	kind: 'good',
+	name: 'Clear aligner tray',
+	unit_price: 240,
+	image_url: '  https://cdn.test/aligner.png  '
+};
+
+const consult: ProductWithCategory = {
+	...productBase,
+	id: CONSULT,
+	kind: 'service',
+	name: 'Whitening consult',
+	unit_price: 95,
+	image_url: '   '
 };
 
 const field = (
@@ -174,6 +221,37 @@ describe('describeListRows', () => {
 					{ type: 'text', text: '+1 555 0180' },
 					{ type: 'text', text: 'Jersey City' },
 					{ type: 'datetime', value: '2026-01-01T00:00:00Z' }
+				]
+			}
+		]);
+	});
+
+	it('carries a product’s picture as an image cell, and null when it has none', () => {
+		const spec: ListSpec = {
+			kind: 'product',
+			fields: [field('name', 'text'), field('image', 'image')]
+		};
+		const rows = describeListRows(
+			{ kind: 'product', rows: [aligner, consult] },
+			spec,
+			() => true,
+			NO_EXTRAS
+		);
+		expect(rows).toEqual([
+			{
+				id: ALIGNER,
+				cells: [
+					{ type: 'link', text: 'Clear aligner tray', href: `/products/${ALIGNER}` },
+					{ type: 'image', url: 'https://cdn.test/aligner.png' }
+				]
+			},
+			{
+				id: CONSULT,
+				cells: [
+					{ type: 'link', text: 'Whitening consult', href: `/products/${CONSULT}` },
+					// A column of whitespace is no picture at all — the page draws the
+					// placeholder tile rather than a broken frame.
+					{ type: 'image', url: null }
 				]
 			}
 		]);

@@ -163,6 +163,12 @@
 
 	let scroller = $state<HTMLDivElement | null>(null);
 	let columns = $state<(HTMLDivElement | undefined)[]>([]);
+	/**
+	 * The hours scroll and the header/all-day strip don't, so a scrollbar on
+	 * the hours narrows only that grid's columns. Reserving the same width on
+	 * the rows above keeps every day column lined up.
+	 */
+	let scrollbarWidth = $state(0);
 
 	/** Minutes from midnight down the grid, in pixels. */
 	function px(minutes: number): number {
@@ -205,6 +211,12 @@
 		scroller.scrollTop =
 			lastScrollTop ??
 			px(todayShown ? Math.max(0, minutesOfDay(now) - 60) : OPENING_HOUR * 60) - 12;
+
+		const measure = () => (scrollbarWidth = scroller!.offsetWidth - scroller!.clientWidth);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(scroller);
+		return () => observer.disconnect();
 	});
 
 	// --- blocks and bars ------------------------------------------------
@@ -422,7 +434,11 @@
 
 <div data-slot="calendar-week" class="flex h-full min-h-0 flex-1 flex-col">
 	<!-- The days -->
-	<div class="grid border-b" style:grid-template-columns={template}>
+	<div
+		class="grid border-b"
+		style:grid-template-columns={template}
+		style:padding-right="{scrollbarWidth}px"
+	>
 		<div class="border-r"></div>
 		{#each days as day (dayKey(day))}
 			{@const isToday = isSameDay(day, today)}
@@ -448,7 +464,11 @@
 	</div>
 
 	<!-- The all-day strip -->
-	<div class="grid border-b" style:grid-template-columns={template}>
+	<div
+		class="grid border-b"
+		style:grid-template-columns={template}
+		style:padding-right="{scrollbarWidth}px"
+	>
 		<div
 			class="text-muted-foreground border-r pe-2 pt-1.5 text-end text-[10px] font-medium uppercase"
 		>

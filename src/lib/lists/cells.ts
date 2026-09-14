@@ -34,7 +34,8 @@ export function paymentTone(word: Exclude<ReturnType<typeof paymentWord>, ''>): 
 /**
  * What a filter compares and the search box matches: the cell's value as
  * text. An enum is its raw value (the filter's options are too), a yes/no
- * the word, a blank an empty string.
+ * the word, a blank an empty string. A picture reads as nothing — there is
+ * no word in it to match or order by.
  */
 export function cellText(cell: ListCell, today: string): string {
 	switch (cell.type) {
@@ -43,6 +44,8 @@ export function cellText(cell: ListCell, today: string): string {
 		case 'record':
 		case 'text':
 			return cell.text;
+		case 'image':
+			return '';
 		case 'number':
 		case 'money':
 			return cell.value === null ? '' : String(cell.value);
