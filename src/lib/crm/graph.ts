@@ -160,6 +160,72 @@ export function neighbourhoodOf(nodeId: string, edges: readonly GraphEdge[]) {
 }
 
 /**
+ * The map around ONE record: it, everything within `depth` hops of it, and
+ * every edge among them — what a record's own page draws instead of the
+ * whole org. The legend is recounted from what survived, keeping the labels
+ * the server already resolved, so a neighbourhood reads in the industry's
+ * words exactly as the whole map does.
+ *
+ * A record in no relationship yet comes back as the single dot it is, which
+ * is the honest answer rather than an empty page. A node the map does not
+ * hold comes back as nothing at all — the same rule `?focus=` follows.
+ *
+ * Breadth-first, so `depth` counts hops and not edges walked: at 1 the
+ * reader sees who this record deals with, at 2 who those deal with in turn.
+ */
+export function egoGraph(data: GraphData, nodeId: string, depth: number): GraphData {
+	const known = new Set(data.nodes.map((node) => node.id));
+	if (!known.has(nodeId)) return { nodes: [], edges: [], kinds: [], types: [] };
+
+	const reached = new Set([nodeId]);
+	let frontier = [nodeId];
+	for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+		const next: string[] = [];
+		for (const edge of data.edges) {
+			const from = frontier.includes(edge.source) ? edge.target : null;
+			const to = frontier.includes(edge.target) ? edge.source : null;
+			for (const other of [from, to]) {
+				if (other === null || reached.has(other) || !known.has(other)) continue;
+				reached.add(other);
+				next.push(other);
+			}
+		}
+		frontier = next;
+	}
+
+	const nodes = data.nodes.filter((node) => reached.has(node.id));
+	// Every edge BETWEEN the records reached, not only the ones walked to get
+	// here — the triangles are what makes a neighbourhood worth drawing.
+	const edges = data.edges.filter((edge) => reached.has(edge.source) && reached.has(edge.target));
+	return {
+		nodes,
+		edges,
+		kinds: countKinds(data.kinds, nodes),
+		types: countTypes(data.types, edges)
+	};
+}
+
+/** The legend's kinds, in the order the whole map had them, recounted. */
+function countKinds(kinds: readonly GraphKind[], nodes: readonly GraphNode[]): GraphKind[] {
+	const counts = new Map<GraphNodeKind, number>();
+	for (const node of nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1);
+	return kinds.flatMap((kind) => {
+		const count = counts.get(kind.kind);
+		return count ? [{ ...kind, count }] : [];
+	});
+}
+
+/** The legend's relationship types, in the order the whole map had them, recounted. */
+function countTypes(types: readonly GraphEdgeType[], edges: readonly GraphEdge[]): GraphEdgeType[] {
+	const counts = new Map<string, number>();
+	for (const edge of edges) counts.set(edge.typeId, (counts.get(edge.typeId) ?? 0) + 1);
+	return types.flatMap((type) => {
+		const count = counts.get(type.id);
+		return count ? [{ ...type, count }] : [];
+	});
+}
+
+/**
  * The words on an edge as read from one of its nodes: "owns" from the
  * owner, "owned by" from the asset. Null when the node is not on the edge.
  */

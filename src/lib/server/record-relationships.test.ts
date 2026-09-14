@@ -3,14 +3,20 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/database.types';
 import { ORG_ID, supabaseMockSequence } from '$lib/server/crm/test-support';
 import type { UserAccess } from '$lib/server/roles';
-import { relationshipActions } from './relationships.server';
+import { relationshipActions } from './record-relationships';
 
 /**
  * The record page's Relationships card from the outside: the two actions
  * that draw and remove a relationship, refused before the database is
  * touched when the reader may not manage this record, and the app-level
  * duplicate check that keeps a symmetric type from being drawn twice.
+ *
+ * Driven through the factory the way a route spreads it — here as a page
+ * that serves companies, which is what every record page does once its kind
+ * is known.
  */
+
+const actions = relationshipActions(() => 'company');
 
 const OWNER: UserAccess = { role: 'owner', roles: [], grants: new Map() };
 const READER: UserAccess = {
@@ -35,7 +41,7 @@ function post(fields: [name: string, value: string][]) {
 	return new Request(`https://app.test/companies/${COMPANY_ID}`, { method: 'POST', body });
 }
 
-type ActionName = keyof typeof relationshipActions;
+type ActionName = keyof typeof actions;
 
 function run(
 	name: ActionName,
@@ -44,10 +50,10 @@ function run(
 	fields: [string, string][]
 ) {
 	// SAFETY: the actions read `request`, `locals` and `params` only.
-	return relationshipActions[name]({
+	return actions[name]({
 		request: post(fields),
 		locals: localsFor(supabase, access),
-		params: { kind: 'companies', id: COMPANY_ID }
+		params: { id: COMPANY_ID }
 	} as never);
 }
 

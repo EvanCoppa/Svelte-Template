@@ -216,10 +216,22 @@ application data is scoped to an organization, never to a bare user. The
   that names another kind links only when `passesFeatureGate()` says the reader
   may open it; otherwise it is plain text or not fetched at all. The page has no
   `pages` row (its title is the record's name) and no nav entry. **A kind that
-  needs its own screen adds `(app)/<kind>/[id]/`** — a static segment outranks the
-  matcher, so the specific page wins and the generic one stays the default for
-  the rest; compose it from the same `RecordDetail` and the `detail/` parts rather
-  than a second renderer. A new list page joins by adding its kind to
+  needs its own screen adds `(app)/<kind>/[id=guid]/`** — a static segment outranks
+  the matcher, so the specific page wins and the generic one stays the default for
+  the rest. **What a record page IS lives in `src/lib/server/record-page.ts`, not
+  in either route**: `loadRecordPage()` is the whole load (the record, its
+  activities, tags, addresses, photos, custom fields, notes, thread, related
+  groups, relationships and the generic edit form) and `recordPageActions(kindOf)`
+  the actions that write them, so a specific page spreads both and adds only what
+  is its own — and the two pages can never drift on what a record page shows.
+  The markup is the same story: the header, the rail, the timeline, the notes and
+  a related group are `detail/` parts both routes compose. A specific page also
+  needs its own `relationship-options/+server.ts` over the shared
+  `relationshipOptions()`, because the Relationships card fetches that path
+  relative to the page it is on. `(app)/companies/[id=guid]/` is the worked
+  example — the ego graph, the people, the account and the map it adds are what a
+  kind earns a page FOR; never a second renderer, a second record load or a second
+  relationship card. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
@@ -240,7 +252,11 @@ application data is scoped to an organization, never to a bare user. The
   another record or a member wears a chip (`Detail.Value`), so a rail row reads
   as a thing rather than a sentence. A new section is a tab, drawn only while
   active; a new fact about the record is a row in the rail; never a card
-  outside the two.
+  outside the two. A kind with its own page keeps that shape and may fill the
+  frames differently where it has more to say — the company page puts the
+  Relationships card on a tab of its own under an ego map, and lists every field
+  in the rail rather than holding the `link` ones back, because the rail is the
+  attribute panel the Edit button opens.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
@@ -492,7 +508,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
     relationships between them, named through each kind's own list module (so the gate
     applies kind by kind, and a member is on the map only where a relationship names
     one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
-    people who work here) and its edges labelled by their types. Nothing per industry is
+    people who work here) and its edges labelled by their types. **One record's
+    corner of it is the same map, narrowed** — `egoGraph()` in `$lib/crm/graph.ts`
+    is a pure fold beside `filterGraph()` and `neighbourhoodOf()`, taking the map
+    `describeGraph()` described and keeping what is within N hops of one node plus
+    every edge among them, legend recounted. The company page draws it; a kind
+    that wants one calls the same fold, never a second server read. Nothing per industry is
     stored for it; a kind or a type joins the map by existing. A proposal's presenter,
     responsible member and parent link are drawn too, even though they stay plain
     columns on `proposals` — `describeGraph()` reads them directly and synthesizes
