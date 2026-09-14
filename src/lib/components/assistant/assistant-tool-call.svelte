@@ -6,17 +6,24 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { toolLabel } from '$lib/ai/labels';
+	import { diffRows, snapshotKey, type RecordSnapshot } from '$lib/ai/snapshots';
 	import type { AssistantToolUIPart } from '$lib/ai/types';
 	import { StatusBadge, type BadgeTone } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
+	import Diff from './assistant-diff.svelte';
 
 	/**
 	 * One tool part of an assistant message, in whichever of the SDK's states
 	 * it is in: the input streaming in, the tool running, an approval the user
 	 * has to answer, or the result. Typed against the agent's tool set, so
 	 * `part.input` and `part.output` are the tool's own types.
+	 *
+	 * An edit waiting for approval shows the change itself — each field's
+	 * current value beside the one proposed — read from the record as the
+	 * thread last saw it (`snapshots`, the page's `recordSnapshots()`), so
+	 * Approve is a decision about something on screen.
 	 */
 	type Part = AssistantToolUIPart;
 
@@ -26,12 +33,15 @@
 		part,
 		onApprove,
 		onDeny,
+		snapshots,
 		...restProps
 	}: Omit<WithElementRef<HTMLAttributes<HTMLDivElement>>, 'children' | 'part'> & {
 		part: Part;
 		/** Called with the approval id when the user allows a paused tool call. */
 		onApprove?: (approvalId: string) => void;
 		onDeny?: (approvalId: string) => void;
+		/** The records the thread has read, keyed by `snapshotKey()`. */
+		snapshots?: ReadonlyMap<string, RecordSnapshot>;
 	} = $props();
 
 	const name = $derived(getToolName(part));
@@ -78,7 +88,20 @@
 		return null;
 	}
 
-	const inputSummary = $derived(primitiveEntries(part.input));
+	/**
+	 * The edit an `updateRecord` call proposes, once its input is complete:
+	 * the record it is about and the rows the diff draws. Null for every
+	 * other tool, and while the input is still streaming in.
+	 */
+	const edit = $derived.by(() => {
+		if (part.type !== 'tool-updateRecord') return null;
+		if (part.state === 'input-streaming' || !part.input) return null;
+		const { kind, id, changes } = part.input;
+		const snapshot = snapshots?.get(snapshotKey(kind, id));
+		return { name: snapshot?.name ?? null, rows: diffRows(snapshot, changes) };
+	});
+
+	const inputSummary = $derived(edit ? [] : primitiveEntries(part.input));
 	const outputSummary = $derived(
 		part.state === 'output-available' ? summarizeOutput(part.output) : null
 	);
@@ -100,7 +123,14 @@
 		<StatusBadge tone={status.tone} class="ml-auto">{status.text}</StatusBadge>
 	</div>
 
-	{#if inputSummary.length > 0}
+	{#if edit}
+		{#if edit.name}
+			<p class="text-muted-foreground mt-1.5 text-xs">
+				Changes to <span class="text-foreground font-medium">{edit.name}</span>
+			</p>
+		{/if}
+		<Diff rows={edit.rows} class="mt-2" />
+	{:else if inputSummary.length > 0}
 		<dl class="text-muted-foreground mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
 			{#each inputSummary as [key, value] (key)}
 				<div class="flex gap-1">

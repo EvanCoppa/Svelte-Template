@@ -98,11 +98,18 @@ chips on the empty screen, and why they stay reachable once a thread is underway
 microphone is dictation**, and it is drawn only where the browser has a speech engine
 at all (`$lib/speech`, which is the one place that knows the API is still prefixed):
 while it listens the icon becomes a level meter and the settled transcript lands in the
-draft, so nothing reaches a server that the reader has not read first. **Send becomes
-Stop** while an answer streams. The controls sit beside the field while the draft still
-fits on one line and drop to their own row under it when it does not — measured off a
-hidden copy of the text, because asking "has it wrapped" would wrap, widen, unwrap and
-oscillate.
+draft, so nothing reaches a server that the reader has not read first. The controls sit
+beside the field while the draft still fits on one line and drop to their own row under
+it when it does not — measured off a hidden copy of the text, because asking "has it
+wrapped" would wrap, widen, unwrap and oscillate.
+
+**The fourth control is whatever there is to commit**, and it is one button in one
+place with three states: Send with something written, **Stop** while an answer streams,
+and — with an empty box — **Call**. An empty box is not a mistake to grey a button out
+for, it is a different way of asking, so the button does not sit there disabled waiting
+for typing; it offers the other way in. That is also why dictation keeps its own
+microphone beside it: putting words in the box and talking to someone are not the same
+act.
 
 A message is the reader's turn as a bubble on the end side and the assistant's as the
 page's own text — full width, no avatar, nothing framing it. Its tool calls land in one
@@ -111,6 +118,128 @@ is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; 
 other call is activity, and they collapse into the one `Assistant.Activity` line above
 the answer — the newest tool named while they run, a count to unfold once they are
 done. `Assistant.Shimmer` is the wait before the first word.
+
+## The call
+
+Pressing the composer's button on an empty box opens a **voice call**: the same
+assistant, the same tools over the same organization's data, reached by talking
+instead of writing. It is the product this template is selling — you can ask your
+business a question out loud and it goes and looks.
+
+**The SDK's realtime mechanism is the mechanism**, as everywhere else here.
+`ai` ships `Experimental_AbstractRealtimeSession`, which owns the socket, captures
+the microphone, plays the model's audio, stops that playback the instant you start
+talking again, assembles both sides of the conversation into `UIMessage`s and
+normalises tool calls. It is deliberately framework-agnostic — one abstract
+`setState` is the whole of a binding, which is what `@ai-sdk/react`'s
+`experimental_useRealtime` implements with React state. `@ai-sdk/svelte` has no
+realtime binding yet, so `src/lib/ai/realtime.svelte.ts` is that same binding in
+runes (`SvelteRealtimeSession`), and `VoiceCall` around it is the app's own part:
+the microphone permission, the mute switch, the input level the orb breathes with,
+and which tool is running. Nothing in it re-implements something the SDK has.
+
+**The key never leaves the server.** `POST /assistant/realtime/token` is the SDK's
+setup endpoint: it builds the session (`voiceSessionConfig()` in
+`src/lib/server/ai/realtime.ts`), mints a short-lived client secret with
+`openai.experimental_realtime.getToken()` through `provider.ts`, and answers with
+`{ token, url, expiresAt, tools }`. The browser opens the WebSocket with that
+secret, which is why `wss://api.openai.com` is in `connect-src` — derived from the
+endpoint by `realtimeOrigins()` (`$lib/ai/realtime`) the way the map's origins are
+derived from its style URLs — and why `Permissions-Policy` now reads
+`microphone=(self)`.
+
+**Instructions and voice are set at mint time, on purpose.** A `session.update`
+only changes the fields it carries, so the browser states how it _listens_
+(`voiceSession()` — semantic VAD, input transcription, audio out) and never what it
+is _told_: a caller who reshaped the update it sends would still be talking to this
+organization's assistant. The spoken persona is `VOICE_INSTRUCTIONS` in `prompts.ts`,
+which shares its tool discipline with the typed one — `TOOL_DISCIPLINE`, written once
+— and differs only where the shape of an answer does: two or three sentences at a
+time, no markdown, money and dates said the way a person says them.
+
+**Tools run on the server, with the caller's own session.** The model is at the far
+end of a socket the browser holds, so a tool call comes back through
+`POST /assistant/realtime/tool`, and `runVoiceTool()` gates it exactly as a typed turn
+is gated: the name must be a tool this caller may use right now, the input is
+validated against that tool's own schema, `requireToolContext()` checks again inside
+the tool, and RLS and the column grants apply underneath. The browser is a relay, not
+the thing with the permissions. A tool that fails answers with its message rather than
+throwing, because a tool call with no output leaves the model waiting for one.
+
+The AI SDK's realtime guide asks for an endpoint per tool rather than one that runs a
+tool by name, on the grounds that a generic route is easy to build without
+authentication, validation or authorization. This app has a generic route _and_ all
+three, in the one place that already expresses them for every tool — seventeen
+endpoints repeating that would be seventeen chances to leave one out. That is the
+deviation, and this paragraph is it being surfaced rather than quietly taken.
+
+**A call offers fewer tools than a thread**: anything in `TOOL_APPROVAL` is withheld,
+and so is anything in `CARD_TOOLS` (`voiceToolNames()`). A call has no cards. Approval
+is a card with Approve and Deny on it — a spoken "yes" is not a decision this app can
+evidence afterwards, and the tools behind that gate delete data or change a record —
+and an artifact tool's result is a card too (a table to filter, a slot to click, a
+line to tick; see "Artifacts"), which spoken would be a list of ids nobody asked to
+hear. Deleting, editing and packing are what the typed thread is for.
+
+**The screen is `Assistant.Call`** — `ui/dialog` rather than `Modal`, which is the
+documented exception (`Modal` is a tray holding a card; a call is a room you step
+into), keeping the focus trap and the Escape because it is still something you are
+inside. It is the orb, what it is doing, and the last thing either of you said, and
+nothing else: on a call there is nothing to read, only something to listen to, and the
+one line of transcript is there so you can check a name you half-heard. Closing it IS
+hanging up — the `$effect` that opens the call tears it down, so the button, Escape, a
+click outside and navigating away all release the microphone through the same line.
+
+**A call hangs up on its own, twice over.** It is metered — an open socket with
+a live microphone costs money for every minute it is up — so `VoiceCall` watches
+two clocks. **Dead air** ends it after two minutes (`IDLE_LIMIT_MS`), which is
+what catches a tab left open in the background. **Length** ends it after thirty
+minutes (`MAX_CALL_MS`) however lively it is, which is what catches the case dead
+air never does: somebody who walked away mid-conversation, or a call left running
+with a room talking near the microphone. Starting another is one press and the
+assistant remembers nothing between calls, so neither limit loses anything.
+
+Both warn first — thirty seconds and a minute respectively — because a call that
+drops with no notice reads as a bug. One function decides, `callLimit()`, rather
+than a check per limit: the two can then never disagree about which applies, the
+nearer deadline is the one said out loud, and the words live beside the numbers
+they belong to the way `callStatusLabel()` does. `VoiceCall` runs it once a
+second off two plain timestamps — a timer reset on every event would be
+rescheduled many times a second while anyone is talking, to answer a question a
+second's resolution already answers — and owns the notice entirely, so a warning
+cannot flicker off and straight back on when somebody speaks.
+
+What counts as "somebody is still here" is the SDK's normalized server events,
+and `isConversationEvent()` states it as what does **not** count — the session
+being set up, an error, and `custom` (whatever the provider sent that the SDK
+does not map, which arrives on its own schedule). Stated that way round, an event
+type a later SDK maps counts as talking rather than being silently ignored: an
+event that failed to reset the clock would cut a call off mid-sentence, while one
+that resets it needlessly only costs a call that was going to end anyway. A tool
+still running counts too — a lookup that outlasts the idle limit is the assistant
+working, not a room nobody is in — but it does not extend the call's own length:
+half an hour is half an hour whatever is happening in it. The ended call stays on
+screen with what happened and a **Call again** button, because a screen that
+vanished would look like a crash.
+
+Beside it, a server-side bound that does not depend on the browser behaving:
+the client secret is minted with `expiresAfterSeconds` of two minutes rather than
+the API's default ten. That bounds _starting_ a call — the browser connects the
+moment it has the secret, so this only has to survive a slow handshake — and it is
+the window a leaked one would be worth anything in. The length of a call is the
+idle timeout's business.
+
+**`Assistant.Orb`** is what you talk to: six conic gradients turning at different
+rates behind a blur and a contrast curve, which is what makes the colours look like
+they move through a liquid rather than cross-fade, grained with a dot grid in the
+page's own background colour. Every measurement scales off `size`, because the effect
+does not survive being resized on its own — at 32px the blur of a 192px orb is the
+whole orb. It is painted from `--primary` with relative `oklch()`, so it follows the
+theme, and it knows only how loud and how fast: `Assistant.Call` maps the call's state
+onto those, and `/components` → Badges & avatars shows the range. The orb swells with
+**your** voice and not the assistant's — while it is talking, the microphone hears an
+echo-cancelled room, and a swell from that would be the orb reacting to itself, so
+speaking gets a breath of its own instead.
 
 ## The agent
 
@@ -178,6 +307,11 @@ needs there, on the same `read < manage < delete` ladder the rest of the app is 
 | `deleteTask`      | tasks     | delete | user     |
 | `listDeals`       | deals     | read   |          |
 | `listTickets`     | tickets   | read   |          |
+| `listEvents`      | calendar  | read   |          |
+| `exploreGraph`    | graph     | read   |          |
+| `listRecords`     | the kind  | read   |          |
+| `findOpenSlots`   | calendar  | read   |          |
+| `packableLines`   | shipments | manage |          |
 
 `activeToolNames(org)` (`tools/index.ts`) keeps a tool only when the feature's mode for
 the org is `enabled` **and** the caller holds the level — the same intersection the hook
@@ -187,20 +321,108 @@ view; a member holding only `read` on tasks can list them and nothing more. Ever
 still runs `requireToolContext()` first, so a stale call replayed from a stored thread
 fails as a tool error the model can explain rather than reaching a data module.
 
+### Tools addressed by kind
+
+The tools above are one per feature, each with that feature's own filters. A second
+family serves **every kind of record with a page** through one door each, the way one
+route serves every record page (`(app)/[kind=record]/[id=guid]`) and one form creates and
+edits every kind — the generic record layer (`$lib/server/crm/records`,
+`$lib/server/records`) rather than a tool per table:
+
+| tool                    | access                  | what it does                                                                                                                                                                                                 |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `findRecords`           | read on the kind        | Records of one kind by name (`listRecordNames()`), ids to pass on.                                                                                                                                           |
+| `getRecord`             | read on the kind        | One record as its page shows it — fields (a field naming another record carries its kind and id), custom fields, tags, related records, relationships, latest activity — plus `editableFields` for a writer. |
+| `updateRecord`          | manage on the kind      | A partial edit through `patchRecord()`: the named fields change, the rest keep their values, the kind's schema validates and `writeRecord()` writes.                                                         |
+| `linkRecords`           | manage on the from kind | Draws a relationship of a type, refusing an open duplicate — the record page's rule.                                                                                                                         |
+| `listRelationshipTypes` | read on any kind        | The relationship types, with both labels and the kinds each end must be.                                                                                                                                     |
+
+Their `ToolAccess` is the second shape, `anyOf`: the tool is **offered** while any record
+kind's feature is open to the caller at the level, and each call re-checks the one kind it
+names with `recordAccess(kind, level)` — the kind's feature, on the same ladder. So a kind
+whose feature the org, its tier or its industry withholds is refused inside the call, and
+the model is told which kinds exist up front: the session block lists every kind this
+caller may read, **in the industry's words** (`recordKindAccess()` — "contact — Patients
+(one: patient) — read, update"), so it asks for a patient as `kind: 'contact'` and never
+for a kind that does not exist here. `canOpenFor(org)` is the record page's `canOpen`
+answered from the tool context, and it decides what a related group, a relationship's
+other end or a graph node names — exactly what the page would link, never more.
+
+**Traversal** is two tools. `getRecord` is the one-hop view — the records that point at
+this one and the relationships it stands in, each with an id to follow — and
+`exploreGraph` is the neighbourhood: a breadth-first walk over the org's `relationships`
+rows from one record, up to three hops and forty nodes, naming records through their
+list modules and members through the roster exactly as the graph page does. The walk
+never steps onto a kind the caller may not open, so nothing beyond such a record is
+reached through it. It is the `graph` feature's tool, since that is the page that draws
+the graph whole. The instructions tell the model to draw conclusions only from what those
+two returned, to name the records and relationships a conclusion rests on, and to say when
+the graph shows no connection.
+
 The `assistant` feature itself grants nothing beyond the page. Opening it is a `read`
 grant on `assistant`; what the assistant can _do_ for you is your grants on everything
 else.
 
-`deleteTask` is listed under `toolApproval` as `'user-approval'`: the model's call pauses
-as an `approval-requested` part, the card shows Approve and Deny, and
-`addToolApprovalResponse` plus `sendAutomaticallyWhen:
+`deleteTask` and `updateRecord` are listed under `toolApproval` as `'user-approval'`:
+the model's call pauses as an `approval-requested` part, the card shows Approve and Deny,
+and `addToolApprovalResponse` plus `sendAutomaticallyWhen:
 lastAssistantMessageIsCompleteWithApprovalResponses` resumes the turn. On the server,
 the browser's copy of the assistant message is **not** trusted: only its approval
-decisions are copied onto the stored message, by approval id.
+decisions are copied onto the stored message, by approval id. An edit earns its pause
+because the card can show it — see "Artifacts" below.
+
+## Artifacts
+
+Some answers are not sentences. A set of records is a table, free time is something
+to pick from, what is left to ship is something to tick into a box — and a tool whose
+result is one of those is drawn in the thread as a component rather than folded into
+the activity line. This is the SDK's generative UI, done the SDK's way: the tool's
+`outputSchema` **is** the artifact's data, the page renders the `tool-<name>` part on
+`part.type` once it is `output-available`, and nothing is streamed beside the message
+for it. So a stored thread draws the same artifacts on reload as it did live, and the
+sources rail keeps reading them through `sourcesOf()` like any other tool part. (Data
+parts — UI that is not a tool result — stay on the "not here yet" list; every artifact
+so far has a tool behind it.)
+
+Two rules hold them together. **An artifact is an existing app component fed by a tool
+result, never a bespoke chat widget**: the list is `createListTable()` over the same
+spec and rows a list page draws (`DataTable`, the one toolbar, a fixed `pageSize`
+because a thread has no viewport to fill), the map is `RelationshipGraph.Root`, the
+record card is the record page's header in miniature, every one inside the same
+`Assistant.Artifact` frame — a card on a hairline with one header row (a mark, a name,
+a quiet count, the reader's actions on the end side) — so the thread reads as one
+column of things the assistant made. And **an artifact that writes does it the page's
+way**: a slot picked on the pick-a-time card and a box opened from the packing card are
+mutations born in a gesture on `/assistant`, so each is a form action there (`book`,
+`pack` in `[[id]]/+page.server.ts`, schemas in `$lib/schemas/assistant.ts`), posted
+through a hidden form the way the calendar's drag-to-move posts `move` — the card hands
+the values up, the page fills the form from script and submits it; never a `fetch` of
+the card's own. Each action opens with the grant the same act takes on its own page
+(`book` the calendar's `manage`; `pack` the shipments' plus the order's, since packing
+part of a line splits it), and the tool says up front whether the caller holds it
+(`canBook`, `canPack`) so a card never offers a button the action would refuse.
+
+| tool            | draws                                                                                                                                                                                                                                                                        | component              |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `getRecord`     | The record's header in miniature: square tile, name, pills, tags, the first fields, how many records point at it, a door to its page when `terms` says the session may open the kind.                                                                                        | `Assistant.RecordCard` |
+| `listRecords`   | A list page's table over a kind — for companies and contacts narrowed by a filter in the view's own shape (`VIEW_FILTER_SCHEMAS`, run through `runView()`), so what the assistant composes is what a saved view will store; the model reads a text copy via `toModelOutput`. | `Assistant.List`       |
+| `exploreGraph`  | The walk as the graph page draws it, opened on the record it started from so its own connections are lit; a legend in the industry's words.                                                                                                                                  | `Assistant.Graph`      |
+| `findOpenSlots` | Free slots of one length inside the working day, found by `openSlots()` (`src/lib/server/ai/slots.ts`, pure, in the zone the model was told), in piles by day; a click posts `book`.                                                                                         | `Assistant.Slots`      |
+| `packableLines` | The order's lines in no box yet (`packableLines()`), each ticked into a new `preparing` shipment with all or part of its quantity — part is a `splitOrderLine()`, the order page's rule; the button posts `pack`.                                                            | `Assistant.Packing`    |
+| `updateRecord`  | Inside the approval card: the change field by field, the current value beside the proposed one, read from the record as the thread last saw it — `recordSnapshots()` over the thread's `getRecord` parts (`src/lib/ai/snapshots.ts`), never a second fetch.                  | `Assistant.Diff`       |
+
+Adding an artifact: the tool as above, a component under `src/lib/components/assistant/`
+composed of the parts the rest of the app draws that thing with, wrapped in
+`Assistant.Artifact`, and one branch in `Assistant.Message`'s part loop. If it writes,
+a schema in `$lib/schemas/assistant.ts`, an action on the page, and a hidden form beside
+the others — the card gets a handler and what it has already done, as props.
 
 Adding a tool: a new file exporting the `tool()` and its `ToolAccess`, one line in each of
-the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`. The type of
-`AssistantUIMessage` follows, so the page's `tool-<name>` part is typed on arrival.
+the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`, and a case in
+`sourcesOf()` (`src/lib/ai/sources.ts`) saying which records its output names. The type of
+`AssistantUIMessage` follows, so the page's `tool-<name>` part is typed on arrival. A tool
+about a kind of record takes the kind as input and checks `recordAccess()` per call rather
+than adding a file per kind.
 
 ## Persistence
 
@@ -225,10 +447,20 @@ itself: `createdAt`, `model`, `inputTokens`, `outputTokens`. The endpoint attach
 ## What is deliberately not here yet
 
 - **Data parts** (`createUIMessageStream` + `writer.write({ type: 'data-…' })`) for UI that
-  is not a tool result. The message type's second parameter is `never` until one exists.
+  is not a tool result. The message type's second parameter is `never` until one exists;
+  every artifact so far is a tool result rendered by `part.type`.
+- **Saving a list the assistant composed as a view** — the filter `listRecords` takes is a
+  view's own shape, so the "Save as view" the card wants is the per-org saved view
+  docs/views.md names as the next phase, and nothing more.
 - **Attachments**, **retrieval** (needs pgvector and an ingest path), **stream
   resumption** (`resumeStream` needs a stream store), and an embedded assistant on other
   pages.
+- **A saved call.** A voice call's transcript lives as long as the call — the screen
+  shows it a turn at a time and nothing is written to `assistant_messages`. Saving one
+  means mapping messages the realtime session assembled onto the thread's own shape so
+  that `validateUIMessages` accepts them on reload, and a half-mapped thread that fails
+  to load is worse than a call that was only a call. A thread you want to keep is the
+  typed one.
 - **`experimental_toolApprovalSecret`** — with the server owning the thread and merging
   only approval decisions, a forged approval cannot rewrite a tool call; add the secret if
   the trust model ever changes.

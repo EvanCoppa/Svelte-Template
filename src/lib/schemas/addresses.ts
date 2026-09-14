@@ -40,3 +40,10 @@ export const addressSchema = z.object({
 });
 
 export const removeAddressSchema = z.object({ id: z.guid() });
+
+/**
+ * Re-run `geocode()` on a saved address — same shape as the remove form,
+ * kept separate so it carries its own form id (`FORM_IDS.locateAddress`).
+ * For an address saved while geocoding was off, down, or stumped.
+ */
+export const locateAddressSchema = z.object({ id: z.guid() });

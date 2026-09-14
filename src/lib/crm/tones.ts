@@ -87,6 +87,18 @@ export const RMA_STATUS_TONE = {
 	rejected: 'error'
 } satisfies Record<Enums<'rma_status'>, BadgeTone>;
 
+/**
+ * Where a visit sits. `completed` is pinned to `occurred_at` by trigger (the
+ * visits migration), so a logged visit and a completed one are the same row
+ * in the same state. `missed` is the planned visit that was not made — there
+ * is no second unmade state, because WHY is a sentence in the notes.
+ */
+export const VISIT_STATUS_TONE = {
+	planned: 'info',
+	completed: 'success',
+	missed: 'warning'
+} satisfies Record<Enums<'visit_status'>, BadgeTone>;
+
 export const PRIORITY_TONE = {
 	low: 'neutral',
 	normal: 'info',

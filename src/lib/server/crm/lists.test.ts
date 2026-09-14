@@ -17,7 +17,8 @@ const NO_EXTRAS: ListExtras = {
 	addresses: [],
 	customValues: [],
 	proposalParents: new Map(),
-	memberNames: new Map()
+	memberNames: new Map(),
+	visitSubjects: new Map()
 };
 
 const STEEL = '20000000-0000-0000-0000-000000000003';
@@ -157,7 +158,8 @@ describe('listNeeds', () => {
 			addresses: false,
 			customValues: false,
 			proposalParents: false,
-			memberNames: false
+			memberNames: false,
+			visitSubjects: false
 		});
 		expect(
 			listNeeds({
@@ -167,7 +169,13 @@ describe('listNeeds', () => {
 					field('custom:mid', 'text', { custom: { definitionId: 'd', valueType: 'text' } })
 				]
 			})
-		).toEqual({ addresses: true, customValues: true, proposalParents: false, memberNames: false });
+		).toEqual({
+			addresses: true,
+			customValues: true,
+			proposalParents: false,
+			memberNames: false,
+			visitSubjects: false
+		});
 	});
 
 	it('asks for a proposal’s parents and member names only on a proposals list, and only when the field is there', () => {
@@ -177,21 +185,29 @@ describe('listNeeds', () => {
 			addresses: false,
 			customValues: false,
 			proposalParents: false,
-			memberNames: false
+			memberNames: false,
+			visitSubjects: false
 		});
 		expect(
 			listNeeds({
 				kind: 'proposal',
 				fields: [field('contact', 'record'), field('owner', 'text'), field('presenter', 'text')]
 			})
-		).toEqual({ addresses: false, customValues: false, proposalParents: true, memberNames: true });
+		).toEqual({
+			addresses: false,
+			customValues: false,
+			proposalParents: true,
+			memberNames: true,
+			visitSubjects: false
+		});
 		// A 'contact' column means something else on a contact's own kind of list
 		// (the contact's company) — it must never trip the proposal-only needs.
 		expect(listNeeds({ kind: 'deal', fields: [field('contact', 'record')] })).toEqual({
 			addresses: false,
 			customValues: false,
 			proposalParents: false,
-			memberNames: false
+			memberNames: false,
+			visitSubjects: false
 		});
 	});
 });

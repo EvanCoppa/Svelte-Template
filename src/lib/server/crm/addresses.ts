@@ -49,6 +49,17 @@ export async function listAddresses(
 	);
 }
 
+/** One address by id, scoped to the org — what a re-geocode reads before it re-fetches coordinates. */
+export async function getAddress(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	addressId: string
+): Promise<Address> {
+	return unwrap(
+		await supabase.from('addresses').select('*').eq('org_id', orgId).eq('id', addressId).single()
+	);
+}
+
 /**
  * The addresses of many records of one kind in one read — what a view
  * needs to pin its rows on a map and show each one's city. Primary first

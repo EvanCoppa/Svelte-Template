@@ -4146,12 +4146,132 @@ export type Database = {
           },
         ]
       }
+      visit_outcomes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          org_id: string
+          result: Database["public"]["Enums"]["visit_result"]
+          sort_order: number
+          tone: Database["public"]["Enums"]["badge_tone"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          org_id: string
+          result: Database["public"]["Enums"]["visit_result"]
+          sort_order?: number
+          tone?: Database["public"]["Enums"]["badge_tone"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          org_id?: string
+          result?: Database["public"]["Enums"]["visit_result"]
+          sort_order?: number
+          tone?: Database["public"]["Enums"]["badge_tone"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visit_outcomes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          latitude: number | null
+          location_accuracy_m: number | null
+          longitude: number | null
+          notes: string | null
+          occurred_at: string | null
+          org_id: string
+          outcome_id: string | null
+          scheduled_for: string | null
+          source: string
+          status: Database["public"]["Enums"]["visit_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          latitude?: number | null
+          location_accuracy_m?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string | null
+          org_id: string
+          outcome_id?: string | null
+          scheduled_for?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["visit_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          latitude?: number | null
+          location_accuracy_m?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string | null
+          org_id?: string
+          outcome_id?: string | null
+          scheduled_for?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["visit_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_outcome_id_org_id_fkey"
+            columns: ["outcome_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "visit_outcomes"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      create_default_visit_outcomes: {
+        Args: { org: string }
+        Returns: undefined
+      }
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
@@ -4195,6 +4315,7 @@ export type Database = {
         | "shipment"
         | "task"
         | "ticket"
+        | "visit"
       custom_field_value_type: "text" | "numeric" | "boolean" | "select"
       duration_unit: "visits" | "days" | "weeks" | "months" | "sec"
       execution_type:
@@ -4267,6 +4388,8 @@ export type Database = {
       stage_outcome: "open" | "won" | "lost"
       task_status: "todo" | "in_progress" | "blocked" | "in_review" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
+      visit_result: "engaged" | "no_contact" | "declined"
+      visit_status: "planned" | "completed" | "missed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4432,6 +4555,7 @@ export const Constants = {
         "shipment",
         "task",
         "ticket",
+        "visit",
       ],
       custom_field_value_type: ["text", "numeric", "boolean", "select"],
       duration_unit: ["visits", "days", "weeks", "months", "sec"],
@@ -4512,6 +4636,8 @@ export const Constants = {
       stage_outcome: ["open", "won", "lost"],
       task_status: ["todo", "in_progress", "blocked", "in_review", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
+      visit_result: ["engaged", "no_contact", "declined"],
+      visit_status: ["planned", "completed", "missed"],
     },
   },
 } as const

@@ -1922,3 +1922,96 @@ insert into public.relationships (id, org_id, relationship_type_id, from_type, f
 		'property', 'c1000000-0000-0000-0008-000000000013', current_date - 1,
 		'00000000-0000-0000-0000-000000000003')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Visits: a roofer's week of site visits
+-- ---------------------------------------------------------------------------
+-- The visits migration ships the table and the industry's word for it
+-- ("Site visits" on a roof, "Service calls" in beverage); this is where it
+-- becomes something you can look at, on Ridgeline Roofing so the vertical
+-- with the homeowners also has the visits to them.
+--
+-- The fixture is the whole shape in four rows: one made and scored, one made
+-- with a fix and a duration, one still on the plan, and one that was planned
+-- and missed. Two of them are to a homeowner (a contact who belongs to no
+-- company) and one to a supplier, which is the point of the subject being the
+-- shared entity link rather than a `company_id`.
+--
+-- `status` is left to the trigger wherever the timestamp says it: a row with
+-- an `occurred_at` is `completed` whatever is written here, so only the two
+-- that have NOT happened name one.
+
+insert into public.visits
+	(id, org_id, entity_type, entity_id, status, scheduled_for, occurred_at, ended_at,
+		outcome_id, notes, latitude, longitude, location_accuracy_m, created_by)
+select v.id, v.org_id, v.entity_type::public.crm_entity_type, v.entity_id,
+	v.status::public.visit_status, v.scheduled_for, v.occurred_at, v.ended_at,
+	(select o.id from public.visit_outcomes o where o.org_id = v.org_id and o.name = v.outcome),
+	v.notes, v.latitude, v.longitude, v.accuracy, v.created_by
+from (values
+	-- Made, scored, and it produced the next step.
+	('f8000000-0000-0000-0000-000000000001'::uuid, '10000000-0000-0000-0000-000000000005'::uuid,
+		'contact', '30000000-0000-0000-0000-000000000053'::uuid, 'completed',
+		null::timestamptz, now() - interval '3 days', now() - interval '3 days' + interval '40 minutes',
+		'Follow-up booked',
+		'Hail bruising on the south slope, two vents cracked. Walked the attic with Marcus; measuring Thursday.',
+		40.033100::numeric, -105.283900::numeric, 8.00::numeric,
+		'00000000-0000-0000-0000-000000000003'::uuid),
+	-- Made, nobody in. The fix is what says the van was actually there.
+	('f8000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005',
+		'contact', '30000000-0000-0000-0000-000000000055', 'completed',
+		null, now() - interval '2 days', now() - interval '2 days' + interval '6 minutes',
+		'Nobody available',
+		'Knocked twice, left the storm-damage leaflet in the door. Truck in the drive, so try an evening.',
+		40.058200, -105.192700, 22.00,
+		'00000000-0000-0000-0000-000000000003'),
+	-- At the supplier, not a homeowner: the subject is whatever you went to see.
+	('f8000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000005',
+		'company', '20000000-0000-0000-0000-000000000051', 'completed',
+		now() - interval '1 day', now() - interval '1 day', null,
+		'Spoke with someone',
+		'Picked up the colour samples and settled the shortfall on the last pallet.',
+		null, null, null,
+		'00000000-0000-0000-0000-000000000003'),
+	-- Still to be made. A planned visit must say when it is for.
+	('f8000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000005',
+		'contact', '30000000-0000-0000-0000-000000000054', 'planned',
+		now() + interval '2 days', null, null,
+		null,
+		'Measure for the re-roof. Gate code is on the contact.',
+		null, null, null,
+		'00000000-0000-0000-0000-000000000003'),
+	-- Planned and not made. WHY is the notes' job, not a second status.
+	('f8000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000005',
+		'company', '20000000-0000-0000-0000-000000000052', 'missed',
+		now() - interval '4 days', null, null,
+		null,
+		'Yard closed early for the holiday — nobody on the counter.',
+		null, null, null,
+		'00000000-0000-0000-0000-000000000003')
+) as v (id, org_id, entity_type, entity_id, status, scheduled_for, occurred_at, ended_at,
+	outcome, notes, latitude, longitude, accuracy, created_by)
+on conflict (id) do nothing;
+
+-- Who went. A relationship, never a column — which is what lets the second
+-- visit carry a crew of two (docs/visits.md, "Who went").
+insert into public.relationships (id, org_id, relationship_type_id, from_type, from_id, to_type, to_id, started_on, created_by) values
+	('f4000000-0000-0000-0005-000000000001', '10000000-0000-0000-0000-000000000005',
+		'f0000000-0000-0000-0000-000000000041', 'visit', 'f8000000-0000-0000-0000-000000000001',
+		'member', '00000000-0000-0000-0000-000000000003', current_date - 3,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0005-000000000002', '10000000-0000-0000-0000-000000000005',
+		'f0000000-0000-0000-0000-000000000041', 'visit', 'f8000000-0000-0000-0000-000000000002',
+		'member', '00000000-0000-0000-0000-000000000003', current_date - 2,
+		'00000000-0000-0000-0000-000000000003'),
+	-- The ride-along: a second person on the same visit, which a column could
+	-- not have held.
+	('f4000000-0000-0000-0005-000000000003', '10000000-0000-0000-0000-000000000005',
+		'f0000000-0000-0000-0000-000000000041', 'visit', 'f8000000-0000-0000-0000-000000000002',
+		'member', '00000000-0000-0000-0000-000000000001', current_date - 2,
+		'00000000-0000-0000-0000-000000000003'),
+	('f4000000-0000-0000-0005-000000000004', '10000000-0000-0000-0000-000000000005',
+		'f0000000-0000-0000-0000-000000000041', 'visit', 'f8000000-0000-0000-0000-000000000004',
+		'member', '00000000-0000-0000-0000-000000000001', current_date,
+		'00000000-0000-0000-0000-000000000003')
+on conflict (id) do nothing;

@@ -1,11 +1,14 @@
 <script lang="ts">
+	import LocateIcon from '@lucide/svelte/icons/locate';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import MapPinOffIcon from '@lucide/svelte/icons/map-pin-off';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { tick } from 'svelte';
 	import { invalidate } from '$app/navigation';
 	import * as Modal from '$lib/components/modal/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
@@ -19,7 +22,12 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { Address } from '$lib/server/crm/addresses';
 	import { capitalize } from '$lib/utils.js';
-	import { ADDRESS_KINDS, addressSchema, removeAddressSchema } from '$lib/schemas/addresses';
+	import {
+		ADDRESS_KINDS,
+		addressSchema,
+		locateAddressSchema,
+		removeAddressSchema
+	} from '$lib/schemas/addresses';
 
 	/**
 	 * A party's addresses, and the one form that edits them. The page owns the
@@ -32,6 +40,7 @@
 		addresses,
 		form: addressForm,
 		removeForm,
+		locateForm,
 		canManage,
 		noun,
 		queryKey
@@ -39,6 +48,7 @@
 		addresses: Address[];
 		form: SuperValidated<Infer<typeof addressSchema>>;
 		removeForm: SuperValidated<Infer<typeof removeAddressSchema>>;
+		locateForm: SuperValidated<Infer<typeof locateAddressSchema>>;
 		canManage: boolean;
 		/** What the record is called — "this contact". */
 		noun: string;
@@ -82,6 +92,34 @@
 			invalidate(queryKey);
 		}
 	});
+
+	// Locating is a click, not a form to fill in: a hidden form bound to the
+	// store, filled from script and submitted the way the invoice's "Apply"
+	// posts a payment (CLAUDE.md, "Server actions vs API endpoints").
+	let locateElement = $state<HTMLFormElement | null>(null);
+	let locatingId = $state<string | null>(null);
+	const { form: locateData, enhance: locateEnhance } = superForm(locateForm, {
+		id: 'locate-address',
+		invalidateAll: false,
+		onUpdated({ form: result }) {
+			locatingId = null;
+			if (!result.valid) {
+				if (result.message) toast.error(result.message);
+				return;
+			}
+			toast.success('Address located');
+			invalidate(queryKey);
+		}
+	});
+
+	async function locate(address: Address) {
+		locatingId = address.id;
+		$locateData = { id: address.id };
+		// The hidden input takes the store's value on the next flush; submitting
+		// before it would post the last address's id.
+		await tick();
+		locateElement?.requestSubmit();
+	}
 
 	function startAdding() {
 		reset();
@@ -140,9 +178,24 @@
 					{/if}
 					{#if address.latitude !== null && address.longitude !== null}
 						<MapPinIcon class="text-muted-foreground size-3.5" aria-label="On the map" />
+					{:else}
+						<MapPinOffIcon class="text-muted-foreground size-3.5" aria-label="Not on the map yet" />
 					{/if}
 					{#if canManage}
 						<span class="ml-auto flex items-center gap-0.5">
+							{#if address.latitude === null || address.longitude === null}
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-7"
+									title="Locate on the map"
+									disabled={locatingId === address.id}
+									onclick={() => locate(address)}
+								>
+									<LocateIcon class={['size-3.5', locatingId === address.id && 'animate-pulse']} />
+									<span class="sr-only">Locate on the map</span>
+								</Button>
+							{/if}
 							<Button
 								variant="ghost"
 								size="icon"
@@ -190,6 +243,15 @@
 			</Empty.Root>
 		{/each}
 	</Card.Content>
+	<form
+		method="POST"
+		action="?/locateAddress"
+		class="hidden"
+		bind:this={locateElement}
+		use:locateEnhance
+	>
+		<input type="hidden" name="id" value={$locateData.id} />
+	</form>
 </Card.Root>
 
 <Modal.Root bind:open={editorOpen}>

@@ -32,10 +32,13 @@ type AssetColumn =
 export async function listAssets(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
-	filter: { status?: Asset['status'] } = {}
+	filter: { status?: Asset['status']; ids?: readonly string[] } = {}
 ): Promise<Asset[]> {
 	let query = supabase.from('assets').select('*').eq('org_id', orgId).order('status').order('name');
 	if (filter.status) query = query.eq('status', filter.status);
+	// Named rows only — how a caller resolves a handful of assets it already
+	// holds ids for, the way listCompanies() does for the view filters.
+	if (filter.ids) query = query.in('id', filter.ids);
 	return unwrap(await query);
 }
 

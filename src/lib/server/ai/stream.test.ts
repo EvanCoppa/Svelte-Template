@@ -215,7 +215,14 @@ describe('streamAssistantTurn', () => {
 		);
 
 		const sent = (h.model.doStreamCalls[0]?.tools ?? []).map((tool) => tool.name).sort();
-		expect(sent).toEqual(['getCompany', 'searchCompanies']);
+		expect(sent).toEqual([
+			'findRecords',
+			'getCompany',
+			'getRecord',
+			'listRecords',
+			'listRelationshipTypes',
+			'searchCompanies'
+		]);
 	});
 
 	it('regenerates by dropping the answer and asking again from the prompt before it', async () => {

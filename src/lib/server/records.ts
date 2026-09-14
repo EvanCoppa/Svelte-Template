@@ -5,6 +5,13 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { Database } from '$lib/database.types';
 import { RECORD_KIND_META, type RecordKind } from '$lib/crm/records';
+import {
+	formatFix,
+	parseFix,
+	splitVisitSubject,
+	visitSubjectKey,
+	VISIT_SUBJECT_KINDS
+} from '$lib/crm/visits';
 import type { ListKind } from '$lib/lists/types';
 import {
 	assetRecordSchema,
@@ -23,6 +30,7 @@ import {
 	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
+	visitRecordSchema,
 	RECORD_FORMS,
 	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
@@ -69,6 +77,8 @@ import {
 import { deleteProposal } from './crm/proposals';
 import { createTask, getTask, updateTask } from './crm/tasks';
 import { createTicket, deleteTicket, getTicket, updateTicket } from './crm/tickets';
+import { listRecordNames } from './crm/records';
+import { createVisit, deleteVisit, getVisit, listVisitOutcomes, updateVisit } from './crm/visits';
 import { can, requirePermission } from './roles';
 
 /**
@@ -136,7 +146,7 @@ export async function loadCreateRecord(
 }
 
 /** The org's rows behind each party picker on the form for `type` — none for a form without one. */
-async function loadPickers(
+export async function loadPickers(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType
@@ -148,7 +158,8 @@ async function loadPickers(
 	return Object.fromEntries(wanted.map((kind, index) => [kind, loaded[index]]));
 }
 
-async function pickerOptions(
+/** The options behind one picker kind — every row of the org's the picker may name. */
+export async function pickerOptions(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	kind: RecordPickerKind
@@ -192,6 +203,31 @@ async function pickerOptions(
 					: (row.property_type ?? undefined)
 			}));
 		}
+		case 'subject': {
+			// Every record you can go and see, in one list, each labelled with
+			// what it is — one question, not two (the `subject` note in
+			// `RECORD_PICKER_KINDS`). Read through `listRecordNames()`, which
+			// is the one place a kind's rows become "an id and a name", so the
+			// picker shows exactly what the record page will put at the top.
+			const kinds = await Promise.all(
+				VISIT_SUBJECT_KINDS.map(async (kind) => ({
+					kind,
+					rows: await listRecordNames(supabase, orgId, kind)
+				}))
+			);
+			return kinds.flatMap(({ kind, rows }) =>
+				rows.map((row) => ({
+					value: visitSubjectKey(kind, row.id),
+					label: row.name,
+					sublabel: kind
+				}))
+			);
+		}
+		case 'outcome':
+			return (await listVisitOutcomes(supabase, orgId)).map((outcome) => ({
+				value: outcome.id,
+				label: outcome.name
+			}));
 	}
 }
 
@@ -305,6 +341,52 @@ export async function updateRecord(
 	return { form };
 }
 
+/** What a partial edit came to: saved, or the validation it failed, as sentences. */
+export type PatchResult = { saved: true } | { saved: false; issues: string[] };
+
+/**
+ * A partial edit for a writer that is not a form — the assistant. The edit
+ * form posts every field, so a blank one means "clear it"; a tool names
+ * only the fields it means to change, and the rest keep what the record
+ * says now. Same registry, same schema and same `writeRecord()` switch as
+ * the form, so a change is validated and written exactly as a person's
+ * would be. A field the registry does not list is a call error (the model
+ * can read the list and retry); a value the schema refuses comes back as
+ * issues rather than a throw, because that is an answer, not a failure.
+ * The caller checks `manage` first — this is the write, not the gate.
+ */
+export async function patchRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: EditableRecordType,
+	id: string,
+	changes: Partial<RecordFormValues>
+): Promise<PatchResult> {
+	const fields = RECORD_FORMS[type].fields;
+	const unknown = Object.keys(changes).filter(
+		(name) => !fields.some((field) => field.name === name)
+	);
+	if (unknown.length > 0) {
+		throw new Error(
+			`A ${type} has no field named ${unknown.join(', ')}. ` +
+				`Its fields are: ${fields.map((field) => field.name).join(', ')}.`
+		);
+	}
+
+	const current = await recordFormValues(supabase, orgId, type, id);
+	if (Object.keys(current).length === 0) throw new Error(`There is no ${type} with id ${id}.`);
+
+	const parsed = RECORD_SCHEMAS[type].safeParse({ ...current, ...changes });
+	if (!parsed.success) {
+		return {
+			saved: false,
+			issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+		};
+	}
+	await writeRecord(supabase, orgId, type, parsed.data, id);
+	return { saved: true };
+}
+
 // ---------------------------------------------------------------------------
 // Deleting one — every list page's row menu
 // ---------------------------------------------------------------------------
@@ -406,6 +488,8 @@ async function removeRecord(
 			return deletePurchase(supabase, orgId, id);
 		case 'rma':
 			return deleteRma(supabase, orgId, id);
+		case 'visit':
+			return deleteVisit(supabase, orgId, id);
 	}
 }
 
@@ -574,6 +658,29 @@ async function recordFormValues(
 						requested_on: str(row.requested_on),
 						reason: str(row.reason),
 						resolution: str(row.resolution)
+					}
+				: {};
+		}
+		case 'visit': {
+			const row = await getVisit(supabase, orgId, id);
+			return row
+				? {
+						subject: visitSubjectKey(row.entity_type, row.entity_id),
+						status: row.status,
+						outcome_id: str(row.outcome_id),
+						scheduled_for: str(row.scheduled_for),
+						occurred_at: str(row.occurred_at),
+						ended_at: str(row.ended_at),
+						location: formatFix(
+							row.latitude === null || row.longitude === null
+								? null
+								: {
+										latitude: row.latitude,
+										longitude: row.longitude,
+										accuracy: row.location_accuracy_m
+									}
+						),
+						notes: str(row.notes)
 					}
 				: {};
 		}
@@ -859,6 +966,30 @@ async function writeRecord(
 			await (id
 				? updatePurchase(supabase, orgId, id, columns)
 				: createPurchase(supabase, orgId, columns));
+			return;
+		}
+		case 'visit': {
+			const data = visitRecordSchema.parse(values);
+			// `<kind>:<id>` back into the entity link's two columns — the one
+			// place that pair is split, as `RECORD_PICKER_KINDS` says.
+			const [entityType, entityId] = splitVisitSubject(data.subject);
+			const fix = parseFix(data.location);
+			const columns = {
+				entity_type: entityType,
+				entity_id: entityId,
+				status: data.status,
+				scheduled_for: instant(data.scheduled_for),
+				occurred_at: instant(data.occurred_at),
+				ended_at: instant(data.ended_at),
+				outcome_id: text(data.outcome_id),
+				notes: text(data.notes),
+				latitude: fix?.latitude ?? null,
+				longitude: fix?.longitude ?? null,
+				location_accuracy_m: fix?.accuracy ?? null
+			};
+			await (id
+				? updateVisit(supabase, orgId, id, columns)
+				: createVisit(supabase, orgId, columns));
 			return;
 		}
 		case 'rma': {

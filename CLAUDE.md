@@ -76,7 +76,9 @@ npm run format         # prettier (svelte + tailwind plugins)
 - The service-role client (`src/lib/supabase.server.ts`) bypasses RLS: create it per
   request in server files only. RLS stays enabled on every table regardless.
 - Every response carries the security headers from
-  `src/lib/server/security-headers.ts`. The CSP's origins derive from
+  `src/lib/server/security-headers.ts`. `Permissions-Policy` grants the microphone to
+  this origin and nothing else (`microphone=(self)`) — dictation and the assistant's
+  voice call are the app's own; camera and location stay refused. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
   as a parameter or documented constant, never a hardcoded project ref. Hosts
   that only serve **images** (a product's `image_url` on a storefront CDN) are the
@@ -216,10 +218,22 @@ application data is scoped to an organization, never to a bare user. The
   that names another kind links only when `passesFeatureGate()` says the reader
   may open it; otherwise it is plain text or not fetched at all. The page has no
   `pages` row (its title is the record's name) and no nav entry. **A kind that
-  needs its own screen adds `(app)/<kind>/[id]/`** — a static segment outranks the
-  matcher, so the specific page wins and the generic one stays the default for
-  the rest; compose it from the same `RecordDetail` and the `detail/` parts rather
-  than a second renderer. A new list page joins by adding its kind to
+  needs its own screen adds `(app)/<kind>/[id=guid]/`** — a static segment outranks
+  the matcher, so the specific page wins and the generic one stays the default for
+  the rest. **What a record page IS lives in `src/lib/server/record-page.ts`, not
+  in either route**: `loadRecordPage()` is the whole load (the record, its
+  activities, tags, addresses, photos, custom fields, notes, thread, related
+  groups, relationships and the generic edit form) and `recordPageActions(kindOf)`
+  the actions that write them, so a specific page spreads both and adds only what
+  is its own — and the two pages can never drift on what a record page shows.
+  The markup is the same story: the header, the rail, the timeline, the notes and
+  a related group are `detail/` parts both routes compose. A specific page also
+  needs its own `relationship-options/+server.ts` over the shared
+  `relationshipOptions()`, because the Relationships card fetches that path
+  relative to the page it is on. `(app)/companies/[id=guid]/` is the worked
+  example — the ego graph, the people, the account and the map it adds are what a
+  kind earns a page FOR; never a second renderer, a second record load or a second
+  relationship card. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
@@ -240,7 +254,11 @@ application data is scoped to an organization, never to a bare user. The
   another record or a member wears a chip (`Detail.Value`), so a rail row reads
   as a thing rather than a sentence. A new section is a tab, drawn only while
   active; a new fact about the record is a row in the rail; never a card
-  outside the two.
+  outside the two. A kind with its own page keeps that shape and may fill the
+  frames differently where it has more to say — the company page puts the
+  Relationships card on a tab of its own under an ego map, and lists every field
+  in the rail rather than holding the `link` ones back, because the rail is the
+  attribute panel the Edit button opens.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
@@ -511,7 +529,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
     relationships between them, named through each kind's own list module (so the gate
     applies kind by kind, and a member is on the map only where a relationship names
     one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
-    people who work here) and its edges labelled by their types. Nothing per industry is
+    people who work here) and its edges labelled by their types. **One record's
+    corner of it is the same map, narrowed** — `egoGraph()` in `$lib/crm/graph.ts`
+    is a pure fold beside `filterGraph()` and `neighbourhoodOf()`, taking the map
+    `describeGraph()` described and keeping what is within N hops of one node plus
+    every edge among them, legend recounted. The company page draws it; a kind
+    that wants one calls the same fold, never a second server read. Nothing per industry is
     stored for it; a kind or a type joins the map by existing. A proposal's presenter,
     responsible member and parent link are drawn too, even though they stay plain
     columns on `proposals` — `describeGraph()` reads them directly and synthesizes
@@ -838,14 +861,19 @@ The assistant (`/assistant`, feature id `assistant`) is built on the Vercel AI S
 SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the installed
 version; read them before the website. The full account is `docs/assistant.md`.
 
-- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package — `@ai-sdk/openai`, over the Responses API. Config is env-only
-  (`OPENAI_API_KEY`, `AI_MODEL`; the default model is `gpt-5.6-luna`); when unconfigured
-  the page says so and the endpoint answers 503, never a crash. What the API is asked for
-  on a call — `store: false`, the per-thread `promptCacheKey` — is the SDK's namespaced
-  `providerOptions`, spelled once in `openaiCallOptions()` (`provider.ts`) and set on the
-  agent and the title call; reasoning is the SDK's portable `reasoning` setting, never a
-  provider option.
+- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`, `realtimeToken()`),
+  which is the only **server** file that imports a provider package — `@ai-sdk/openai`,
+  over the Responses API. Config is env-only (`OPENAI_API_KEY`, `AI_MODEL`; the default
+  model is `gpt-5.6-luna`); when unconfigured the page says so and the endpoint answers
+  503, never a crash. What the API is asked for on a call — `store: false`, the
+  per-thread `promptCacheKey` — is the SDK's namespaced `providerOptions`, spelled once in
+  `openaiCallOptions()` (`provider.ts`) and set on the agent and the title call; reasoning
+  is the SDK's portable `reasoning` setting, never a provider option. The one browser
+  exception is `realtimeModel()` in `src/lib/ai/realtime.svelte.ts`: a realtime model's
+  other half parses the provider's events and serialises ours **in the browser**, so it
+  cannot live on the server the way `chatModel()` does. It is loaded only when a call
+  starts, its key is a placeholder that is never used, and it is the only client module
+  allowed to name the vendor.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.
@@ -856,7 +884,14 @@ version; read them before the website. The full account is `docs/assistant.md`.
   features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
   org and the caller holds the level, and every tool re-checks with
   `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
-  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts` + a
+  case in `sourcesOf()`. **A tool about a kind of record is addressed by kind, never a
+  file per kind**: `findRecords`, `getRecord`, `updateRecord`, `linkRecords` and
+  `exploreGraph` serve every kind with a page through the generic record layer
+  (`getRecord()`, `patchRecord()`, `getRelationships()`), their `ToolAccess` is `anyOf`
+  the kinds' features, each call re-checks the kind it names with `recordAccess()`, and
+  the session block lists the kinds this caller may read in the industry's words
+  (`recordKindAccess()`) — docs/assistant.md, "Tools addressed by kind".
 - **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
   tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
   result is a data part; a message-level fact is metadata (`messageMetadataSchema`).
@@ -866,6 +901,30 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
+- **Talking to it is the same assistant** (`docs/assistant.md`, "The call"). The
+  composer's commit button is whatever there is to commit — Send with something written,
+  Stop while an answer streams, and **Call** with an empty box — and pressing Call opens
+  `Assistant.Call` over the SDK's `Experimental_AbstractRealtimeSession`, bound to runes
+  in `src/lib/ai/realtime.svelte.ts` because `@ai-sdk/svelte` ships no realtime binding
+  yet. The key never reaches the browser: `/assistant/realtime/token` mints a short-lived
+  client secret with the session already decided (`voiceSessionConfig()`), because a
+  `session.update` only changes the fields it carries — so instructions and voice are the
+  server's and the browser states only how it listens. A tool call comes back through
+  `/assistant/realtime/tool` and `runVoiceTool()`, gated exactly as a typed turn is; the
+  browser is a relay, not the thing with the permissions. A call offers one tool fewer
+  than a thread — anything in `TOOL_APPROVAL` is withheld, because a spoken "yes" is not
+  an approval this app can evidence. `Assistant.Orb` is what you talk to, and it knows
+  only how loud and how fast. **A call hangs up on its own, twice over**, because an
+  open socket with a live microphone is metered: after two minutes of dead air
+  (`IDLE_LIMIT_MS`) and after thirty minutes however lively it is (`MAX_CALL_MS`),
+  each warning first. `callLimit()` is the one decision — never a check per limit —
+  so the nearer deadline is the one said out loud and the words live beside the
+  numbers; `isConversationEvent()` says what keeps a call alive by naming what does
+  not, so an event type a later SDK maps counts as talking rather than cutting a call
+  off mid-sentence. A running tool holds off the idle limit and never the length one.
+  The secret is minted with a two-minute life as the server-side half of the same
+  bound. The transcript is not
+  saved: a thread you want to keep is the typed one.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
   (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
@@ -880,6 +939,18 @@ version; read them before the website. The full account is `docs/assistant.md`.
   `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
   its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
   line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- **An artifact is a tool result drawn as a component** (docs/assistant.md, "Artifacts"):
+  `Assistant.Message` renders `tool-getRecord`, `tool-listRecords`, `tool-exploreGraph`,
+  `tool-findOpenSlots` and `tool-packableLines` in place once `output-available`, and
+  `tool-updateRecord`'s approval card shows the change field by field (`Assistant.Diff`,
+  from `recordSnapshots()` over the thread). The tool's `outputSchema` is the artifact's
+  data — no data part, nothing streamed beside the message — and **an artifact is an
+  existing app component inside the `Assistant.Artifact` frame, never a bespoke chat
+  widget** (`createListTable()` + `DataTable`, `RelationshipGraph.Root`, the record
+  page's header). One that writes posts a form action on the assistant page through a
+  hidden form (`book`, `pack`; schemas in `$lib/schemas/assistant.ts`), the calendar's
+  drag-to-move road — never a `fetch` of its own — and its tool says whether the caller
+  holds the grant (`canBook`, `canPack`) so no card offers a button the action refuses.
 - Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
   opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives

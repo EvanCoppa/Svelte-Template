@@ -23,14 +23,18 @@ const FEATURE_IDS = [
 	'tasks',
 	'tickets',
 	'staff',
-	'assistant'
+	'assistant',
+	'calendar',
+	'graph',
+	'orders',
+	'shipments'
 ] as const;
 
 function featureRow(id: string): Feature {
 	return {
 		id,
 		name: id,
-		noun: null,
+		noun: id.replace(/ies$/, 'y').replace(/s$/, ''),
 		description: null,
 		route: `/${id}`,
 		icon: null,
