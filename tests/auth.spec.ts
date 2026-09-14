@@ -569,24 +569,57 @@ test.describe('the platform area', () => {
 		await expect(page).toHaveURL('/admin');
 	});
 
-	test('refuses its data pages and its one mutation the same way', async ({ page }) => {
-		// Each page and each action proves the operator flag for itself, so
-		// reaching past the landing page changes nothing.
-		expect((await page.goto('/admin/organizations'))?.status()).toBe(404);
-		expect((await page.goto('/admin/tiers'))?.status()).toBe(404);
+	test('refuses every page in the area the same way', async ({ page }) => {
+		// Each page proves the operator flag for itself, so reaching past the
+		// landing page changes nothing — including the detail pages, which are
+		// reached by a key rather than from a link.
+		for (const path of [
+			'/admin/organizations',
+			'/admin/tiers',
+			'/admin/tiers/free',
+			'/admin/industries',
+			'/admin/industries/crm',
+			'/admin/features',
+			'/admin/features/deals'
+		]) {
+			expect((await page.goto(path))?.status(), path).toBe(404);
+		}
+	});
 
-		// seed.sql's Acme Inc — a real organization, so the refusal is the
-		// operator check and nothing else. The origin header is what gets the
-		// POST past SvelteKit's CSRF check, which would otherwise answer 403
-		// before the action ever ran and prove nothing about the guard.
-		const posted = await page.request.post(
-			'/admin/organizations/10000000-0000-0000-0000-000000000001?/setTier',
-			{
-				form: { tierId: 'enterprise' },
-				headers: { origin: new URL(page.url()).origin }
-			}
-		);
-		expect(posted.status()).toBe(404);
+	test('refuses every write in the area the same way', async ({ page }) => {
+		// The assertion that has to hold as the area grows: an action is
+		// reached by POST with no load in front of it, so each one repeats the
+		// operator check itself. seed.sql's Acme Inc is a real organization and
+		// 'free' a real plan, so what refuses these is the guard and nothing
+		// else. The origin header is what gets the POST past SvelteKit's CSRF
+		// check, which would otherwise answer 403 before the action ever ran
+		// and prove nothing.
+		const ORG = '10000000-0000-0000-0000-000000000001';
+		const origin = new URL(page.url()).origin;
+
+		const writes: [string, Record<string, string>][] = [
+			[`/admin/organizations/${ORG}?/rename`, { name: 'Not Acme' }],
+			[`/admin/organizations/${ORG}?/setTier`, { tierId: 'enterprise' }],
+			[
+				`/admin/organizations/${ORG}?/setIndustry`,
+				{ industryId: 'dentistry', confirm: 'Acme Inc' }
+			],
+			[`/admin/organizations/${ORG}?/setOverride`, { featureId: 'deals', mode: 'enabled' }],
+			[`/admin/organizations/${ORG}?/clearOverride`, { featureId: 'deals' }],
+			['/admin/tiers?/create', { id: 'trespass', name: 'Trespass' }],
+			['/admin/tiers/free?/rename', { name: 'Gratis' }],
+			['/admin/industries?/create', { id: 'trespass', name: 'Trespass' }],
+			['/admin/industries/crm?/rename', { name: 'Sales' }],
+			[
+				'/admin/features/deals?/save',
+				{ name: 'Deals', icon: 'handshake', category: 'crm', sortOrder: '200' }
+			]
+		];
+
+		for (const [action, form] of writes) {
+			const posted = await page.request.post(action, { form, headers: { origin } });
+			expect(posted.status(), action).toBe(404);
+		}
 	});
 });
 

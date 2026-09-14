@@ -45,5 +45,15 @@ export const QUERY = {
 	 * is platform data, read outside any tenant, and nothing under `app:`
 	 * depends on it.
 	 */
-	adminOrganizations: 'admin:organizations'
+	adminOrganizations: 'admin:organizations',
+	/**
+	 * The platform's reference catalogs as the platform area edits them: the
+	 * plans, the verticals and the feature registry. One key for the three
+	 * because they are one graph — moving a feature between plans changes
+	 * what every directory of them reads — and because only an operator ever
+	 * looks at them. The tenant side has its own key for the resolved answer
+	 * (`features`), which a catalog edit changes on the org's next request,
+	 * not in this browser.
+	 */
+	adminCatalog: 'admin:catalog'
 } as const;

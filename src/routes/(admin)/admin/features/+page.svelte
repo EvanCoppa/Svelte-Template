@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createColumnHelper, createTable, renderComponent } from '@tanstack/svelte-table';
+	import { adminFeatureHref } from '$lib/admin/nav';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as PageHeader from '$lib/components/page-header/index.js';
 	import { iconFor } from '$lib/features/icons';
@@ -18,7 +19,8 @@
 				renderComponent(FeatureIconCell, { icon: iconFor(getValue()), slug: getValue() })
 		}),
 		columnHelper.accessor('name', {
-			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Feature' })
+			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Feature' }),
+			cell: ({ getValue, row }) => DataTable.linkCell(getValue(), adminFeatureHref(row.original.id))
 		}),
 		columnHelper.accessor('id', {
 			header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'ID' })

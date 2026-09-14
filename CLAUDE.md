@@ -486,13 +486,42 @@ the rules that must not drift:
   (like `settingsNav`, and for the same reason — these pages are not
   features). Adding an admin page = the route plus one entry there. No
   migration: `/admin` is outside `features` and outside `pages` on purpose.
-- **Read-only by default, with exactly one mutation**: moving an organization
-  to another plan, on that organization's page. It validates the target and
-  the tier through the caller's own client first, and only then reaches for
-  the service-role client, because `organizations.tier_id` is revoked from
-  `authenticated`. A second write earns the same scrutiny or does not ship —
-  role editing, feature editing, industry changes, system-admin management
-  and an audit table are all deliberately deferred.
+- **Every write proves the operator, then the target, then writes** — the
+  shape `setTier` set and every action copies: `requireSystemAdmin()` first
+  (a POST reaches an action with no load in front of it), then the target
+  looked up through the CALLER's own client so "does it exist" is answered by
+  the same RLS that decides whether this caller may see it, then the
+  referenced catalog row checked for a readable message with the foreign key
+  as the backstop, and only then the write.
+- **Which client a write takes is decided by the grants, never by
+  convenience.** `renameOrganization()` goes through the caller's client:
+  `name` is the one column `authenticated` may update and an operator is
+  `owner` everywhere, so RLS is a real boundary and is left in the path. The
+  tier, the industry, the per-org feature overrides and every reference
+  catalog take the service-role client, because no policy can let those
+  through. A parameter named `admin` is a service-role client, and its
+  function is reachable only from an action that has already proved
+  `requireSystemAdmin()`.
+- **What is editable, and what stays a migration.** Editable: an
+  organization's name, plan, vertical and feature overrides; a plan's name
+  and what it unlocks; a vertical's name, what it includes and what it calls
+  each of those; a feature row's default name, noun, description, icon,
+  section and order. Deliberately not: a feature's `id` and `route` — both
+  facts about the CODE, since a route naming no page is a feature whose every
+  click 404s — creating or deleting a feature row, roles, and system-admin
+  management. An audit TABLE is still deferred; until there is one every
+  write logs a `[platform-admin]` line carrying the operator, the target and
+  the value it left.
+- **Set membership is written as a diff, never delete-all-then-insert.** An
+  `industry_features` row is not a bare join row: it also carries that
+  vertical's own name, noun and sidebar position for the feature, so
+  rewriting the set wholesale would silently throw all of it away for every
+  feature that was only passing through. `membershipDiff()` is the one place
+  that is decided, and `tier_features` goes through it too.
+- **A catalog edit changes nothing in this browser.** Freshness in the area
+  is `QUERY.adminOrganizations` and `QUERY.adminCatalog`, its own `admin:`
+  domain; what a tenant sees is re-resolved on that organization's next
+  request. Never invalidate a tenant key from `/admin`, and never read one.
 - Reuse from the app is limited to organization-agnostic primitives (`ui/`,
   `DataTable`, `PageHeader`, `iconFor`, `isPathUnder`, `titleFor`) and data
   modules that already take an explicit org id (`listStaff()`). Never reach

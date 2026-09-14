@@ -53,9 +53,25 @@ export function isAdminItemActive(item: { href: string }, pathname: string): boo
 	return item.href === ADMIN_HOME ? pathname === ADMIN_HOME : isPathUnder(item.href, pathname);
 }
 
-/** The platform area's page for one organization — the only linkable record it has. */
+/**
+ * The platform area's detail pages — every row in every directory links to
+ * one. An organization is keyed by uuid (`[id=guid]`); a plan, a vertical and
+ * a feature are keyed by the text id their migration chose (`[id=key]`).
+ */
 export function adminOrganizationHref(id: string): string {
 	return `/admin/organizations/${id}`;
+}
+
+export function adminTierHref(id: string): string {
+	return `/admin/tiers/${id}`;
+}
+
+export function adminIndustryHref(id: string): string {
+	return `/admin/industries/${id}`;
+}
+
+export function adminFeatureHref(id: string): string {
+	return `/admin/features/${id}`;
 }
 
 /**
