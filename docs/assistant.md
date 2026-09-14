@@ -106,11 +106,18 @@ oscillate.
 
 A message is the reader's turn as a bubble on the end side and the assistant's as the
 page's own text — full width, no avatar, nothing framing it. Its tool calls land in one
-of two places, and which one is not a matter of taste: a call **waiting on the reader**
-is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; every
-other call is activity, and they collapse into the one `Assistant.Activity` line above
-the answer — the newest tool named while they run, a count to unfold once they are
-done. `Assistant.Shimmer` is the wait before the first word.
+of three places, and which one is not a matter of taste: a call **waiting on the reader**
+is a question, so it keeps its `Assistant.ToolCall` card with Approve and Deny; a call
+whose result **is** the answer draws an **artifact**, the component that renders that
+tool's output; every other call is activity, and they collapse into the one
+`Assistant.Activity` line above the answer — the newest tool named while they run, a
+count to unfold once they are done. `Assistant.Shimmer` is the wait before the first
+word.
+
+A call lands in exactly one of the three, and which tools have artifacts is a decision
+recorded per tool rather than a habit — the map is total, so a new tool does not compile
+until someone has made it. The whole account, including the five questions that settle
+it, is [`docs/assistant-artifacts.md`](assistant-artifacts.md).
 
 ## The agent
 
@@ -199,7 +206,10 @@ the browser's copy of the assistant message is **not** trusted: only its approva
 decisions are copied onto the stored message, by approval id.
 
 Adding a tool: a new file exporting the `tool()` and its `ToolAccess`, one line in each of
-the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`. The type of
+the two maps in `tools/index.ts`, a label in `src/lib/ai/labels.ts`, and a verdict in
+`TOOL_ARTIFACT` — whether this tool's result earns a component in the thread or reads
+better as a line of activity ([`docs/assistant-artifacts.md`](assistant-artifacts.md)).
+That last map is total, so the decision is taken rather than skipped. The type of
 `AssistantUIMessage` follows, so the page's `tool-<name>` part is typed on arrival.
 
 ## Persistence
@@ -224,6 +234,11 @@ itself: `createdAt`, `model`, `inputTokens`, `outputTokens`. The endpoint attach
 
 ## What is deliberately not here yet
 
+- **Artifacts** — the components that render a tool's output in the thread. The
+  convention, the decision test and the per-tool verdicts are written up in
+  [`docs/assistant-artifacts.md`](assistant-artifacts.md); the seam itself
+  (`src/lib/ai/artifacts.ts`, the renderer, the three-way split in `Assistant.Message`)
+  arrives with the first one.
 - **Data parts** (`createUIMessageStream` + `writer.write({ type: 'data-…' })`) for UI that
   is not a tool result. The message type's second parameter is `never` until one exists.
 - **Attachments**, **retrieval** (needs pgvector and an ingest path), **stream

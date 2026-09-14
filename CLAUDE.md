@@ -773,7 +773,28 @@ version; read them before the website. The full account is `docs/assistant.md`.
   features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
   org and the caller holds the level, and every tool re-checks with
   `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
-  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts` +
+  **a verdict in `TOOL_ARTIFACT`** (next bullet).
+- **Every tool decides whether its result earns an artifact** — a component that renders
+  that tool's output in the thread, the AI SDK's generative UI done this repo's way: the
+  model picks the tool, the tool's typed output picks a component we wrote, and nothing
+  is ever generated as markup. A call therefore lands in one of **three** places, never
+  two of them: the `Assistant.ToolCall` card when it is waiting on the reader, an
+  artifact when the result IS the answer, the `Assistant.Activity` line when it is the
+  working. The default is still the activity line — a card dropped into a column of
+  prose interrupts reading, and a write whose whole content is "done" says it better in
+  a sentence — but the choice is **recorded per tool, not defaulted into**:
+  `TOOL_ARTIFACT` (`src/lib/ai/artifacts.ts`) is total over `AssistantToolName`, exactly
+  as `TOOL_LABELS` is, so a new tool does not compile until someone has decided. An
+  artifact renders `part.output` and nothing else (never a fetch, never `page.data`), is
+  a **read rather than a control** (acts go through the record's own page or the
+  approval card — never a `fetch` born in the thread), links a record only when `terms`
+  says this session may open it, builds from the same primitives as every other screen
+  (`DataTable`, the `detail/` parts, `Kanban` — never a hand-rolled table for the
+  thread), and degrades to nothing rather than crashing on a stored output whose shape
+  it no longer knows. The five questions that settle the verdict, the per-tool table and
+  the renderer's shape (an exhaustive `switch` like `sourcesOfPart()`, never a component
+  registry needing a cast) are `docs/assistant-artifacts.md`.
 - **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
   tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
   result is a data part; a message-level fact is metadata (`messageMetadataSchema`).
@@ -794,9 +815,10 @@ version; read them before the website. The full account is `docs/assistant.md`.
   as the body — never a card inside the page. The thread reaches the rail as a getter
   `Assistant.Root` publishes through `assistantThread`. The conversation is one column
   with two states — the composer centred under "How can I help you today?" over
-  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
-  its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
-  line. See docs/assistant.md, "The screen"; never build a second thread rail.
+  `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader
+  must answer keeps its `Assistant.ToolCall` card, one whose result is the answer draws
+  its artifact, and every other one collapses into the `Assistant.Activity` line. See
+  docs/assistant.md, "The screen"; never build a second thread rail.
 - Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
   opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
