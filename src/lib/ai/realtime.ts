@@ -65,26 +65,62 @@ export function voiceSession() {
 }
 
 /**
- * How long a call may go with nobody saying anything before it hangs up
- * itself, and how long before that it says so.
+ * The two limits on a call, and how long before each one it says so.
  *
  * A call is metered: an open socket with a live microphone costs money for
- * every minute of dead air, and a tab left open in the background would spend
- * it all night. Two minutes is well past a pause for thought and well short
- * of a bill nobody meant to run up, and the last thirty seconds of it are
- * spent saying so rather than going quiet and then hanging up — a call that
- * drops with no warning reads as a bug.
+ * every minute it is up, so it is bounded twice. **Idle** is dead air — two
+ * minutes is well past a pause for thought and well short of a bill nobody
+ * meant to run up, and a tab left open in the background would otherwise
+ * spend it all night. **Length** is the call itself: half an hour is longer
+ * than any question about a business takes, and a call that has run that long
+ * is almost always one somebody walked away from mid-conversation, which dead
+ * air alone never catches.
+ *
+ * Both warn before they act, because a call that drops with no notice reads
+ * as a bug. Neither loses anything: starting another is one press, and the
+ * assistant remembers nothing between calls anyway.
  */
 export const IDLE_LIMIT_MS = 120_000;
 export const IDLE_WARNING_MS = 30_000;
+export const MAX_CALL_MS = 30 * 60_000;
+export const MAX_CALL_WARNING_MS = 60_000;
 
-export type IdleStatus = 'live' | 'warning' | 'expired';
+/**
+ * Whether a call carries on, and what to say about it — one decision rather
+ * than a limit each, so the two can never disagree about which applies and
+ * the screen has one line to read. The words live here with the numbers they
+ * belong to, the way `callStatusLabel()` does.
+ */
+export type CallLimit =
+	{ status: 'live' } | { status: 'warning'; notice: string } | { status: 'ended'; reason: string };
 
-/** Where a call stands, given how long it has been since anybody said anything. */
-export function idleStatus(silentForMs: number): IdleStatus {
-	if (silentForMs >= IDLE_LIMIT_MS) return 'expired';
-	if (silentForMs >= IDLE_LIMIT_MS - IDLE_WARNING_MS) return 'warning';
-	return 'live';
+export function callLimit({
+	openForMs,
+	silentForMs
+}: {
+	/** How long the call has been up. */
+	openForMs: number;
+	/** How long since anybody last said anything. */
+	silentForMs: number;
+}): CallLimit {
+	if (openForMs >= MAX_CALL_MS) {
+		return {
+			status: 'ended',
+			reason: 'This call reached its thirty-minute limit. Start another whenever you like.'
+		};
+	}
+	if (silentForMs >= IDLE_LIMIT_MS) {
+		return { status: 'ended', reason: 'The call ended because nobody was talking.' };
+	}
+	// The nearer deadline is the one worth saying out loud, and silence is
+	// always the nearer one where both apply.
+	if (silentForMs >= IDLE_LIMIT_MS - IDLE_WARNING_MS) {
+		return { status: 'warning', notice: 'Still there? The call will end in a moment.' };
+	}
+	if (openForMs >= MAX_CALL_MS - MAX_CALL_WARNING_MS) {
+		return { status: 'warning', notice: 'This call is about to reach its thirty-minute limit.' };
+	}
+	return { status: 'live' };
 }
 
 /**

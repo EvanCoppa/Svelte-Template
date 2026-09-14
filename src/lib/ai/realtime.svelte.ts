@@ -7,8 +7,8 @@ import {
 } from 'ai';
 import { toolLabel } from '$lib/ai/labels';
 import {
+	callLimit,
 	callState,
-	idleStatus,
 	isConversationEvent,
 	voiceSession,
 	type CallState,
@@ -107,16 +107,17 @@ export class VoiceCall {
 	#starting = $state(false);
 	/** Why the call ended on its own, or null while it is live or never opened. */
 	#ended = $state<string | null>(null);
-	/** True while the call is about to hang up for want of anyone talking. */
-	#idleWarning = $state(false);
+	/** What a call about to reach one of its limits says, or null. */
+	#notice = $state<string | null>(null);
 	/**
-	 * When the conversation last moved, and the timer that watches it. A plain
-	 * number rather than state: it is written on every audio chunk, and nothing
-	 * draws it — what the screen reads is `idleWarning`, which changes twice a
-	 * call at most.
+	 * When the call opened and when the conversation last moved, with the timer
+	 * that watches both. Plain numbers rather than state: the second is written
+	 * on every audio chunk and nothing draws either — what the screen reads is
+	 * `notice`, which changes twice a call at most.
 	 */
+	#openedAt = 0;
 	#lastHeard = 0;
-	#idleTimer: ReturnType<typeof setInterval> | null = null;
+	#limitTimer: ReturnType<typeof setInterval> | null = null;
 	/**
 	 * Set the moment the call is hung up, and checked after every await in
 	 * `start()`. Opening a call is three round trips — the microphone, the
@@ -167,9 +168,9 @@ export class VoiceCall {
 		return this.#ended;
 	}
 
-	/** Whether the call is about to hang up because nobody is saying anything. */
-	get idleWarning(): boolean {
-		return this.#idleWarning;
+	/** What to say about a call approaching one of its limits, or null. */
+	get notice(): string | null {
+		return this.#notice;
 	}
 
 	/** Why the call could not start or could not continue, in words for the reader. */
@@ -194,7 +195,7 @@ export class VoiceCall {
 		this.#hungUp = false;
 		this.#failure = null;
 		this.#ended = null;
-		this.#idleWarning = false;
+		this.#notice = null;
 
 		let stream: MediaStream;
 		try {
@@ -248,7 +249,7 @@ export class VoiceCall {
 			this.#stopMeter = meterInput(stream, (level) => {
 				this.#level = level;
 			});
-			this.#watchForSilence();
+			this.#watchLimits();
 		} catch (cause) {
 			stream.getTracks().forEach((track) => track.stop());
 			this.#failure = cause instanceof Error ? cause.message : 'The call could not be started.';
@@ -258,14 +259,14 @@ export class VoiceCall {
 	}
 
 	/**
-	 * Hang up: the socket, the microphone, the level meter and the idle watch
-	 * all go together. A reason is given when the call ended itself, and is
-	 * what the screen says in place of the status line.
+	 * Hang up: the socket, the microphone, the level meter and the watch on
+	 * both limits all go together. A reason is given when the call ended
+	 * itself, and is what the screen says in place of the status line.
 	 */
 	end(reason: string | null = null): void {
 		this.#hungUp = true;
-		if (this.#idleTimer !== null) clearInterval(this.#idleTimer);
-		this.#idleTimer = null;
+		if (this.#limitTimer !== null) clearInterval(this.#limitTimer);
+		this.#limitTimer = null;
 		this.#stopMeter?.();
 		this.#stopMeter = null;
 		this.#session?.dispose();
@@ -276,42 +277,50 @@ export class VoiceCall {
 		this.#muted = false;
 		this.#running = 0;
 		this.#tool = null;
-		this.#idleWarning = false;
+		this.#notice = null;
 		this.#ended = reason;
 	}
 
 	/**
-	 * The conversation moved, so the call is not idle. Called many times a
-	 * second while anyone is talking, which is why the timestamp is plain and
-	 * the one piece of state here is only written when it actually changes.
+	 * The conversation moved. Called many times a second while anyone is
+	 * talking, so it writes nothing but a plain timestamp — the tick below owns
+	 * every piece of state that follows from it, which is also what keeps a
+	 * warning from flickering off and straight back on.
 	 */
 	#heard(): void {
 		this.#lastHeard = Date.now();
-		if (this.#idleWarning) this.#idleWarning = false;
 	}
 
 	/**
-	 * Watch for dead air. One interval reading a timestamp rather than a timer
+	 * Watch both limits. One interval reading two timestamps rather than timers
 	 * reset on every event: the conversation moves many times a second while
 	 * anyone is talking, and rescheduling a timeout that often is a lot of work
-	 * to answer a question a second's resolution already answers.
+	 * to answer a question a second's resolution already answers. What the two
+	 * numbers mean is `callLimit()`'s, so the deadlines and the words for them
+	 * live together.
 	 *
 	 * A tool still running counts as the call being alive — a lookup that
-	 * outlasts the limit is the assistant working, not a room nobody is in.
+	 * outlasts the idle limit is the assistant working, not a room nobody is
+	 * in. It does not extend the call's own length: half an hour is half an
+	 * hour whatever is happening in it.
 	 */
-	#watchForSilence(): void {
-		this.#heard();
-		this.#idleTimer = setInterval(() => {
-			if (this.#running > 0) {
-				this.#heard();
+	#watchLimits(): void {
+		const now = Date.now();
+		this.#openedAt = now;
+		this.#lastHeard = now;
+
+		this.#limitTimer = setInterval(() => {
+			if (this.#running > 0) this.#heard();
+			const limit = callLimit({
+				openForMs: Date.now() - this.#openedAt,
+				silentForMs: Date.now() - this.#lastHeard
+			});
+			if (limit.status === 'ended') {
+				this.end(limit.reason);
 				return;
 			}
-			const status = idleStatus(Date.now() - this.#lastHeard);
-			if (status === 'expired') {
-				this.end('The call ended because nobody was talking.');
-			} else {
-				this.#idleWarning = status === 'warning';
-			}
+			const notice = limit.status === 'warning' ? limit.notice : null;
+			if (this.#notice !== notice) this.#notice = notice;
 		}, 1000);
 	}
 

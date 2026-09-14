@@ -874,12 +874,16 @@ version; read them before the website. The full account is `docs/assistant.md`.
   browser is a relay, not the thing with the permissions. A call offers one tool fewer
   than a thread — anything in `TOOL_APPROVAL` is withheld, because a spoken "yes" is not
   an approval this app can evidence. `Assistant.Orb` is what you talk to, and it knows
-  only how loud and how fast. **A call hangs up on its own** after two minutes of
-  nobody talking (`IDLE_LIMIT_MS`, warning for the last thirty seconds), because an
-  open socket with a live microphone is metered; `isConversationEvent()` says what
-  keeps one alive by naming what does not, so an event type a later SDK maps counts
-  as talking rather than cutting a call off mid-sentence. The secret is minted with a
-  two-minute life as the server-side half of the same bound. The transcript is not
+  only how loud and how fast. **A call hangs up on its own, twice over**, because an
+  open socket with a live microphone is metered: after two minutes of dead air
+  (`IDLE_LIMIT_MS`) and after thirty minutes however lively it is (`MAX_CALL_MS`),
+  each warning first. `callLimit()` is the one decision — never a check per limit —
+  so the nearer deadline is the one said out loud and the words live beside the
+  numbers; `isConversationEvent()` says what keeps a call alive by naming what does
+  not, so an event type a later SDK maps counts as talking rather than cutting a call
+  off mid-sentence. A running tool holds off the idle limit and never the length one.
+  The secret is minted with a two-minute life as the server-side half of the same
+  bound. The transcript is not
   saved: a thread you want to keep is the typed one.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads

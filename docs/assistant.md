@@ -188,23 +188,37 @@ one line of transcript is there so you can check a name you half-heard. Closing 
 hanging up — the `$effect` that opens the call tears it down, so the button, Escape, a
 click outside and navigating away all release the microphone through the same line.
 
-**A call hangs up on its own.** It is metered — an open socket with a live
-microphone costs money for every minute of dead air, and a tab left in the
-background would spend it all night — so `VoiceCall` watches for silence and ends
-a call after two minutes of it (`IDLE_LIMIT_MS`), saying so for the last thirty
-seconds (`IDLE_WARNING_MS`) rather than dropping without warning. What counts as
-"somebody is still here" is the SDK's normalized server events, and
-`isConversationEvent()` states it as what does **not** count — the session being
-set up, an error, and `custom` (whatever the provider sent that the SDK does not
-map, which arrives on its own schedule). Stated that way round, an event type a
-later SDK maps counts as talking rather than being silently ignored: an event
-that failed to reset the clock would cut a call off mid-sentence, while one that
-resets it needlessly only costs a call that was going to end anyway. A tool still
-running counts too — a lookup that outlasts the limit is the assistant working,
-not a room nobody is in. One interval reading a timestamp, not a timeout
-rescheduled on every audio chunk. The ended call stays on screen with what
-happened and a **Call again** button, because a screen that vanished would look
-like a crash.
+**A call hangs up on its own, twice over.** It is metered — an open socket with
+a live microphone costs money for every minute it is up — so `VoiceCall` watches
+two clocks. **Dead air** ends it after two minutes (`IDLE_LIMIT_MS`), which is
+what catches a tab left open in the background. **Length** ends it after thirty
+minutes (`MAX_CALL_MS`) however lively it is, which is what catches the case dead
+air never does: somebody who walked away mid-conversation, or a call left running
+with a room talking near the microphone. Starting another is one press and the
+assistant remembers nothing between calls, so neither limit loses anything.
+
+Both warn first — thirty seconds and a minute respectively — because a call that
+drops with no notice reads as a bug. One function decides, `callLimit()`, rather
+than a check per limit: the two can then never disagree about which applies, the
+nearer deadline is the one said out loud, and the words live beside the numbers
+they belong to the way `callStatusLabel()` does. `VoiceCall` runs it once a
+second off two plain timestamps — a timer reset on every event would be
+rescheduled many times a second while anyone is talking, to answer a question a
+second's resolution already answers — and owns the notice entirely, so a warning
+cannot flicker off and straight back on when somebody speaks.
+
+What counts as "somebody is still here" is the SDK's normalized server events,
+and `isConversationEvent()` states it as what does **not** count — the session
+being set up, an error, and `custom` (whatever the provider sent that the SDK
+does not map, which arrives on its own schedule). Stated that way round, an event
+type a later SDK maps counts as talking rather than being silently ignored: an
+event that failed to reset the clock would cut a call off mid-sentence, while one
+that resets it needlessly only costs a call that was going to end anyway. A tool
+still running counts too — a lookup that outlasts the idle limit is the assistant
+working, not a room nobody is in — but it does not extend the call's own length:
+half an hour is half an hour whatever is happening in it. The ended call stays on
+screen with what happened and a **Call again** button, because a screen that
+vanished would look like a crash.
 
 Beside it, a server-side bound that does not depend on the browser behaving:
 the client secret is minted with `expiresAfterSeconds` of two minutes rather than

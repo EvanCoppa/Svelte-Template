@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { UIMessage } from 'ai';
 import {
+	callLimit,
 	callState,
 	callStatusLabel,
 	captionOf,
-	idleStatus,
 	isConversationEvent,
 	lastTurn,
 	messageText,
 	realtimeOrigins,
 	voiceSession,
 	IDLE_LIMIT_MS,
-	IDLE_WARNING_MS
+	IDLE_WARNING_MS,
+	MAX_CALL_MS,
+	MAX_CALL_WARNING_MS
 } from './realtime';
 
 /** A message the way the SDK assembles one from a call's transcripts. */
@@ -100,20 +102,65 @@ describe('captionOf', () => {
 	});
 });
 
-describe('idleStatus', () => {
-	it('warns before it hangs up, so a call never drops without saying so', () => {
-		expect(idleStatus(0)).toBe('live');
-		expect(idleStatus(IDLE_LIMIT_MS - IDLE_WARNING_MS - 1)).toBe('live');
-		expect(idleStatus(IDLE_LIMIT_MS - IDLE_WARNING_MS)).toBe('warning');
-		expect(idleStatus(IDLE_LIMIT_MS - 1)).toBe('warning');
-		expect(idleStatus(IDLE_LIMIT_MS)).toBe('expired');
-		expect(idleStatus(IDLE_LIMIT_MS * 10)).toBe('expired');
+describe('callLimit', () => {
+	/** A call that has just started and in which somebody just spoke. */
+	const fresh = { openForMs: 0, silentForMs: 0 };
+
+	it('carries on while there is time on both clocks', () => {
+		expect(callLimit(fresh)).toEqual({ status: 'live' });
+		expect(
+			callLimit({ openForMs: 10 * 60_000, silentForMs: IDLE_LIMIT_MS - IDLE_WARNING_MS - 1 })
+		).toEqual({ status: 'live' });
 	});
 
-	it('leaves enough silence for a pause and not enough for a night', () => {
+	it('warns before it hangs up on dead air, so a call never drops without saying so', () => {
+		expect(callLimit({ ...fresh, silentForMs: IDLE_LIMIT_MS - IDLE_WARNING_MS })).toMatchObject({
+			status: 'warning'
+		});
+		expect(callLimit({ ...fresh, silentForMs: IDLE_LIMIT_MS - 1 })).toMatchObject({
+			status: 'warning'
+		});
+		expect(callLimit({ ...fresh, silentForMs: IDLE_LIMIT_MS })).toEqual({
+			status: 'ended',
+			reason: expect.stringContaining('nobody was talking')
+		});
+	});
+
+	it('warns before the call’s own length runs out, and then ends it however lively it is', () => {
+		expect(callLimit({ openForMs: MAX_CALL_MS - MAX_CALL_WARNING_MS, silentForMs: 0 })).toEqual({
+			status: 'warning',
+			notice: expect.stringContaining('thirty-minute')
+		});
+		expect(callLimit({ openForMs: MAX_CALL_MS - MAX_CALL_WARNING_MS - 1, silentForMs: 0 })).toEqual(
+			{ status: 'live' }
+		);
+		// Somebody talking right now does not buy another minute.
+		expect(callLimit({ openForMs: MAX_CALL_MS, silentForMs: 0 })).toEqual({
+			status: 'ended',
+			reason: expect.stringContaining('thirty-minute')
+		});
+	});
+
+	it('says the nearer deadline when both are close', () => {
+		const both = {
+			openForMs: MAX_CALL_MS - MAX_CALL_WARNING_MS,
+			silentForMs: IDLE_LIMIT_MS - IDLE_WARNING_MS
+		};
+		// Thirty seconds of silence left beats a minute of call left.
+		expect(callLimit(both)).toEqual({
+			status: 'warning',
+			notice: expect.stringContaining('Still there')
+		});
+	});
+
+	it('leaves room for a pause and for a conversation, and not for a night', () => {
 		expect(IDLE_LIMIT_MS).toBeGreaterThan(60_000);
 		expect(IDLE_LIMIT_MS).toBeLessThanOrEqual(5 * 60_000);
 		expect(IDLE_WARNING_MS).toBeLessThan(IDLE_LIMIT_MS);
+		expect(MAX_CALL_MS).toBe(30 * 60_000);
+		expect(MAX_CALL_WARNING_MS).toBeLessThan(MAX_CALL_MS);
+		// The length cap has to outlast dead air, or nothing would ever go idle.
+		expect(MAX_CALL_MS).toBeGreaterThan(IDLE_LIMIT_MS);
 	});
 });
 

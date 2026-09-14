@@ -125,15 +125,12 @@
 
 	/**
 	 * The one line under the orb. A call that hung up itself says why, a call
-	 * about to says so while there is still time to speak up, and otherwise it
-	 * is what the assistant is doing.
+	 * about to reach one of its limits says so while there is still time to do
+	 * something about it, and otherwise it is what the assistant is doing. The
+	 * words for the first two are `$lib/ai/realtime`'s, beside the deadlines
+	 * they belong to.
 	 */
-	const status = $derived(
-		call?.ended ??
-			(call?.idleWarning
-				? 'Still there? The call will end in a moment.'
-				: (call?.activity ?? callStatusLabel(phase)))
-	);
+	const status = $derived(call?.ended ?? call?.notice ?? call?.activity ?? callStatusLabel(phase));
 </script>
 
 <Dialog.Root
