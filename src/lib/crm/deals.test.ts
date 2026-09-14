@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	buildDealColumns,
 	closeLabel,
 	dealIsSlipping,
 	groupDealsByStage,
@@ -48,6 +49,41 @@ describe('the funnel’s columns', () => {
 	it('adds a column up, counting a deal with no figure as nothing', () => {
 		expect(stageTotal([{ amount: 12000 }, { amount: null }, { amount: 500 }])).toBe(12500);
 		expect(stageTotal([])).toBe(0);
+	});
+});
+
+describe('the funnel’s columns, grouped', () => {
+	it('gives every open stage its own column, one status each', () => {
+		const columns = buildDealColumns([
+			{ id: 'lead', name: 'Lead', outcome: 'open', probability: 10 },
+			{ id: 'proposal', name: 'Proposal', outcome: 'open', probability: 60 }
+		]);
+
+		expect(columns.map((column) => column.id)).toEqual(['lead', 'proposal']);
+		expect(columns[0].statuses).toEqual([
+			{ value: 'lead', label: 'Lead', tone: 'info', fill: 0.1 }
+		]);
+	});
+
+	it('folds every closed stage into one Closed column, split into a zone each', () => {
+		const columns = buildDealColumns([
+			{ id: 'lead', name: 'Lead', outcome: 'open', probability: 10 },
+			{ id: 'won', name: 'Won', outcome: 'won', probability: 100 },
+			{ id: 'lost', name: 'Lost', outcome: 'lost', probability: 0 }
+		]);
+
+		expect(columns.map((column) => column.id)).toEqual(['lead', 'closed']);
+		const closed = columns[1];
+		expect(closed.label).toBe('Closed');
+		expect(closed.statuses.map((status) => status.value)).toEqual(['won', 'lost']);
+		expect(closed.statuses.map((status) => status.fill)).toEqual(['done', 'stopped']);
+	});
+
+	it('draws no Closed column at all when a board has no closed stage', () => {
+		const columns = buildDealColumns([
+			{ id: 'lead', name: 'Lead', outcome: 'open', probability: 10 }
+		]);
+		expect(columns.map((column) => column.id)).toEqual(['lead']);
 	});
 });
 
