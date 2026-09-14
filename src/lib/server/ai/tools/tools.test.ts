@@ -163,7 +163,9 @@ describe('createTask', () => {
 				completedAt: null,
 				companyId: COMPANY_ID,
 				contactId: null
-			}
+			},
+			// The company is who the task is FOR; nobody was put ON it.
+			assignees: []
 		});
 	});
 

@@ -731,7 +731,13 @@ answer:
   only place that shape is known; the Relationships card draws the result, so
   `describeTask()` has **no "Assigned to" field** — never add a second copy of a
   relationship as a record field. `deals.assigned_to` and `calendar_events.assigned_to`
-  stay columns on purpose: each is genuinely one person.
+  stay columns on purpose: each is genuinely one person — a deal's and a ticket's are
+  a `member` **picker field** on the generic form (below), so one person is picked the
+  way a stage is. **Assigning is not linking, and a record often does both**: the
+  assignee is the colleague who will do the work, while `company_id` / `contact_id`
+  are the party it is FOR. Never answer one with the other — a contact is not an
+  assignee, and a colleague is not the customer. The assistant says the same thing in
+  the same words (docs/assistant.md, "Assigning is not linking").
 - **Priority is one vocabulary** — the `public.priority` enum (renamed from
   `ticket_priority` when tasks became its second table), its options named once in
   `PRIORITY_OPTIONS` (`src/lib/schemas/records.ts`) and toned once in `PRIORITY_TONE`
@@ -791,8 +797,8 @@ Every field posts a **string** — that is what lets one component render them a
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
 schema so the enum unions come back without a cast), with `recordFormValues()` its
 mirror on the way back into the form. A record that points at another row — an
-invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
-field types**: still a
+invoice's customer, a deal's stage, a ticket's assignee — uses the `company` /
+`contact` / `stage` / `member` **picker field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
@@ -867,12 +873,17 @@ version; read them before the website. The full account is `docs/assistant.md`.
   `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
   file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts` + a
   case in `sourcesOf()`. **A tool about a kind of record is addressed by kind, never a
-  file per kind**: `findRecords`, `getRecord`, `updateRecord`, `linkRecords` and
-  `exploreGraph` serve every kind with a page through the generic record layer
-  (`getRecord()`, `patchRecord()`, `getRelationships()`), their `ToolAccess` is `anyOf`
+  file per kind**: `findRecords`, `getRecord`, `listRecordFields`, `createRecord`,
+  `updateRecord`, `addNote`, `linkRecords` and `exploreGraph` serve every kind with a
+  page through the generic record layer (`getRecord()`, `insertRecord()`,
+  `patchRecord()`, `getRelationships()`), their `ToolAccess` is `anyOf`
   the kinds' features, each call re-checks the kind it names with `recordAccess()`, and
-  the session block lists the kinds this caller may read in the industry's words
-  (`recordKindAccess()`) — docs/assistant.md, "Tools addressed by kind".
+  the session block lists the kinds this caller may read in the industry's words, with
+  what it may do to each — read, create, update (`recordKindAccess()`) —
+  docs/assistant.md, "Tools addressed by kind". **A kind whose creation is special is
+  special for the assistant too**: `createRecord` writes every kind the generic form
+  creates but a task, because `createTask` writes the row AND the people on it in one
+  call, exactly as the tasks page's modal does.
 - **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
   tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
   result is a data part; a message-level fact is metadata (`messageMetadataSchema`).

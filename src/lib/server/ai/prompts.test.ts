@@ -37,12 +37,22 @@ describe('sessionContext', () => {
 		const block = sessionContext({
 			...ctx,
 			kinds: [
-				{ kind: 'contact', name: 'Patients', noun: 'patient', canManage: true },
-				{ kind: 'proposal', name: 'Treatment plans', noun: 'treatment plan', canManage: false }
+				{ kind: 'contact', name: 'Patients', noun: 'patient', canCreate: true, canUpdate: true },
+				// A document with a lifecycle: it can be drafted, but changing
+				// one is its own page's business, never the edit form's.
+				{ kind: 'invoice', name: 'Invoices', noun: 'invoice', canCreate: true, canUpdate: false },
+				{
+					kind: 'proposal',
+					name: 'Treatment plans',
+					noun: 'treatment plan',
+					canCreate: false,
+					canUpdate: false
+				}
 			]
 		});
 		expect(block).toContain('Record kinds here');
-		expect(block).toContain('- contact — Patients (one: patient) — read, update');
+		expect(block).toContain('- contact — Patients (one: patient) — read, create, update');
+		expect(block).toContain('- invoice — Invoices (one: invoice) — read, create');
 		expect(block).toContain('- proposal — Treatment plans (one: treatment plan) — read');
 
 		expect(sessionContext(ctx)).not.toContain('Record kinds');

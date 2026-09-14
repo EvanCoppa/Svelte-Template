@@ -12,6 +12,8 @@ const TOOL_DISCIPLINE = `How to work:
 - Look a record up before acting on one (searchCompanies, searchContacts, or findRecords for any kind), and ask which is meant when a name matches several.
 - To answer how records relate — who owns what, who is connected to whom, what a person is involved in — start from getRecord (its fields, the records that point at it, its relationships and activity), and follow the ids with getRecord or exploreGraph for the wider neighbourhood. Draw conclusions only from what the tools returned, name the records and relationships they rest on, and say when the graph shows no connection.
 - Before you create, change, link, complete or delete anything, make sure you have everything the tool needs; ask for what is missing rather than assuming it. When updating a record, read it first and change only the fields the user named.
+- To create something: listRecordFields says what a kind takes — which fields are required, what each holds, and the values a chosen field accepts — and createRecord writes it. A task goes through createTask instead, which also puts people on it. Look up anything the new record points at (a company, a contact, a stage) before you write, and leave a field out rather than guessing at it.
+- Two different links, and a record often wants both. ASSIGNING is a colleague — someone who works at this organization, from listMembers, who will do the work: assignTask puts one on a task (a task can carry several, and unassignTask takes one off), while a deal or a ticket has a single assignee field you set like any other field. LINKING is the company or the contact the work is FOR — the customer it is about — set with the record's own company and contact fields. Never assign work to a contact or record a colleague as the customer, and when a name could be either, ask which was meant.
 - If you have no tool for what the user asks, say plainly that you cannot do that here. When an action is denied or not approved, do not retry it.`;
 
 /**
@@ -58,7 +60,10 @@ export type SessionKind = {
 	kind: string;
 	name: string;
 	noun: string;
-	canManage: boolean;
+	/** Whether this session can write a new one of these at all — a kind with no form cannot be created. */
+	canCreate: boolean;
+	/** Whether the generic edit form covers it; an invoice's lifecycle is its own page's. */
+	canUpdate: boolean;
 };
 
 export type SessionContext = {
@@ -106,10 +111,14 @@ export function sessionContext(ctx: SessionContext): string {
 	if (ctx.kinds && ctx.kinds.length > 0) {
 		lines.push(
 			'Record kinds here (kind — what this organization calls them — what you may do):',
-			...ctx.kinds.map(
-				(kind) =>
-					`- ${kind.kind} — ${kind.name} (one: ${kind.noun}) — ${kind.canManage ? 'read, update' : 'read'}`
-			)
+			...ctx.kinds.map((kind) => {
+				// What the tools will actually accept for this kind, so the model
+				// never offers to create something this workspace has no form for.
+				const verbs = ['read'];
+				if (kind.canCreate) verbs.push('create');
+				if (kind.canUpdate) verbs.push('update');
+				return `- ${kind.kind} — ${kind.name} (one: ${kind.noun}) — ${verbs.join(', ')}`;
+			})
 		);
 	}
 	return `<session_context>\n${lines.join('\n')}\n</session_context>`;

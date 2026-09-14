@@ -295,23 +295,26 @@ column grants and the `unwrap` error contract apply exactly as they do for a per
 Next to each tool sits its **access**: the feature whose data it touches and the level it
 needs there, on the same `read < manage < delete` ladder the rest of the app is gated on.
 
-| tool              | feature   | level  | approval |
-| ----------------- | --------- | ------ | -------- |
-| `searchCompanies` | companies | read   |          |
-| `getCompany`      | companies | read   |          |
-| `searchContacts`  | contacts  | read   |          |
-| `addNote`         | companies | manage |          |
-| `listTasks`       | tasks     | read   |          |
-| `createTask`      | tasks     | manage |          |
-| `completeTask`    | tasks     | manage |          |
-| `deleteTask`      | tasks     | delete | user     |
-| `listDeals`       | deals     | read   |          |
-| `listTickets`     | tickets   | read   |          |
-| `listEvents`      | calendar  | read   |          |
-| `exploreGraph`    | graph     | read   |          |
-| `listRecords`     | the kind  | read   |          |
-| `findOpenSlots`   | calendar  | read   |          |
-| `packableLines`   | shipments | manage |          |
+| tool              | feature             | level  | approval |
+| ----------------- | ------------------- | ------ | -------- |
+| `searchCompanies` | companies           | read   |          |
+| `getCompany`      | companies           | read   |          |
+| `searchContacts`  | contacts            | read   |          |
+| `addNote`         | the kind            | manage |          |
+| `listTasks`       | tasks               | read   |          |
+| `createTask`      | tasks               | manage |          |
+| `completeTask`    | tasks               | manage |          |
+| `deleteTask`      | tasks               | delete | user     |
+| `assignTask`      | tasks               | manage |          |
+| `unassignTask`    | tasks               | manage |          |
+| `listMembers`     | anything naming one | read   |          |
+| `listDeals`       | deals               | read   |          |
+| `listTickets`     | tickets             | read   |          |
+| `listEvents`      | calendar            | read   |          |
+| `exploreGraph`    | graph               | read   |          |
+| `listRecords`     | the kind            | read   |          |
+| `findOpenSlots`   | calendar            | read   |          |
+| `packableLines`   | shipments           | manage |          |
 
 `activeToolNames(org)` (`tools/index.ts`) keeps a tool only when the feature's mode for
 the org is `enabled` **and** the caller holds the level — the same intersection the hook
@@ -333,9 +336,42 @@ edits every kind — the generic record layer (`$lib/server/crm/records`,
 | ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `findRecords`           | read on the kind        | Records of one kind by name (`listRecordNames()`), ids to pass on.                                                                                                                                           |
 | `getRecord`             | read on the kind        | One record as its page shows it — fields (a field naming another record carries its kind and id), custom fields, tags, related records, relationships, latest activity — plus `editableFields` for a writer. |
+| `listRecordFields`      | manage on the kind      | The kind's form before there is a record to read: each field's name, type, whether it is required, and the values a chosen field accepts.                                                                    |
+| `createRecord`          | manage on the kind      | A new record through `insertRecord()`: the named fields are validated by the kind's own schema (a field left out is its default) and `writeRecord()` writes the row, answering with its id and name.         |
 | `updateRecord`          | manage on the kind      | A partial edit through `patchRecord()`: the named fields change, the rest keep their values, the kind's schema validates and `writeRecord()` writes.                                                         |
+| `addNote`               | manage on the kind      | Logs a `note` activity against any record through the shared entity link.                                                                                                                                    |
 | `linkRecords`           | manage on the from kind | Draws a relationship of a type, refusing an open duplicate — the record page's rule.                                                                                                                         |
 | `listRelationshipTypes` | read on any kind        | The relationship types, with both labels and the kinds each end must be.                                                                                                                                     |
+
+`createRecord` writes every kind the generic form creates **but a task**, for the reason
+the tasks page keeps its own modal instead of `CreateRecord`: the row is not the whole
+act, so `createTask` writes the task and the people on it in one call. A kind with a page
+but no form — a proposal, a shipment — the assistant does not create at all, and the
+session block says so per kind: `read`, `read, create`, `read, create, update`. Unlike an
+edit, a create does **not** pause for approval: it adds a record rather than overwriting
+one, and there is no before-and-after for a card to show.
+
+#### Assigning is not linking
+
+Two different links, and a record often wants both — so the assistant is told them apart
+in `TOOL_DISCIPLINE` and answers each where the data model does:
+
+- **Assigning** is a colleague: someone who works here, who will do the work.
+  `listMembers` names them (`listStaff()`, marking which one the caller is) and is offered
+  wherever a person can be named — the roster, the records that carry an assignee, the
+  graph — rather than behind `staff` read, because the tasks page shows the same names to
+  anyone who may put someone on a card. A **deal** and a **ticket** have a single
+  `assigned_to` column, so it is a `member` field on their form like any other field
+  (`RECORD_PICKER_KINDS`), written by `createRecord` / `updateRecord`. A **task** has no
+  such field: its assignees are `assigned_to` relationships, several at once and ended
+  rather than deleted, so `assignTask` and `unassignTask` write them — both addressed by
+  task and person, never by relationship id, and both idempotent (`changed: false` when
+  the task already read that way).
+- **Linking** is the party the work is FOR — the customer. `company_id` and `contact_id`
+  are columns on a deal, a task and a ticket alike, set through the record's own fields.
+
+Neither is a second way to say the other: a contact is never an assignee, and a colleague
+is never the company a task is about.
 
 Their `ToolAccess` is the second shape, `anyOf`: the tool is **offered** while any record
 kind's feature is open to the caller at the level, and each call re-checks the one kind it

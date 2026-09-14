@@ -1,7 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { tool } from 'ai';
 import { z } from 'zod';
-import type { Database } from '$lib/database.types';
 import { listActivities } from '$lib/server/crm/activities';
 import { listCustomFields } from '$lib/server/crm/custom-fields';
 import {
@@ -14,8 +12,7 @@ import { getRelationships } from '$lib/server/crm/relationships';
 import { listTagsFor } from '$lib/server/crm/tags';
 import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
-import { isEditableRecordType, pickerOptions, type EditableRecordType } from '$lib/server/records';
-import { RECORD_FORMS } from '$lib/schemas/records';
+import { isEditableRecordType } from '$lib/server/records';
 import { toolContextSchema } from '../context';
 import {
 	anyRecordAccess,
@@ -24,6 +21,7 @@ import {
 	recordAccess,
 	requireToolContext
 } from './access';
+import { describeRecordFields, recordFieldSchema } from './record-fields';
 import { fieldValueText, recordKindSchema, recordRefSchema } from './record-ref';
 
 export const getRecordAccess = anyRecordAccess('read');
@@ -76,18 +74,6 @@ const activitySchema = z.object({
 	by: z.string().nullable()
 });
 
-const editableFieldSchema = z.object({
-	name: z.string(),
-	label: z.string(),
-	type: z
-		.string()
-		.describe(
-			'text, email, tel, number, integer, date, datetime, textarea, select (one of options), ' +
-				'or a record kind — pass that record’s id, from findRecords.'
-		),
-	options: z.array(z.object({ value: z.string(), label: z.string() })).optional()
-});
-
 const recordSummarySchema = recordRefSchema.extend({
 	status: z.array(z.string()).describe('Lifecycle pills: status, stage outcome, kind…'),
 	fields: z.array(fieldSchema),
@@ -95,7 +81,7 @@ const recordSummarySchema = recordRefSchema.extend({
 	tags: z.array(z.string()),
 	createdAt: z.string(),
 	updatedAt: z.string(),
-	editableFields: z.array(editableFieldSchema).optional()
+	editableFields: z.array(recordFieldSchema).optional()
 });
 
 /** A record field as the model reads it: its text, and the record it names when it names one. */
@@ -161,7 +147,7 @@ export const getRecord = tool({
 				].filter((userId): userId is string => userId !== null)
 			),
 			isEditableRecordType(kind) && isToolActive(org, recordAccess(kind, 'manage'))
-				? describeEditableFields(supabase, orgId, kind)
+				? describeRecordFields(supabase, orgId, kind)
 				: undefined
 		]);
 
@@ -214,42 +200,3 @@ export const getRecord = tool({
 		};
 	}
 });
-
-/**
- * The fields `updateRecord` accepts for a kind, from the same registry the
- * edit form renders: a select carries its options, a deal's stage the org's
- * own stages (each labelled with its board), and a party picker says which
- * kind of id it takes. Only asked for when the caller may manage the kind.
- */
-async function describeEditableFields(
-	supabase: SupabaseClient<Database>,
-	orgId: string,
-	kind: EditableRecordType
-): Promise<z.infer<typeof editableFieldSchema>[]> {
-	const fields = RECORD_FORMS[kind].fields;
-	const stages = fields.some((field) => field.type === 'stage')
-		? await pickerOptions(supabase, orgId, 'stage')
-		: [];
-	return fields.map((field) => {
-		if (field.type === 'select') {
-			return {
-				name: field.name,
-				label: field.label,
-				type: field.type,
-				options: (field.options ?? []).map(({ value, label }) => ({ value, label }))
-			};
-		}
-		if (field.type === 'stage') {
-			return {
-				name: field.name,
-				label: field.label,
-				type: field.type,
-				options: stages.map(({ value, label, sublabel }) => ({
-					value,
-					label: sublabel ? `${label} (${sublabel})` : label
-				}))
-			};
-		}
-		return { name: field.name, label: field.label, type: field.type };
-	});
-}

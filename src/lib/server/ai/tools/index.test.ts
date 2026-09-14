@@ -71,28 +71,40 @@ describe('activeToolNames — tools are linked to features', () => {
 	it('walks the ladder: manage includes read, delete includes both', () => {
 		const manage = activeToolNames(orgContext({ role: 'member', grants: { tasks: 'manage' } }));
 		expect(manage.sort()).toEqual([
+			'addNote',
+			'assignTask',
 			'completeTask',
+			'createRecord',
 			'createTask',
 			'findRecords',
 			'getRecord',
 			'linkRecords',
+			'listMembers',
+			'listRecordFields',
 			'listRecords',
 			'listRelationshipTypes',
 			'listTasks',
+			'unassignTask',
 			'updateRecord'
 		]);
 
 		const del = activeToolNames(orgContext({ role: 'member', grants: { tasks: 'delete' } }));
 		expect(del.sort()).toEqual([
+			'addNote',
+			'assignTask',
 			'completeTask',
+			'createRecord',
 			'createTask',
 			'deleteTask',
 			'findRecords',
 			'getRecord',
 			'linkRecords',
+			'listMembers',
+			'listRecordFields',
 			'listRecords',
 			'listRelationshipTypes',
 			'listTasks',
+			'unassignTask',
 			'updateRecord'
 		]);
 	});
@@ -119,13 +131,20 @@ describe('activeToolNames — tools are linked to features', () => {
 		expect(kindsOff).not.toContain('linkRecords');
 		expect(kindsOff).not.toContain('listRelationshipTypes');
 		expect(kindsOff).not.toContain('listRecords');
+		expect(kindsOff).not.toContain('createRecord');
+		expect(kindsOff).not.toContain('listRecordFields');
+		expect(kindsOff).not.toContain('addNote');
 		expect(kindsOff).toContain('listEvents');
+		// The roster is not a record kind: naming a colleague survives every
+		// kind being off, because the calendar still books time against one.
+		expect(kindsOff).toContain('listMembers');
 
 		// Reading tickets alone is enough to be offered the reading tools, not the writing ones.
 		const reader = activeToolNames(orgContext({ role: 'member', grants: { tickets: 'read' } }));
 		expect(reader.sort()).toEqual([
 			'findRecords',
 			'getRecord',
+			'listMembers',
 			'listRecords',
 			'listRelationshipTypes',
 			'listTickets'
