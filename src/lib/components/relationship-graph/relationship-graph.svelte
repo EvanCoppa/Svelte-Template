@@ -140,8 +140,8 @@
 	 * band either side of a name's own line: a record reads as a word with a
 	 * dot on it at every zoom, which is the whole job.
 	 */
-	const DOT_MIN_RADIUS = 4.5;
-	const DOT_MAX_RADIUS = NAME_LINE + 6;
+	const DOT_MIN_RADIUS = 13;
+	const DOT_MAX_RADIUS = 33;
 	const screenRadiusOf = (node: SimNode, zoom: number) =>
 		Math.min(DOT_MAX_RADIUS, Math.max(DOT_MIN_RADIUS, radiusOf(node) * Math.sqrt(zoom)));
 
