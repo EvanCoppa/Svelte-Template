@@ -51,6 +51,9 @@ export const FEATURE_IDS = [
 	'graph',
 	// The whiteboard — one canvas, kept on the device (the whiteboard migration).
 	'whiteboard',
+	// Where people went and what came of it (the visits migration). Hidden for
+	// the verticals the customer comes TO.
+	'visits',
 	// Views — each a features row at /views/<id> (the views migration).
 	'suppliers',
 	'partner-contacts',

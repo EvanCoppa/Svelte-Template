@@ -53,6 +53,8 @@ export const QUERY = {
 	notifications: 'app:notifications',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
+	/** Where people went — logging one, or booking the next, changes it. */
+	visits: 'app:visits',
 	/** One CRM record of any kind, as the generic record page shows it. */
 	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */

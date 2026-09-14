@@ -1,0 +1,12 @@
+-- One more kind of CRM record, shipped alone: Postgres refuses to use an enum
+-- value in the transaction that added it (the party-model migration explains),
+-- so the value lands here and the migration that follows adds the table, the
+-- `private.crm_entity_exists()` branch and everything that makes it
+-- resolvable.
+--
+--   visit  somebody went there: a door knocked, a site walked, a machine
+--          serviced, a property shown (the visits migration)
+--
+-- Positioned to keep the enum alphabetical, the order the generated types
+-- list it in.
+alter type public.crm_entity_type add value if not exists 'visit' after 'ticket';

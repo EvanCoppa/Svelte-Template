@@ -47,8 +47,12 @@ import { unwrap, unwrapDeleted } from './unwrap';
 export const RELATIONSHIP_TYPE = {
 	assignedTo: 'f0000000-0000-0000-0000-000000000012',
 	responsibleFor: 'f0000000-0000-0000-0000-000000000013',
-	presents: 'f0000000-0000-0000-0000-000000000031',
-	proposedTo: 'f0000000-0000-0000-0000-000000000032'
+	// Re-homed by the visits migration: 0031/0032 were already `services` and
+	// `located_at`, so the rows proposal_graph_edges meant to ship were never
+	// inserted and these two constants resolved to the wrong labels.
+	presents: 'f0000000-0000-0000-0000-000000000033',
+	proposedTo: 'f0000000-0000-0000-0000-000000000034',
+	attendedBy: 'f0000000-0000-0000-0000-000000000041'
 } as const;
 
 export type RelationshipType = Tables<'relationship_types'>;

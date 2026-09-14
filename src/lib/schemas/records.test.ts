@@ -28,9 +28,18 @@ function sampleFor(field: RecordField): string {
 	// `includes` about an arbitrary field type. Widening only — no value is
 	// created or narrowed by it.
 	if ((RECORD_PICKER_KINDS as readonly string[]).includes(field.type)) {
-		return '20000000-0000-0000-0000-000000000001';
+		// The one picker whose value is not a bare id: a visit's subject is a
+		// kind AND a row, because the link it writes is two columns
+		// ($lib/crm/visits, `visitSubjectKey`).
+		return field.type === 'subject'
+			? 'company:20000000-0000-0000-0000-000000000001'
+			: '20000000-0000-0000-0000-000000000001';
 	}
 	switch (field.type) {
+		case 'geo':
+			// A point and the radius the device reported, as `formatFix()`
+			// writes it.
+			return '51.5,-0.12,8';
 		case 'select':
 			return field.options?.[0]?.value ?? '';
 		case 'email':
@@ -86,6 +95,15 @@ describe('the record registry', () => {
 				// matches the schema key.
 				if (field.type === type) {
 					expect(field.name).toMatch(/_id$/);
+					continue;
+				}
+				// A visit's subject is the second exception, and for the
+				// opposite reason: its value is not an id at all but a
+				// `<kind>:<id>` pair, because the link it fills in is two
+				// columns rather than one. Calling it `subject_id` would name
+				// it after something it does not hold.
+				if (field.type === 'subject') {
+					expect(field.name).toBe('subject');
 					continue;
 				}
 				expect(field.name).toBe(`${field.type}_id`);

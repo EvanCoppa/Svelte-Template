@@ -3,6 +3,7 @@ import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
 import { couponDiscountText } from '$lib/crm/coupons';
 import { leaseName } from '$lib/crm/leases';
 import { recordHref, type RecordKind } from '$lib/crm/records';
+import { visitName, visitSubjectKey } from '$lib/crm/visits';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
@@ -18,6 +19,7 @@ import {
 	PURCHASE_STATUS_TONE,
 	SHIPMENT_DELIVERY_TONE,
 	RMA_STATUS_TONE,
+	VISIT_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	TICKET_STATUS_TONE
 } from '$lib/crm/tones';
@@ -46,7 +48,8 @@ import { listOrders, type OrderWithCustomer } from './orders';
 import { listPurchases, type PurchaseWithVendor } from './purchases';
 import { listShipments, type ShipmentWithOrder } from './shipments';
 import { listRmas, type RmaWithParties } from './rmas';
-import { proposalParentKey, type CanOpen, type ProposalParent } from './records';
+import { listVisits, type VisitWithOutcome } from './visits';
+import { proposalParentKey, type CanOpen, type ProposalParent, type VisitSubject } from './records';
 import { listTickets, type TicketWithParties } from './tickets';
 
 /**
@@ -81,7 +84,8 @@ export type ListResult =
 	| { kind: 'order'; rows: OrderWithCustomer[] }
 	| { kind: 'shipment'; rows: ShipmentWithOrder[] }
 	| { kind: 'purchase'; rows: PurchaseWithVendor[] }
-	| { kind: 'rma'; rows: RmaWithParties[] };
+	| { kind: 'rma'; rows: RmaWithParties[] }
+	| { kind: 'visit'; rows: VisitWithOutcome[] };
 
 /** Every row of the kind the org has — a kind's own list page. */
 export async function listRecords(
@@ -122,6 +126,8 @@ export async function listRecords(
 			return { kind, rows: await listPurchases(supabase, orgId) };
 		case 'rma':
 			return { kind, rows: await listRmas(supabase, orgId) };
+		case 'visit':
+			return { kind, rows: await listVisits(supabase, orgId) };
 	}
 }
 
@@ -142,6 +148,8 @@ export type ListNeeds = {
 	customValues: boolean;
 	proposalParents: boolean;
 	memberNames: boolean;
+	/** Who each visit was to — a visit has no name of its own. */
+	visitSubjects: boolean;
 };
 
 export function listNeeds(spec: ListSpec): ListNeeds {
@@ -152,7 +160,10 @@ export function listNeeds(spec: ListSpec): ListNeeds {
 			spec.kind === 'proposal' && spec.fields.some((field) => field.key === 'contact'),
 		memberNames:
 			spec.kind === 'proposal' &&
-			spec.fields.some((field) => field.key === 'owner' || field.key === 'presenter')
+			spec.fields.some((field) => field.key === 'owner' || field.key === 'presenter'),
+		// Unconditional for visits, unlike the others: `name` is the subject,
+		// and the resolver puts `name` first whatever the rows say.
+		visitSubjects: spec.kind === 'visit'
 	};
 }
 
@@ -161,6 +172,7 @@ export type ListExtras = {
 	customValues: readonly CustomFieldValue[];
 	proposalParents: ReadonlyMap<string, ProposalParent>;
 	memberNames: ReadonlyMap<string, string>;
+	visitSubjects: ReadonlyMap<string, VisitSubject>;
 };
 
 /** The first address listed for each record — the primary one, the way `listAddressesFor()` orders them. */
@@ -666,6 +678,38 @@ export function describeListRows(
 						return text(rma.resolution);
 					case 'created_at':
 						return datetime(rma.created_at);
+				}
+			});
+		case 'visit':
+			return describe(result.kind, result.rows, (visit, key) => {
+				switch (key) {
+					// The subject's name, linking to the VISIT — the row opens
+					// what it is a row of, like every other list. Who was
+					// visited is opened from the record page.
+					case 'name':
+						return link(
+							'visit',
+							visit.id,
+							visitName(
+								extras.visitSubjects.get(visitSubjectKey(visit.entity_type, visit.entity_id))?.name
+							)
+						);
+					case 'status':
+						return status(visit.status, VISIT_STATUS_TONE[visit.status]);
+					// The org's own word for the outcome, in the tone it gave
+					// it — not one this file picked from the result.
+					case 'outcome':
+						return visit.visit_outcomes
+							? status(visit.visit_outcomes.name, visit.visit_outcomes.tone)
+							: text(null);
+					case 'occurred_at':
+						return datetime(visit.occurred_at);
+					case 'scheduled_for':
+						return datetime(visit.scheduled_for);
+					case 'notes':
+						return text(visit.notes);
+					case 'created_at':
+						return datetime(visit.created_at);
 				}
 			});
 	}

@@ -19,6 +19,7 @@ import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
 import PencilRulerIcon from '@lucide/svelte/icons/pencil-ruler';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
+import RouteIcon from '@lucide/svelte/icons/route';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
 import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 import ShieldIcon from '@lucide/svelte/icons/shield';
@@ -65,6 +66,7 @@ export const ICONS = {
 	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
 	'rotate-ccw': RotateCcwIcon,
+	route: RouteIcon,
 	shield: ShieldIcon,
 	'shopping-bag': ShoppingBagIcon,
 	'shopping-cart': ShoppingCartIcon,

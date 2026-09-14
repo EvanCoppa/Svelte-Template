@@ -15,7 +15,8 @@ import {
 	PURCHASE_STATUS_TONE,
 	SHIPMENT_DELIVERY_TONE,
 	RMA_STATUS_TONE,
-	TICKET_STATUS_TONE
+	TICKET_STATUS_TONE,
+	VISIT_STATUS_TONE
 } from '$lib/crm/tones';
 import type { TermId } from '$lib/features/vocabulary';
 import { capitalize } from '$lib/utils.js';
@@ -298,6 +299,22 @@ export const LIST_FIELD_CATALOG = {
 		total: money('Total'),
 		expected_at: datetime('Expected'),
 		ordered_at: datetime('Ordered'),
+		created_at: created
+	},
+	visit: {
+		/**
+		 * Who was visited — a visit has no name of its own, so this is the
+		 * subject's name, and like every list's first field it links to the
+		 * record the row IS. Text rather than `record`, because the cell opens
+		 * the visit and not the company.
+		 */
+		name: text('Visited'),
+		status: enumOf('Status', VISIT_STATUS_TONE),
+		/** An org's own rows, toned per row; the filter offers the names on screen. */
+		outcome: { label: { text: 'Outcome' }, type: 'enum' },
+		occurred_at: datetime('When'),
+		scheduled_for: datetime('Scheduled'),
+		notes: text('Notes'),
 		created_at: created
 	},
 	rma: {

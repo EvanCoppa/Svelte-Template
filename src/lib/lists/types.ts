@@ -40,7 +40,8 @@ export const LIST_KINDS = [
 	'order',
 	'shipment',
 	'purchase',
-	'rma'
+	'rma',
+	'visit'
 ] as const satisfies readonly RecordKind[];
 
 export type ListKind = (typeof LIST_KINDS)[number];

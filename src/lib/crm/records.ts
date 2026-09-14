@@ -39,7 +39,8 @@ export const RECORD_KINDS = [
 	'purchase',
 	'rma',
 	'task',
-	'ticket'
+	'ticket',
+	'visit'
 ] as const satisfies readonly Enums<'crm_entity_type'>[];
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
@@ -77,7 +78,8 @@ export const RECORD_KIND_META = {
 	purchase: { feature: 'purchases', segment: 'purchases' },
 	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },
-	ticket: { feature: 'tickets', segment: 'tickets' }
+	ticket: { feature: 'tickets', segment: 'tickets' },
+	visit: { feature: 'visits', segment: 'visits' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;
 
 /** Whether a string names a record kind — an entity type read off a row, say. */
