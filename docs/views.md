@@ -100,6 +100,15 @@ record, coloured from the `app.css` tokens and framed to the pins. The library i
 inside the attachment — it touches `window` on import, so a top-level import would break
 the server render — and lands in its own chunk.
 
+The same three pieces — `pinsFor()`, `MapView` and `mapConfig()` — also draw the map on
+`/companies`, the kind's own list page rather than a view: a company is a party like any
+view's source, so its base list carries the table/map toggle directly
+(`src/routes/(app)/companies/`) instead of a filtered view existing only to add one.
+Reach for a view's map when the map is of a **cut** of a kind (a territory, a segment);
+reach for the kind's own page when the map is of **all of it** — never both for the same
+rows, which is the trap `merchant-map` fell into (a company view filtered to
+`relationship = customer` next to the unfiltered Merchants page, two links over one book).
+
 The map is a style URL, and a second one for the dark theme: both are constants in
 `mapConfig()` (`src/lib/map.ts`) — OpenFreeMap's Liberty and Dark styles, which need no
 key and no account, so a clone draws a map with nothing to configure. `mapOrigins()`

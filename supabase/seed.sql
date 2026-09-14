@@ -1449,8 +1449,8 @@ values
 		(select id from public.custom_field_definitions where org_id = '10000000-0000-0000-0000-000000000016' and entity_type = 'company' and key = 'average_ticket'), null, 16.80)
 on conflict (entity_type, entity_id, field_definition_id) do nothing;
 
--- Where they are, so the Merchant map opens on pins rather than an empty map
--- (the same shape Bright Smile's patient map uses).
+-- Where they are, so the Merchants page's map layout opens on pins rather
+-- than an empty map (the same shape Bright Smile's patient map uses).
 insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, city, region, postal_code, country, latitude, longitude, is_primary) values
 	('32000000-0000-0000-0007-000000000001', '10000000-0000-0000-0000-000000000015', 'company',
 		'20000000-0000-0000-0007-000000000001', 'primary', '418 Bayshore Blvd', 'Tampa', 'FL', '33606', 'US', 27.9284, -82.4847, true),
