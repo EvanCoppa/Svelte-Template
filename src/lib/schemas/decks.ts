@@ -3,10 +3,11 @@ import { z } from 'zod';
 /**
  * A slide deck's `deck_json`, validated at the boundary before it is saved.
  *
- * A deck is a reusable presentation template: which slides, in what order, on
- * which template, with what design and static copy. It holds no proposal data
- * — the presenter injects that at render time — so nothing here knows about
- * proposals, and the same deck presents every proposal an org sends.
+ * An org has one deck — how its slideshow is put together: which slides, in
+ * what order, on which template, with what design and static copy. It holds
+ * no proposal data; the presenter injects that at render time
+ * (`$lib/slides/present`), so the same deck presents every proposal the org
+ * sends.
  *
  * This is the freeform-content tier of the three-tier enforcement rule in
  * docs/proposals.md. The database guarantees only the envelope (an object
@@ -19,10 +20,10 @@ export const DECK_VERSION = 1;
 
 /**
  * A runtime binding. The key it is stored under names a `text` entry, and
- * `sourceField` is a dot path resolved against the live proposal when the
- * deck is presented ("client.name", "option.computed_total"). The authored
- * text stays as the fallback when the path resolves to nothing, so a deck
- * always renders even with no proposal attached.
+ * `sourceField` is a dot path resolved against the proposal being presented
+ * ("client.name", "presenter.name" — the list is `BINDINGS` in
+ * `$lib/slides/bindings`). The authored text stays as the fallback when the
+ * path resolves to nothing, so a deck always renders.
  */
 export const slideVariableSchema = z.object({
 	sourceField: z
@@ -42,14 +43,18 @@ export const slideContentSchema = z.object({
 	text: z.record(z.string(), z.string()).default({}),
 	/**
 	 * Named image slots. URLs only: a data: URI would put megabytes of base64
-	 * inside deck_json, which is read and rewritten on every save.
+	 * inside deck_json, which is read and rewritten on every save. An empty
+	 * string is an unfilled slot.
 	 */
 	images: z
 		.record(
 			z.string(),
-			z.url('Images must be URLs.').refine((value) => !value.startsWith('data:'), {
-				error: 'Images must be URLs, not inline data.'
-			})
+			z.union([
+				z.literal(''),
+				z.url('Images must be URLs.').refine((value) => !value.startsWith('data:'), {
+					error: 'Images must be URLs, not inline data.'
+				})
+			])
 		)
 		.default({}),
 	/** Per-slide colour overrides, as CSS values. */
@@ -62,7 +67,7 @@ export const slideContentSchema = z.object({
 
 /**
  * One slide. `templateId` names the component that renders it; the registry
- * of valid ids belongs to the slide builder, so it is only shape-checked
+ * of valid ids belongs to the slides module, so it is only shape-checked
  * here — an unknown id is the renderer's problem, not a reason to refuse a
  * save and lose the author's work.
  */
@@ -83,23 +88,7 @@ export const slideDeckSchema = z
 		path: ['slides']
 	});
 
-/** The deck row's own editable fields; `deck_json` is validated above. */
-export const slideDeckRowSchema = z.object({
-	name: z
-		.string()
-		.trim()
-		.min(1, 'Give the deck a name.')
-		.max(120, 'Keep the name under 120 characters.')
-});
-
-/**
- * The per-slide types (`z.infer<typeof slideInstanceSchema>` and friends) are
- * deliberately not exported until something consumes them — the slide builder
- * will. Infer them from the schemas above rather than restating their shape.
- */
 export type SlideDeck = z.infer<typeof slideDeckSchema>;
 
-/** A deck with nothing in it — what a new row starts as. */
-export function emptyDeck(): SlideDeck {
-	return { version: DECK_VERSION, slides: [] };
-}
+/** What the builder posts: the deck, whole. */
+export const slideBuilderSchema = z.object({ deck: slideDeckSchema });

@@ -2988,7 +2988,6 @@ export type Database = {
           base_config: Json
           created_at: string
           created_by: string | null
-          deck_id: string | null
           default_fee: number | null
           entity_id: string | null
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -3007,7 +3006,6 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
-          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -3026,7 +3024,6 @@ export type Database = {
           base_config?: Json
           created_at?: string
           created_by?: string | null
-          deck_id?: string | null
           default_fee?: number | null
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
@@ -3042,13 +3039,6 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "proposals_deck_id_org_id_fkey"
-            columns: ["deck_id", "org_id"]
-            isOneToOne: false
-            referencedRelation: "slide_decks"
-            referencedColumns: ["id", "org_id"]
-          },
           {
             foreignKeyName: "proposals_org_id_fkey"
             columns: ["org_id"]
@@ -3783,6 +3773,44 @@ export type Database = {
           },
         ]
       }
+      slide_decks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deck_json: Json
+          id: string
+          org_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deck_json?: Json
+          id?: string
+          org_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deck_json?: Json
+          id?: string
+          org_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slide_decks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_compensation: {
         Row: {
           commission_percent: number | null
@@ -3812,47 +3840,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organization_members"
             referencedColumns: ["org_id", "user_id"]
-          },
-        ]
-      }
-      slide_decks: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          deck_json: Json
-          id: string
-          name: string
-          org_id: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          deck_json?: Json
-          id?: string
-          name: string
-          org_id: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          deck_json?: Json
-          id?: string
-          name?: string
-          org_id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "slide_decks_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
           },
         ]
       }

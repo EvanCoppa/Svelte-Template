@@ -26,6 +26,8 @@ export const QUERY = {
 	proposals: 'app:proposals',
 	billables: 'app:billables',
 	quickPlans: 'app:quick-plans',
+	/** The org's one slide deck — the builder saves it, the presenter reads it. */
+	slides: 'app:slides',
 	invoices: 'app:invoices',
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',

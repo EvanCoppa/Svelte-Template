@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-	comparisonTableSchema,
-	investmentLineItemsSchema,
 	MONEY_MAX,
-	parseNumericCell,
 	proposalInsertSchema,
 	proposalLineItemSchema,
 	proposalOptionInsertSchema,
 	proposalOptionUpdateSchema,
-	proposalUpdateSchema,
-	type ComparisonTable
+	proposalUpdateSchema
 } from './proposals';
 
 const ID = '11111111-1111-1111-1111-111111111111';
@@ -197,127 +193,5 @@ describe('proposalLineItemSchema', () => {
 		expect(proposalLineItemSchema.safeParse({ label: 'Crown', unit_cost: 1.999 }).success).toBe(
 			false
 		);
-	});
-});
-
-describe('parseNumericCell', () => {
-	it('reads money and percentages the way the slides do', () => {
-		expect(parseNumericCell('$4,500.00')).toBe(4500);
-		expect(parseNumericCell(' 12% ')).toBe(12);
-		expect(parseNumericCell('-30')).toBe(-30);
-		expect(parseNumericCell('3 visits')).toBeNull();
-		expect(parseNumericCell('TBD')).toBeNull();
-		expect(parseNumericCell('')).toBeNull();
-	});
-});
-
-describe('comparisonTableSchema', () => {
-	const table = [
-		'Feature | Basic | Standard* | Premium',
-		'Price | $12,000 | $24,000 | $30,000',
-		'Onboarding | no | yes | included',
-		'Support tier | email | business hours | 24/7'
-	].join('\n');
-
-	function parse(raw: string): ComparisonTable {
-		const result = comparisonTableSchema.safeParse(raw);
-		if (!result.success) throw new Error(messagesOf(result));
-		return result.data;
-	}
-
-	it('parses the header, the recommended column and typed cells', () => {
-		const parsed = parse(table);
-		expect(parsed.heading).toBe('Feature');
-		expect(parsed.columns).toEqual([
-			{ label: 'Basic', recommended: false },
-			{ label: 'Standard', recommended: true },
-			{ label: 'Premium', recommended: false }
-		]);
-		expect(parsed.rows.map((row) => row.label)).toEqual(['Price', 'Onboarding', 'Support tier']);
-		expect(parsed.rows[0]).toMatchObject({
-			numeric: true,
-			cells: [
-				{ kind: 'number', value: 12000, text: '$12,000' },
-				{ kind: 'number', value: 24000, text: '$24,000' },
-				{ kind: 'number', value: 30000, text: '$30,000' }
-			]
-		});
-		expect(parsed.rows[1]?.cells).toEqual([{ kind: 'no' }, { kind: 'yes' }, { kind: 'yes' }]);
-		expect(parsed.rows[2]).toMatchObject({ numeric: false });
-		expect(parsed.rows[2]?.cells[2]).toEqual({ kind: 'text', text: '24/7' });
-	});
-
-	it('rejects a row whose cell count differs from the header', () => {
-		const result = comparisonTableSchema.safeParse(`${table}\nWarranty | 1 | 2`);
-		expect(messagesOf(result)).toMatch(/Line 5: 3 cells, the header has 4/);
-	});
-
-	it('rejects a numeric row with a cell that does not parse', () => {
-		const result = comparisonTableSchema.safeParse(
-			'Feature | Basic | Premium\nPrice | $1,200 | TBD'
-		);
-		expect(messagesOf(result)).toMatch(/"TBD" is not a number/);
-	});
-
-	it('lets a numeric row carry blanks and dashes as "not offered"', () => {
-		const result = comparisonTableSchema.safeParse(
-			'Feature | Basic | Premium\nSeats | — | 12\nAddons | | 3'
-		);
-		expect(result.success).toBe(true);
-		expect(result.data?.rows[0]?.cells).toEqual([
-			{ kind: 'no' },
-			{ kind: 'number', value: 12, text: '12' }
-		]);
-		expect(result.data?.rows[1]?.cells[0]).toEqual({ kind: 'text', text: '' });
-	});
-
-	it('allows at most one recommended column', () => {
-		const result = comparisonTableSchema.safeParse('Feature | A* | B*\nPrice | 1 | 2');
-		expect(messagesOf(result)).toMatch(/only one column can end in "\*"/);
-	});
-
-	it('needs a header, at least one option column and at least one row', () => {
-		expect(messagesOf(comparisonTableSchema.safeParse(''))).toMatch(
-			/header line and at least one row/
-		);
-		expect(messagesOf(comparisonTableSchema.safeParse('Feature | A'))).toMatch(/at least one row/);
-		expect(messagesOf(comparisonTableSchema.safeParse('Feature\nPrice'))).toMatch(
-			/at least one option column/
-		);
-		expect(messagesOf(comparisonTableSchema.safeParse('Feature | A | \nPrice | 1 | 2'))).toMatch(
-			/option 2 has no label/
-		);
-		expect(messagesOf(comparisonTableSchema.safeParse('Feature | A\n | 1'))).toMatch(
-			/row has no label/
-		);
-	});
-
-	it('reports every problem at once', () => {
-		const result = comparisonTableSchema.safeParse('Feature | A* | B*\nPrice | 1\nSeats | TBD | 2');
-		expect(result.error?.issues).toHaveLength(3);
-	});
-});
-
-describe('investmentLineItemsSchema', () => {
-	it('parses label|amount lines with tolerant amounts', () => {
-		const result = investmentLineItemsSchema.safeParse('Crown | $1,200.50\nWhitening|300');
-		expect(result.data).toEqual([
-			{ label: 'Crown', amount: 1200.5 },
-			{ label: 'Whitening', amount: 300 }
-		]);
-	});
-
-	it('treats blank input as no items', () => {
-		expect(investmentLineItemsSchema.safeParse('  \n ').data).toEqual([]);
-	});
-
-	it('rejects a line without an amount, a bad amount, or a missing label', () => {
-		expect(messagesOf(investmentLineItemsSchema.safeParse('Crown'))).toMatch(
-			/expected "label\|amount"/
-		);
-		expect(messagesOf(investmentLineItemsSchema.safeParse('Crown | TBD'))).toMatch(
-			/"TBD" is not an amount/
-		);
-		expect(messagesOf(investmentLineItemsSchema.safeParse(' | 100'))).toMatch(/no label/);
 	});
 });

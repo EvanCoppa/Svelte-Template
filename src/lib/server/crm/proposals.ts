@@ -45,7 +45,6 @@ type ProposalColumn =
 	| 'default_fee'
 	| 'tax_rate'
 	| 'valid_until'
-	| 'deck_id'
 	| 'presenter_id'
 	| 'responsible_id';
 

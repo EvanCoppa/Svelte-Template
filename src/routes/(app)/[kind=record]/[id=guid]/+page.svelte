@@ -5,6 +5,7 @@
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
+	import PresentationIcon from '@lucide/svelte/icons/presentation';
 	import ReceiptIcon from '@lucide/svelte/icons/receipt';
 	import * as Detail from '$lib/components/detail/index.js';
 	import EditRecord from '$lib/components/edit-record.svelte';
@@ -91,6 +92,14 @@
 				</Detail.Facts>
 			{/if}
 		</Detail.Identity>
+
+		{#if data.record.kind === 'proposal'}
+			<!-- The slideshow: this {terms.noun} through the org's deck, full screen. -->
+			<Button href="/proposals/{data.record.id}/present" class="ml-auto shrink-0">
+				<PresentationIcon />
+				Present
+			</Button>
+		{/if}
 	</Detail.Header>
 
 	<!-- The tabs are the page; the rail beside them says what the record is and

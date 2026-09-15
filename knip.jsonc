@@ -9,7 +9,10 @@
 	// composed in markup through a namespace import (`<DataTable.Root>`), which
 	// knip cannot trace through a Svelte template, so their indexes are entry
 	// points for the same reason.
+	// A route-level components/ folder (CLAUDE.md, "Where a component lives") may
+	// carry the same namespace index, composed in its page's template the same way.
 	"entry": [
+		"src/routes/**/components/index.ts",
 		"src/lib/components/ui/*/index.ts",
 		"src/lib/components/enhanced/index.ts",
 		"src/lib/components/enhanced/*/index.ts",
