@@ -14,10 +14,12 @@ import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+import MailIcon from '@lucide/svelte/icons/mail';
 import MapIcon from '@lucide/svelte/icons/map';
 import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
 import PencilRulerIcon from '@lucide/svelte/icons/pencil-ruler';
+import PresentationIcon from '@lucide/svelte/icons/presentation';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import RouteIcon from '@lucide/svelte/icons/route';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
@@ -59,10 +61,12 @@ export const ICONS = {
 	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,
 	'list-checks': ListChecksIcon,
+	mail: MailIcon,
 	map: MapIcon,
 	'map-pin': MapPinIcon,
 	package: PackageIcon,
 	'pencil-ruler': PencilRulerIcon,
+	presentation: PresentationIcon,
 	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
 	'rotate-ccw': RotateCcwIcon,

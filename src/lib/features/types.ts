@@ -51,6 +51,10 @@ export const FEATURE_IDS = [
 	'graph',
 	// The whiteboard — one canvas, kept on the device (the whiteboard migration).
 	'whiteboard',
+	// Stubs: registered so they hold their spot in the nav ahead of the real
+	// screen (the nav_resketch migration).
+	'emails',
+	'slide-builder',
 	// Where people went and what came of it (the visits migration). Hidden for
 	// the verticals the customer comes TO.
 	'visits',

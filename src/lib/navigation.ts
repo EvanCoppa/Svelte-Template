@@ -220,6 +220,16 @@ export function iconForPath(pathname: string, nav: readonly NavItem[]): string |
  * Adding a settings page = the route under `(app)/settings/`, one entry
  * here, and its `pages` row by migration for the title. Groups render in
  * declared order.
+ *
+ * Billables and Quick Plans (the "Business" group) are the one deliberate
+ * exception, and the only one in the app: they are registered features at
+ * `/billables` and `/quick-plans` (the workspace nav category), not settings
+ * pages, so they stay behind the feature gate and `requirePermission()` in
+ * their own actions rather than becoming exempt like everything else here.
+ * They are listed in this nav only because a fee schedule is edited rarely
+ * enough to belong beside the org's other configuration, not because they
+ * stopped being gated business data — never add a route here that isn't
+ * either a true settings page or this same kind of already-gated exception.
  */
 export interface SettingsNavItem {
 	label: string;
@@ -267,6 +277,23 @@ export const settingsNav: SettingsNavGroup[] = [
 				href: '/settings/features',
 				icon: 'toggle-right',
 				aliases: ['plan', 'modules', 'upgrade']
+			}
+		]
+	},
+	{
+		label: 'Business',
+		items: [
+			{
+				label: 'Billables',
+				href: '/billables',
+				icon: 'receipt-text',
+				aliases: ['fee schedule', 'procedures', 'services', 'pricing']
+			},
+			{
+				label: 'Quick Plans',
+				href: '/quick-plans',
+				icon: 'layers',
+				aliases: ['bundles', 'packages']
 			}
 		]
 	}

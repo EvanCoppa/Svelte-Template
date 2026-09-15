@@ -172,11 +172,17 @@ describe('settingsNav', () => {
 		expect(nav.some((item) => item.href.startsWith('/settings'))).toBe(false);
 	});
 
-	it('lists every section under /settings with an icon the app ships', () => {
+	it('lists every section under /settings with an icon the app ships, but for the documented Billables/Quick Plans exception', () => {
+		// Both stay registered, gated features at their own routes (the
+		// navigation.ts "Business" group comment) — everything else here is a
+		// true settings page.
+		const gatedFeatureExceptions = ['/billables', '/quick-plans'];
 		const items = settingsNavItems();
 		expect(items.length).toBe(settingsNav.reduce((n, g) => n + g.items.length, 0));
 		for (const item of items) {
-			expect(item.href.startsWith('/settings/')).toBe(true);
+			expect(item.href.startsWith('/settings/') || gatedFeatureExceptions.includes(item.href)).toBe(
+				true
+			);
 			expect(isIconName(item.icon)).toBe(true);
 		}
 	});
