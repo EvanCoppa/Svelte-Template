@@ -24,7 +24,7 @@ import type { Actions, PageServerLoad } from './$types';
  * `$lib/server/record-page.ts`, composed rather than copied.
  */
 
-export const PRODUCT_IMAGE_FORM_IDS = {
+const PRODUCT_IMAGE_FORM_IDS = {
 	upload: 'product-image',
 	remove: 'remove-product-image'
 } as const;

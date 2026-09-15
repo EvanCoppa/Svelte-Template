@@ -43,7 +43,7 @@
 	let editorOpen = $state(false);
 	let removing = $state(false);
 
-	const { form, errors, message, submitting, enhance, reset } = superForm(uploadForm, {
+	const { errors, message, submitting, enhance, reset } = superForm(uploadForm, {
 		id: 'product-image',
 		validators: zod4Client(productImageUploadSchema),
 		invalidateAll: false,
