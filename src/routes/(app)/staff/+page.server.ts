@@ -15,13 +15,16 @@ import {
 import {
 	createInvite,
 	inviteUrl,
+	listCompensation,
 	listInvites,
 	listStaff,
 	removeMember,
-	revokeInvite
+	revokeInvite,
+	setCompensation
 } from '$lib/server/staff';
 import {
 	assignRoleSchema,
+	compensationSchema,
 	inviteLinkSchema,
 	inviteSchema,
 	removeMemberSchema,
@@ -65,7 +68,8 @@ const FORM_IDS = {
 	assignRole: 'assign-role',
 	unassignRole: 'unassign-role',
 	revokeInvite: 'revoke-invite',
-	removeMember: 'remove-member'
+	removeMember: 'remove-member',
+	compensation: 'compensation'
 } as const;
 
 /**
@@ -75,6 +79,17 @@ const FORM_IDS = {
  * in an RLS refusal. System admins are owners everywhere and pass.
  */
 function canAssignRoles(access: UserAccess): boolean {
+	return access.role === 'owner' || access.role === 'admin';
+}
+
+/**
+ * Pay is gated the same way role assignment is — owner/admin, not a staff
+ * grant — because the member_compensation policies accept exactly that (see
+ * the member_compensation migration). Kept as its own check rather than
+ * reusing `canAssignRoles` so the two can diverge later without one silently
+ * changing the other's meaning.
+ */
+function canManagePay(access: UserAccess): boolean {
 	return access.role === 'owner' || access.role === 'admin';
 }
 
@@ -107,9 +122,11 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	requirePermission(access, 'staff');
 
 	const manages = can(access, 'staff', 'manage');
+	const managesPay = canManagePay(access);
 
 	const [
 		staff,
+		compensation,
 		roles,
 		invites,
 		inviteForm,
@@ -117,9 +134,14 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		assignForm,
 		unassignForm,
 		revokeForm,
-		removeForm
+		removeForm,
+		compensationForm
 	] = await Promise.all([
 		listStaff(supabase, orgId),
+		// Pay is not roster data: a plain member's call would come back empty
+		// anyway (RLS), but skipping it entirely is what keeps their load from
+		// ever asking a table they may not read.
+		managesPay ? listCompensation(supabase, orgId) : new Map(),
 		listRoles(supabase, industryId),
 		// Invite rows carry join tokens; only a manager may see them, and RLS
 		// would return zero rows anyway.
@@ -129,23 +151,29 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		superValidate(zod4(assignRoleSchema), { id: FORM_IDS.assignRole }),
 		superValidate(zod4(unassignRoleSchema), { id: FORM_IDS.unassignRole }),
 		superValidate(zod4(revokeInviteSchema), { id: FORM_IDS.revokeInvite }),
-		superValidate(zod4(removeMemberSchema), { id: FORM_IDS.removeMember })
+		superValidate(zod4(removeMemberSchema), { id: FORM_IDS.removeMember }),
+		superValidate(zod4(compensationSchema), { id: FORM_IDS.compensation })
 	]);
 
 	return {
-		staff,
+		staff: staff.map((member) => ({
+			...member,
+			compensation: compensation.get(member.userId) ?? null
+		})),
 		roles,
 		invites,
 		/** What the screen may offer — the load already proved `read`. */
 		canManage: manages,
 		canAssignRoles: canAssignRoles(access),
+		canManagePay: managesPay,
 		canRemove: can(access, 'staff', 'delete'),
 		inviteForm,
 		inviteLinkForm,
 		assignForm,
 		unassignForm,
 		revokeForm,
-		removeForm
+		removeForm,
+		compensationForm
 	};
 };
 
@@ -289,6 +317,31 @@ export const actions: Actions = {
 			await removeMember(locals.supabase, orgId, form.data.user_id);
 		} catch (err) {
 			return message(form, err instanceof Error ? err.message : 'Could not remove the member.', {
+				status: 400
+			});
+		}
+
+		return { form };
+	},
+
+	setCompensation: async ({ locals, request }) => {
+		const { orgId, access } = accessFor(locals);
+		const form = await superValidate(request, zod4(compensationSchema), {
+			id: FORM_IDS.compensation
+		});
+		if (!form.valid) return fail(400, { form });
+		if (!canManagePay(access)) {
+			return message(form, 'Only owners and admins can set pay.', { status: 403 });
+		}
+
+		try {
+			await setCompensation(locals.supabase, orgId, form.data.user_id, {
+				hourlyWage: form.data.hourly_wage === '' ? null : Number(form.data.hourly_wage),
+				commissionPercent:
+					form.data.commission_percent === '' ? null : Number(form.data.commission_percent)
+			});
+		} catch (err) {
+			return message(form, err instanceof Error ? err.message : 'Could not save pay.', {
 				status: 400
 			});
 		}

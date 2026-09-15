@@ -21,7 +21,20 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 
 export type Invite = Tables<'organization_invites'>;
 
-/** One roster row: the membership joined with identity and held roles. */
+/**
+ * A member's pay, per org. Not roster data: `listCompensation()` only ever
+ * returns rows for the members an owner/admin caller may see — RLS backs
+ * that independently of who calls it, so a plain member's client gets none.
+ */
+export type Compensation = { hourlyWage: number | null; commissionPercent: number | null };
+
+/**
+ * One roster row: the membership joined with identity and held roles.
+ * `listStaff()` itself always sets `compensation` to `null` — the page's
+ * load overwrites it for an owner/admin caller only, from a separate query
+ * against `member_compensation`, so it reads as `null` for everyone else
+ * rather than something every caller of `listStaff()` must fetch.
+ */
 export type StaffMember = {
 	userId: string;
 	role: Enums<'org_role'>;
@@ -30,6 +43,7 @@ export type StaffMember = {
 	email: string | null;
 	avatarUrl: string | null;
 	roles: { id: string; name: string }[];
+	compensation: Compensation | null;
 };
 
 /**
@@ -58,7 +72,8 @@ export async function listStaff(
 			displayName: profile.display_name,
 			email: profile.email,
 			avatarUrl: profile.avatar_url,
-			roles: member_roles.map(({ roles: r }) => ({ id: r.id, name: r.name }))
+			roles: member_roles.map(({ roles: r }) => ({ id: r.id, name: r.name })),
+			compensation: null
 		}))
 		.sort((a, b) => (a.displayName ?? a.email ?? '').localeCompare(b.displayName ?? b.email ?? ''));
 }
@@ -141,6 +156,55 @@ export async function removeMember(
 			.eq('user_id', userId)
 			.select('id:user_id'),
 		'Member'
+	);
+}
+
+/**
+ * Every member's pay in the org, keyed by user id. RLS limits the rows this
+ * returns to owner/admin callers (member_compensation migration); a plain
+ * member's client sees an empty map rather than an error, which is what lets
+ * the load skip this call entirely for a caller it already knows cannot see
+ * it, instead of relying on the empty result.
+ */
+export async function listCompensation(
+	supabase: SupabaseClient<Database>,
+	orgId: string
+): Promise<Map<string, Compensation>> {
+	const rows = unwrap(
+		await supabase
+			.from('member_compensation')
+			.select('user_id, hourly_wage, commission_percent')
+			.eq('org_id', orgId)
+	);
+	return new Map(
+		rows.map((row) => [
+			row.user_id,
+			{ hourlyWage: row.hourly_wage, commissionPercent: row.commission_percent }
+		])
+	);
+}
+
+/**
+ * Set a member's pay. Upsert rather than update: the row may not exist yet
+ * (nobody has set this member's pay before). RLS backs the owner/admin
+ * boundary independently of the action's own permission check.
+ */
+export async function setCompensation(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	userId: string,
+	compensation: Compensation
+): Promise<void> {
+	ensure(
+		await supabase.from('member_compensation').upsert(
+			{
+				org_id: orgId,
+				user_id: userId,
+				hourly_wage: compensation.hourlyWage,
+				commission_percent: compensation.commissionPercent
+			},
+			{ onConflict: 'org_id,user_id' }
+		)
 	);
 }
 

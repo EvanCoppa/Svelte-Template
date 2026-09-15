@@ -4,11 +4,13 @@ import {
 	acceptanceFor,
 	createInvite,
 	inviteUrl,
+	listCompensation,
 	listInvites,
 	listStaff,
 	lookupInvite,
 	removeMember,
-	revokeInvite
+	revokeInvite,
+	setCompensation
 } from './staff';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './crm/test-support';
 
@@ -64,6 +66,54 @@ describe('listStaff', () => {
 
 		const staff = await listStaff(supabase, ORG_ID);
 		expect(staff.map((m) => m.email)).toEqual(['Ann@example.com', 'zed@example.com']);
+	});
+});
+
+describe('listCompensation', () => {
+	it('keys the pay rows by user id', async () => {
+		const { supabase, from, builder } = supabaseMock({
+			data: [
+				{ user_id: USER_ID, hourly_wage: 22.5, commission_percent: null },
+				{ user_id: OTHER_USER_ID, hourly_wage: null, commission_percent: 8.5 }
+			]
+		});
+
+		const compensation = await listCompensation(supabase, ORG_ID);
+		expect(from).toHaveBeenCalledWith('member_compensation');
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(compensation.get(USER_ID)).toEqual({ hourlyWage: 22.5, commissionPercent: null });
+		expect(compensation.get(OTHER_USER_ID)).toEqual({ hourlyWage: null, commissionPercent: 8.5 });
+	});
+
+	it('comes back empty for a caller RLS shows nothing to', async () => {
+		const { supabase } = supabaseMock({ data: [] });
+
+		const compensation = await listCompensation(supabase, ORG_ID);
+		expect(compensation.size).toBe(0);
+	});
+});
+
+describe('setCompensation', () => {
+	it('upserts on the org/user pair', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: null });
+
+		await setCompensation(supabase, ORG_ID, USER_ID, {
+			hourlyWage: 22.5,
+			commissionPercent: null
+		});
+		expect(from).toHaveBeenCalledWith('member_compensation');
+		expect(builder.upsert).toHaveBeenCalledWith(
+			{ org_id: ORG_ID, user_id: USER_ID, hourly_wage: 22.5, commission_percent: null },
+			{ onConflict: 'org_id,user_id' }
+		);
+	});
+
+	it('throws when RLS refuses the write', async () => {
+		const { supabase } = supabaseMock({ error: { message: 'permission denied' } });
+
+		await expect(
+			setCompensation(supabase, ORG_ID, USER_ID, { hourlyWage: 10, commissionPercent: null })
+		).rejects.toThrow('permission denied');
 	});
 });
 

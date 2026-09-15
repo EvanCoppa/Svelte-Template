@@ -40,3 +40,27 @@ export const unassignRoleSchema = z.object({
 export const removeMemberSchema = z.object({
 	user_id: z.guid()
 });
+
+/**
+ * Every field posts a string, like the generic record form's — blank means
+ * "no figure", not zero, so the server tells the two apart the same way
+ * `writeRecord()`'s `amount()` helper does. The range checks here are for a
+ * readable inline error; the database's own check constraints are the real
+ * boundary.
+ */
+function optionalAmount(message: string, max?: number) {
+	return z
+		.string()
+		.trim()
+		.refine((value) => {
+			if (value === '') return true;
+			const n = Number(value);
+			return !Number.isNaN(n) && n >= 0 && (max === undefined || n <= max);
+		}, message);
+}
+
+export const compensationSchema = z.object({
+	user_id: z.guid(),
+	hourly_wage: optionalAmount('Enter a wage of 0 or more.'),
+	commission_percent: optionalAmount('Enter a percentage between 0 and 100.', 100)
+});

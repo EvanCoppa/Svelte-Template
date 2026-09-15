@@ -8,6 +8,7 @@
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
+	import WalletIcon from '@lucide/svelte/icons/wallet';
 	import XIcon from '@lucide/svelte/icons/x';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import { CopyButton, HoldToConfirm } from '$lib/components/enhanced/index.js';
@@ -24,7 +25,19 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { StaffMember } from '$lib/server/staff';
 	import { capitalize } from '$lib/utils.js';
-	import { inviteSchema } from './schema';
+	import { compensationSchema, inviteSchema } from './schema';
+
+	// A fixed locale, like `dateFormat` below — the server render and the
+	// hydrated one must agree, so this can never follow the visitor's own.
+	const currencyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+	function formatWage(value: number | null): string {
+		return value === null ? '—' : `${currencyFormat.format(value)}/hr`;
+	}
+
+	function formatCommission(value: number | null): string {
+		return value === null ? '—' : `${value}%`;
+	}
 
 	let { data } = $props();
 
@@ -153,13 +166,40 @@
 				renderComponent(Staff.RowActions, {
 					name: Staff.memberName(row.original),
 					canAssignRoles: data.canAssignRoles,
+					canManagePay: data.canManagePay,
 					canRemove: canRemoveMember(row.original),
 					onManage: () => (managingId = row.original.userId),
+					onManagePay: () => openPay(row.original),
 					onRemove: () => (removingId = row.original.userId)
 				})
 			)
 		]);
-		if (data.canAssignRoles || data.canRemove) return defs;
+		// Pay is management data, not roster data: the two wage/commission
+		// columns only exist on the definition list for a caller who may see
+		// them at all — never rendered blank for everyone else.
+		if (data.canManagePay) {
+			defs.splice(
+				defs.length - 1,
+				0,
+				columnHelper.accessor((member) => member.compensation?.hourlyWage ?? null, {
+					id: 'hourlyWage',
+					header: ({ column }) =>
+						renderComponent(DataTable.ColumnHeader, { column, title: 'Hourly wage' }),
+					cell: ({ getValue }) => formatWage(getValue()),
+					enableGlobalFilter: false,
+					meta: { title: 'Hourly wage' }
+				}),
+				columnHelper.accessor((member) => member.compensation?.commissionPercent ?? null, {
+					id: 'commissionPercent',
+					header: ({ column }) =>
+						renderComponent(DataTable.ColumnHeader, { column, title: 'Commission' }),
+					cell: ({ getValue }) => formatCommission(getValue()),
+					enableGlobalFilter: false,
+					meta: { title: 'Commission' }
+				})
+			);
+		}
+		if (data.canAssignRoles || data.canManagePay || data.canRemove) return defs;
 		return defs.filter((def) => def.id !== 'actions');
 	});
 
@@ -174,14 +214,16 @@
 	});
 
 	/**
-	 * The two per-member dialogs address a member by id, not by a copied row:
-	 * an assign or a remove reloads the roster underneath them, and a snapshot
-	 * would keep showing the roles the member held before the click.
+	 * The per-member dialogs address a member by id, not by a copied row: an
+	 * assign, a pay change or a remove reloads the roster underneath them, and
+	 * a snapshot would keep showing what the member held before the click.
 	 */
 	let managingId = $state<string | null>(null);
 	let removingId = $state<string | null>(null);
+	let payingId = $state<string | null>(null);
 	const managing = $derived(data.staff.find((member) => member.userId === managingId) ?? null);
 	const removing = $derived(data.staff.find((member) => member.userId === removingId) ?? null);
+	const paying = $derived(data.staff.find((member) => member.userId === payingId) ?? null);
 
 	/** Which role the manage dialog's picker has selected. */
 	let roleChoice = $state('');
@@ -277,6 +319,38 @@
 			toast.success('Member removed');
 		}
 	});
+
+	// A visible form, unlike the id-only ones above: the reader types an
+	// amount, so it validates client-side and binds like `invite`'s does.
+	const {
+		form: compensationFormData,
+		errors: compensationErrors,
+		message: compensationMessage,
+		constraints: compensationConstraints,
+		submitting: settingPay,
+		enhance: compensationEnhance
+	} = superForm(data.compensationForm, {
+		id: 'compensation',
+		validators: zod4Client(compensationSchema),
+		onUpdated({ form }) {
+			if (!form.valid) return;
+			payingId = null;
+			toast.success('Pay updated');
+		}
+	});
+
+	/** Opening the dialog fills the form from this row's own pay, once — not a
+	 *  continuous sync, so editing one field never fights a rerender. */
+	function openPay(member: StaffMember) {
+		payingId = member.userId;
+		$compensationFormData.user_id = member.userId;
+		$compensationFormData.hourly_wage =
+			member.compensation?.hourlyWage != null ? String(member.compensation.hourlyWage) : '';
+		$compensationFormData.commission_percent =
+			member.compensation?.commissionPercent != null
+				? String(member.compensation.commissionPercent)
+				: '';
+	}
 </script>
 
 {#snippet stat(label: string, value: number, tone: BadgeTone | null = null)}
@@ -572,6 +646,81 @@
 					>
 						Hold to remove
 					</HoldToConfirm>
+				</Modal.Footer>
+			</form>
+		{/if}
+	</Modal.Content>
+</Modal.Root>
+
+<!-- Set pay — owner/admin only, and never shown to the member it names. -->
+<Modal.Root
+	open={paying !== null}
+	onOpenChange={(open) => {
+		if (!open) payingId = null;
+	}}
+>
+	<Modal.Content>
+		{#if paying}
+			<form method="POST" action="?/setCompensation" use:compensationEnhance>
+				<input type="hidden" name="user_id" value={paying.userId} />
+				<Modal.Card>
+					<Modal.Header>
+						<Modal.Title><WalletIcon /> Pay for {Staff.memberName(paying)}</Modal.Title>
+						<Modal.Description>
+							Visible to owners and admins only — never on the roster a plain member sees.
+						</Modal.Description>
+					</Modal.Header>
+					<Modal.Body>
+						<FormAlert message={$compensationMessage} class="mb-0" />
+
+						<div class="grid gap-2">
+							<Label for="compensation-hourly-wage">Hourly wage</Label>
+							<Input
+								id="compensation-hourly-wage"
+								name="hourly_wage"
+								inputmode="decimal"
+								placeholder="0.00"
+								aria-invalid={$compensationErrors.hourly_wage ? 'true' : undefined}
+								aria-describedby={$compensationErrors.hourly_wage
+									? 'compensation-hourly-wage-error'
+									: undefined}
+								bind:value={$compensationFormData.hourly_wage}
+								{...$compensationConstraints.hourly_wage}
+							/>
+							{#if $compensationErrors.hourly_wage}
+								<p id="compensation-hourly-wage-error" class="text-destructive text-sm">
+									{$compensationErrors.hourly_wage}
+								</p>
+							{/if}
+						</div>
+
+						<div class="grid gap-2">
+							<Label for="compensation-commission-percent">Commission percent</Label>
+							<Input
+								id="compensation-commission-percent"
+								name="commission_percent"
+								inputmode="decimal"
+								placeholder="0"
+								aria-invalid={$compensationErrors.commission_percent ? 'true' : undefined}
+								aria-describedby={$compensationErrors.commission_percent
+									? 'compensation-commission-percent-error'
+									: undefined}
+								bind:value={$compensationFormData.commission_percent}
+								{...$compensationConstraints.commission_percent}
+							/>
+							{#if $compensationErrors.commission_percent}
+								<p id="compensation-commission-percent-error" class="text-destructive text-sm">
+									{$compensationErrors.commission_percent}
+								</p>
+							{/if}
+						</div>
+					</Modal.Body>
+				</Modal.Card>
+				<Modal.Footer>
+					<Modal.Cancel>Cancel</Modal.Cancel>
+					<Modal.Action type="submit" disabled={$settingPay}>
+						{$settingPay ? 'Saving…' : 'Save'}
+					</Modal.Action>
 				</Modal.Footer>
 			</form>
 		{/if}

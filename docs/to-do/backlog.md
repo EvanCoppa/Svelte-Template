@@ -21,18 +21,24 @@ Fixed in #153: `SettingsSidebar` and `AssistantSidebar` now derive
 `NavUser`, same as `AppSidebar`. Covered by `navigation.test.ts` and
 `tests/auth.spec.ts`.
 
-### 1.2 Hourly wage and commission percentage on staff — **Ready**
+### 1.2 Hourly wage and commission percentage on staff — **Done**
 
-- [ ] Migration adding `hourly_wage numeric` and `commission_percent numeric` to
-      the member/staff record, with check constraints (wage `>= 0`, percent
-      `0–100`).
-- [ ] Decide the read boundary: pay is not roster data. Gate both columns behind
-      owner/admin (or a dedicated level) with column-level grants, so a member
-      reading the roster never receives them.
-- [ ] `npm run db:types` and commit the regenerated `src/lib/database.types.ts`.
-- [ ] Surface them on the staff page and in the record form; money renders
-      through the existing `money` field type.
-- [ ] Tests for the new policies and for the form action.
+Pay lives in its own `member_compensation` table rather than columns on
+`organization_members`: Postgres column GRANTs can't distinguish "owner of
+org X" from "member of org X" under the shared `authenticated` role, so the
+boundary is RLS instead, restricted to owner/admin both ways (not even the
+member themselves can read their own row).
+
+- [x] Migration: `member_compensation` (`org_id`, `user_id`, `hourly_wage`,
+      `commission_percent`, check constraints, FK onto `organization_members`).
+- [x] Read boundary: RLS gates both columns to owner/admin; a plain member's
+      `listCompensation()` call comes back empty rather than erroring.
+- [x] `npm run db:types` and the regenerated `src/lib/database.types.ts` committed.
+- [x] Surfaced on the staff page: two list columns (hidden entirely for a
+      caller who can't manage pay) and a "Set pay" row action/modal.
+- [x] Tests for `listCompensation`/`setCompensation` and the `compensationSchema`
+      validation; verified in a real browser session that a plain member sees
+      neither the columns nor the action.
 
 ---
 
@@ -68,13 +74,13 @@ Discussed as a list; still needs sorting into real columns vs. custom fields vs.
 relationships. Proposed classification to confirm:
 
 - **Relationships, not columns** — rep and owner are both members. `assigned_to`
-  stays a column only if genuinely single-valued; a rep *and* an owner means two
+  stays a column only if genuinely single-valued; a rep _and_ an owner means two
   named roles, which is the `proposals` presenter/responsible pattern
   (composite key onto the membership) rather than two ad-hoc columns.
 - **Universal columns** — next action (text), next action due date, last
   activity date, expected close date, projected value (noun renamed per industry
   through `terms`, so it is not "monthly revenue" everywhere).
-- **Source** — points at a contact *or* a company, so it is a relationship, not
+- **Source** — points at a contact _or_ a company, so it is a relationship, not
   an `owner_id`-shaped column that has to pick a kind.
 - **Payment-processing custom fields** — current processor, current POS/gateway,
   main objection, statement status, proposal status, application status. These
@@ -152,7 +158,7 @@ lifecycle from onboarding; the cadence engine (§4.1) schedules the work but doe
 not own it.
 
 - [ ] Plan doc section defining the boundary between onboarding and follow-up.
-- [ ] Decide what a follow-up record *is* — a lifecycle on the customer, or
+- [ ] Decide what a follow-up record _is_ — a lifecycle on the customer, or
       scheduled occurrences with no record of their own.
 
 ---
