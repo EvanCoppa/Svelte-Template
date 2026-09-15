@@ -233,7 +233,13 @@ application data is scoped to an organization, never to a bare user. The
   relative to the page it is on. `(app)/companies/[id=guid]/` is the worked
   example — the ego graph, the people, the account and the map it adds are what a
   kind earns a page FOR; never a second renderer, a second record load or a second
-  relationship card. A new list page joins by adding its kind to
+  relationship card. `(app)/products/[id=guid]/` is the second: its picture is the
+  header tile (`Detail.Identity image`), Overview leads with the Media card and what
+  the storefront says, and the rail opens with Sales performance and Inventory —
+  figures folded in the browser from the order lines that cite it (`salesSummary()`
+  / `allocatedQuantity()` in `$lib/crm/products`), each shown only when the
+  `orders` grant lets this session read them, and the Orders and Purchases tabs
+  are those lines listed. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.

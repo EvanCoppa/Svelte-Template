@@ -8,6 +8,7 @@
 	let {
 		id,
 		name,
+		image = null,
 		pills = [],
 		tags = [],
 		children
@@ -15,6 +16,8 @@
 		/** The record's id — the seed its tile is tinted from, never its name. */
 		id: string;
 		name: string;
+		/** The record's own picture, when it has one — a product's storefront image — in place of its initials. */
+		image?: string | null;
 		/** The record's lifecycle, beside its name. */
 		pills?: readonly { label: string; tone: BadgeTone }[];
 		tags?: readonly { id: string; name: string; tone: BadgeTone }[];
@@ -30,13 +33,19 @@
 		A record's tile is square, the way an app or a company mark is; a round
 		one would read as a person even for a product.
 	-->
-	<div
-		class="{Avatar.avatarTint(
-			id
-		)} flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold"
-	>
-		{initials}
-	</div>
+	{#if image}
+		<div class="bg-muted size-14 shrink-0 overflow-hidden rounded-lg border">
+			<img src={image} alt="" class="size-full object-cover" width="56" height="56" />
+		</div>
+	{:else}
+		<div
+			class="{Avatar.avatarTint(
+				id
+			)} flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold"
+		>
+			{initials}
+		</div>
+	{/if}
 	<div class="min-w-0 space-y-1">
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 			<h1 class="text-2xl font-bold tracking-tight">{name}</h1>

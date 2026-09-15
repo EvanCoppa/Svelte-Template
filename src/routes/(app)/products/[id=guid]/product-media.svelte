@@ -1,29 +1,33 @@
 <script lang="ts">
 	import ImageIcon from '@lucide/svelte/icons/image';
+	import ImagePlusIcon from '@lucide/svelte/icons/image-plus';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import UploadIcon from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { invalidate } from '$app/navigation';
-	import { BlurUpImage } from '$lib/components/enhanced/index.js';
+	import { BlurUpImage, Lightbox } from '$lib/components/enhanced/index.js';
 	import * as Modal from '$lib/components/modal/index.js';
 	import { FormAlert } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { productImageUploadSchema, removeProductImageSchema } from '$lib/schemas/products';
 
 	/**
-	 * The product's storefront picture — one field (`products.image_url`), not
-	 * a gallery, so this is its own small card rather than `Detail.Images`
-	 * (a multi-photo attachment for an asset or a property). Uploading
-	 * replaces whatever was there; the record page's `?/uploadProductImage`
-	 * and `?/removeProductImage` actions own the storage side.
+	 * The product's pictures: the storefront image (`products.image_url`, the
+	 * one this page uploads and replaces) first and largest, then the gallery
+	 * URLs `additional_images` carries, then the tile that adds one. One
+	 * uploaded slot rather than `Detail.Images` (an asset's attachments): a
+	 * storefront shows THE picture, and the gallery is the import's to fill.
+	 * The record page's `?/uploadProductImage` and `?/removeProductImage`
+	 * actions own the storage side.
 	 */
 	let {
 		imageUrl,
+		gallery,
 		name,
 		form: uploadForm,
 		removeForm,
@@ -31,7 +35,9 @@
 		queryKey
 	}: {
 		imageUrl: string | null;
-		/** The product's name, for the picture's alt text. */
+		/** The extra storefront images, as URLs. */
+		gallery: readonly string[];
+		/** The product's name, for the pictures' alt text. */
 		name: string;
 		form: SuperValidated<Infer<typeof productImageUploadSchema>>;
 		removeForm: SuperValidated<Infer<typeof removeProductImageSchema>>;
@@ -42,6 +48,11 @@
 
 	let editorOpen = $state(false);
 	let removing = $state(false);
+	/** The picture open full-size, by its URL. */
+	let viewing = $state<string | null>(null);
+
+	const pictures = $derived([...(imageUrl ? [imageUrl] : []), ...gallery]);
+	const empty = $derived(pictures.length === 0);
 
 	const { errors, message, submitting, enhance, reset } = superForm(uploadForm, {
 		id: 'product-image',
@@ -75,11 +86,14 @@
 		reset();
 		editorOpen = true;
 	}
+
+	const tileId = (index: number) => `product-picture-${String(index)}`;
 </script>
 
-<Card.Root data-slot="product-image">
+<Card.Root data-slot="product-media">
 	<Card.Header>
-		<Card.Title>Image</Card.Title>
+		<Card.Title>Media</Card.Title>
+		<Card.Description>What a storefront shows for this product.</Card.Description>
 		{#if canManage}
 			<Card.Action class="flex gap-2">
 				{#if imageUrl}
@@ -89,25 +103,72 @@
 					</Button>
 				{/if}
 				<Button variant="outline" size="sm" onclick={startAdding}>
-					<ImageIcon />
-					{imageUrl ? 'Replace image' : 'Add image'}
+					<UploadIcon />
+					{imageUrl ? 'Replace' : 'Upload'}
 				</Button>
 			</Card.Action>
 		{/if}
 	</Card.Header>
 	<Card.Content>
-		{#if imageUrl}
-			<div class="max-w-[12rem] overflow-hidden rounded-lg border">
-				<BlurUpImage src={imageUrl} alt="{name} product image" width={480} height={480} />
-			</div>
-		{:else}
-			<Empty.Root class="p-6">
-				<Empty.Header>
-					<Empty.Title class="text-base">No image yet</Empty.Title>
-					<Empty.Description>The picture a storefront shows for this product.</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
+		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+			{#each pictures as url, index (url)}
+				{@const primary = index === 0 && url === imageUrl}
+				<figure class="relative {primary ? 'col-span-2 row-span-2' : ''}">
+					<button
+						type="button"
+						id={tileId(index)}
+						class="bg-muted block aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg border"
+						onclick={() => (viewing = url)}
+					>
+						<BlurUpImage
+							src={url}
+							alt={primary ? `${name} product image` : `${name}, picture ${String(index + 1)}`}
+							width={primary ? 800 : 400}
+							height={primary ? 800 : 400}
+							class="size-full object-cover"
+						/>
+					</button>
+					{#if primary}
+						<figcaption
+							class="bg-background/90 text-muted-foreground absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+						>
+							Storefront
+						</figcaption>
+					{/if}
+				</figure>
+				{#if viewing === url}
+					<Lightbox
+						open={viewing === url}
+						onClose={() => (viewing = null)}
+						src={url}
+						alt="{name} product image"
+						origin={typeof document !== 'undefined' ? document.getElementById(tileId(index)) : null}
+					/>
+				{/if}
+			{/each}
+
+			{#if canManage && !imageUrl}
+				<button
+					type="button"
+					class="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm transition-colors {empty
+						? 'col-span-2 row-span-2'
+						: ''}"
+					onclick={startAdding}
+				>
+					<span class="bg-muted flex size-9 items-center justify-center rounded-full">
+						<ImagePlusIcon class="size-4" />
+					</span>
+					Add image
+				</button>
+			{:else if empty}
+				<div
+					class="text-muted-foreground col-span-2 row-span-2 flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm"
+				>
+					<ImageIcon class="size-5" />
+					No image yet
+				</div>
+			{/if}
+		</div>
 	</Card.Content>
 </Card.Root>
 

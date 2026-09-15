@@ -262,3 +262,32 @@ export async function deletePurchaseLine(
 		'Line'
 	);
 }
+
+/** A purchase line with the purchase it is on — what a product's page lists under Purchases. */
+export type ProductPurchaseLine = PurchaseLineItem & {
+	purchases: Pick<
+		Purchase,
+		'id' | 'number' | 'status' | 'created_at' | 'ordered_at' | 'currency'
+	> & {
+		companies: Vendor;
+	};
+};
+
+/**
+ * Every purchase line that cites one product, newest purchase first — who the
+ * org buys it from and what it paid, as the product's page lists them.
+ */
+export async function listPurchaseLinesForProduct(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	productId: string
+): Promise<ProductPurchaseLine[]> {
+	return unwrap(
+		await supabase
+			.from('purchase_line_items')
+			.select(`*, purchases!inner(id, number, status, created_at, ordered_at, currency, ${VENDOR})`)
+			.eq('org_id', orgId)
+			.eq('product_id', productId)
+			.order('created_at', { ascending: false })
+	);
+}
