@@ -656,6 +656,88 @@ test.describe('the workspace switcher', () => {
 		await expect(page.getByRole('menuitem', { name: 'Acme Inc' })).toBeVisible();
 		await expect(page.getByRole('menuitem', { name: 'Globex' })).toHaveCount(0);
 	});
+
+	test('offers no way into the platform area to someone who is not an operator', async ({
+		page
+	}) => {
+		await clickWhenLive(switcher(page).getByRole('button', { name: 'Acme Inc' }), () =>
+			expect(page.getByRole('menuitem', { name: 'E2E Robot' })).toBeVisible()
+		);
+
+		// seed.sql makes only the developer account a system admin, so
+		// e2e@example.com sees workspaces and nothing else.
+		await expect(page.getByRole('menuitem', { name: 'Platform Administration' })).toHaveCount(0);
+	});
+});
+
+test.describe('the platform area', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	test('is a 404 for a signed-in user who is not a system admin', async ({ page }) => {
+		// A hidden menu entry is not the protection: the server refuses the
+		// route itself, and refuses it with 404 rather than 403 so the console
+		// does not announce itself to every tenant user.
+		const response = await page.goto('/admin');
+
+		expect(response?.status()).toBe(404);
+		await expect(page).toHaveURL('/admin');
+	});
+
+	test('refuses every page in the area the same way', async ({ page }) => {
+		// Each page proves the operator flag for itself, so reaching past the
+		// landing page changes nothing — including the detail pages, which are
+		// reached by a key rather than from a link.
+		for (const path of [
+			'/admin/organizations',
+			'/admin/tiers',
+			'/admin/tiers/free',
+			'/admin/industries',
+			'/admin/industries/crm',
+			'/admin/features',
+			'/admin/features/deals'
+		]) {
+			expect((await page.goto(path))?.status(), path).toBe(404);
+		}
+	});
+
+	test('refuses every write in the area the same way', async ({ page }) => {
+		// The assertion that has to hold as the area grows: an action is
+		// reached by POST with no load in front of it, so each one repeats the
+		// operator check itself. seed.sql's Acme Inc is a real organization and
+		// 'free' a real plan, so what refuses these is the guard and nothing
+		// else. The origin header is what gets the POST past SvelteKit's CSRF
+		// check, which would otherwise answer 403 before the action ever ran
+		// and prove nothing.
+		const ORG = '10000000-0000-0000-0000-000000000001';
+		const origin = new URL(page.url()).origin;
+
+		const writes: [string, Record<string, string>][] = [
+			[`/admin/organizations/${ORG}?/rename`, { name: 'Not Acme' }],
+			[`/admin/organizations/${ORG}?/setTier`, { tierId: 'enterprise' }],
+			[
+				`/admin/organizations/${ORG}?/setIndustry`,
+				{ industryId: 'dentistry', confirm: 'Acme Inc' }
+			],
+			[`/admin/organizations/${ORG}?/setOverride`, { featureId: 'deals', mode: 'enabled' }],
+			[`/admin/organizations/${ORG}?/clearOverride`, { featureId: 'deals' }],
+			['/admin/tiers?/create', { id: 'trespass', name: 'Trespass' }],
+			['/admin/tiers/free?/rename', { name: 'Gratis' }],
+			['/admin/industries?/create', { id: 'trespass', name: 'Trespass' }],
+			['/admin/industries/crm?/rename', { name: 'Sales' }],
+			[
+				'/admin/features/deals?/save',
+				{ name: 'Deals', icon: 'handshake', category: 'crm', sortOrder: '200' }
+			]
+		];
+
+		for (const [action, form] of writes) {
+			const posted = await page.request.post(action, { form, headers: { origin } });
+			expect(posted.status(), action).toBe(404);
+		}
+	});
 });
 
 test.describe('the note dock', () => {

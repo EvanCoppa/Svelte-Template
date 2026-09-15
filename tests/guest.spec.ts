@@ -57,6 +57,15 @@ test.describe('unauthenticated visitor', () => {
 		await expect(page.locator('input[name="next"]')).toHaveValue('/invite/some-token');
 	});
 
+	test('sends the platform console through login like anything else', async ({ page }) => {
+		// /admin is outside the tenant app but not outside the default-deny
+		// guard: an anonymous visitor learns nothing about it, and the
+		// system-admin check never has to answer.
+		await page.goto('/admin');
+
+		await expect(page).toHaveURL('/login?next=%2Fadmin');
+	});
+
 	test('guards routes that do not exist, rather than leaking a 404', async ({ page }) => {
 		// Default-deny happens in hooks, before routing — so an unknown path is
 		// indistinguishable from a real private one to an anonymous visitor.

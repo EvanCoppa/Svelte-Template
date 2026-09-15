@@ -21,6 +21,15 @@ export type OrgContext = {
 	features: FeatureMap;
 	/** The user's roles and grants in the active org. */
 	access: UserAccess;
+	/**
+	 * Is this user a platform operator? Already looked up here to build the
+	 * list of organizations, so the `(app)` layout ships it to the org picker
+	 * for free — which is all it is for: the entry the picker draws for the
+	 * platform area. It authorizes nothing. `/admin` proves it again on the
+	 * server for every page, action and endpoint
+	 * (`requireSystemAdmin()` in `$lib/server/admin/guard`).
+	 */
+	systemAdmin: boolean;
 };
 
 type Event = Pick<RequestEvent, 'locals' | 'cookies'>;
@@ -127,5 +136,5 @@ export async function loadOrgContext(event: Event): Promise<OrgContext> {
 			? { role: activeOrg.role, roles: [], grants: new Map() }
 			: await getUserAccess(supabase, activeOrg.id, user.id, activeOrg.role, activeOrg.industryId);
 
-	return { organizations, activeOrg, features, access };
+	return { organizations, activeOrg, features, access, systemAdmin };
 }

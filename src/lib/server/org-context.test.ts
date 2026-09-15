@@ -211,6 +211,10 @@ describe('loadOrgContext', () => {
 		]);
 		expect(ctx.activeOrg.id).toBe(GLOBEX_ID);
 		expect(ctx.access).toEqual({ role: 'owner', roles: [], grants: new Map() });
+		// The flag rides along so the (app) layout can draw the org picker's
+		// platform entry without a second lookup — a menu decision only; the
+		// platform area proves it again on every request it serves.
+		expect(ctx.systemAdmin).toBe(true);
 		expect(h.from).toHaveBeenCalledWith('system_admins');
 		expect(h.builders.system_admins.eq).toHaveBeenCalledWith('user_id', USER_ID);
 		expect(h.from).not.toHaveBeenCalledWith('member_roles');
@@ -234,6 +238,12 @@ describe('loadOrgContext', () => {
 		expect(ctx.organizations.map((o) => o.name)).toEqual(['AAA Corp', 'Acme Inc']);
 		expect(ctx.activeOrg.id).toBe(ORG_ID);
 		expect(h.cookies.set).toHaveBeenCalledWith('app-active-org', ORG_ID, expect.anything());
+	});
+
+	it('reports a plain member as no operator', async () => {
+		const h = harness({ organizations: [orgRow('member', acme)] });
+
+		await expect(loadOrgContext(h.event)).resolves.toMatchObject({ systemAdmin: false });
 	});
 
 	it('drops an org that reaches a non-operator without a membership row', async () => {
