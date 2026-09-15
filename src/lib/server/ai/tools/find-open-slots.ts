@@ -26,8 +26,9 @@ export const findOpenSlots = tool({
 		'Find free time on the calendar and offer it to the user as a pick-a-time card: every ' +
 		'open slot of the length asked for inside the working day, with nothing booked across ' +
 		'it. The user books one with a click, so do not book it yourself — say what you found ' +
-		'and let them choose. Resolve "next week" or "Tuesday afternoon" into the window ' +
-		'against the session time zone, and pass that zone.',
+		'and let them choose. This is for "when am I free?"; when the user names a time ' +
+		'instead, book it with createEvent. Resolve "next week" or "Tuesday afternoon" into ' +
+		'the window against the session time zone, and pass that zone.',
 	inputSchema: z.object({
 		from: z.iso.datetime({ offset: true }).describe('Window start, ISO 8601 with offset.'),
 		to: z.iso.datetime({ offset: true }).describe('Window end (exclusive), ISO 8601 with offset.'),

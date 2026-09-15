@@ -21,16 +21,25 @@ describe('createAssistantAgent', () => {
 		const sent = (model.doStreamCalls[0]?.tools ?? []).map((tool) => tool.name).sort();
 		expect(sent).toEqual([...activeToolNames(org)].sort());
 		expect(sent).toEqual([
+			// Writing tasks brings the whole task family, the kind-addressed
+			// writers (a note and a record hang off any kind), and the roster,
+			// because putting someone on a task means naming them first.
+			'addNote',
+			'assignTask',
 			'completeTask',
+			'createRecord',
 			'createTask',
 			'findRecords',
 			'getCompany',
 			'getRecord',
 			'linkRecords',
+			'listMembers',
+			'listRecordFields',
 			'listRecords',
 			'listRelationshipTypes',
 			'listTasks',
 			'searchCompanies',
+			'unassignTask',
 			'updateRecord'
 		]);
 	});
@@ -88,7 +97,7 @@ describe('createAssistantAgent', () => {
 				(m) => m.role === 'system' && String(m.content).includes('<session_context>')
 			)?.content
 		);
-		expect(session).toContain('- contact — contacts (one: contact) — read, update');
+		expect(session).toContain('- contact — contacts (one: contact) — read, create, update');
 		expect(session).toContain('- deal — deals (one: deal) — read');
 		expect(session).not.toContain('- company');
 		expect(session).not.toContain('- task');

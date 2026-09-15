@@ -58,6 +58,16 @@ export const RECORD_TYPES = [
 
 export type RecordType = (typeof RECORD_TYPES)[number];
 
+/**
+ * Whether a kind of record has a form in this registry — which is to say
+ * whether it can be created at all. A kind with a page but no form here
+ * (a proposal, a shipment) is one whose creation is a screen or an act on
+ * another record, and says so where it lives.
+ */
+export function isRecordType(kind: string): kind is RecordType {
+	return RECORD_TYPES.some((type) => type === kind);
+}
+
 /** What every record form's values look like: one string per field. */
 export type RecordFormValues = Record<string, string>;
 
@@ -84,7 +94,21 @@ export const RECORD_PICKER_KINDS = [
 	 */
 	'subject',
 	/** An org's own `visit_outcomes` rows, like a deal's stage. */
-	'outcome'
+	'outcome',
+	/**
+	 * Someone who works here, from the org's roster — who a record that
+	 * carries an `assigned_to` column belongs to. A membership is not a
+	 * record kind, so this picker's rows are the staff list rather than
+	 * anything `findRecords` can reach.
+	 *
+	 * **Assigning is not linking**, and a record often does both: the
+	 * assignee is the colleague who will do the work, while `company` and
+	 * `contact` are the party it is FOR. A task's assignees are neither —
+	 * they are `assigned_to` relationships, several per task and ended
+	 * rather than deleted (docs/tasks.md), which is why the task modal
+	 * writes them and no form field can.
+	 */
+	'member'
 ] as const;
 
 export type RecordPickerKind = (typeof RECORD_PICKER_KINDS)[number];
@@ -149,9 +173,15 @@ export type RecordForm = {
 
 const email = z.email();
 
+/**
+ * A field that must be filled in. The message is spelled for BOTH ways it can
+ * be missing — left blank on a form, and absent altogether from a writer that
+ * is not a form (`insertRecord()`, the assistant's) — so a required field
+ * reads the same sentence whoever left it out.
+ */
 const requiredText = (label: string) =>
 	z
-		.string()
+		.string({ error: `${label} is required.` })
 		.trim()
 		.min(1, `${label} is required.`)
 		.max(200, `${label} must be 200 characters or fewer.`);
@@ -240,6 +270,19 @@ export const contactRecordSchema = z.object({
 
 export const dealRecordSchema = z.object({
 	title: requiredText('Title'),
+	/**
+	 * Who the deal is with. Both may be blank — an opportunity nobody is
+	 * attached to yet is a legitimate row (crm/deals.ts) — and both may be
+	 * set: a buyer at a company is a person AND an account.
+	 */
+	company_id: optionalPick,
+	contact_id: optionalPick,
+	/**
+	 * Whose deal it is: one person who works here, pinned to the membership
+	 * by a composite key, so leaving it blank clears it. A column rather than
+	 * a relationship because a deal has exactly one owner (docs/relationships.md).
+	 */
+	assigned_to: optionalPick,
 	/**
 	 * Where the deal sits on a board. Blank on create means "the org's default
 	 * board, first stage" (`crm/deals.ts` places it); blank on edit means the
@@ -503,16 +546,28 @@ export const visitRecordSchema = z
 		path: ['ended_at']
 	});
 
+/**
+ * A task as the record page edits it. Who the task is FOR is here — a
+ * company, a person, both or neither — and who is ON it deliberately is not:
+ * assignment is a relationship, several per task and ended rather than
+ * deleted, so the Relationships card owns it (docs/tasks.md).
+ */
 export const taskRecordSchema = z.object({
 	title: requiredText('Title'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+	company_id: optionalPick,
+	contact_id: optionalPick,
 	due_at: optionalInstant,
 	details: optionalLongText
 });
 
+/** A ticket: who raised it (the party), and who is handling it (a colleague). */
 export const ticketRecordSchema = z.object({
 	subject: requiredText('Subject'),
 	priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+	company_id: optionalPick,
+	contact_id: optionalPick,
+	assigned_to: optionalPick,
 	description: optionalLongText
 });
 
@@ -604,10 +659,15 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		feature: 'deals',
 		query: QUERY.deals,
 		// Stage is second because moving one is the commonest edit a deal ever
-		// gets — the funnel is the reason the record exists.
+		// gets — the funnel is the reason the record exists. Then who it is
+		// with, then whose it is: the party and the assignee are two different
+		// questions, and the labels say which is which.
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Annual renewal' },
 			{ name: 'stage_id', label: 'Stage', type: 'stage' },
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'assigned_to', label: 'Assigned to', type: 'member' },
 			{ name: 'amount', label: 'Amount', type: 'number', placeholder: '12000' },
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]
@@ -869,9 +929,15 @@ export const RECORD_FORMS: RecordFormRegistry = {
 	task: {
 		feature: 'tasks',
 		query: QUERY.tasks,
+		// No assignee field: who is on a task is a relationship, drawn by the
+		// Relationships card and written by the task modal (docs/tasks.md).
+		// The company and the contact are who it is FOR, which is a different
+		// question and a column apiece.
 		fields: [
 			{ name: 'title', label: 'Title', type: 'text', placeholder: 'Call back about the quote' },
 			{ name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS },
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
 			{ name: 'due_at', label: 'Due', type: 'datetime' },
 			{ name: 'details', label: 'Details', type: 'textarea', wide: true }
 		]
@@ -882,6 +948,9 @@ export const RECORD_FORMS: RecordFormRegistry = {
 		fields: [
 			{ name: 'subject', label: 'Subject', type: 'text', placeholder: 'Panel is offline' },
 			{ name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS },
+			{ name: 'company_id', label: 'Company', type: 'company' },
+			{ name: 'contact_id', label: 'Contact', type: 'contact' },
+			{ name: 'assigned_to', label: 'Assigned to', type: 'member' },
 			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
 		]
 	}

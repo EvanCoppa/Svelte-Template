@@ -64,6 +64,15 @@ The type id is `RELATIONSHIP_TYPE.assignedTo` in `src/lib/server/crm/relationshi
 Types are addressed by id and never by key, because an org may define its own type
 reusing a system key.
 
+The assistant says all of this the same way: `assignTask` and `unassignTask`
+(`src/lib/server/ai/tools/`) go through the same three functions, addressed by task
+and person rather than by relationship id, and `createTask` writes the row and its
+assignments in one call exactly as the modal does. Putting someone on a task is
+therefore never `updateRecord` — a task has no assignee field to set — and the
+instructions spell the distinction out, because "assign it to Dana" and "it's for
+Dana at Acme" are two different sentences (docs/assistant.md, "Assigning is not
+linking").
+
 ## The conversation
 
 `task_comments` is `ticket_comments`'s shape — authored content, editable by its

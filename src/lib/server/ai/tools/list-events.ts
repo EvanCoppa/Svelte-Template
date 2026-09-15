@@ -1,11 +1,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { isRecordKind } from '$lib/crm/records';
-import { listCalendarEvents } from '$lib/server/crm/calendar';
+import { listCalendarEvents, type CalendarEvent } from '$lib/server/crm/calendar';
 import { recordLinks } from '$lib/server/crm/links';
 import { loadVocabulary } from '$lib/server/features';
 import { getDisplayNames } from '$lib/server/profiles';
-import { toolContextSchema } from '../context';
+import { toolContextSchema, type AssistantToolContext } from '../context';
 import { canOpenFor, requireToolContext, type ToolAccess } from './access';
 import { recordRefSchema } from './record-ref';
 
@@ -14,7 +14,7 @@ export const listEventsAccess: ToolAccess = { feature: 'calendar', level: 'read'
 /** A window can be a year; the model gets the first hundred and a count. */
 const MAX_EVENTS = 100;
 
-const eventSchema = z.object({
+export const eventSchema = z.object({
 	id: z.string(),
 	title: z.string(),
 	startsAt: z.string(),
@@ -43,37 +43,52 @@ export const listEvents = tool({
 	}),
 	contextSchema: toolContextSchema,
 	execute: async ({ from, to }, { context }) => {
-		const { supabase, orgId, org } = requireToolContext(context, listEventsAccess);
+		const { supabase, orgId } = requireToolContext(context, listEventsAccess);
 		const rows = await listCalendarEvents(supabase, orgId, { from, to });
 		const shown = rows.slice(0, MAX_EVENTS);
-
-		const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
-		const [links, people] = await Promise.all([
-			recordLinks(supabase, orgId, shown, canOpenFor(org), vocabulary),
-			getDisplayNames(
-				supabase,
-				shown.flatMap((row) => (row.assigned_to ? [row.assigned_to] : []))
-			)
-		]);
-
-		return {
-			events: shown.map((row) => {
-				const link = links[row.id];
-				const kind = row.entity_type && isRecordKind(row.entity_type) ? row.entity_type : null;
-				return {
-					id: row.id,
-					title: row.title,
-					startsAt: row.starts_at,
-					endsAt: row.ends_at,
-					allDay: row.all_day,
-					location: row.location,
-					description: row.description,
-					assignedTo: row.assigned_to ? (people.get(row.assigned_to) ?? null) : null,
-					about:
-						link && kind && row.entity_id ? { kind, id: row.entity_id, name: link.label } : null
-				};
-			}),
-			total: rows.length
-		};
+		return { events: await describeEvents(context, shown), total: rows.length };
 	}
 });
+
+/**
+ * Events as every calendar tool answers with them — who each is booked for
+ * and what it is about, named through the same two batch reads whether there
+ * is one of them or a hundred. Shared rather than repeated, so a booking and
+ * the list it lands in describe an event the same way (the rule
+ * `summarizeTask()` follows for tasks).
+ *
+ * A record the caller may not open is not named: `canOpenFor()` is the
+ * record page's `canOpen`, so an event about something out of reach reads as
+ * an event about nothing rather than leaking its name.
+ */
+export async function describeEvents(
+	{ supabase, orgId, org }: AssistantToolContext,
+	rows: readonly CalendarEvent[]
+): Promise<z.infer<typeof eventSchema>[]> {
+	if (rows.length === 0) return [];
+
+	const vocabulary = await loadVocabulary(supabase, org.activeOrg.industryId);
+	const [links, people] = await Promise.all([
+		recordLinks(supabase, orgId, rows, canOpenFor(org), vocabulary),
+		getDisplayNames(
+			supabase,
+			rows.flatMap((row) => (row.assigned_to ? [row.assigned_to] : []))
+		)
+	]);
+
+	return rows.map((row) => {
+		const link = links[row.id];
+		const kind = row.entity_type && isRecordKind(row.entity_type) ? row.entity_type : null;
+		return {
+			id: row.id,
+			title: row.title,
+			startsAt: row.starts_at,
+			endsAt: row.ends_at,
+			allDay: row.all_day,
+			location: row.location,
+			description: row.description,
+			assignedTo: row.assigned_to ? (people.get(row.assigned_to) ?? null) : null,
+			about: link && kind && row.entity_id ? { kind, id: row.entity_id, name: link.label } : null
+		};
+	});
+}

@@ -14,11 +14,18 @@ export const TOOL_LABELS = {
 	createTask: { running: 'Creating a task', done: 'Created a task' },
 	completeTask: { running: 'Updating a task', done: 'Updated a task' },
 	deleteTask: { running: 'Deleting a task', done: 'Deleted a task' },
+	assignTask: { running: 'Assigning the task', done: 'Assigned the task' },
+	unassignTask: { running: 'Updating who is on the task', done: 'Updated who is on the task' },
 	listDeals: { running: 'Listing deals', done: 'Listed deals' },
 	listTickets: { running: 'Listing tickets', done: 'Listed tickets' },
 	listEvents: { running: 'Reading the calendar', done: 'Read the calendar' },
+	createEvent: { running: 'Booking the time', done: 'Booked the time' },
+	updateEvent: { running: 'Changing the booking', done: 'Changed the booking' },
+	deleteEvent: { running: 'Cancelling the event', done: 'Cancelled the event' },
 	findRecords: { running: 'Finding records', done: 'Found records' },
 	getRecord: { running: 'Opening a record', done: 'Read a record' },
+	listRecordFields: { running: 'Reading the form', done: 'Read the form' },
+	createRecord: { running: 'Creating a record', done: 'Created a record' },
 	updateRecord: { running: 'Updating a record', done: 'Updated a record' },
 	exploreGraph: { running: 'Exploring connections', done: 'Explored connections' },
 	listRelationshipTypes: {
@@ -26,6 +33,7 @@ export const TOOL_LABELS = {
 		done: 'Read relationship types'
 	},
 	linkRecords: { running: 'Linking records', done: 'Linked records' },
+	listMembers: { running: 'Reading the team', done: 'Read the team' },
 	listRecords: { running: 'Building a list', done: 'Built a list' },
 	findOpenSlots: { running: 'Looking for free time', done: 'Found free time' },
 	packableLines: { running: 'Reading what is left to ship', done: 'Read what is left to ship' }
