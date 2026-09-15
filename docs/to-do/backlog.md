@@ -41,26 +41,52 @@ Fixed in #153: `SettingsSidebar` and `AssistantSidebar` now derive
 The largest cluster. Order matters: stages, then fields, then history, then the
 AI tools that read the history.
 
-### 2.1 Payment-processing pipeline stages — **Drafted**
+### 2.1 Payment-processing pipeline stages — **Drafted** (mechanism built; not yet a live PR)
 
-A migration exists in a separate worktree but was never opened as a PR. Agreed
-grouping:
+Turned into a general mechanism rather than a one-off migration, once it
+became clear the seed data already hand-built this exact funnel per org
+(`supabase/seed.sql`, before this) — org-by-org replacement was always meant
+to be a fixture's workaround, not the shape.
 
-- **Prospecting** — Prospect, Contacted
-- **Qualification** — Waiting on Statements, Presentation Scheduled, Proposal
-  Sent, Application Sent
-- **Underwriting** — Underwriting, Approved, Denied
-- **Closed Won** — Installed, Live
-- **Closed Lost** — Lost
+`industry_pipelines` (name/description) and `industry_pipeline_stages`
+(`20260919110000_industry_pipeline_stages.sql`) are the `industry_custom_fields`
+shape applied to pipelines: an industry ships a funnel, and `create_default_pipeline()`
+copies it in at org creation instead of the generic six-stage board — falling
+back to that same generic board for an industry that ships none. Shipped for
+`merchant-services` (the ten stages below) and, as a second proof the
+mechanism generalizes, `real-estate` (the seven stages `seed.sql` already had
+for Ironwood/Larkspur). **Deliberately create-time only, no backfill and no
+re-apply on an industry switch** — a deal already sitting in a stage is not
+something a later industry-catalog change may silently move or orphan; an
+existing org's board is its own from the moment it exists, exactly as
+`pipelines` being rows rather than an enum already implied.
 
-- [ ] Recover the drafted migration and open it as a PR.
-- [ ] Verify it preserves orgs that already customized their board rather than
-      overwriting their `pipeline_stages`.
-- [ ] Check the grouping against `buildDealColumns()` — every terminal stage
-      (`won`/`lost` outcome) shares the one Closed column with a drop zone each,
-      so Installed / Live / Denied / Lost must not each grow a column.
-- [ ] Set `probability` per stage so the Kanban ring reads correctly.
-- [ ] Seed data + `npm run db:reset` round trip + regenerate types.
+- **Prospect** (open) → **Contacted** (open) → **Waiting on Statements**
+  (open) → **Presentation Scheduled** (open) → **Proposal Sent** (open) →
+  **Application Sent** (open) → **Underwriting** (open) → **Approved** (open)
+  → **Installed / Live** (won) / **Lost** (lost)
+
+- [x] Migration: `industry_pipelines` + `industry_pipeline_stages` tables,
+      `create_default_pipeline()` rewritten to read them (falling back to the
+      original six stages), seeded for `merchant-services` and `real-estate`.
+- [x] Preserves orgs that already customized their board — the function only
+      runs once, at org creation; no backfill loop, no trigger on `industry_id`
+      changing.
+- [x] Matches `buildDealColumns()` already: `Installed / Live` and `Lost` are
+      the only two terminal stages here (won/lost respectively), so they share
+      the one Closed column with a drop zone each — no separate `Denied` stage
+      (a denied application is `Lost`), and `Installed`/`Live` merged into one
+      stage rather than two, matching what `seed.sql` had already proven out
+      rather than the finer 12-stage split first discussed.
+- [x] `probability` set per stage (5 → 90 climbing through the open stages).
+- [x] `seed.sql` simplified: the old per-org rename/replace/delete dance for
+      Keystone Payments, Cobalt Merchant Services, Ironwood Property Group and
+      Larkspur Rentals is gone — the trigger now produces the same board on
+      insert.
+- [ ] **Not done**: opening this as its own PR (it's bundled into the deal
+      timeline PR, #162, for now — pull it out if that PR should stay
+      narrower). Not run through a live `db:reset` in this session (see the
+      same Docker caveat on §2.3) — verify before merging.
 
 ### 2.2 Deal object fields — **Idea**
 

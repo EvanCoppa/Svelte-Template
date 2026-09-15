@@ -1252,6 +1252,70 @@ export type Database = {
           },
         ]
       }
+      industry_pipeline_stages: {
+        Row: {
+          created_at: string
+          industry_id: string
+          name: string
+          outcome: Database["public"]["Enums"]["stage_outcome"]
+          probability: number | null
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          industry_id: string
+          name: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          industry_id?: string
+          name?: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipeline_stages_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_pipelines: {
+        Row: {
+          created_at: string
+          description: string | null
+          industry_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          industry_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          industry_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipelines_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: true
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_terms: {
         Row: {
           created_at: string
