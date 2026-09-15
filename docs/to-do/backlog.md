@@ -96,19 +96,20 @@ Tasks:
 
 Plan: [`unified-deal-timeline-plan.md`](./unified-deal-timeline-plan.md).
 
-Settled shape: `activities` keeps human interactions (notes, calls, emails,
-meetings, texts — author-editable); a **separate append-only event stream**
-records system facts. One screen shows both, sorted chronologically.
+Settled shape: no second table. The timeline **is** `activities` — system facts
+(stage change, owner change, document events, proposal/application milestones,
+promotion, cadence steps) are logged as `activities` rows with a system `type`
+and no human author, alongside the existing note/call/email/meeting/text kinds.
+One `Detail.Thread` already renders it; no combined reader across two tables.
 
-- [ ] Migration for the append-only event table: actor, timestamp, event type,
-      related record/document id, structured metadata. No update or delete
-      grants — insert only.
-- [ ] Emit events for: stage change, owner change, document uploaded/linked/
-      removed, proposal sent, application sent, promotion into onboarding,
-      cadence step fired, key status changes.
-- [ ] Render both sources in the record page's Activity tab as one timeline.
-- [ ] Make sure the polymorphic entity link is reused
-      (`crm_entity_type` + `private.crm_entity_exists()`), not a deals-only table.
+- [ ] Confirm/extend `activities.type` with the system-generated kinds; add a
+      jsonb detail column for before/after values if one doesn't exist yet.
+- [ ] Insert an `activities` row for: stage change, owner change, document
+      uploaded/linked/removed, proposal sent, application sent, promotion into
+      onboarding, cadence step fired — in the same transaction as the write
+      that causes it.
+- [ ] Render the new system kinds in `Detail.Thread` with their own icon/label.
+- [ ] Tests: ordering, permissions, and that a system row is never editable.
 
 ### 2.4 Deals without a party, and promotion — **Idea**
 

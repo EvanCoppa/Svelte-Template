@@ -2,83 +2,70 @@
 
 ## Goal
 
-Give every deal one trustworthy chronological view of what happened, while keeping
-human-entered interactions and system-generated facts distinct underneath.
+Give every deal one trustworthy chronological view of what happened.
 
 The timeline should support day-to-day follow-up now and later provide reliable
 evidence for win/loss intelligence, coaching, and reporting.
 
-## Recommended model
+## Decided model
 
-Keep the existing `activities` table for human interactions:
+No second table. The timeline **is** `activities` — the same table and the same
+`Detail.Thread` rendering every other record already uses. System-generated facts
+(stage transitions, owner changes, proposal/application status changes, documents
+uploaded/linked/removed, promotion into onboarding, cadence milestones) are logged
+as `activities` rows too, written server-side in the same transaction as the write
+that caused them, with a `type` that marks them as system-generated (as opposed to
+a note/call/email/meeting/text a person logged).
 
-- notes
-- calls
-- emails
-- meetings
-- text messages
-- other logged interactions
+This drops the earlier append-only system-event table idea: two tables feeding one
+reader was extra machinery for a distinction (`activities` vs. "system events")
+that the existing `type` column and authorship already express. A system-authored
+row simply has no human author — `authored by`/edit permission checks already key
+off that — so "system rows are not user-editable" falls out of the existing rule
+rather than needing a second no-update-no-delete table.
 
-Add an append-only system-event stream for facts produced by the application:
+## What changes on `activities`
 
-- deal stage transitions
-- owner or assignment changes
-- proposal/application status changes
-- documents uploaded, linked, or removed
-- promotion into onboarding
-- cadence and notification milestones
-- important field changes that need historical context
-
-The record page should read both sources through one timeline query, sort by the
-event's effective time, and label each entry as an interaction or system event.
-The existing activity rows are editable by authors/managers; system events should
-not be edited or deleted. Corrections should be represented by a later event.
-
-## Minimum system-event shape
-
-Each event needs:
-
-- organization and CRM record scope
-- event type and human-readable summary
-- effective timestamp and recorded timestamp
-- actor, when a user caused it; otherwise a system/source label
-- optional related record IDs, such as a document, proposal, or task
-- structured metadata for before/after values or event-specific context
-- a deduplication key for retried writes
-
-Store references rather than file contents or large payloads. Sensitive values
-must remain subject to the same field-level access rules as the source record.
+- Reuse `type` for the system-generated kinds (`stage_changed`, `owner_changed`,
+  `document_uploaded`, `proposal_sent`, `promoted`, …) alongside the existing
+  human kinds (note/call/email/meeting/text).
+- A system row has no `author_id` (or a service-role/system marker) — never
+  editable, the same way an authored row is only editable by its author or an
+  owner/admin.
+- Structured before/after values, when a system row needs them, go in whatever
+  column already carries an activity's free-form detail (or a small jsonb column
+  added to `activities` if none exists) — no new table, no new polymorphic link.
+- Same organization/record RLS `activities` already has; no new policies.
 
 ## First implementation slice
 
-1. Define a small event vocabulary and append-only table with organization and
-   record-level RLS.
-2. Log deal stage changes in the same transaction as the stage update, including
-   the previous and next stage IDs.
-3. Log document-link and proposal/application milestones where those writes
-   already exist.
-4. Add a server-side timeline reader that combines activities and system events.
-5. Render both kinds in the existing record timeline with clear icons and labels.
-6. Add tests for ordering, permissions, retries, and the rule that system events
-   cannot be updated or deleted.
+1. Confirm `activities.type` can take the new system kinds and check whether a
+   jsonb detail column already exists on the table for before/after values; add
+   one if not.
+2. Insert an `activities` row for deal stage changes in the same transaction as
+   the stage update, including the previous and next stage.
+3. Insert one for document-link and proposal/application milestones where those
+   writes already exist.
+4. Render the system kinds in the existing `Detail.Thread` with their own
+   icon/label, keyed off `type` the way every other kind already is.
+5. Tests: ordering, permissions, and that a system row is never editable.
 
 ## Design guardrails
 
-- Do not turn every database mutation into a timeline entry; only changes that
-  help explain customer progress, ownership, risk, or outcome belong there.
+- Do not turn every database mutation into an activity; only changes that help
+  explain customer progress, ownership, risk, or outcome belong there.
 - Keep activity logging user-friendly and fast; do not require reps to duplicate
   events already generated by a stage or document action.
-- Preserve unknown and not-applicable values distinctly for future analysis.
 - Keep the timeline organization-scoped and permission-filtered server-side.
 - Avoid claiming causation from the timeline alone; analytics should show sample
   size, time window, and missing-data rates.
 
 ## Open decisions
 
-- Final name: `record_events`, `timeline_events`, or another domain term.
-- Whether field changes beyond stage/owner need explicit opt-in event types.
-- Retention, export, and legal/audit requirements for immutable history.
-- Whether users may hide low-value automated events without deleting them.
+- Exact new `type` values for the system-generated kinds.
+- Whether field changes beyond stage/owner need their own `type` or fold into a
+  generic "field changed" kind with metadata.
+- Retention/export requirements, if any, beyond what `activities` already has.
 
 This is a planning document only. It intentionally adds no application code,
 migrations, generated types, or behavior.
