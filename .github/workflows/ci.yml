@@ -46,6 +46,23 @@ jobs:
       - name: Normal lint + anti-slop rules
         run: npm run lint:oxlint
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Formatting + eslint + design-system rules
+        run: npm run lint
+
   knip:
     name: Knip
     runs-on: ubuntu-latest

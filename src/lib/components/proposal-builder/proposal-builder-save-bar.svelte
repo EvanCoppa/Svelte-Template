@@ -23,7 +23,7 @@
 	} = $props();
 
 	const button =
-		'h-auto flex-1 px-6 py-3 font-medium text-white shadow-sm transition-all duration-300 hover:shadow-md focus:ring-0 focus:outline-none disabled:cursor-not-allowed';
+		'text-primary-foreground h-auto flex-1 px-6 py-3 font-medium shadow-sm transition-all duration-300 hover:shadow-md focus:ring-0 focus:outline-none disabled:cursor-not-allowed';
 </script>
 
 <div
@@ -37,8 +37,8 @@
 		disabled={submitting}
 		onclick={onPrimary}
 		class="{button} {submitting
-			? 'border-0 bg-gray-400 sm:rounded-r-none'
-			: 'rounded-sm bg-blue-600 hover:bg-blue-700'}"
+			? 'bg-muted-foreground border-0 sm:rounded-r-none'
+			: 'bg-primary hover:bg-primary/90 rounded-sm'}"
 	>
 		<span class="transition-opacity duration-300" style:opacity={submitting ? 0 : 1}>
 			{primaryLabel}
@@ -49,8 +49,8 @@
 		disabled={submitting}
 		onclick={onSecondary}
 		class="{button} {submitting
-			? 'border-0 bg-gray-400 sm:rounded-l-none'
-			: 'rounded-sm bg-blue-600 hover:bg-blue-700'}"
+			? 'bg-muted-foreground border-0 sm:rounded-l-none'
+			: 'bg-primary hover:bg-primary/90 rounded-sm'}"
 	>
 		<span class="transition-opacity duration-300" style:opacity={submitting ? 0 : 1}>
 			{secondaryLabel}
@@ -59,8 +59,8 @@
 
 	{#if submitting}
 		<div class="pointer-events-none absolute inset-0 flex items-center justify-center gap-2">
-			<LoaderCircleIcon class="h-5 w-5 animate-spin text-white" />
-			<span class="font-medium text-white">Submitting...</span>
+			<LoaderCircleIcon class="text-background h-5 w-5 animate-spin" />
+			<span class="text-background font-medium">Submitting...</span>
 		</div>
 	{/if}
 </div>

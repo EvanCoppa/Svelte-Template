@@ -32,7 +32,7 @@
 		{#if showHint}
 			<Kbd
 				class={onFill
-					? 'text-primary-foreground border-white/25 bg-white/15'
+					? 'text-primary-foreground border-white/25 bg-white/15 dark:border-white/25 dark:bg-white/15'
 					: 'bg-background text-muted-foreground'}>↵</Kbd
 			>
 		{/if}
