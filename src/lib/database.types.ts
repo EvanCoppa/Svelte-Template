@@ -19,6 +19,8 @@ export type Database = {
           entity_id: string | null
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
           id: string
+          is_system: boolean | null
+          metadata: Json | null
           occurred_at: string
           org_id: string
           subject: string | null
@@ -34,6 +36,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id: string
           subject?: string | null
@@ -49,6 +53,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id?: string
           subject?: string | null
@@ -4292,7 +4298,15 @@ export type Database = {
     }
     Enums: {
       activity_direction: "inbound" | "outbound"
-      activity_type: "note" | "call" | "email" | "meeting" | "sms" | "other"
+      activity_type:
+        | "note"
+        | "call"
+        | "email"
+        | "meeting"
+        | "sms"
+        | "other"
+        | "stage_changed"
+        | "owner_changed"
       address_kind: "primary" | "billing" | "shipping" | "service" | "other"
       asset_status: "active" | "inactive" | "retired"
       badge_tone:
@@ -4531,7 +4545,16 @@ export const Constants = {
   public: {
     Enums: {
       activity_direction: ["inbound", "outbound"],
-      activity_type: ["note", "call", "email", "meeting", "sms", "other"],
+      activity_type: [
+        "note",
+        "call",
+        "email",
+        "meeting",
+        "sms",
+        "other",
+        "stage_changed",
+        "owner_changed",
+      ],
       address_kind: ["primary", "billing", "shipping", "service", "other"],
       asset_status: ["active", "inactive", "retired"],
       badge_tone: [

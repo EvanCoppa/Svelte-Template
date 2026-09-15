@@ -34,6 +34,22 @@ export async function listPipelines(
 }
 
 /**
+ * A stage's own name, for a timeline entry that names where a deal came from
+ * or landed — the one lookup that doesn't need the whole board. RLS scopes
+ * it the way every other read here is scoped, without an explicit org_id
+ * filter: a stage id from another org simply is not visible.
+ */
+export async function getStageName(
+	supabase: SupabaseClient<Database>,
+	stageId: string
+): Promise<string | null> {
+	const stage = await unwrap(
+		await supabase.from('pipeline_stages').select('name').eq('id', stageId).maybeSingle()
+	);
+	return stage?.name ?? null;
+}
+
+/**
  * The board new deals land in. Never null in practice — the organizations
  * trigger creates one per org and the migration backfilled the rest — but the
  * signature stays honest about what the query can return.

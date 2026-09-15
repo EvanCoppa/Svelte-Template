@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables, TablesInsert, TablesUpdate } from '$lib/database.types';
-import { defaultPipeline, listPipelines } from './pipelines';
+import { logSystemActivity } from './activities';
+import type { CrmEntityRef } from './entity';
+import { defaultPipeline, getStageName, listPipelines } from './pipelines';
+import { getDisplayNames } from '../profiles';
 import { unwrap, unwrapDeleted } from './unwrap';
 
 /**
@@ -161,13 +164,23 @@ export async function moveDeal(
 	return updateDeal(supabase, orgId, dealId, await dealPlacement(supabase, orgId, stageId));
 }
 
+/** The two fields a change to is worth its own timeline entry for. */
+const TRACKED_COLUMNS = ['stage_id', 'assigned_to'] as const satisfies readonly DealColumn[];
+
 export async function updateDeal(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	dealId: string,
 	values: Pick<TablesUpdate<'deals'>, DealColumn>
 ): Promise<Deal> {
-	return unwrap(
+	// Read before the write only when it might have something to compare
+	// against — most edits (title, amount, a party) touch neither tracked
+	// field, and cost this function nothing beyond the update it always did.
+	const before = TRACKED_COLUMNS.some((column) => column in values)
+		? await getDeal(supabase, orgId, dealId)
+		: null;
+
+	const after = unwrap(
 		await supabase
 			.from('deals')
 			.update(values)
@@ -176,6 +189,56 @@ export async function updateDeal(
 			.select()
 			.single()
 	);
+
+	if (before) await logDealChanges(supabase, orgId, dealId, before, after);
+	return after;
+}
+
+/**
+ * The deal's own corner of the unified timeline
+ * (docs/to-do/unified-deal-timeline-plan.md): a stage or owner change is
+ * logged as a system `activities` row, in the same shape a human-logged one
+ * takes — the record page's timeline needs no second reader for it. Best
+ * effort past the write itself: a name lookup that fails leaves a plainer
+ * sentence rather than losing the entry.
+ */
+async function logDealChanges(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	dealId: string,
+	before: DealWithParties,
+	after: Deal
+): Promise<void> {
+	const entity: CrmEntityRef = { entityType: 'deal', entityId: dealId };
+
+	if (after.stage_id !== before.stage_id) {
+		const toName = (await getStageName(supabase, after.stage_id)) ?? 'another stage';
+		await logSystemActivity(supabase, orgId, entity, {
+			type: 'stage_changed',
+			subject: `Moved from ${before.pipeline_stages.name} to ${toName}`,
+			metadata: { from: before.stage_id, to: after.stage_id }
+		});
+	}
+
+	if (after.assigned_to !== before.assigned_to) {
+		const names = await getDisplayNames(
+			supabase,
+			[before.assigned_to, after.assigned_to].filter((userId): userId is string => userId !== null)
+		);
+		const label = (userId: string | null) =>
+			userId === null ? 'nobody' : (names.get(userId) ?? 'a former member');
+		const subject =
+			before.assigned_to === null
+				? `Assigned to ${label(after.assigned_to)}`
+				: after.assigned_to === null
+					? `Unassigned from ${label(before.assigned_to)}`
+					: `Reassigned from ${label(before.assigned_to)} to ${label(after.assigned_to)}`;
+		await logSystemActivity(supabase, orgId, entity, {
+			type: 'owner_changed',
+			subject,
+			metadata: { from: before.assigned_to, to: after.assigned_to }
+		});
+	}
 }
 
 export async function deleteDeal(

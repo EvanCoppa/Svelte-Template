@@ -14,7 +14,10 @@ const DEAL_ID = '40000000-0000-0000-0000-000000000001';
 const COMPANY_ID = '20000000-0000-0000-0000-000000000001';
 const CONTACT_ID = '30000000-0000-0000-0000-000000000001';
 const STAGE_ID = '50000000-0000-0000-0000-000000000001';
+const OTHER_STAGE_ID = '50000000-0000-0000-0000-000000000002';
 const PIPELINE_ID = '51000000-0000-0000-0000-000000000001';
+const MEMBER_A = '70000000-0000-0000-0000-000000000001';
+const MEMBER_B = '70000000-0000-0000-0000-000000000002';
 
 describe('deals data access', () => {
 	it('lists deals with both parties and their stage, newest first', async () => {
@@ -111,6 +114,92 @@ describe('deals data access', () => {
 		expect(builder.update).toHaveBeenCalledWith({ stage_id: STAGE_ID });
 		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
 		expect(builder.eq).toHaveBeenCalledWith('id', DEAL_ID);
+	});
+
+	it('reads nothing extra for an edit that touches neither the stage nor the owner', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: DEAL_ID } });
+
+		await updateDeal(supabase, ORG_ID, DEAL_ID, { title: 'Renewal — take two' });
+		// The one query the write always needed, and nothing to compare against.
+		expect(from).toHaveBeenCalledTimes(1);
+	});
+
+	it('logs a system activity when a deal changes stage, naming both stages', async () => {
+		const before = {
+			id: DEAL_ID,
+			stage_id: STAGE_ID,
+			assigned_to: null,
+			pipeline_stages: { name: 'Prospecting' }
+		};
+		const after = { id: DEAL_ID, stage_id: OTHER_STAGE_ID, assigned_to: null };
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: before },
+			{ data: after },
+			{ data: { name: 'Qualification' } },
+			{ data: { id: 'activity-1' } }
+		]);
+
+		await updateDeal(supabase, ORG_ID, DEAL_ID, { stage_id: OTHER_STAGE_ID });
+
+		expect(builder.update).toHaveBeenCalledWith({ stage_id: OTHER_STAGE_ID });
+		expect(builder.insert).toHaveBeenCalledWith({
+			type: 'stage_changed',
+			subject: 'Moved from Prospecting to Qualification',
+			occurred_at: expect.any(String),
+			metadata: { from: STAGE_ID, to: OTHER_STAGE_ID },
+			org_id: ORG_ID,
+			entity_type: 'deal',
+			entity_id: DEAL_ID
+		});
+	});
+
+	it('logs a system activity when a deal is reassigned, naming both members', async () => {
+		const before = {
+			id: DEAL_ID,
+			stage_id: STAGE_ID,
+			assigned_to: MEMBER_A,
+			pipeline_stages: { name: 'Prospecting' }
+		};
+		const after = { id: DEAL_ID, stage_id: STAGE_ID, assigned_to: MEMBER_B };
+		const profiles = [
+			{ id: MEMBER_A, display_name: 'Alice', email: null },
+			{ id: MEMBER_B, display_name: 'Bob', email: null }
+		];
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: before },
+			{ data: after },
+			{ data: profiles },
+			{ data: { id: 'activity-1' } }
+		]);
+
+		await updateDeal(supabase, ORG_ID, DEAL_ID, { assigned_to: MEMBER_B });
+
+		expect(builder.insert).toHaveBeenCalledWith({
+			type: 'owner_changed',
+			subject: 'Reassigned from Alice to Bob',
+			occurred_at: expect.any(String),
+			metadata: { from: MEMBER_A, to: MEMBER_B },
+			org_id: ORG_ID,
+			entity_type: 'deal',
+			entity_id: DEAL_ID
+		});
+	});
+
+	it('never logs a stage or owner activity that is never edited', async () => {
+		const before = {
+			id: DEAL_ID,
+			stage_id: STAGE_ID,
+			assigned_to: MEMBER_A,
+			pipeline_stages: { name: 'Prospecting' }
+		};
+		const after = { id: DEAL_ID, stage_id: STAGE_ID, assigned_to: MEMBER_A };
+		const { supabase, builder } = supabaseMockSequence([{ data: before }, { data: after }]);
+
+		// stage_id is present but unchanged — still a tracked-column edit (the
+		// caller re-posted the same value), but nothing to say about it.
+		await updateDeal(supabase, ORG_ID, DEAL_ID, { stage_id: STAGE_ID });
+
+		expect(builder.insert).not.toHaveBeenCalled();
 	});
 
 	it('writes the board with the stage when a card is dropped on one', async () => {

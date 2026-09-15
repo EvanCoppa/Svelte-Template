@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { createActivity, deleteActivity, listActivities, updateActivity } from './activities';
+import { describe, expect, it, vi } from 'vitest';
+import {
+	createActivity,
+	deleteActivity,
+	listActivities,
+	logSystemActivity,
+	updateActivity
+} from './activities';
 import { ORG_ID, supabaseMock } from './test-support';
 
 const ACTIVITY_ID = '60000000-0000-0000-0000-000000000001';
@@ -58,6 +64,36 @@ describe('activities data access', () => {
 			entity_type: null,
 			entity_id: null
 		});
+	});
+
+	it('logs a system entry with a fixed occurred_at and no direction', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-09-19T12:00:00.000Z'));
+		try {
+			const { supabase, builder } = supabaseMock({ data: { id: ACTIVITY_ID } });
+
+			await logSystemActivity(
+				supabase,
+				ORG_ID,
+				{ entityType: 'deal', entityId: COMPANY_ID },
+				{
+					type: 'stage_changed',
+					subject: 'Moved from Prospecting to Qualification',
+					metadata: { from: 'a', to: 'b' }
+				}
+			);
+			expect(builder.insert).toHaveBeenCalledWith({
+				type: 'stage_changed',
+				subject: 'Moved from Prospecting to Qualification',
+				occurred_at: '2026-09-19T12:00:00.000Z',
+				metadata: { from: 'a', to: 'b' },
+				org_id: ORG_ID,
+				entity_type: 'deal',
+				entity_id: COMPANY_ID
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('updates scoped to org and id', async () => {

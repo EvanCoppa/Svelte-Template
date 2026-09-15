@@ -68,13 +68,13 @@ Discussed as a list; still needs sorting into real columns vs. custom fields vs.
 relationships. Proposed classification to confirm:
 
 - **Relationships, not columns** — rep and owner are both members. `assigned_to`
-  stays a column only if genuinely single-valued; a rep *and* an owner means two
+  stays a column only if genuinely single-valued; a rep _and_ an owner means two
   named roles, which is the `proposals` presenter/responsible pattern
   (composite key onto the membership) rather than two ad-hoc columns.
 - **Universal columns** — next action (text), next action due date, last
   activity date, expected close date, projected value (noun renamed per industry
   through `terms`, so it is not "monthly revenue" everywhere).
-- **Source** — points at a contact *or* a company, so it is a relationship, not
+- **Source** — points at a contact _or_ a company, so it is a relationship, not
   an `owner_id`-shaped column that has to pick a kind.
 - **Payment-processing custom fields** — current processor, current POS/gateway,
   main objection, statement status, proposal status, application status. These
@@ -92,24 +92,36 @@ Tasks:
 - [ ] Decide which of these become list columns (`list_fields` /
       `industry_list_fields`) for the deals list.
 
-### 2.3 Unified deal timeline — **Planned**
+### 2.3 Unified deal timeline — **Drafted** (stage/owner slice built; the rest is not)
 
 Plan: [`unified-deal-timeline-plan.md`](./unified-deal-timeline-plan.md).
 
 Settled shape: no second table. The timeline **is** `activities` — system facts
 (stage change, owner change, document events, proposal/application milestones,
-promotion, cadence steps) are logged as `activities` rows with a system `type`
-and no human author, alongside the existing note/call/email/meeting/text kinds.
-One `Detail.Thread` already renders it; no combined reader across two tables.
+promotion, cadence steps) are logged as `activities` rows with a system `type`,
+the acting member still as `author_id` for attribution — `is_system`
+(generated from `type`) is what makes a row uneditable, not a missing author.
+`Detail.Activity` already renders it; no combined reader across two tables.
 
-- [ ] Confirm/extend `activities.type` with the system-generated kinds; add a
-      jsonb detail column for before/after values if one doesn't exist yet.
-- [ ] Insert an `activities` row for: stage change, owner change, document
-      uploaded/linked/removed, proposal sent, application sent, promotion into
-      onboarding, cadence step fired — in the same transaction as the write
-      that causes it.
-- [ ] Render the new system kinds in `Detail.Thread` with their own icon/label.
-- [ ] Tests: ordering, permissions, and that a system row is never editable.
+- [x] Extended `activities.type` with `stage_changed` / `owner_changed`; added
+      a `metadata jsonb` column and a generated `is_system` column
+      (`20260919100000_deal_activity_types.sql`,
+      `20260919100100_deal_timeline_system_activities.sql`). **Not yet run
+      through a local `db:reset` round trip or `db:types` regeneration against
+      a live database** — this session had no Docker to boot the stack, so
+      `src/lib/database.types.ts` was hand-edited to match. Verify both before
+      this ships.
+- [x] `updateDeal()` (`src/lib/server/crm/deals.ts`) logs a `stage_changed` /
+      `owner_changed` activity itself when those columns change, so the move
+      action and the generic edit form both get it for free.
+- [x] `Detail.Activity` (`src/lib/components/detail/detail-activity.svelte`)
+      draws the two new kinds with their own icon and label.
+- [x] Unit tests for the new logging (`deals.test.ts`), `logSystemActivity()`
+      (`activities.test.ts`) and `getStageName()` (`pipelines.test.ts`).
+- [ ] Document uploaded/linked/removed, proposal sent, application sent,
+      promotion into onboarding, cadence step fired — each is its own
+      `logSystemActivity()` call at the write that already exists (or, for
+      promotion/cadence, at the write §2.4/§4.1 add), not built yet.
 
 ### 2.4 Deals without a party, and promotion — **Idea**
 
@@ -153,7 +165,7 @@ lifecycle from onboarding; the cadence engine (§4.1) schedules the work but doe
 not own it.
 
 - [ ] Plan doc section defining the boundary between onboarding and follow-up.
-- [ ] Decide what a follow-up record *is* — a lifecycle on the customer, or
+- [ ] Decide what a follow-up record _is_ — a lifecycle on the customer, or
       scheduled occurrences with no record of their own.
 
 ---
