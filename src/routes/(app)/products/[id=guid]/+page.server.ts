@@ -24,7 +24,10 @@ import type { Actions, PageServerLoad } from './$types';
  * `$lib/server/record-page.ts`, composed rather than copied.
  */
 
-export const PRODUCT_IMAGE_FORM_IDS = {
+// Not exported: a +page.server.ts may only export load/actions/the page
+// config options, so this stays a module-private constant like RECORD_FORM_IDS
+// would be if record-page.ts were a route file instead of a shared module.
+const PRODUCT_IMAGE_FORM_IDS = {
 	upload: 'product-image',
 	remove: 'remove-product-image'
 } as const;
