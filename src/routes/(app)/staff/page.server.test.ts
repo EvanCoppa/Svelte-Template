@@ -40,6 +40,7 @@ describe('setPay action', () => {
 	it('refuses a plain member, RLS-shaped, before touching the database', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 
+		// SAFETY: setPay only reads `locals` and `request` off the action event.
 		const result = await actions.setPay({
 			locals: localsFor(supabase, MEMBER),
 			request: requestFor({ user_id: USER_ID, hourly_wage: '20', commission_percent: '' })
@@ -54,6 +55,7 @@ describe('setPay action', () => {
 	it('lets an owner set both figures', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 
+		// SAFETY: setPay only reads `locals` and `request` off the action event.
 		const result = await actions.setPay({
 			locals: localsFor(supabase, OWNER),
 			request: requestFor({ user_id: USER_ID, hourly_wage: '22.5', commission_percent: '4' })
@@ -71,6 +73,7 @@ describe('setPay action', () => {
 	it('clears a figure left blank instead of keeping the old value', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 
+		// SAFETY: setPay only reads `locals` and `request` off the action event.
 		await actions.setPay({
 			locals: localsFor(supabase, OWNER),
 			request: requestFor({ user_id: USER_ID, hourly_wage: '', commission_percent: '' })
@@ -87,6 +90,7 @@ describe('setPay action', () => {
 	it('rejects a malformed figure before it reaches the database', async () => {
 		const { supabase, builder } = supabaseMock({ data: null });
 
+		// SAFETY: setPay only reads `locals` and `request` off the action event.
 		const result = await actions.setPay({
 			locals: localsFor(supabase, OWNER),
 			request: requestFor({ user_id: USER_ID, hourly_wage: 'lots', commission_percent: '' })

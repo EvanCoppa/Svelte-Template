@@ -55,6 +55,17 @@
 		return dateFormat.format(new Date(value));
 	}
 
+	const wageFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+	/** Blank for a member with nothing entered, or a viewer RLS returned nothing to. */
+	function formatWage(value: number | null): string {
+		return value === null ? '—' : `${wageFormat.format(value)}/hr`;
+	}
+
+	function formatCommission(value: number | null): string {
+		return value === null ? '—' : `${value}%`;
+	}
+
 	/**
 	 * A `type="number"` input hands the binding a number, or null once cleared;
 	 * every field here is a string (the schema's rule), so the setter puts the
@@ -129,15 +140,6 @@
 				enableGlobalFilter: true,
 				meta: { title: 'Member' }
 			}),
-			// The org role is a filter: the values are the three ranks.
-			columnHelper.accessor('role', {
-				header: ({ column }) =>
-					renderComponent(DataTable.ColumnHeader, { column, title: 'Org role' }),
-				cell: ({ getValue }) => DataTable.statusCell(getValue(), ORG_ROLE_TONES[getValue()]),
-				enableGlobalFilter: false,
-				filterFn: 'oneOf',
-				meta: { title: 'Org role', filter: { options: ORG_ROLE_OPTIONS } }
-			}),
 			columnHelper.accessor((member) => member.roles.map((role) => role.name).join(', '), {
 				id: 'roles',
 				header: ({ column }) => renderComponent(DataTable.ColumnHeader, { column, title: 'Roles' }),
@@ -152,12 +154,37 @@
 				enableGlobalFilter: false,
 				meta: { title: 'Roles' }
 			}),
-			columnHelper.accessor('joinedAt', {
+			// Pay follows its own RLS, not a column-visibility check: every staff
+			// reader gets this column, and a viewer the policy withholds pay from
+			// (staff_compensation migration) simply finds it blank, the same as an
+			// unentered figure — never a client-side gate on top of the database one.
+			columnHelper.accessor((member) => data.compensation.get(member.userId)?.hourlyWage ?? null, {
+				id: 'hourlyWage',
 				header: ({ column }) =>
-					renderComponent(DataTable.ColumnHeader, { column, title: 'Joined' }),
-				cell: ({ getValue }) => formatDate(getValue()),
+					renderComponent(DataTable.ColumnHeader, { column, title: 'Hourly Wage' }),
+				cell: ({ getValue }) => formatWage(getValue()),
 				enableGlobalFilter: false,
-				meta: { title: 'Joined' }
+				meta: { title: 'Hourly Wage' }
+			}),
+			columnHelper.accessor(
+				(member) => data.compensation.get(member.userId)?.commissionPercent ?? null,
+				{
+					id: 'commissionPercent',
+					header: ({ column }) =>
+						renderComponent(DataTable.ColumnHeader, { column, title: 'Commission %' }),
+					cell: ({ getValue }) => formatCommission(getValue()),
+					enableGlobalFilter: false,
+					meta: { title: 'Commission %' }
+				}
+			),
+			// The org role is a filter: the values are the three ranks.
+			columnHelper.accessor('role', {
+				header: ({ column }) =>
+					renderComponent(DataTable.ColumnHeader, { column, title: 'Status' }),
+				cell: ({ getValue }) => DataTable.statusCell(getValue(), ORG_ROLE_TONES[getValue()]),
+				enableGlobalFilter: false,
+				filterFn: 'oneOf',
+				meta: { title: 'Status', filter: { options: ORG_ROLE_OPTIONS } }
 			}),
 			DataTable.actionsColumn(columnHelper, ({ row }) =>
 				renderComponent(Staff.RowActions, {
