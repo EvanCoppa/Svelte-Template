@@ -205,6 +205,19 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/staff');
 	});
 
+	test('keeps Settings and Staff together across shell sidebars', async ({ page }) => {
+		for (const path of ['/settings/profile', '/assistant']) {
+			await page.goto(path);
+
+			const trigger = page.locator('[data-slot="sidebar-footer"]').getByRole('button').first();
+			await clickWhenLive(trigger, () => expect(page.getByRole('menu')).toBeVisible());
+
+			const items = page.getByRole('menu').getByRole('menuitem');
+			await expect(items.nth(0)).toHaveText('Settings');
+			await expect(items.nth(1)).toHaveText('Staff');
+		}
+	});
+
 	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
 		page
 	}) => {
