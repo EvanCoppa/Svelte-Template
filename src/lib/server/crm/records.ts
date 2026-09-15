@@ -63,6 +63,7 @@ import {
 	type ProposalWithOptions
 } from './proposals';
 import type { CrmEntityType } from './entity';
+import { listRelationships, RELATIONSHIP_TYPE } from './relationships';
 import { getTask, listTasks, type Task, type TaskWithParties } from './tasks';
 import { getTicket, listTickets, type TicketThread, type TicketWithParties } from './tickets';
 import { getVisit, listVisits, type VisitWithOutcome } from './visits';
@@ -1345,7 +1346,34 @@ export async function listRelatedRecords(
 	const party =
 		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
 
+	// A deal is not a party (it has no company_id/contact_id of its own to
+	// join a task against), so its to-do list is whatever tasks the graph
+	// names it — the `related_to` link, added from the deal's own
+	// Relationships card, exactly the shape docs/relationships.md calls out
+	// for "any other link between two records".
+	const dealTasks =
+		kind === 'deal' && canOpen('task')
+			? listRelationships(
+					supabase,
+					orgId,
+					{ entityType: 'deal', entityId: id },
+					{ typeId: RELATIONSHIP_TYPE.relatedTo, openOnly: true }
+				).then((rows) => {
+					const taskIds = rows
+						.map((row) => (row.from_type === 'task' ? row.from_id : null))
+						.concat(rows.map((row) => (row.to_type === 'task' ? row.to_id : null)))
+						.filter((taskId): taskId is string => taskId !== null);
+					return taskIds.length > 0
+						? listTasks(supabase, orgId, { ids: taskIds }).then((tasks): RelatedGroup => ({
+								kind: 'task',
+								records: tasks.map(relatedTask)
+							}))
+						: null;
+				})
+			: Promise.resolve(null);
+
 	const groups = await Promise.all([
+		dealTasks,
 		kind === 'company' && canOpen('contact')
 			? listContacts(supabase, orgId, party ?? {}).then((rows): RelatedGroup => ({
 					kind: 'contact',
