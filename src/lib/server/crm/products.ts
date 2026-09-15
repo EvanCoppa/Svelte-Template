@@ -115,6 +115,79 @@ export async function deleteProduct(
 	);
 }
 
+const PRODUCT_IMAGE_BUCKET = 'product-images';
+
+/** A product's image object never changes extension after upload. */
+function productImageExtension(file: File): string {
+	const fromName = file.name.split('.').pop();
+	if (fromName && fromName.length <= 5) return fromName.toLowerCase();
+	return file.type.split('/').pop() ?? 'bin';
+}
+
+function productImagePath(orgId: string, productId: string, file: File): string {
+	return `${orgId}/${productId}/${crypto.randomUUID()}.${productImageExtension(file)}`;
+}
+
+/** The storage path a product's public image URL points at, or null for a URL typed by hand. */
+function productImageStoragePath(url: string): string | null {
+	const marker = `/object/public/${PRODUCT_IMAGE_BUCKET}/`;
+	const index = url.indexOf(marker);
+	return index === -1 ? null : url.slice(index + marker.length);
+}
+
+/**
+ * Uploads a file to the public `product-images` bucket (provisioned by the
+ * product images bucket migration) and points `image_url` at it, replacing
+ * whatever was there. The upload is undone if the row write fails, and the
+ * object the row pointed at before is removed once the new one is live —
+ * the same rollback and no-orphans rule `entity-images.ts` takes, adapted to
+ * a single-slot field instead of a gallery row per file.
+ */
+export async function setProductImage(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	productId: string,
+	file: File
+): Promise<Product> {
+	const previous = await getProduct(supabase, orgId, productId);
+	if (!previous) throw new Error('Product was not found.');
+
+	const path = productImagePath(orgId, productId, file);
+	const uploaded = await supabase.storage
+		.from(PRODUCT_IMAGE_BUCKET)
+		.upload(path, file, { contentType: file.type });
+	if (uploaded.error) throw new Error(uploaded.error.message, { cause: uploaded.error });
+
+	const {
+		data: { publicUrl }
+	} = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+
+	try {
+		const updated = await updateProduct(supabase, orgId, productId, { image_url: publicUrl });
+		const previousPath = previous.image_url ? productImageStoragePath(previous.image_url) : null;
+		if (previousPath) await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([previousPath]);
+		return updated;
+	} catch (cause) {
+		await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
+		throw cause;
+	}
+}
+
+/** Clears a product's image, removing the storage object it pointed at. */
+export async function clearProductImage(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	productId: string
+): Promise<Product> {
+	const previous = await getProduct(supabase, orgId, productId);
+	if (!previous) throw new Error('Product was not found.');
+
+	const updated = await updateProduct(supabase, orgId, productId, { image_url: null });
+	const previousPath = previous.image_url ? productImageStoragePath(previous.image_url) : null;
+	if (previousPath) await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([previousPath]);
+	return updated;
+}
+
 export async function listProductCategories(
 	supabase: SupabaseClient<Database>,
 	orgId: string
