@@ -117,6 +117,9 @@ export function supabaseMockSequence(results: QueryResult[]) {
 	return { supabase, from, builder: methods };
 }
 
+/** The origin `storageMock().bucket.getPublicUrl()` builds its URLs on. */
+export const PUBLIC_BUCKET_URL = 'https://storage.test/object/public';
+
 export type StorageResult = {
 	upload?: { data?: unknown; error?: { message: string } | null };
 	createSignedUrls?: {
@@ -148,6 +151,11 @@ export function storageMock(result: StorageResult = {}) {
 			data: null,
 			error: null,
 			...result.remove
+		})),
+		// The one synchronous member of the bucket API: a public URL is built
+		// from the path rather than fetched.
+		getPublicUrl: vi.fn((path: string) => ({
+			data: { publicUrl: `${PUBLIC_BUCKET_URL}/${path}` }
 		}))
 	};
 	const from = vi.fn(() => bucket);

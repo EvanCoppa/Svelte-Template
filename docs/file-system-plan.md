@@ -8,10 +8,10 @@
 
 The file system has two authorities:
 
-| concern | authority | rule |
-| --- | --- | --- |
-| folders, names, relationships, metadata, trash state | Postgres | the database is the source of truth for what a member sees |
-| file bytes | private Supabase Storage bucket | the object is addressed by an immutable file id, not by a user-editable folder path |
+| concern                                              | authority                       | rule                                                                                |
+| ---------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| folders, names, relationships, metadata, trash state | Postgres                        | the database is the source of truth for what a member sees                          |
+| file bytes                                           | private Supabase Storage bucket | the object is addressed by an immutable file id, not by a user-editable folder path |
 
 The MVP is a small, organization-scoped file cabinet:
 
@@ -32,15 +32,15 @@ or full-text content indexing in this phase.
 The plan should reuse these conventions rather than create a second way to do tenancy,
 records, or storage:
 
-| existing pattern | reuse | add for files |
-| --- | --- | --- |
-| `organizations` + `organization_members` | `org_id` on every file-system row | none |
-| `private.org_role(org_id)` | all table and Storage authorization checks | policies specific to file/folder actions |
-| `created_by`, timestamps, `updated_at` trigger | authorship and ordinary metadata | file/folder rows and an append-only event row if approved |
-| `archived_at` on notes | the repository's soft-state vocabulary | prefer a more explicit `trashed_at` for file semantics |
-| `entity_images` | private bucket, first path segment is the org id, Storage RLS | a separate general-purpose private bucket and file-id path |
-| server-side Supabase clients and form actions | privileged signed URL creation and mutations | file-system server module/routes |
-| feature registry and page registry | later feature/page registration | not part of this planning-only PR |
+| existing pattern                               | reuse                                                         | add for files                                              |
+| ---------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `organizations` + `organization_members`       | `org_id` on every file-system row                             | none                                                       |
+| `private.org_role(org_id)`                     | all table and Storage authorization checks                    | policies specific to file/folder actions                   |
+| `created_by`, timestamps, `updated_at` trigger | authorship and ordinary metadata                              | file/folder rows and an append-only event row if approved  |
+| `archived_at` on notes                         | the repository's soft-state vocabulary                        | prefer a more explicit `trashed_at` for file semantics     |
+| `entity_images`                                | private bucket, first path segment is the org id, Storage RLS | a separate general-purpose private bucket and file-id path |
+| server-side Supabase clients and form actions  | privileged signed URL creation and mutations                  | file-system server module/routes                           |
+| feature registry and page registry             | later feature/page registration                               | not part of this planning-only PR                          |
 
 Relevant references are [the multi-tenancy rules in `CLAUDE.md`](../CLAUDE.md),
 [`entity_images` and its private bucket policies](../supabase/migrations/20260911090300_entity_images.sql),
@@ -89,17 +89,17 @@ approved.
 One row is one logical folder. An absent `parent_id` means the organization root; there
 is no Storage object for a folder, so empty folders work naturally.
 
-| column | purpose |
-| --- | --- |
-| `id uuid` | stable folder identity |
-| `org_id uuid` | organization scope, required and indexed |
-| `parent_id uuid nullable` | self-reference to another folder in the same organization |
-| `name text` | display name |
-| `name_key text` | normalized comparison key for sibling-name uniqueness and search |
-| `created_by uuid` | member who created it |
-| `created_at`, `updated_at` | ordinary timestamps |
-| `trashed_at timestamptz nullable` | soft-delete state; null means active |
-| `trashed_by uuid nullable` | actor who trashed it |
+| column                            | purpose                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `id uuid`                         | stable folder identity                                           |
+| `org_id uuid`                     | organization scope, required and indexed                         |
+| `parent_id uuid nullable`         | self-reference to another folder in the same organization        |
+| `name text`                       | display name                                                     |
+| `name_key text`                   | normalized comparison key for sibling-name uniqueness and search |
+| `created_by uuid`                 | member who created it                                            |
+| `created_at`, `updated_at`        | ordinary timestamps                                              |
+| `trashed_at timestamptz nullable` | soft-delete state; null means active                             |
+| `trashed_by uuid nullable`        | actor who trashed it                                             |
 
 Use a composite relationship or equivalent database validation so a folder cannot point
 at a parent from another organization. A folder cannot be moved beneath itself or one of
@@ -110,21 +110,21 @@ its descendants.
 One row is one logical file and one Storage object. The row is the authority used for
 listing, authorization, search, and download preparation.
 
-| column | purpose |
-| --- | --- |
-| `id uuid` | stable file identity and Storage path component |
-| `org_id uuid` | organization scope, required and indexed |
-| `folder_id uuid nullable` | containing folder; null means root |
-| `name text` | user-visible filename, independent of the object key |
-| `name_key text` | normalized sibling-name comparison/search key |
-| `storage_path text` | immutable path inside the private bucket |
-| `mime_type text nullable` | detected or client-provided type for display/download headers |
-| `size_bytes bigint` | authoritative byte count after upload |
-| `checksum text nullable` | optional later integrity/deduplication field; not required to ship |
-| `created_by uuid` | uploader/creator |
-| `created_at`, `updated_at` | ordinary timestamps |
-| `trashed_at timestamptz nullable` | soft-delete state; null means active |
-| `trashed_by uuid nullable` | actor who trashed it |
+| column                            | purpose                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `id uuid`                         | stable file identity and Storage path component                    |
+| `org_id uuid`                     | organization scope, required and indexed                           |
+| `folder_id uuid nullable`         | containing folder; null means root                                 |
+| `name text`                       | user-visible filename, independent of the object key               |
+| `name_key text`                   | normalized sibling-name comparison/search key                      |
+| `storage_path text`               | immutable path inside the private bucket                           |
+| `mime_type text nullable`         | detected or client-provided type for display/download headers      |
+| `size_bytes bigint`               | authoritative byte count after upload                              |
+| `checksum text nullable`          | optional later integrity/deduplication field; not required to ship |
+| `created_by uuid`                 | uploader/creator                                                   |
+| `created_at`, `updated_at`        | ordinary timestamps                                                |
+| `trashed_at timestamptz nullable` | soft-delete state; null means active                               |
+| `trashed_by uuid nullable`        | actor who trashed it                                               |
 
 `storage_path` is not writable after insert. Renaming changes `name` and moving changes
 `folder_id`; neither operation moves or rewrites bytes.
@@ -421,14 +421,14 @@ the MVP into a general collaboration platform.
 Before implementation is considered complete, verify:
 
 - [ ] The plan remains docs-only: no application code, migration, or generated type was
-  changed in the planning PR.
+      changed in the planning PR.
 - [ ] Every metadata table is organization-scoped, indexed by `org_id`, and has RLS
-  enabled.
+      enabled.
 - [ ] Policies use `private.org_role(org_id)` and do not trust user-editable metadata.
 - [ ] `UPDATE` policies include both `USING` and `WITH CHECK`.
 - [ ] Cross-organization folder/file relationships are blocked at the database boundary.
 - [ ] The bucket is private and Storage policies derive the org from the first path
-  segment.
+      segment.
 - [ ] Storage paths use `{org_id}/{file_id}/content`; rename and move do not move bytes.
 - [ ] Uploads cannot create discoverable orphan objects or leave visible pending rows.
 - [ ] Signed download URLs are short-lived and generated only after authorization.
@@ -436,9 +436,9 @@ Before implementation is considered complete, verify:
 - [ ] Empty folders survive without a placeholder object.
 - [ ] Duplicate active sibling names have one documented behavior and a race-safe check.
 - [ ] Trash is hidden from ordinary listings; restore handles missing parents and name
-  collisions explicitly.
+      collisions explicitly.
 - [ ] Permanent deletion, if added, has a clear actor restriction and retention rule.
 - [ ] Mutation history is append-only and distinct from CRM activities.
 - [ ] CRM links and portal grants are additive and do not make the org bucket public.
 - [ ] `git diff --check`, the repository's docs formatting/lint checks, and the relevant
-  schema/security review pass before the implementation PR begins.
+      schema/security review pass before the implementation PR begins.
