@@ -137,6 +137,16 @@ insert into public.organization_members (org_id, user_id, role) values
 	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'member')
 on conflict (org_id, user_id) do update set role = excluded.role;
 
+-- Pay is owner/admin-only, so seed a couple of rows to exercise it: e2e's
+-- hourly wage at Acme (a plain member's own row, unreadable to them through
+-- RLS) and dev's commission at Globex (dev is a plain member there too).
+insert into public.member_compensation (org_id, user_id, hourly_wage, commission_percent) values
+	('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 22.50, null),
+	('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', null, 8.5)
+on conflict (org_id, user_id) do update set
+	hourly_wage = excluded.hourly_wage,
+	commission_percent = excluded.commission_percent;
+
 -- Industry fixtures: two organizations in every industry the catalog ships
 -- (industry_role_catalog migration), so each vertical's role ladder and
 -- feature shape is exercisable after a reset. Evan owns one org per

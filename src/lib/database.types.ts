@@ -1601,6 +1601,45 @@ export type Database = {
           },
         ]
       }
+      member_compensation: {
+        Row: {
+          commission_percent: number | null
+          hourly_wage: number | null
+          org_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          commission_percent?: number | null
+          hourly_wage?: number | null
+          org_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          commission_percent?: number | null
+          hourly_wage?: number | null
+          org_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_compensation_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_compensation_org_id_user_id_fkey"
+            columns: ["org_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+        ]
+      }
       member_roles: {
         Row: {
           created_at: string
