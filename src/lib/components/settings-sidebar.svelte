@@ -8,7 +8,7 @@
 	import SidebarSearch from '$lib/components/sidebar-search.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { iconFor } from '$lib/features/icons';
-	import { isNavItemActive, settingsNav } from '$lib/navigation';
+	import { isNavItemActive, settingsNav, userMenuNav } from '$lib/navigation';
 
 	/**
 	 * The sidebar while you are under `/settings`. The `(app)` layout swaps
@@ -28,6 +28,7 @@
 	}: ComponentProps<typeof Sidebar.Root> = $props();
 
 	let user = $derived(page.data.user);
+	let userMenuItems = $derived(userMenuNav(page.data.nav ?? []));
 
 	// A nav, so its entries jump rather than step deeper — the same pairing
 	// `AppSidebar` makes; see `$lib/breadcrumbs.svelte`.
@@ -87,7 +88,7 @@
 		<div
 			class="border-border bg-background flex w-full flex-col rounded-xl border shadow-sm group-data-[collapsible=icon]:hidden"
 		>
-			<NavUser {user} />
+			<NavUser {user} items={userMenuItems} />
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>

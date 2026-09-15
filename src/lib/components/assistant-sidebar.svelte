@@ -18,6 +18,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import type { OrgMembership } from '$lib/org';
+	import { userMenuNav } from '$lib/navigation';
 	import type { ConversationSummary } from '$lib/server/ai/conversations';
 
 	/**
@@ -43,6 +44,7 @@
 	let organizations: OrgMembership[] = $derived(page.data.organizations ?? []);
 	let activeOrg = $derived(page.data.activeOrg);
 	let user = $derived(page.data.user);
+	let userMenuItems = $derived(userMenuNav(page.data.nav ?? []));
 	let conversations: ConversationSummary[] = $derived(page.data.conversations ?? []);
 
 	/** The thread on screen, or null on a new one. */
@@ -234,7 +236,7 @@
 		<div
 			class="border-border bg-background flex w-full flex-col rounded-xl border shadow-sm group-data-[collapsible=icon]:hidden"
 		>
-			<NavUser {user} />
+			<NavUser {user} items={userMenuItems} />
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
