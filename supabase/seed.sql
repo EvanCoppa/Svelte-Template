@@ -277,7 +277,7 @@ insert into public.addresses (id, org_id, entity_type, entity_id, kind, line1, c
 		'1 Dock Road', 'Jersey City', 'NJ', '07305', 'US', 40.717800, -74.043100, true)
 on conflict (id) do nothing;
 
--- A partner and the person at it, so the Partner contacts view lists someone.
+-- A partner and the person at it, so the Partners view lists someone.
 insert into public.companies (id, org_id, name, email, phone, website, status, relationship, created_by) values
 	('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001',
 		'Oscorp', 'partners@oscorp.example.com', null,
