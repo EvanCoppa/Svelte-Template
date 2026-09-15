@@ -3,15 +3,33 @@ import type { OrgContext } from '$lib/server/org-context';
 import type { AssistantToolContext } from '../context';
 import { isToolActive, type ToolAccess } from './access';
 import { addNote, addNoteAccess } from './add-note';
+import { assignTask, assignTaskAccess } from './assign-task';
 import { completeTask, completeTaskAccess } from './complete-task';
+import { createEvent, createEventAccess } from './create-event';
+import { createRecord, createRecordAccess } from './create-record';
 import { createTask, createTaskAccess } from './create-task';
+import { deleteEvent, deleteEventAccess } from './delete-event';
 import { deleteTask, deleteTaskAccess } from './delete-task';
+import { exploreGraph, exploreGraphAccess } from './explore-graph';
+import { findOpenSlots, findOpenSlotsAccess } from './find-open-slots';
+import { findRecords, findRecordsAccess } from './find-records';
 import { getCompany, getCompanyAccess } from './get-company';
+import { getRecord, getRecordAccess } from './get-record';
+import { linkRecords, linkRecordsAccess } from './link-records';
 import { listDeals, listDealsAccess } from './list-deals';
+import { listEvents, listEventsAccess } from './list-events';
+import { listMembers, listMembersAccess } from './list-members';
+import { listRecordFields, listRecordFieldsAccess } from './list-record-fields';
+import { listRecords, listRecordsAccess } from './list-records';
+import { listRelationshipTypes, listRelationshipTypesAccess } from './list-relationship-types';
 import { listTasks, listTasksAccess } from './list-tasks';
 import { listTickets, listTicketsAccess } from './list-tickets';
+import { packableLines, packableLinesAccess } from './packable-lines';
 import { searchCompanies, searchCompaniesAccess } from './search-companies';
 import { searchContacts, searchContactsAccess } from './search-contacts';
+import { unassignTask, unassignTaskAccess } from './unassign-task';
+import { updateEvent, updateEventAccess } from './update-event';
+import { updateRecord, updateRecordAccess } from './update-record';
 
 /**
  * The assistant's tools, one file each: an AI SDK `tool()` — zod
@@ -24,6 +42,32 @@ import { searchContacts, searchContactsAccess } from './search-contacts';
  * The agent always carries the full set, so `AssistantUIMessage` has a stable
  * type; which tools the model may call on a given request is
  * `activeToolNames()`, passed as `activeTools`.
+ *
+ * Two families. The first is a tool per feature (companies, contacts, tasks,
+ * deals, tickets, the calendar), each with that feature's own filters. The
+ * second is addressed by record KIND — `findRecords`, `getRecord`,
+ * `listRecordFields`, `createRecord`, `updateRecord`, `addNote`,
+ * `exploreGraph`, `linkRecords` — and serves every kind with a page through
+ * the generic record layer (`$lib/server/crm/records`,
+ * `$lib/server/records`), the way one route serves every record page. Those
+ * are offered while any kind is open to the caller and check the kind each
+ * call names (`recordAccess()`), so a kind whose feature the org, its tier
+ * or its industry withholds is refused inside the call, and the session
+ * block names only the kinds that exist for this org.
+ *
+ * Assignment cuts across both and is two different links, which is why it is
+ * two different places: who a record is FOR is a party (a `company_id` and a
+ * `contact_id`, written through the record's own fields), and who will DO the
+ * work is a colleague — `listMembers` names them, an assignee field takes one
+ * for a deal or a ticket, and `assignTask` / `unassignTask` write a task's,
+ * which are relationships rather than a column (docs/tasks.md).
+ *
+ * A third family answers with an ARTIFACT — a result the page draws as a
+ * component in the thread rather than folding into the activity line:
+ * `listRecords` (a list page's table), `findOpenSlots` (a pick-a-time card)
+ * and `packableLines` (a packing card). Their output is the component's
+ * data; `toModelOutput` hands the model a compact copy where the full one
+ * would be tokens for nobody (docs/assistant.md, "Artifacts").
  */
 export const assistantTools = {
 	searchCompanies,
@@ -34,8 +78,26 @@ export const assistantTools = {
 	createTask,
 	completeTask,
 	deleteTask,
+	assignTask,
+	unassignTask,
 	listDeals,
-	listTickets
+	listTickets,
+	listEvents,
+	createEvent,
+	updateEvent,
+	deleteEvent,
+	findRecords,
+	getRecord,
+	listRecordFields,
+	createRecord,
+	updateRecord,
+	exploreGraph,
+	listRelationshipTypes,
+	linkRecords,
+	listMembers,
+	listRecords,
+	findOpenSlots,
+	packableLines
 } satisfies ToolSet;
 
 export type AssistantTools = typeof assistantTools;
@@ -50,8 +112,26 @@ export const TOOL_ACCESS = {
 	createTask: createTaskAccess,
 	completeTask: completeTaskAccess,
 	deleteTask: deleteTaskAccess,
+	assignTask: assignTaskAccess,
+	unassignTask: unassignTaskAccess,
 	listDeals: listDealsAccess,
-	listTickets: listTicketsAccess
+	listTickets: listTicketsAccess,
+	listEvents: listEventsAccess,
+	createEvent: createEventAccess,
+	updateEvent: updateEventAccess,
+	deleteEvent: deleteEventAccess,
+	findRecords: findRecordsAccess,
+	getRecord: getRecordAccess,
+	listRecordFields: listRecordFieldsAccess,
+	createRecord: createRecordAccess,
+	updateRecord: updateRecordAccess,
+	exploreGraph: exploreGraphAccess,
+	listRelationshipTypes: listRelationshipTypesAccess,
+	linkRecords: linkRecordsAccess,
+	listMembers: listMembersAccess,
+	listRecords: listRecordsAccess,
+	findOpenSlots: findOpenSlotsAccess,
+	packableLines: packableLinesAccess
 } satisfies Record<AssistantToolName, ToolAccess>;
 
 export const TOOL_NAMES =
@@ -68,10 +148,27 @@ export function activeToolNames(org: OrgContext): AssistantToolName[] {
 }
 
 /**
- * Tools that remove data pause for the user's approval in the thread — the
- * SDK's `toolApproval` map. Everything else runs when the model calls it.
+ * Tools that pause for the user's approval in the thread — the SDK's
+ * `toolApproval` map. A delete, because it removes data — a task, and a
+ * booking, which vanishes from everyone's calendar with no undo; and an edit
+ * of a record, because the card can show the change field by field before it
+ * lands (`Assistant.Diff`), which is what makes a writing assistant one a
+ * reader trusts. Everything else runs when the model calls it — a create
+ * included: it adds something rather than replacing something.
  */
-export const TOOL_APPROVAL = { deleteTask: 'user-approval' } as const;
+export const TOOL_APPROVAL = {
+	deleteTask: 'user-approval',
+	deleteEvent: 'user-approval',
+	updateRecord: 'user-approval'
+} as const;
+
+/**
+ * Tools whose result is a card the reader works in — a table to filter, free
+ * time to pick from, lines to tick into a box — rather than something to be
+ * told (docs/assistant.md, "Artifacts"). The typed thread draws them; a voice
+ * call, which has no cards, is not offered them (`voiceToolNames()`).
+ */
+export const CARD_TOOLS = ['listRecords', 'findOpenSlots', 'packableLines'] as const;
 
 /** One request context for every tool; the SDK wants the map keyed by tool name. */
 export function toolsContextFor(

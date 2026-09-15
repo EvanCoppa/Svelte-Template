@@ -6,7 +6,12 @@ import type { ListKind, ListRow, ListSpec } from '$lib/lists/types';
 import { listAddressesFor } from './crm/addresses';
 import { listCustomFieldDefinitions, listCustomFieldValuesFor } from './crm/custom-fields';
 import { describeListRows, listNeeds, listRecords, resultIds, type ListResult } from './crm/lists';
-import { resolveProposalParents, type ProposalParent } from './crm/records';
+import {
+	resolveProposalParents,
+	resolveVisitSubjects,
+	type ProposalParent,
+	type VisitSubject
+} from './crm/records';
 import { loadListRegistry } from './features';
 import { getDisplayNames } from './profiles';
 import { hasGrant } from './roles';
@@ -27,6 +32,13 @@ import { hasGrant } from './roles';
 
 export type ListData = { list: { spec: ListSpec; rows: ListRow[] } };
 
+/**
+ * What a list needs of the request: the client, the org context and the
+ * active org — a page's `locals`, or the same three fields as the assistant's
+ * tool context carries them.
+ */
+export type ListLocals = Pick<App.Locals, 'supabase' | 'org' | 'activeOrgId'>;
+
 /** A kind's own list page: every row of the kind, described for its feature's list. */
 export async function loadRecordList(locals: App.Locals, kind: ListKind): Promise<ListData> {
 	const { supabase, activeOrgId } = locals;
@@ -40,7 +52,7 @@ export async function loadRecordList(locals: App.Locals, kind: ListKind): Promis
 
 /** Rows already read (a view's), described for the list `featureId` owns. */
 export async function loadList(
-	locals: App.Locals,
+	locals: ListLocals,
 	featureId: string,
 	result: ListResult
 ): Promise<ListData> {
@@ -60,7 +72,7 @@ export async function loadList(
 	// Only what the spec draws: a list with no city column reads no addresses.
 	const needs = listNeeds(spec);
 	const ids = resultIds(result);
-	const [addresses, customValues, proposalParents, memberNames] = await Promise.all([
+	const [addresses, customValues, proposalParents, memberNames, visitSubjects] = await Promise.all([
 		needs.addresses ? listAddressesFor(supabase, activeOrgId, result.kind, ids) : [],
 		needs.customValues ? listCustomFieldValuesFor(supabase, activeOrgId, result.kind, ids) : [],
 		needs.proposalParents && result.kind === 'proposal'
@@ -68,7 +80,10 @@ export async function loadList(
 			: new Map<string, ProposalParent>(),
 		needs.memberNames && result.kind === 'proposal'
 			? getDisplayNames(supabase, proposalMemberIds(result.rows))
-			: new Map<string, string>()
+			: new Map<string, string>(),
+		needs.visitSubjects && result.kind === 'visit'
+			? resolveVisitSubjects(supabase, activeOrgId, result.rows)
+			: new Map<string, VisitSubject>()
 	]);
 
 	return {
@@ -78,7 +93,8 @@ export async function loadList(
 				addresses,
 				customValues,
 				proposalParents,
-				memberNames
+				memberNames,
+				visitSubjects
 			})
 		}
 	};

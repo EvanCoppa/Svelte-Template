@@ -16,8 +16,13 @@ import { unwrap } from './unwrap';
 export type Pipeline = Tables<'pipelines'>;
 export type PipelineStage = Tables<'pipeline_stages'>;
 
+/** A stage with the column it shares with others, if any — see `buildDealColumns()`. */
+export type PipelineStageWithGroup = PipelineStage & {
+	pipeline_stage_groups: Pick<Tables<'pipeline_stage_groups'>, 'label'> | null;
+};
+
 /** A board with its columns in order — what a pipeline view renders from. */
-export type PipelineWithStages = Pipeline & { pipeline_stages: PipelineStage[] };
+export type PipelineWithStages = Pipeline & { pipeline_stages: PipelineStageWithGroup[] };
 
 export async function listPipelines(
 	supabase: SupabaseClient<Database>,
@@ -26,11 +31,27 @@ export async function listPipelines(
 	return unwrap(
 		await supabase
 			.from('pipelines')
-			.select('*, pipeline_stages(*)')
+			.select('*, pipeline_stages(*, pipeline_stage_groups(label))')
 			.eq('org_id', orgId)
 			.order('sort_order')
 			.order('sort_order', { referencedTable: 'pipeline_stages' })
 	);
+}
+
+/**
+ * A stage's own name, for a timeline entry that names where a deal came from
+ * or landed — the one lookup that doesn't need the whole board. RLS scopes
+ * it the way every other read here is scoped, without an explicit org_id
+ * filter: a stage id from another org simply is not visible.
+ */
+export async function getStageName(
+	supabase: SupabaseClient<Database>,
+	stageId: string
+): Promise<string | null> {
+	const stage = await unwrap(
+		await supabase.from('pipeline_stages').select('name').eq('id', stageId).maybeSingle()
+	);
+	return stage?.name ?? null;
 }
 
 /**
@@ -45,7 +66,7 @@ export async function defaultPipeline(
 	return unwrap(
 		await supabase
 			.from('pipelines')
-			.select('*, pipeline_stages(*)')
+			.select('*, pipeline_stages(*, pipeline_stage_groups(label))')
 			.eq('org_id', orgId)
 			.eq('is_default', true)
 			.order('sort_order', { referencedTable: 'pipeline_stages' })

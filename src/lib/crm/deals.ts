@@ -1,5 +1,7 @@
 import { parseDayKey, relativeDayLabel, startOfDay } from '$lib/calendar';
-import type { KanbanRingFill } from '$lib/components/kanban/index.js';
+import type { KanbanRingFill, KanbanStatus } from '$lib/components/kanban/index.js';
+import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
+import { STAGE_OUTCOME_TONE } from '$lib/crm/tones';
 import type { Tables } from '$lib/database.types';
 
 /**
@@ -9,9 +11,13 @@ import type { Tables } from '$lib/database.types';
  * questions and should not answer them itself.
  *
  * The board's columns are **rows, not an enum**: a dental practice and a roofer
- * do not run the same funnel, so a column is a `pipeline_stages` row and the
- * stage a deal is in is the state it is in. That is the one difference from the
- * task board, where a column is a group of several statuses.
+ * do not run the same funnel, so a column is built from `pipeline_stages` rows.
+ * An open stage IS the state a deal is in and gets its own column, the same
+ * one-status-one-column rule the funnel has always followed — but every stage
+ * that closes the deal shares one `Closed` column, grouped and split into drop
+ * zones the way the task board's grouped columns are (`buildDealColumns()`
+ * below), so scanning who is won and who is lost does not cost the funnel a
+ * column per terminal stage.
  *
  * Every Date here is local, the rule `$lib/calendar.ts` sets: "slipping" is a
  * wall-clock word, so it is worked out in the reader's own zone rather than in
@@ -20,6 +26,111 @@ import type { Tables } from '$lib/database.types';
 
 /** A stage as a column needs it — never the whole row. */
 export type StageLike = Pick<Tables<'pipeline_stages'>, 'outcome' | 'probability'>;
+
+/**
+ * A stage as the board's columns are built from — enough to name and tone it,
+ * plus which column it shares with other OPEN stages, if any
+ * (`pipeline_stage_groups` — the deal board's `TASK_STATUS_GROUPS`, as rows).
+ * `groupLabel` is present exactly when `groupId` is; a null group draws the
+ * stage as a column of its own, same as every stage has always had.
+ */
+export type StageColumn = Pick<
+	Tables<'pipeline_stages'>,
+	'id' | 'name' | 'outcome' | 'probability'
+> & {
+	groupId: string | null;
+	groupLabel: string | null;
+};
+
+/** One status inside a column, with the hue and ring its own drop zone draws. */
+export type DealColumnStatus = KanbanStatus & { tone: BadgeTone; fill: KanbanRingFill };
+
+/** One column of the funnel — an open stage on its own, or every closed one together. */
+export type DealColumn = {
+	/** Names the column to the board. A stage's own id for an open stage. */
+	id: string;
+	label: string;
+	tone: BadgeTone;
+	fill: KanbanRingFill;
+	statuses: readonly DealColumnStatus[];
+};
+
+/** The one column every closed stage shares, whatever an org calls its stages. */
+const CLOSED_COLUMN_ID = 'closed';
+
+/** One stage, as the status a column's drop zone draws. */
+function statusOf(stage: StageColumn): DealColumnStatus {
+	return {
+		value: stage.id,
+		label: stage.name,
+		tone: STAGE_OUTCOME_TONE[stage.outcome],
+		fill: stageFill(stage)
+	};
+}
+
+/**
+ * The funnel's columns, built from one board's stages. Two groupings apply,
+ * and they answer different questions:
+ *
+ *  - Every stage whose outcome closes the deal (won, lost, and any more an
+ *    org adds) is folded into one `Closed` column, split into a drop zone per
+ *    stage — outcome is the only thing that matters there, so the funnel is
+ *    the same width regardless of how many terminal stages an org defines.
+ *  - Among the OPEN stages, one carrying the same `groupId` as another shares
+ *    ITS column too (`pipeline_stage_groups` — the same `Kanban.Zones`
+ *    grouped-column pattern the task board uses, as rows rather than a JS
+ *    constant because a pipeline's stages are rows). An ungrouped open stage
+ *    is a column of its own, exactly as every stage has always been — a board
+ *    nobody has grouped renders exactly as it did before this existed.
+ *
+ * Column order follows `stages`' own order (sort_order): a group's column
+ * takes the position of its first member.
+ */
+export function buildDealColumns(stages: readonly StageColumn[]): DealColumn[] {
+	const open = stages.filter((stage) => stage.outcome === 'open');
+	const closed = stages.filter((stage) => stage.outcome !== 'open');
+
+	const columns: DealColumn[] = [];
+	const groupsSeen = new Set<string>();
+
+	for (const stage of open) {
+		if (stage.groupId === null) {
+			columns.push({
+				id: stage.id,
+				label: stage.name,
+				tone: STAGE_OUTCOME_TONE[stage.outcome],
+				fill: stageFill(stage),
+				statuses: [statusOf(stage)]
+			});
+			continue;
+		}
+		if (groupsSeen.has(stage.groupId)) continue;
+		groupsSeen.add(stage.groupId);
+
+		const members = open.filter((candidate) => candidate.groupId === stage.groupId);
+		const [first] = members;
+		columns.push({
+			id: stage.groupId,
+			label: stage.groupLabel ?? first.name,
+			tone: STAGE_OUTCOME_TONE[first.outcome],
+			fill: stageFill(first),
+			statuses: members.map(statusOf)
+		});
+	}
+
+	if (closed.length > 0) {
+		const [first] = closed;
+		columns.push({
+			id: CLOSED_COLUMN_ID,
+			label: 'Closed',
+			tone: STAGE_OUTCOME_TONE[first.outcome],
+			fill: stageFill(first),
+			statuses: closed.map(statusOf)
+		});
+	}
+
+	return columns;
+}
 
 /**
  * A deal as any of these functions needs it, with the stage it sits in. The

@@ -30,12 +30,31 @@ export const QUERY = {
 	/** Every charge and payment on the ledger — an invoice issued or voided, a payment recorded or applied, changes it. */
 	ledger: 'app:ledger',
 	assets: 'app:assets',
+	/** What customers asked for — a line, a split or a shipment moves the header. */
+	orders: 'app:orders',
+	/** Boxes going out — packing one or a carrier scan moves its order too. */
+	shipments: 'app:shipments',
+	/** The org's merchandising shelves — a group's members change with the group. */
+	featuredGroups: 'app:featured-groups',
+	/** The catalog tree — a category added, moved or removed changes it. */
+	categories: 'app:categories',
+	coupons: 'app:coupons',
+	/** What the org buys from its vendors — a line received moves the header too. */
+	purchases: 'app:purchases',
+	/** Returns coming back from customers. */
+	rmas: 'app:rmas',
+	/** The portfolio — buildings and the units inside them, which are rows in the same list. */
+	properties: 'app:properties',
+	/** The rent roll: every tenancy, running, upcoming or ended. */
+	leases: 'app:leases',
 	/** Every note the session can see: the dock's rail and the /notes page share it. */
 	notes: 'app:notes',
 	/** The bell's inbox — reading, dismissing or restoring one changes it. */
 	notifications: 'app:notifications',
 	tasks: 'app:tasks',
 	tickets: 'app:tickets',
+	/** Where people went — logging one, or booking the next, changes it. */
+	visits: 'app:visits',
 	/** One CRM record of any kind, as the generic record page shows it. */
 	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */

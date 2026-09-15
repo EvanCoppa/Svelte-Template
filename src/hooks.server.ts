@@ -19,6 +19,7 @@ import {
 	shouldAttemptDevAutoLogin
 } from '$lib/server/dev-auto-login';
 import { ADMIN_HOME } from '$lib/admin/nav';
+import { realtimeOrigins } from '$lib/ai/realtime';
 import { featureGateFor } from '$lib/features/gate';
 import { mapConfig, mapOrigins } from '$lib/map';
 import { isPathUnder } from '$lib/navigation';
@@ -76,7 +77,8 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
 	return applySecurityHeaders(await resolve(event), PUBLIC_SUPABASE_URL, {
 		dev,
 		mapOrigins: mapOrigins(mapConfig()),
-		imageOrigins: imageOrigins(publicEnv.PUBLIC_IMAGE_ORIGINS)
+		imageOrigins: imageOrigins(publicEnv.PUBLIC_IMAGE_ORIGINS),
+		realtimeOrigins: realtimeOrigins()
 	});
 };
 

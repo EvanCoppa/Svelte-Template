@@ -2,6 +2,7 @@
 	import type { ChatStatus } from 'ai';
 	import { tick } from 'svelte';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
+	import AudioLinesIcon from '@lucide/svelte/icons/audio-lines';
 	import MicIcon from '@lucide/svelte/icons/mic';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -21,6 +22,14 @@
 	 * and the button becomes Stop while an answer streams. The draft is the
 	 * composer's own state — the page hears about it only when it is sent.
 	 *
+	 * **The commit button is whatever there is to commit.** With something
+	 * written it sends; with an empty box there is nothing to send, so it
+	 * starts a call instead — the same button, in the same place, always the
+	 * thing you do next. That is also why it is never drawn as disabled while
+	 * the box is empty: an empty box is not a mistake, it is a different way of
+	 * asking. Dictation keeps its own microphone beside it, because putting
+	 * words in the box and talking to someone are not the same act.
+	 *
 	 * The controls sit beside the field while what you are writing still fits
 	 * on one line, and drop to their own row under it when it does not, so a
 	 * long prompt gets the whole width instead of a narrowing slot.
@@ -35,6 +44,7 @@
 		suggestions = [],
 		onSend,
 		onStop,
+		onCall,
 		...restProps
 	}: Omit<WithElementRef<HTMLAttributes<HTMLFormElement>, HTMLFormElement>, 'children'> & {
 		status: ChatStatus;
@@ -47,6 +57,11 @@
 		suggestions?: string[];
 		onSend: (text: string) => void;
 		onStop: () => void;
+		/**
+		 * Start a voice call. Left out where the page has no call to offer, and
+		 * then an empty box simply shows a send button with nothing to send.
+		 */
+		onCall?: (() => void) | undefined;
 	} = $props();
 
 	let draft = $state('');
@@ -57,8 +72,32 @@
 	let recalled = $state(-1);
 	let interrupted = '';
 
+	/**
+	 * The commit button's skin, worn by all three of its states — Stop, Call
+	 * and Send are one button, so they are one class list.
+	 *
+	 * `transform` has to be named in the transition. This used to say
+	 * `transition-opacity`, which is the same tailwind-merge group as the base
+	 * recipe's `transition-all` and so quietly replaced it — taking the
+	 * button's press with it, which snapped down and snapped back instead of
+	 * animating. 200ms where the rest of the bar is 150: the commit action is
+	 * the one control that should charge up rather than only light up.
+	 *
+	 * Disabled is its own colour, not the enabled fill at 30%: a washed out
+	 * gradient reads as a broken button rather than as one that is not ready
+	 * yet.
+	 */
+	const COMMIT = cn(
+		'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))]',
+		'transition-[opacity,transform,background-color] duration-200',
+		'enabled:hover:opacity-90',
+		'disabled:bg-secondary disabled:text-muted-foreground disabled:bg-none'
+	);
+
 	const busy = $derived(status === 'submitted' || status === 'streaming');
 	const canSend = $derived(!disabled && !busy && draft.trim().length > 0);
+	/** Nothing written, nothing streaming, and a call to offer: the button is a call. */
+	const calls = $derived(onCall !== undefined && !busy && draft.trim().length === 0);
 
 	/**
 	 * Whether the draft still fits beside the controls. Measured off a hidden
@@ -79,6 +118,9 @@
 		const inline = controls.clientWidth - CONTROLS_WIDTH;
 		wide = draft.includes('\n') || measure.offsetWidth + 8 > inline;
 	});
+
+	/** Where the commit button sits: beside the field, or under it once the draft has grown. */
+	const slot = $derived(wide ? 'col-start-4 row-start-2' : 'col-start-4 row-start-1');
 
 	function send() {
 		const text = draft.trim();
@@ -222,7 +264,7 @@
 							variant="ghost"
 							size="icon"
 							class={cn(
-								'text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground size-8 shrink-0 justify-self-start rounded-[9px] active:scale-[0.94]',
+								'text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground size-8 shrink-0 justify-self-start rounded-[9px]',
 								wide ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
 							)}
 							aria-label="Openers"
@@ -272,7 +314,7 @@
 					aria-label={listening ? 'Stop dictation' : 'Start dictation'}
 					aria-pressed={listening}
 					class={cn(
-						'size-8 shrink-0 rounded-[9px] active:scale-[0.94]',
+						'size-8 shrink-0 rounded-[9px]',
 						listening
 							? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
 							: 'text-muted-foreground hover:text-foreground',
@@ -296,10 +338,7 @@
 				<Button
 					type="button"
 					size="icon"
-					class={cn(
-						'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))]',
-						wide ? 'col-start-4 row-start-2' : 'col-start-4 row-start-1'
-					)}
+					class={cn(COMMIT, slot)}
 					onclick={onStop}
 					aria-label="Stop"
 				>
@@ -309,14 +348,22 @@
 						<SquareIcon class="size-3 fill-current" />
 					{/if}
 				</Button>
+			{:else if calls}
+				<Button
+					type="button"
+					size="icon"
+					class={cn(COMMIT, slot)}
+					{disabled}
+					onclick={onCall}
+					aria-label="Start a voice call"
+				>
+					<AudioLinesIcon class="size-[18px]" />
+				</Button>
 			{:else}
 				<Button
 					type="submit"
 					size="icon"
-					class={cn(
-						'from-primary size-7 shrink-0 rounded-[8px] bg-gradient-to-br to-[oklch(from_var(--primary)_0.74_calc(c_*_0.6)_calc(h_-_28))] transition-opacity enabled:hover:opacity-90 enabled:active:scale-[0.94] disabled:opacity-30',
-						wide ? 'col-start-4 row-start-2' : 'col-start-4 row-start-1'
-					)}
+					class={cn(COMMIT, slot)}
 					disabled={!canSend}
 					aria-label="Send"
 				>

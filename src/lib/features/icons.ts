@@ -7,7 +7,9 @@ import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 import CircleUserIcon from '@lucide/svelte/icons/circle-user';
 import ContactIcon from '@lucide/svelte/icons/contact';
+import FileSignatureIcon from '@lucide/svelte/icons/file-signature';
 import FileTextIcon from '@lucide/svelte/icons/file-text';
+import Grid3x3Icon from '@lucide/svelte/icons/grid-3x3';
 import HandshakeIcon from '@lucide/svelte/icons/handshake';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
@@ -17,12 +19,18 @@ import MapPinIcon from '@lucide/svelte/icons/map-pin';
 import PackageIcon from '@lucide/svelte/icons/package';
 import PencilRulerIcon from '@lucide/svelte/icons/pencil-ruler';
 import ReceiptIcon from '@lucide/svelte/icons/receipt';
+import RouteIcon from '@lucide/svelte/icons/route';
 import ReceiptTextIcon from '@lucide/svelte/icons/receipt-text';
+import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 import ShieldIcon from '@lucide/svelte/icons/shield';
+import ShoppingBagIcon from '@lucide/svelte/icons/shopping-bag';
+import ShoppingCartIcon from '@lucide/svelte/icons/shopping-cart';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 import SparklesIcon from '@lucide/svelte/icons/sparkles';
+import StarIcon from '@lucide/svelte/icons/star';
 import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
 import TicketIcon from '@lucide/svelte/icons/ticket';
+import TicketPercentIcon from '@lucide/svelte/icons/ticket-percent';
 import ToggleRightIcon from '@lucide/svelte/icons/toggle-right';
 import TruckIcon from '@lucide/svelte/icons/truck';
 import UsersIcon from '@lucide/svelte/icons/users';
@@ -44,7 +52,9 @@ export const ICONS = {
 	'calendar-days': CalendarDaysIcon,
 	'circle-user': CircleUserIcon,
 	contact: ContactIcon,
+	'file-signature': FileSignatureIcon,
 	'file-text': FileTextIcon,
+	'grid-3x3': Grid3x3Icon,
 	handshake: HandshakeIcon,
 	layers: LayersIcon,
 	'layout-dashboard': LayoutDashboardIcon,
@@ -55,11 +65,17 @@ export const ICONS = {
 	'pencil-ruler': PencilRulerIcon,
 	receipt: ReceiptIcon,
 	'receipt-text': ReceiptTextIcon,
+	'rotate-ccw': RotateCcwIcon,
+	route: RouteIcon,
 	shield: ShieldIcon,
+	'shopping-bag': ShoppingBagIcon,
+	'shopping-cart': ShoppingCartIcon,
 	'sliders-horizontal': SlidersHorizontalIcon,
 	sparkles: SparklesIcon,
+	star: StarIcon,
 	'sticky-note': StickyNoteIcon,
 	ticket: TicketIcon,
+	'ticket-percent': TicketPercentIcon,
 	'toggle-right': ToggleRightIcon,
 	truck: TruckIcon,
 	users: UsersIcon,

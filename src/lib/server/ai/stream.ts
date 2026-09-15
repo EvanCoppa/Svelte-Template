@@ -4,6 +4,7 @@ import {
 	createAgentUIStreamResponse,
 	createIdGenerator,
 	isToolUIPart,
+	smoothStream,
 	type LanguageModel
 } from 'ai';
 import type { StreamRequest } from '$lib/ai/schemas';
@@ -59,8 +60,14 @@ export async function streamAssistantTurn({
 	const { supabase, orgId, userId } = context;
 	const conversationId = request.id;
 
-	const conversation = await ensureConversation(supabase, orgId, userId, conversationId);
-	const stored = await toUIMessages(await loadMessages(supabase, conversationId));
+	// Both reads are about the same thread and neither needs the other's answer:
+	// a conversation that does not exist yet has no messages either way. Running
+	// them together saves a round trip from the wait in front of the first token.
+	const [conversation, storedRows] = await Promise.all([
+		ensureConversation(supabase, orgId, userId, conversationId),
+		loadMessages(supabase, conversationId)
+	]);
+	const stored = await toUIMessages(storedRows);
 
 	let messages: AssistantUIMessage[];
 	if (request.trigger === 'regenerate-message') {
@@ -70,19 +77,40 @@ export async function streamAssistantTurn({
 		messages = await mergeIncoming(supabase, conversationId, stored, incoming);
 	}
 
-	// Title the thread from its opening message, before the first answer
-	// streams: by the time the turn ends and the page refreshes its rail, the
-	// title is already there — no race with the stream's end.
-	if (!conversation.title && stored.length === 0) {
-		const opening = messages.find((m) => m.role === 'user');
-		const title = opening ? await generateTitle(model, textOf(opening)) : null;
-		if (title) await updateConversationTitle(supabase, orgId, conversationId, title);
-	}
+	// Title the thread from its opening message — started here and deliberately
+	// NOT awaited. Awaiting it would put a whole model round trip in front of
+	// the first token of every new conversation, which is the one wait every
+	// reader sees and the first impression the assistant makes. Started now it
+	// runs alongside the answer instead, and `onEnd` settles it before the turn
+	// finishes, so the rail still finds the title when the page reloads it.
+	const titling =
+		!conversation.title && stored.length === 0
+			? titleThread({
+					supabase,
+					orgId,
+					conversationId,
+					model,
+					opening: messages.find((message) => message.role === 'user'),
+					generateTitle
+				})
+			: null;
 
 	return createAgentUIStreamResponse({
-		agent: createAssistantAgent({ model, context, timeZone: request.timeZone, userName }),
+		agent: createAssistantAgent({
+			model,
+			context,
+			conversationId,
+			timeZone: request.timeZone,
+			userName
+		}),
 		uiMessages: messages,
 		originalMessages: messages,
+		// A provider delivers text in whatever bursts its own batching produces —
+		// several words at once, then a pause — which reads as lurching rather
+		// than writing. The SDK's own transform re-chunks the stream to one word
+		// at a time so the answer arrives at a steady pace. It paces what has
+		// already been generated; it never waits for more.
+		experimental_transform: smoothStream({ chunking: 'word' }),
 		generateMessageId,
 		messageMetadata: ({ part }) => {
 			if (part.type === 'start') return { createdAt: Date.now(), model: modelId };
@@ -95,6 +123,10 @@ export async function streamAssistantTurn({
 			return undefined;
 		},
 		onEnd: async ({ messages: finalMessages }) => {
+			// Settle the title before the thread is saved, so a turn never ends
+			// with the naming still in flight — the page refreshes its rail off
+			// the end of the stream and would otherwise race it.
+			if (titling) await titling;
 			try {
 				await saveMessages(supabase, conversationId, finalMessages);
 			} catch (cause) {
@@ -108,6 +140,39 @@ export async function streamAssistantTurn({
 			return 'The assistant hit an error. Try again.';
 		}
 	});
+}
+
+/**
+ * Name a thread from the message that opened it, and store the name.
+ *
+ * Every failure is swallowed here rather than raised: this runs beside the
+ * answer, so a thread that could not be named must not become a turn that
+ * failed. It is also why the promise is safe to leave unawaited until `onEnd`
+ * — it never rejects.
+ */
+async function titleThread({
+	supabase,
+	orgId,
+	conversationId,
+	model,
+	opening,
+	generateTitle
+}: {
+	supabase: SupabaseClient<Database>;
+	orgId: string;
+	conversationId: string;
+	model: LanguageModel;
+	/** The thread's first user message, if it has one. */
+	opening: AssistantUIMessage | undefined;
+	generateTitle: typeof generateConversationTitle;
+}): Promise<void> {
+	if (!opening) return;
+	try {
+		const title = await generateTitle(model, textOf(opening));
+		if (title) await updateConversationTitle(supabase, orgId, conversationId, title);
+	} catch (cause) {
+		console.error('[assistant] failed to title the thread', { conversationId, cause });
+	}
 }
 
 /**

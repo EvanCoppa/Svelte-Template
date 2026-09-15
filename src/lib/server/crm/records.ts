@@ -1,20 +1,36 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BadgeTone } from '$lib/components/ui/badge/badge-tones.js';
+import { couponDiscountText } from '$lib/crm/coupons';
 import { recommendedOption } from '$lib/crm/proposals';
+import { leaseName } from '$lib/crm/leases';
 import { recordHref, type RecordKind } from '$lib/crm/records';
+import {
+	isVisitSubjectKind,
+	visitName,
+	visitSubjectKey,
+	type VisitSubjectKind
+} from '$lib/crm/visits';
 import {
 	ASSET_STATUS_TONE,
 	COMPANY_RELATIONSHIP_TONE,
+	COUPON_DISCOUNT_TYPE_TONE,
 	INVOICE_STATUS_TONE,
 	PARTY_STATUS_TONE,
 	PAYMENT_STATE_TONE,
 	PRODUCT_KIND_TONE,
+	PROPERTY_STATUS_TONE,
 	PROPOSAL_STATUS_TONE,
+	FULFILLMENT_STATE_TONE,
+	ORDER_STATUS_TONE,
+	PURCHASE_STATUS_TONE,
+	SHIPMENT_DELIVERY_TONE,
+	RMA_STATUS_TONE,
 	STAGE_OUTCOME_TONE,
 	PRIORITY_TONE,
 	TASK_STATUS_LABEL,
 	TASK_STATUS_TONE,
-	TICKET_STATUS_TONE
+	TICKET_STATUS_TONE,
+	VISIT_STATUS_TONE
 } from '$lib/crm/tones';
 import type { Database } from '$lib/database.types';
 import type { Vocabulary } from '$lib/features/vocabulary';
@@ -23,8 +39,11 @@ import { getAsset, listAssets, type Asset } from './assets';
 import { getBillable, listBillables, type Billable } from './billables';
 import { getCompany, listCompanies, type CompanyWithContacts } from './companies';
 import { getContact, listContacts, type ContactWithCompany } from './contacts';
+import { getCoupon, listCoupons, type Coupon } from './coupons';
 import type { CustomField } from './custom-fields';
 import { getDeal, listDeals, type DealWithParties } from './deals';
+import { getLease, listLeases, type LeaseWithParties } from './leases';
+import { getProperty, isUnit, listProperties, type Property } from './properties';
 import {
 	getInvoice,
 	listInvoices,
@@ -32,6 +51,10 @@ import {
 	type InvoiceWithParties
 } from './invoices';
 import { getProduct, listProducts, type ProductWithCategory } from './products';
+import { getOrder, listOrders, type OrderWithDetails } from './orders';
+import { getPurchase, listPurchases, type PurchaseWithDetails } from './purchases';
+import { getShipment, listShipments, type ShipmentWithDetails } from './shipments';
+import { getRma, listRmas, type RmaWithParties } from './rmas';
 import {
 	getProposal,
 	listProposals,
@@ -42,6 +65,7 @@ import {
 import type { CrmEntityType } from './entity';
 import { getTask, listTasks, type Task, type TaskWithParties } from './tasks';
 import { getTicket, listTickets, type TicketThread, type TicketWithParties } from './tickets';
+import { getVisit, listVisits, type VisitWithOutcome } from './visits';
 
 /**
  * One record of any kind, as the generic record page shows it.
@@ -85,8 +109,12 @@ export type FieldValue =
 	| { type: 'datetime'; value: string }
 	/** Somewhere outside the app: a mailto, a tel, a website. */
 	| { type: 'link'; value: string; href: string }
-	/** Another CRM record; `href` is null when the reader may not open it. */
-	| { type: 'record'; value: string; href: string | null }
+	/**
+	 * Another CRM record, named and addressed; `href` is null when the reader
+	 * may not open it (the page draws plain text), while `kind` and `id` say
+	 * which record it is for a reader that follows links by id — the assistant.
+	 */
+	| { type: 'record'; value: string; href: string | null; kind: RecordKind; id: string }
 	/** A member, by user id — the page resolves the name (see `$lib/server/profiles`). */
 	| { type: 'person'; userId: string };
 
@@ -194,7 +222,9 @@ function record(
 	return {
 		type: 'record',
 		value: target.name,
-		href: canOpen(kind) ? recordHref(kind, target.id) : null
+		href: canOpen(kind) ? recordHref(kind, target.id) : null,
+		kind,
+		id: target.id
 	};
 }
 
@@ -227,6 +257,287 @@ export function describeAsset(row: Asset): RecordDetail {
 			{ label: 'Acquired', value: date(row.acquired_on) },
 			{ label: 'Disposed', value: date(row.disposed_on) },
 			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describeCoupon(row: Coupon): RecordDetail {
+	return {
+		kind: 'coupon',
+		id: row.id,
+		// A coupon is known by the thing a buyer types.
+		name: row.code,
+		pills: [
+			pill(row.is_active ? 'active' : 'inactive', row.is_active ? 'success' : 'neutral'),
+			pill(row.discount_type, COUPON_DISCOUNT_TYPE_TONE[row.discount_type])
+		],
+		fields: [
+			// Read against the type in the one place that knows how, so this
+			// says exactly what the list cell says.
+			{ label: 'Discount', value: text(couponDiscountText(row)) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Starts', value: date(row.starts_on) },
+			{ label: 'Ends', value: date(row.ends_on) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * A building or a unit — one describer, because they are one table. What
+ * differs is only which fields have anything in them: a building carries the
+ * money and the dates, a unit carries the bedrooms and the rent it could
+ * fetch. The pill says which it is, so a reader never has to work it out from
+ * a blank field.
+ *
+ * The building a unit belongs to is a `record` field pointing back into the
+ * same kind — the one link the tree needs, since the units under a building
+ * arrive as related records like every other kind's children.
+ */
+export function describeProperty(
+	row: Property,
+	building: Pick<Property, 'id' | 'name'> | null,
+	canOpen: CanOpen
+): RecordDetail {
+	const unit = isUnit(row);
+	return {
+		kind: 'property',
+		id: row.id,
+		name: row.name,
+		pills: [
+			pill(unit ? 'unit' : 'building', unit ? 'info' : 'neutral'),
+			pill(row.status, PROPERTY_STATUS_TONE[row.status])
+		],
+		// Who owns it, who manages it and which trade services it are not
+		// fields: they are relationships, drawn by the page from
+		// `getRelationships()` beside every other kind's.
+		fields: [
+			{ label: 'Building', value: record('property', building, canOpen) },
+			{ label: 'Type', value: text(row.property_type) },
+			{ label: 'Identifier', value: text(row.identifier) },
+			{ label: 'Bedrooms', value: count(row.bedrooms) },
+			{ label: 'Bathrooms', value: count(row.bathrooms) },
+			{ label: 'Square feet', value: count(row.square_feet) },
+			// What it could fetch. What anyone actually pays is on the lease.
+			{ label: 'Market rent', value: money(row.market_rent, row.currency) },
+			{ label: 'Description', value: text(row.description) },
+			{ label: 'Acquired', value: date(row.acquired_on) },
+			{ label: 'Disposed', value: date(row.disposed_on) },
+			{ label: 'Purchase price', value: money(row.purchase_price, row.currency) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * One customer order.
+ *
+ * Two pills, because an order has two axes: what a person committed to
+ * (`status`) and how much of it has gone out (`fulfillment_status`, folded
+ * from the lines by the database). How much has been PAID is a third axis and
+ * deliberately not here — it is a fact about the order's invoices.
+ *
+ * The lines are not fields: they are the record page's own screen, the way an
+ * invoice's are.
+ */
+export function describeOrder(row: OrderWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'order',
+		id: row.id,
+		name: row.number,
+		pills: [
+			pill(row.status, ORDER_STATUS_TONE[row.status]),
+			pill(row.fulfillment_status, FULFILLMENT_STATE_TONE[row.fulfillment_status])
+		],
+		fields: [
+			{ label: 'Customer', value: record('company', row.companies, canOpen) },
+			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
+			{ label: 'Customer PO', value: text(row.customer_po) },
+			// Every figure here is the database's: the subtotal and the tax
+			// roll up from the lines and the total is generated from them.
+			{ label: 'Subtotal', value: money(row.subtotal, row.currency) },
+			{ label: 'Tax', value: money(row.tax, row.currency) },
+			{ label: 'Shipping', value: money(row.shipping, row.currency) },
+			{ label: 'Discount', value: money(row.discount, row.currency) },
+			{ label: 'Total', value: money(row.total, row.currency) },
+			{ label: 'Confirmed', value: datetime(row.confirmed_at) },
+			{ label: 'Cancelled', value: datetime(row.cancelled_at) },
+			{ label: 'Est. ship', value: date(row.estimated_ship_date) },
+			{ label: 'Notes', value: text(row.notes) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * One box.
+ *
+ * It has no name of its own — a shipment is known by its carrier and tracking
+ * number, unique together per org — so the tracking number names the record,
+ * and a box not yet handed to a carrier reads as untracked rather than blank.
+ *
+ * The pill is `delivery_status`, which is the CARRIER's word: writing it is
+ * what pushes `shipped` or `delivered` onto every line in the box.
+ */
+export function describeShipment(row: ShipmentWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'shipment',
+		id: row.id,
+		name: row.tracking_number ?? 'Untracked shipment',
+		pills: [pill(row.delivery_status, SHIPMENT_DELIVERY_TONE[row.delivery_status])],
+		fields: [
+			{ label: 'Carrier', value: text(row.carrier) },
+			{ label: 'Shipped by', value: record('company', row.companies, canOpen) },
+			{ label: 'Shipped', value: date(row.ship_date) },
+			{ label: 'Due', value: date(row.estimated_delivery_date) },
+			{ label: 'Delivered', value: datetime(row.delivered_at) },
+			// The carrier's own last words, and why live tracking stopped when
+			// it has. Both are the sync's, never typed.
+			{ label: 'Detail', value: text(row.status_detail) },
+			{ label: 'Last scan', value: datetime(row.carrier_updated_at) },
+			{ label: 'Tracking error', value: text(row.tracking_error) },
+			{ label: 'Notes', value: text(row.notes) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describePurchase(row: PurchaseWithDetails, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'purchase',
+		id: row.id,
+		name: row.number,
+		pills: [pill(row.status, PURCHASE_STATUS_TONE[row.status])],
+		fields: [
+			{ label: 'Vendor', value: record('company', row.companies, canOpen) },
+			{ label: 'Reference', value: text(row.reference) },
+			// Every figure here is the database's: the subtotal rolls up from
+			// the lines and the total is generated from it.
+			{ label: 'Subtotal', value: money(row.subtotal, row.currency) },
+			{ label: 'Freight', value: money(row.freight, row.currency) },
+			{ label: 'Tax', value: money(row.tax, row.currency) },
+			{ label: 'Total', value: money(row.total, row.currency) },
+			{ label: 'Ordered', value: datetime(row.ordered_at) },
+			{ label: 'Expected', value: datetime(row.expected_at) },
+			{ label: 'Received', value: datetime(row.received_at) },
+			{ label: 'Due', value: date(row.due_date) },
+			{ label: 'Notes', value: text(row.notes) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+export function describeRma(row: RmaWithParties, canOpen: CanOpen): RecordDetail {
+	return {
+		kind: 'rma',
+		id: row.id,
+		name: row.number,
+		pills: [pill(row.status, RMA_STATUS_TONE[row.status])],
+		fields: [
+			{ label: 'Company', value: record('company', row.companies, canOpen) },
+			{ label: 'Contact', value: record('contact', row.contacts, canOpen) },
+			{ label: 'Requested', value: date(row.requested_on) },
+			{ label: 'Reason', value: text(row.reason) },
+			{ label: 'Resolution', value: text(row.resolution) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/** The record a visit was to, resolved through that kind's own module. */
+export type VisitSubject = { kind: VisitSubjectKind; id: string; name: string };
+
+/**
+ * A visit.
+ *
+ * Named for who was visited (`visitName()`), because a visit has no name
+ * column — the lease's arrangement, and for the same reason. The outcome is a
+ * `visit_outcomes` row, so its pill wears the tone the ORG gave it rather than
+ * one this file picked; the status pill is ours, from the enum.
+ *
+ * There is no "Attended by" field: attendance is a relationship, and the
+ * Relationships card already draws it (docs/tasks.md's rule — never a second
+ * copy of a relationship as a record field). Time on site is not a field
+ * either: it is `ended_at` minus `occurred_at`, and subtracting two instants
+ * for display is the browser's job, exactly as formatting one is.
+ */
+export function describeVisit(
+	row: VisitWithOutcome,
+	subject: VisitSubject | null,
+	canOpen: CanOpen
+): RecordDetail {
+	const outcome = row.visit_outcomes;
+	return {
+		kind: 'visit',
+		id: row.id,
+		name: visitName(subject?.name),
+		pills: [
+			pill(row.status, VISIT_STATUS_TONE[row.status]),
+			...(outcome ? [{ label: outcome.name, tone: outcome.tone }] : [])
+		],
+		fields: [
+			// The subject is never null in the database, so a blank here means
+			// the reader cannot see it — not that the visit was to nobody.
+			{ label: 'Visited', value: subject ? record(subject.kind, subject, canOpen) : EMPTY },
+			{ label: 'Scheduled', value: datetime(row.scheduled_for) },
+			{ label: 'Arrived', value: datetime(row.occurred_at) },
+			{ label: 'Left', value: datetime(row.ended_at) },
+			{ label: 'Outcome', value: text(outcome?.name ?? null) },
+			{ label: 'Notes', value: text(row.notes) }
+		],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		createdBy: row.created_by
+	};
+}
+
+/**
+ * A tenancy.
+ *
+ * The pill says whether the term is fixed or month-to-month, which is a
+ * STORED fact (`ends_on` null or not) — deliberately not whether the lease is
+ * running today. Whether it is running is a question about a day, and a day
+ * is a wall-clock word: `leaseStateOn()` answers it in the browser on the
+ * rent roll, the way the task board buckets by the viewer's clock and the
+ * ledger decides overdue by the viewer's date. A pill computed here would be
+ * the server deciding what "now" means, and wrong at midnight.
+ */
+export function describeLease(row: LeaseWithParties, canOpen: CanOpen): RecordDetail {
+	const tenant = row.contacts ?? row.companies;
+	const tenantKind: RecordKind = row.contacts ? 'contact' : 'company';
+	return {
+		kind: 'lease',
+		id: row.id,
+		// A lease is named for what is rented and by whom — it has no name
+		// column, because neither half of that is the lease's to own.
+		name: leaseName({ property: row.properties?.name, tenant: tenant?.name }),
+		pills: [row.ends_on === null ? pill('month-to-month', 'info') : pill('fixed term', 'neutral')],
+		fields: [
+			{ label: 'Property', value: record('property', row.properties, canOpen) },
+			{ label: 'Tenant', value: record(tenantKind, tenant, canOpen) },
+			{ label: 'Starts', value: date(row.starts_on) },
+			// Null is month-to-month, which the pill already says; the blank
+			// field is honest rather than a made-up date.
+			{ label: 'Ends', value: date(row.ends_on) },
+			{ label: 'Rent', value: money(row.rent_amount, row.currency) },
+			{ label: 'Rent due', value: count(row.rent_due_day) },
+			{ label: 'Security deposit', value: money(row.security_deposit, row.currency) },
+			{ label: 'Notes', value: text(row.notes) }
 		],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -549,9 +860,25 @@ export async function getRecord(
 			const row = await getContact(supabase, orgId, id);
 			return row && describeContact(row, canOpen);
 		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row && describeCoupon(row);
+		}
 		case 'product': {
 			const row = await getProduct(supabase, orgId, id);
 			return row && describeProduct(row);
+		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			if (!row) return null;
+			// A unit names the building above it; a building names nothing,
+			// so the second read only happens for the half that has a parent.
+			const building = row.parent_id ? await getProperty(supabase, orgId, row.parent_id) : null;
+			return describeProperty(row, building, canOpen);
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row && describeLease(row, canOpen);
 		}
 		case 'deal': {
 			const row = await getDeal(supabase, orgId, id);
@@ -573,6 +900,22 @@ export async function getRecord(
 			const row = await getInvoice(supabase, orgId, id);
 			return row && describeInvoice(row, canOpen);
 		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row && describeOrder(row, canOpen);
+		}
+		case 'shipment': {
+			const row = await getShipment(supabase, orgId, id);
+			return row && describeShipment(row, canOpen);
+		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row && describePurchase(row, canOpen);
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row && describeRma(row, canOpen);
+		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
 			return row && describeTask(row, canOpen);
@@ -580,6 +923,10 @@ export async function getRecord(
 		case 'ticket': {
 			const row = await getTicket(supabase, orgId, id);
 			return row && describeTicket(row, canOpen);
+		}
+		case 'visit': {
+			const row = await getVisit(supabase, orgId, id);
+			return row && describeVisit(row, await resolveVisitSubject(supabase, orgId, row), canOpen);
 		}
 	}
 }
@@ -613,18 +960,61 @@ export async function listRecordNames(
 			return (await listCompanies(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
 		case 'contact':
 			return (await listContacts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'coupon':
+			return (await listCoupons(supabase, orgId)).map((row) => ({ id: row.id, name: row.code }));
 		case 'product':
 			return (await listProducts(supabase, orgId)).map((row) => ({ id: row.id, name: row.name }));
+		case 'property':
+			// Buildings and units alike — they are one table, and the graph
+			// draws a unit as its own node with `part_of` as the edge.
+			return (await listProperties(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: row.name
+			}));
+		case 'lease':
+			// A lease has no name column: it is named for what is rented and
+			// by whom, exactly as `describeLease()` names it.
+			return (await listLeases(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: leaseName({
+					property: row.properties?.name,
+					tenant: row.contacts?.name ?? row.companies?.name
+				})
+			}));
 		case 'deal':
 			return (await listDeals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'proposal':
 			return (await listProposals(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'invoice':
 			return (await listInvoices(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'order':
+			return (await listOrders(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
+		case 'shipment':
+			return (await listShipments(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: row.tracking_number ?? 'Untracked shipment'
+			}));
+		case 'purchase':
+			return (await listPurchases(supabase, orgId)).map((row) => ({
+				id: row.id,
+				name: row.number
+			}));
+		case 'rma':
+			return (await listRmas(supabase, orgId)).map((row) => ({ id: row.id, name: row.number }));
 		case 'task':
 			return (await listTasks(supabase, orgId)).map((row) => ({ id: row.id, name: row.title }));
 		case 'ticket':
 			return (await listTickets(supabase, orgId)).map((row) => ({ id: row.id, name: row.subject }));
+		case 'visit': {
+			// A visit has no name column: it is named for who was visited, so
+			// the subjects are resolved in one pass and each row takes its own.
+			const rows = await listVisits(supabase, orgId);
+			const subjects = await resolveVisitSubjects(supabase, orgId, rows);
+			return rows.map((row) => ({
+				id: row.id,
+				name: visitName(subjects.get(visitSubjectKey(row.entity_type, row.entity_id))?.name)
+			}));
+		}
 	}
 }
 
@@ -658,6 +1048,86 @@ export async function resolveProposalParent(
 			return parent && { kind, id: parent.id, name: parent.title };
 		}
 	}
+}
+
+/**
+ * Who a visit was to, read through that kind's own module — the visits
+ * version of `resolveProposalParent()`, over the five kinds you can go and
+ * see (`VISIT_SUBJECT_KINDS`, which mirrors the database's own constraint).
+ *
+ * Null when RLS hides the record or it went in the moment between the two
+ * reads. Never null because the link is unset: the column pair is not
+ * nullable, unlike a proposal's.
+ */
+export async function resolveVisitSubject(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	visit: { entity_type: CrmEntityType; entity_id: string }
+): Promise<VisitSubject | null> {
+	if (!isVisitSubjectKind(visit.entity_type)) return null;
+	const kind = visit.entity_type;
+	switch (kind) {
+		case 'company': {
+			const subject = await getCompany(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'contact': {
+			const subject = await getContact(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'deal': {
+			const subject = await getDeal(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.title };
+		}
+		case 'property': {
+			const subject = await getProperty(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+		case 'asset': {
+			const subject = await getAsset(supabase, orgId, visit.entity_id);
+			return subject && { kind, id: subject.id, name: subject.name };
+		}
+	}
+}
+
+/**
+ * Who many visits were to, one query per kind present rather than one per row
+ * — the list page's version of `resolveVisitSubject()`, and the same shape as
+ * `resolveProposalParents()`.
+ */
+export async function resolveVisitSubjects(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	rows: readonly { entity_type: CrmEntityType; entity_id: string }[]
+): Promise<ReadonlyMap<string, VisitSubject>> {
+	const idsByKind = new Map<VisitSubjectKind, string[]>();
+	for (const row of rows) {
+		if (!isVisitSubjectKind(row.entity_type)) continue;
+		const ids = idsByKind.get(row.entity_type) ?? [];
+		ids.push(row.entity_id);
+		idsByKind.set(row.entity_type, ids);
+	}
+
+	const idsFor = (kind: VisitSubjectKind) => idsByKind.get(kind) ?? [];
+	const [companies, contacts, deals, properties, assets] = await Promise.all([
+		idsFor('company').length ? listCompanies(supabase, orgId, { ids: idsFor('company') }) : [],
+		idsFor('contact').length ? listContacts(supabase, orgId, { ids: idsFor('contact') }) : [],
+		idsFor('deal').length ? listDeals(supabase, orgId, { ids: idsFor('deal') }) : [],
+		idsFor('property').length ? listProperties(supabase, orgId, { ids: idsFor('property') }) : [],
+		idsFor('asset').length ? listAssets(supabase, orgId, { ids: idsFor('asset') }) : []
+	]);
+
+	const subjects = new Map<string, VisitSubject>();
+	const put = (kind: VisitSubjectKind, id: string, name: string) =>
+		subjects.set(visitSubjectKey(kind, id), { kind, id, name });
+
+	for (const row of companies) put('company', row.id, row.name);
+	for (const row of contacts) put('contact', row.id, row.name);
+	// A deal is named by its title, exactly as `listRecordNames()` names one.
+	for (const row of deals) put('deal', row.id, row.title);
+	for (const row of properties) put('property', row.id, row.name);
+	for (const row of assets) put('asset', row.id, row.name);
+	return subjects;
 }
 
 /** The lookup key `resolveProposalParents()` fills and the proposals list reads. */
@@ -787,6 +1257,38 @@ function relatedTask(row: Task): RelatedRecord {
 	};
 }
 
+/** A unit under the building on screen. Its meta is what makes a unit a unit. */
+function relatedProperty(row: Property): RelatedRecord {
+	const measurements = [
+		row.bedrooms === null ? null : `${row.bedrooms} bed`,
+		row.bathrooms === null ? null : `${row.bathrooms} bath`,
+		row.square_feet === null ? null : `${row.square_feet} sq ft`
+	].filter(Boolean);
+	return {
+		id: row.id,
+		name: row.name,
+		href: recordHref('property', row.id),
+		pill: pill(row.status, PROPERTY_STATUS_TONE[row.status]),
+		meta: measurements.length > 0 ? measurements.join(' · ') : (row.property_type ?? row.identifier)
+	};
+}
+
+/**
+ * A tenancy on the property or tenant on screen. The pill is the stored
+ * fixed/rolling fact, not whether it is running — see `describeLease()`.
+ */
+function relatedLease(row: LeaseWithParties): RelatedRecord {
+	const tenant = row.contacts?.name ?? row.companies?.name;
+	const term = row.ends_on === null ? `from ${row.starts_on}` : `${row.starts_on} – ${row.ends_on}`;
+	return {
+		id: row.id,
+		name: tenant ?? row.properties?.name ?? 'Lease',
+		href: recordHref('lease', row.id),
+		pill: row.ends_on === null ? pill('month-to-month', 'info') : pill('fixed term', 'neutral'),
+		meta: `${term} · ${moneyText(row.rent_amount, row.currency)}`
+	};
+}
+
 function relatedTicket(row: TicketWithParties): RelatedRecord {
 	return {
 		id: row.id,
@@ -794,6 +1296,16 @@ function relatedTicket(row: TicketWithParties): RelatedRecord {
 		href: recordHref('ticket', row.id),
 		pill: pill(row.status, TICKET_STATUS_TONE[row.status]),
 		meta: `#${String(row.number)} · ${row.priority} priority`
+	};
+}
+
+function relatedRma(row: RmaWithParties): RelatedRecord {
+	return {
+		id: row.id,
+		name: row.number,
+		href: recordHref('rma', row.id),
+		pill: pill(row.status, RMA_STATUS_TONE[row.status]),
+		meta: row.reason?.trim() || null
 	};
 }
 
@@ -815,6 +1327,20 @@ export async function listRelatedRecords(
 	id: string,
 	canOpen: CanOpen
 ): Promise<RelatedGroup[]> {
+	// A property's related records are its own: the units inside it, and the
+	// tenancies on it. Handled before the party check because a property is
+	// not a party — this is the tree and the rent roll, not the CRM graph.
+	if (kind === 'property') {
+		const [units, leases] = await Promise.all([
+			canOpen('property') ? listProperties(supabase, orgId, { parentId: id }) : Promise.resolve([]),
+			canOpen('lease') ? listLeases(supabase, orgId, { propertyId: id }) : Promise.resolve([])
+		]);
+		return [
+			{ kind: 'property' as const, records: units.map(relatedProperty) },
+			{ kind: 'lease' as const, records: leases.map(relatedLease) }
+		].filter((group) => group.records.length > 0);
+	}
+
 	if (kind !== 'company' && kind !== 'contact' && kind !== 'deal') return [];
 	const party =
 		kind === 'company' ? { companyId: id } : kind === 'contact' ? { contactId: id } : null;
@@ -824,6 +1350,16 @@ export async function listRelatedRecords(
 			? listContacts(supabase, orgId, party ?? {}).then((rows): RelatedGroup => ({
 					kind: 'contact',
 					records: rows.map(relatedContact)
+				}))
+			: null,
+		// A tenant's tenancies, right after the people — for a landlord this is
+		// the most important thing about a contact. Companies rent too (a shop,
+		// a corporate let), so both sides of the party model ask for them, each
+		// by its own column rather than an unfiltered list.
+		party && canOpen('lease')
+			? listLeases(supabase, orgId, party).then((rows): RelatedGroup => ({
+					kind: 'lease',
+					records: rows.map(relatedLease)
 				}))
 			: null,
 		party && canOpen('deal')
@@ -853,6 +1389,12 @@ export async function listRelatedRecords(
 			? listTickets(supabase, orgId, party).then((rows): RelatedGroup => ({
 					kind: 'ticket',
 					records: rows.map(relatedTicket)
+				}))
+			: null,
+		party && canOpen('rma')
+			? listRmas(supabase, orgId, party).then((rows): RelatedGroup => ({
+					kind: 'rma',
+					records: rows.map(relatedRma)
 				}))
 			: null
 	]);

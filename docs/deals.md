@@ -20,20 +20,44 @@ the pure questions the browser asks — which column a deal is in, how full a st
 ring is, what a column adds up to, how its close date reads — are
 `src/lib/crm/deals.ts`, the mirror of `src/lib/crm/tasks.ts`.
 
-## One column, one state
+## One column per open stage, unless grouped — and one Closed column
 
 A `Kanban.Column` is a status group and the `statuses` under it are the states a
-record is in (CLAUDE.md, "A board is `Kanban`"). On this board the two coincide: a
-stage IS the state a deal is in, so every column declares exactly one status and a
-release lands straight away. The drop zones the task board shows are for a column
-that groups several states — they are not part of every board.
+record is in (CLAUDE.md, "A board is `Kanban`"). For an open stage the two default
+to coinciding: a stage IS the state a deal is in, so an ungrouped one gets a column
+of its own and a release lands straight away. Every stage whose outcome closes the
+deal — `won`, `lost`, and any more an org adds — shares one `Closed` column
+instead, split into a drop zone per stage exactly the way the task board's grouped
+columns work: a card dragged there is asked which outcome it landed on, rather than
+the funnel growing a column per terminal stage. `buildDealColumns()`
+(`$lib/crm/deals.ts`) is the one place that groups them; the page only renders what
+it returns.
+
+A wide funnel earns the same treatment among its OPEN stages: `pipeline_stage_groups`
+(the `pipeline_stage_groups` migration) is one row per visual column several open
+stages share — the deal board's answer to the task board's `TASK_STATUS_GROUPS`, as
+rows rather than a JS constant, because a pipeline's stages are rows too (org-definable
+sets are rows, CLAUDE.md). A `pipeline_stages` row points at its group with
+`group_id`; null (the default every stage has always had) is a column of its own.
+`buildDealColumns()` folds stages sharing a `group_id` into one column the same
+`Kanban.Zones` way the Closed column already works — a group is never a deal's
+status, only ever a way the board is read, and dropping a card on a grouped
+column's zone still writes the one real stage it landed on. Merchant services'
+ten-stage funnel (`industry_pipeline_stages.group_label`, seeded per industry —
+see below) is the worked example: eight open stages become three columns
+(Prospecting, Qualification, Underwriting) rather than eight, so the whole funnel
+draws in four columns total including Closed. There is no settings screen to shape
+groups yet, matching pipelines/pipeline_stages themselves — an org's own board is
+grouped by hand today, the way its stages are.
 
 What the columns look like is the stage's own data, not a palette the page keeps:
 `STAGE_OUTCOME_TONE` (open / won / lost) is the hue, and the stage's `probability`
 is how full its `Kanban.Ring` is drawn — so the rings fill up across the funnel
 instead of three hues repeating, and the two ends are the words a fraction cannot
-say (`won` is done, `lost` is stopped). A column's header carries its count and what
-it is worth, which is the reason a funnel is drawn rather than listed.
+say (`won` is done, `lost` is stopped). The Closed column's own header wears its
+first stage's hue and ring, the same simplification the task board's grouped
+headers make. A column's header carries its count and what it is worth, which is
+the reason a funnel is drawn rather than listed.
 
 A funnel draws **one board at a time**, because a stage only means something inside
 its own pipeline. Which one is in the query string — resolved in the load, never

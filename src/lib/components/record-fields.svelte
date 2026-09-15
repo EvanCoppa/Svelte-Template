@@ -5,8 +5,12 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { toLocalDateTimeInput } from '$lib/calendar';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import CrosshairIcon from '@lucide/svelte/icons/crosshair';
+	import { formatFix, parseFix } from '$lib/crm/visits';
 	import {
 		RECORD_FORMS,
+		RECORD_PICKER_KINDS,
 		type RecordField,
 		type RecordFormValues,
 		type RecordPickerKind,
@@ -69,9 +73,64 @@
 		return field.type === 'datetime' && value !== '' ? toLocalDateTimeInput(value) : value;
 	}
 
-	/** A field that picks one of the org's own rows — its options came with the form. */
+	/**
+	 * A field that picks one of the org's own rows — its options came with the
+	 * form. Derived from `RECORD_PICKER_KINDS` rather than listed, so a kind
+	 * added to the registry renders here without a second edit.
+	 */
 	function isPicker(field: RecordField): field is RecordField & { type: RecordPickerKind } {
-		return field.type === 'company' || field.type === 'contact' || field.type === 'stage';
+		// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` so
+		// `includes` accepts the broader field-type union. Widening only, and
+		// the predicate's narrowing is what the return type asserts.
+		return (RECORD_PICKER_KINDS as readonly string[]).includes(field.type);
+	}
+
+	/**
+	 * What a captured fix reads as. The numbers are the device's, so they are
+	 * shown rather than made typeable — `parseFix()` is the one reader, here
+	 * and on the server.
+	 */
+	function fixLabel(value: string): string {
+		const fix = parseFix(value);
+		if (!fix) return 'No location captured';
+		const point = `${fix.latitude.toFixed(5)}, ${fix.longitude.toFixed(5)}`;
+		return fix.accuracy === null ? point : `${point} (±${Math.round(fix.accuracy)}m)`;
+	}
+
+	/** Set while the device is being asked, so the button says what it is doing. */
+	let locating = $state(false);
+	let locationError = $state('');
+
+	/**
+	 * Ask the device where it is and put the answer in the field. A refusal is
+	 * reported next to the button and nothing is written: a visit is worth
+	 * keeping without a fix (the rule `parseFix()` states), so this never
+	 * blocks the form.
+	 */
+	function capture(name: string) {
+		if (!navigator.geolocation) {
+			locationError = 'This browser cannot report a location.';
+			return;
+		}
+		locating = true;
+		locationError = '';
+		navigator.geolocation.getCurrentPosition(
+			(position) => {
+				locating = false;
+				$form[name] = formatFix({
+					latitude: Number(position.coords.latitude.toFixed(6)),
+					longitude: Number(position.coords.longitude.toFixed(6)),
+					accuracy: Number.isFinite(position.coords.accuracy)
+						? Number(position.coords.accuracy.toFixed(2))
+						: null
+				});
+			},
+			() => {
+				locating = false;
+				locationError = 'Could not read this device’s location.';
+			},
+			{ enableHighAccuracy: true, timeout: 10000 }
+		);
 	}
 
 	function inputType(field: RecordField) {
@@ -82,6 +141,8 @@
 				return 'email' as const;
 			case 'tel':
 				return 'tel' as const;
+			case 'url':
+				return 'url' as const;
 			case 'number':
 			case 'integer':
 				return 'number' as const;
@@ -118,6 +179,32 @@
 				clearable
 				{invalid}
 			/>
+		{:else if field.type === 'geo'}
+			<div class="flex flex-wrap items-center gap-2">
+				<!-- The value posts through a hidden input, exactly as a Combobox
+				     does, so the field needs no JavaScript to submit what it holds. -->
+				<input type="hidden" name={field.name} value={$form[field.name]} />
+				<Button
+					{id}
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={locating}
+					onclick={() => capture(field.name)}
+				>
+					<CrosshairIcon />
+					{locating ? 'Locating…' : 'Use my location'}
+				</Button>
+				<span class="text-muted-foreground text-sm">{fixLabel($form[field.name])}</span>
+				{#if $form[field.name] !== ''}
+					<Button type="button" variant="ghost" size="sm" onclick={() => ($form[field.name] = '')}>
+						Clear
+					</Button>
+				{/if}
+			</div>
+			{#if locationError}
+				<p class="text-muted-foreground text-sm">{locationError}</p>
+			{/if}
 		{:else if field.type === 'textarea'}
 			<Textarea
 				{id}

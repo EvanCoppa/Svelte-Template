@@ -3,24 +3,41 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
-import type { Database } from '$lib/database.types';
+import type { Database, Json } from '$lib/database.types';
+import { memberName } from '$lib/components/staff/member';
 import { RECORD_KIND_META, type RecordKind } from '$lib/crm/records';
+import {
+	formatFix,
+	parseFix,
+	splitVisitSubject,
+	visitSubjectKey,
+	VISIT_SUBJECT_KINDS
+} from '$lib/crm/visits';
 import type { ListKind } from '$lib/lists/types';
 import {
 	assetRecordSchema,
 	billableRecordSchema,
 	companyRecordSchema,
 	contactRecordSchema,
+	couponRecordSchema,
 	dealRecordSchema,
 	deleteRecordSchema,
 	invoiceRecordSchema,
+	leaseRecordSchema,
 	productRecordSchema,
+	orderRecordSchema,
+	purchaseRecordSchema,
+	rmaRecordSchema,
+	propertyRecordSchema,
 	taskRecordSchema,
 	ticketRecordSchema,
+	visitRecordSchema,
+	isRecordType,
 	RECORD_FORMS,
 	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
-	RECORD_TYPES,
+	storefrontMetadataSchema,
+	type ProductRecordValues,
 	type RecordFieldOption,
 	type RecordFormValues,
 	type RecordPickerKind,
@@ -43,14 +60,36 @@ import {
 	listContacts,
 	updateContact
 } from './crm/contacts';
+import { createCoupon, deleteCoupon, getCoupon, updateCoupon } from './crm/coupons';
 import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './crm/deals';
 import { createInvoice } from './crm/invoices';
+import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
+import {
+	createProduct,
+	deleteProduct,
+	getProduct,
+	listProductCategories,
+	updateProduct
+} from './crm/products';
+import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
+import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
+import { deleteShipment } from './crm/shipments';
+import { createRma, deleteRma, getRma, updateRma } from './crm/rmas';
+import {
+	createProperty,
+	deleteProperty,
+	getProperty,
+	listProperties,
+	updateProperty
+} from './crm/properties';
 import { deleteProposal } from './crm/proposals';
-import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
 import { createTask, getTask, updateTask } from './crm/tasks';
 import { createTicket, deleteTicket, getTicket, updateTicket } from './crm/tickets';
+import { listRecordNames } from './crm/records';
+import { createVisit, deleteVisit, getVisit, listVisitOutcomes, updateVisit } from './crm/visits';
 import { can, requirePermission } from './roles';
+import { listStaff } from './staff';
 
 /**
  * The server half of the generic record form (`$lib/schemas/records.ts` is the
@@ -117,7 +156,7 @@ export async function loadCreateRecord(
 }
 
 /** The org's rows behind each party picker on the form for `type` — none for a form without one. */
-async function loadPickers(
+export async function loadPickers(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType
@@ -129,7 +168,8 @@ async function loadPickers(
 	return Object.fromEntries(wanted.map((kind, index) => [kind, loaded[index]]));
 }
 
-async function pickerOptions(
+/** The options behind one picker kind — every row of the org's the picker may name. */
+export async function pickerOptions(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	kind: RecordPickerKind
@@ -158,6 +198,69 @@ async function pickerOptions(
 					sublabel: pipeline.name
 				}))
 			);
+		case 'property': {
+			// Buildings and units in one list, because they are one table — and
+			// a unit is shown under the building it belongs to, so two
+			// "Unit 1"s tell apart. One pass builds the name index, so the
+			// sublabel costs no extra query.
+			const rows = await listProperties(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id
+					? (names.get(row.parent_id) ?? undefined)
+					: (row.property_type ?? undefined)
+			}));
+		}
+		case 'subject': {
+			// Every record you can go and see, in one list, each labelled with
+			// what it is — one question, not two (the `subject` note in
+			// `RECORD_PICKER_KINDS`). Read through `listRecordNames()`, which
+			// is the one place a kind's rows become "an id and a name", so the
+			// picker shows exactly what the record page will put at the top.
+			const kinds = await Promise.all(
+				VISIT_SUBJECT_KINDS.map(async (kind) => ({
+					kind,
+					rows: await listRecordNames(supabase, orgId, kind)
+				}))
+			);
+			return kinds.flatMap(({ kind, rows }) =>
+				rows.map((row) => ({
+					value: visitSubjectKey(kind, row.id),
+					label: row.name,
+					sublabel: kind
+				}))
+			);
+		}
+		case 'outcome':
+			return (await listVisitOutcomes(supabase, orgId)).map((outcome) => ({
+				value: outcome.id,
+				label: outcome.name
+			}));
+		case 'category': {
+			// The catalog tree, flat — a node is shown under its parent so two
+			// "Accessories" tell apart, the properties picker's rule. One pass
+			// builds the name index, so the sublabel costs no extra query.
+			const rows = await listProductCategories(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id ? (names.get(row.parent_id) ?? undefined) : undefined
+			}));
+		}
+		case 'member':
+			// Everyone who works here, named the way the roster names them, so
+			// a picker, a task card and the staff page call the same person the
+			// same thing.
+			return (await listStaff(supabase, orgId)).map((member) => {
+				const option: RecordFieldOption = { value: member.userId, label: memberName(member) };
+				// The email tells two same-named colleagues apart — but only
+				// where there is a display name, because otherwise it IS the label.
+				if (member.displayName && member.email) option.sublabel = member.email;
+				return option;
+			});
 	}
 }
 
@@ -203,7 +306,7 @@ export type EditableRecordType = Exclude<RecordType, 'invoice'>;
 
 /** Whether a record page should offer the edit form for this kind. */
 export function isEditableRecordType(kind: RecordKind): kind is EditableRecordType {
-	return kind !== 'invoice' && RECORD_TYPES.some((type) => type === kind);
+	return kind !== 'invoice' && isRecordType(kind);
 }
 
 /**
@@ -269,6 +372,95 @@ export async function updateRecord(
 	}
 
 	return { form };
+}
+
+/**
+ * A field a writer named that the kind does not have. A throw rather than an
+ * issue, because it is a mistake about the FORM rather than about a value —
+ * and the message names the fields, so one retry can be right. Shared by the
+ * two writers that are not forms: a form can only post the inputs it renders.
+ */
+function requireKnownFields(type: RecordType, values: Partial<RecordFormValues>): void {
+	const fields = RECORD_FORMS[type].fields;
+	const unknown = Object.keys(values).filter(
+		(name) => !fields.some((field) => field.name === name)
+	);
+	if (unknown.length > 0) {
+		throw new Error(
+			`A ${type} has no field named ${unknown.join(', ')}. ` +
+				`Its fields are: ${fields.map((field) => field.name).join(', ')}.`
+		);
+	}
+}
+
+/** What a partial edit came to: saved, or the validation it failed, as sentences. */
+export type PatchResult = { saved: true } | { saved: false; issues: string[] };
+
+/**
+ * A partial edit for a writer that is not a form — the assistant. The edit
+ * form posts every field, so a blank one means "clear it"; a tool names
+ * only the fields it means to change, and the rest keep what the record
+ * says now. Same registry, same schema and same `writeRecord()` switch as
+ * the form, so a change is validated and written exactly as a person's
+ * would be. A field the registry does not list is a call error (the model
+ * can read the list and retry); a value the schema refuses comes back as
+ * issues rather than a throw, because that is an answer, not a failure.
+ * The caller checks `manage` first — this is the write, not the gate.
+ */
+export async function patchRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: EditableRecordType,
+	id: string,
+	changes: Partial<RecordFormValues>
+): Promise<PatchResult> {
+	requireKnownFields(type, changes);
+
+	const current = await recordFormValues(supabase, orgId, type, id);
+	if (Object.keys(current).length === 0) throw new Error(`There is no ${type} with id ${id}.`);
+
+	const parsed = RECORD_SCHEMAS[type].safeParse({ ...current, ...changes });
+	if (!parsed.success) {
+		return {
+			saved: false,
+			issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+		};
+	}
+	await writeRecord(supabase, orgId, type, parsed.data, id);
+	return { saved: true };
+}
+
+/** What a create by something other than a form came to: the row, or the validation it failed. */
+export type InsertResult = { created: true; id: string } | { created: false; issues: string[] };
+
+/**
+ * A create for a writer that is not a form — the assistant. The create form
+ * posts every field, blank ones included; a tool names only the fields it was
+ * given and the schema's defaults fill in the rest, exactly as an untouched
+ * input would have. Same registry, same schema and same `writeRecord()`
+ * switch as the form, so a record made here is validated and written the way
+ * a person's is — and a field the registry does not list is a call error the
+ * model can read and retry, while a value the schema refuses comes back as
+ * issues, because that is an answer rather than a failure.
+ *
+ * The caller checks `manage` first — this is the write, not the gate.
+ */
+export async function insertRecord(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	type: RecordType,
+	values: Partial<RecordFormValues>
+): Promise<InsertResult> {
+	requireKnownFields(type, values);
+
+	const parsed = RECORD_SCHEMAS[type].safeParse(values);
+	if (!parsed.success) {
+		return {
+			created: false,
+			issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+		};
+	}
+	return { created: true, id: await writeRecord(supabase, orgId, type, parsed.data) };
 }
 
 // ---------------------------------------------------------------------------
@@ -349,10 +541,31 @@ async function removeRecord(
 			return deleteBillable(supabase, orgId, id);
 		case 'asset':
 			return deleteAsset(supabase, orgId, id);
+		case 'property':
+			// A building's units go with it (`parent_id` cascades), which is the
+			// depth cap earning its keep: there is no third level to orphan.
+			return deleteProperty(supabase, orgId, id);
+		case 'lease':
+			return deleteLease(supabase, orgId, id);
 		case 'proposal':
 			return deleteProposal(supabase, orgId, id);
 		case 'ticket':
 			return deleteTicket(supabase, orgId, id);
+		case 'coupon':
+			return deleteCoupon(supabase, orgId, id);
+		case 'order':
+			return deleteOrder(supabase, orgId, id);
+		// A shipment is deletable but not creatable or editable through the
+		// generic form: `order_id` is not null and insert-only, so a box is
+		// packed on the order it ships.
+		case 'shipment':
+			return deleteShipment(supabase, orgId, id);
+		case 'purchase':
+			return deletePurchase(supabase, orgId, id);
+		case 'rma':
+			return deleteRma(supabase, orgId, id);
+		case 'visit':
+			return deleteVisit(supabase, orgId, id);
 	}
 }
 
@@ -403,6 +616,9 @@ async function recordFormValues(
 				? {
 						title: row.title,
 						stage_id: row.stage_id,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						assigned_to: str(row.assigned_to),
 						amount: str(row.amount),
 						expected_close_date: str(row.expected_close_date)
 					}
@@ -414,11 +630,17 @@ async function recordFormValues(
 				? {
 						name: row.name,
 						kind: row.kind,
+						category_id: str(row.category_id),
 						sku: str(row.sku),
 						unit_price: str(row.unit_price),
 						unit_cost: str(row.unit_cost),
 						unit: str(row.unit),
-						description: str(row.description)
+						msrp: str(row.msrp),
+						is_active: String(row.is_active),
+						description: str(row.description),
+						long_description: str(row.long_description),
+						image_url: str(row.image_url),
+						...storefrontFormValues(row.metadata)
 					}
 				: {};
 		}
@@ -450,12 +672,129 @@ async function recordFormValues(
 					}
 				: {};
 		}
+		case 'coupon': {
+			const row = await getCoupon(supabase, orgId, id);
+			return row
+				? {
+						code: row.code,
+						discount_type: row.discount_type,
+						discount_value: str(row.discount_value),
+						starts_on: str(row.starts_on),
+						ends_on: str(row.ends_on),
+						is_active: row.is_active ? 'true' : 'false',
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'property': {
+			const row = await getProperty(supabase, orgId, id);
+			return row
+				? {
+						name: row.name,
+						parent_id: str(row.parent_id),
+						property_type: str(row.property_type),
+						identifier: str(row.identifier),
+						status: row.status,
+						bedrooms: str(row.bedrooms),
+						bathrooms: str(row.bathrooms),
+						square_feet: str(row.square_feet),
+						market_rent: str(row.market_rent),
+						acquired_on: str(row.acquired_on),
+						purchase_price: str(row.purchase_price),
+						description: str(row.description)
+					}
+				: {};
+		}
+		case 'order': {
+			const row = await getOrder(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						contact_id: str(row.contact_id),
+						customer_po: str(row.customer_po),
+						estimated_ship_date: str(row.estimated_ship_date),
+						shipping: str(row.shipping),
+						discount: str(row.discount),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'purchase': {
+			const row = await getPurchase(supabase, orgId, id);
+			return row
+				? {
+						company_id: row.company_id,
+						reference: str(row.reference),
+						expected_at: str(row.expected_at),
+						due_date: str(row.due_date),
+						freight: str(row.freight),
+						tax: str(row.tax),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'rma': {
+			const row = await getRma(supabase, orgId, id);
+			return row
+				? {
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						status: row.status,
+						requested_on: str(row.requested_on),
+						reason: str(row.reason),
+						resolution: str(row.resolution)
+					}
+				: {};
+		}
+		case 'visit': {
+			const row = await getVisit(supabase, orgId, id);
+			return row
+				? {
+						subject: visitSubjectKey(row.entity_type, row.entity_id),
+						status: row.status,
+						outcome_id: str(row.outcome_id),
+						scheduled_for: str(row.scheduled_for),
+						occurred_at: str(row.occurred_at),
+						ended_at: str(row.ended_at),
+						location: formatFix(
+							row.latitude === null || row.longitude === null
+								? null
+								: {
+										latitude: row.latitude,
+										longitude: row.longitude,
+										accuracy: row.location_accuracy_m
+									}
+						),
+						notes: str(row.notes)
+					}
+				: {};
+		}
+		case 'lease': {
+			const row = await getLease(supabase, orgId, id);
+			return row
+				? {
+						property_id: row.property_id,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						starts_on: row.starts_on,
+						// Blank for a month-to-month tenancy, which is what a
+						// null end date means.
+						ends_on: str(row.ends_on),
+						rent_amount: str(row.rent_amount),
+						rent_due_day: str(row.rent_due_day),
+						security_deposit: str(row.security_deposit),
+						notes: str(row.notes)
+					}
+				: {};
+		}
 		case 'task': {
 			const row = await getTask(supabase, orgId, id);
 			return row
 				? {
 						title: row.title,
 						priority: row.priority,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
 						due_at: str(row.due_at),
 						details: str(row.details)
 					}
@@ -467,6 +806,9 @@ async function recordFormValues(
 				? {
 						subject: row.subject,
 						priority: row.priority,
+						company_id: str(row.company_id),
+						contact_id: str(row.contact_id),
+						assigned_to: str(row.assigned_to),
 						description: str(row.description)
 					}
 				: {};
@@ -487,13 +829,19 @@ async function recordFormValues(
  * defaults to), never "leave it as it was" — otherwise clearing a field would
  * silently do nothing.
  */
+/**
+ * The one place a form's strings become a row — for every kind, creating and
+ * editing alike. Answers with the record's id, which is what a writer that is
+ * not a form needs: a create action redirects or refreshes a list, but
+ * `insertRecord()` has to be able to say WHICH record it just made.
+ */
 async function writeRecord(
 	supabase: SupabaseClient<Database>,
 	orgId: string,
 	type: RecordType,
 	values: RecordFormValues,
 	id?: string
-): Promise<void> {
+): Promise<string> {
 	switch (type) {
 		case 'company': {
 			const data = companyRecordSchema.parse(values);
@@ -505,10 +853,10 @@ async function writeRecord(
 				phone: text(data.phone),
 				website: text(data.website)
 			};
-			await (id
+			const row = await (id
 				? updateCompany(supabase, orgId, id, columns)
 				: createCompany(supabase, orgId, columns));
-			return;
+			return row.id;
 		}
 		case 'contact': {
 			const data = contactRecordSchema.parse(values);
@@ -519,15 +867,20 @@ async function writeRecord(
 				phone: text(data.phone),
 				status: data.status
 			};
-			await (id
+			const row = await (id
 				? updateContact(supabase, orgId, id, columns)
 				: createContact(supabase, orgId, columns));
-			return;
+			return row.id;
 		}
 		case 'deal': {
 			const data = dealRecordSchema.parse(values);
 			const columns = {
 				title: data.title,
+				// Who it is with, and whose it is: two different links, and a
+				// deal may carry both, either or neither.
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				assigned_to: text(data.assigned_to),
 				amount: amount(data.amount),
 				expected_close_date: text(data.expected_close_date)
 			};
@@ -539,29 +892,40 @@ async function writeRecord(
 			const placement =
 				data.stage_id === '' ? null : await dealPlacement(supabase, orgId, data.stage_id);
 			if (id) {
-				await updateDeal(supabase, orgId, id, placement ? { ...columns, ...placement } : columns);
-			} else if (placement) {
-				await createDeal(supabase, orgId, { ...columns, ...placement });
-			} else {
-				await createDeal(supabase, orgId, columns);
+				const row = await updateDeal(
+					supabase,
+					orgId,
+					id,
+					placement ? { ...columns, ...placement } : columns
+				);
+				return row.id;
 			}
-			return;
+			const row = placement
+				? await createDeal(supabase, orgId, { ...columns, ...placement })
+				: await createDeal(supabase, orgId, columns);
+			return row.id;
 		}
 		case 'product': {
 			const data = productRecordSchema.parse(values);
 			const columns = {
 				name: data.name,
 				kind: data.kind,
+				category_id: text(data.category_id),
 				sku: text(data.sku),
 				unit_price: price(data.unit_price),
 				unit_cost: amount(data.unit_cost),
 				unit: text(data.unit),
-				description: text(data.description)
+				msrp: amount(data.msrp),
+				is_active: data.is_active === 'true',
+				description: text(data.description),
+				long_description: text(data.long_description),
+				image_url: text(data.image_url),
+				metadata: storefrontMetadata(data)
 			};
-			await (id
+			const row = await (id
 				? updateProduct(supabase, orgId, id, columns)
 				: createProduct(supabase, orgId, columns));
-			return;
+			return row.id;
 		}
 		case 'billable': {
 			const data = billableRecordSchema.parse(values);
@@ -574,10 +938,10 @@ async function writeRecord(
 				is_featured: data.is_featured === 'true',
 				description: text(data.description)
 			};
-			await (id
+			const row = await (id
 				? updateBillable(supabase, orgId, id, columns)
 				: createBillable(supabase, orgId, columns));
-			return;
+			return row.id;
 		}
 		case 'asset': {
 			const data = assetRecordSchema.parse(values);
@@ -590,10 +954,60 @@ async function writeRecord(
 				purchase_price: amount(data.purchase_price),
 				description: text(data.description)
 			};
-			await (id
+			const row = await (id
 				? updateAsset(supabase, orgId, id, columns)
 				: createAsset(supabase, orgId, columns));
-			return;
+			return row.id;
+		}
+		case 'property': {
+			const data = propertyRecordSchema.parse(values);
+			// A blank parent is a building (or a single-family, which is its
+			// own unit); a picked one makes this a unit inside it. The
+			// database refuses a unit of a unit on either path, so neither
+			// creating nor re-parenting can build a deeper tree.
+			const columns = {
+				name: data.name,
+				parent_id: text(data.parent_id),
+				property_type: text(data.property_type),
+				identifier: text(data.identifier),
+				status: data.status,
+				bedrooms: integer(data.bedrooms),
+				bathrooms: amount(data.bathrooms),
+				square_feet: integer(data.square_feet),
+				market_rent: amount(data.market_rent),
+				acquired_on: text(data.acquired_on),
+				purchase_price: amount(data.purchase_price),
+				description: text(data.description)
+			};
+			const row = await (id
+				? updateProperty(supabase, orgId, id, columns)
+				: createProperty(supabase, orgId, columns));
+			return row.id;
+		}
+		case 'lease': {
+			const data = leaseRecordSchema.parse(values);
+			// A blank end date is month-to-month, so it stays null rather than
+			// being invented — and ending a lease early is moving this date,
+			// not a status change, because there is no status column.
+			const columns = {
+				property_id: data.property_id,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				starts_on: data.starts_on,
+				ends_on: text(data.ends_on),
+				rent_amount: Number(data.rent_amount),
+				// Blank is the column's own default (the 1st), written out
+				// rather than omitted: on an edit, leaving it out would mean
+				// "as it was", and a blank field means the empty value on both
+				// paths.
+				rent_due_day: data.rent_due_day === '' ? 1 : Number(data.rent_due_day),
+				security_deposit: amount(data.security_deposit),
+				notes: text(data.notes)
+			};
+			const row = await (id
+				? updateLease(supabase, orgId, id, columns)
+				: createLease(supabase, orgId, columns));
+			return row.id;
 		}
 		case 'invoice': {
 			// Create only — an invoice is edited through its own lifecycle
@@ -605,7 +1019,7 @@ async function writeRecord(
 			// left blank are the company's own, when there is one to ask.
 			const company =
 				data.company_id === '' ? null : await getCompany(supabase, orgId, data.company_id);
-			await createInvoice(supabase, orgId, {
+			const row = await createInvoice(supabase, orgId, {
 				company_id: text(data.company_id),
 				contact_id: text(data.contact_id),
 				payment_terms_days: integer(data.payment_terms_days) ?? company?.payment_terms_days ?? null,
@@ -613,30 +1027,132 @@ async function writeRecord(
 				billing_email: text(data.billing_email),
 				memo: text(data.memo)
 			});
-			return;
+			return row.id;
+		}
+		case 'coupon': {
+			const data = couponRecordSchema.parse(values);
+			const columns = {
+				code: data.code,
+				discount_type: data.discount_type,
+				// A not-null money column: blank is zero, the products rule.
+				discount_value: price(data.discount_value),
+				starts_on: text(data.starts_on),
+				ends_on: text(data.ends_on),
+				is_active: data.is_active === 'true',
+				description: text(data.description)
+			};
+			const row = await (id
+				? updateCoupon(supabase, orgId, id, columns)
+				: createCoupon(supabase, orgId, columns));
+			return row.id;
+		}
+		case 'order': {
+			const data = orderRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				contact_id: text(data.contact_id),
+				customer_po: text(data.customer_po),
+				estimated_ship_date: text(data.estimated_ship_date),
+				// Not-null money columns: blank is zero, the products rule.
+				shipping: price(data.shipping),
+				discount: price(data.discount),
+				notes: text(data.notes)
+			};
+			const row = await (id
+				? updateOrder(supabase, orgId, id, columns)
+				: createOrder(supabase, orgId, columns));
+			return row.id;
+		}
+		case 'purchase': {
+			const data = purchaseRecordSchema.parse(values);
+			const columns = {
+				company_id: data.company_id,
+				reference: text(data.reference),
+				expected_at: instant(data.expected_at),
+				due_date: text(data.due_date),
+				// Not-null money columns: blank is zero, the products rule.
+				freight: price(data.freight),
+				tax: price(data.tax),
+				notes: text(data.notes)
+			};
+			const row = await (id
+				? updatePurchase(supabase, orgId, id, columns)
+				: createPurchase(supabase, orgId, columns));
+			return row.id;
+		}
+		case 'visit': {
+			const data = visitRecordSchema.parse(values);
+			// `<kind>:<id>` back into the entity link's two columns — the one
+			// place that pair is split, as `RECORD_PICKER_KINDS` says.
+			const [entityType, entityId] = splitVisitSubject(data.subject);
+			const fix = parseFix(data.location);
+			const columns = {
+				entity_type: entityType,
+				entity_id: entityId,
+				status: data.status,
+				scheduled_for: instant(data.scheduled_for),
+				occurred_at: instant(data.occurred_at),
+				ended_at: instant(data.ended_at),
+				outcome_id: text(data.outcome_id),
+				notes: text(data.notes),
+				latitude: fix?.latitude ?? null,
+				longitude: fix?.longitude ?? null,
+				location_accuracy_m: fix?.accuracy ?? null
+			};
+			const row = await (id
+				? updateVisit(supabase, orgId, id, columns)
+				: createVisit(supabase, orgId, columns));
+			return row.id;
+		}
+		case 'rma': {
+			const data = rmaRecordSchema.parse(values);
+			const columns = {
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				status: data.status,
+				reason: text(data.reason),
+				resolution: text(data.resolution)
+			};
+			// `requested_on` is not null with a default of today, so a blank
+			// field means today rather than a null the column would refuse.
+			const requested = data.requested_on === '' ? {} : { requested_on: data.requested_on };
+			const row = await (id
+				? updateRma(supabase, orgId, id, { ...columns, ...requested })
+				: createRma(supabase, orgId, { ...columns, ...requested }));
+			return row.id;
 		}
 		case 'task': {
 			const data = taskRecordSchema.parse(values);
+			// No assignee here: who is on a task is a relationship the task
+			// modal and the assistant's assignTask write (docs/tasks.md). The
+			// two ids below are who the task is FOR.
 			const columns = {
 				title: data.title,
 				priority: data.priority,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
 				due_at: instant(data.due_at),
 				details: text(data.details)
 			};
-			await (id ? updateTask(supabase, orgId, id, columns) : createTask(supabase, orgId, columns));
-			return;
+			const row = await (id
+				? updateTask(supabase, orgId, id, columns)
+				: createTask(supabase, orgId, columns));
+			return row.id;
 		}
 		case 'ticket': {
 			const data = ticketRecordSchema.parse(values);
 			const columns = {
 				subject: data.subject,
 				priority: data.priority,
+				company_id: text(data.company_id),
+				contact_id: text(data.contact_id),
+				assigned_to: text(data.assigned_to),
 				description: text(data.description)
 			};
-			await (id
+			const row = await (id
 				? updateTicket(supabase, orgId, id, columns)
 				: createTicket(supabase, orgId, columns));
-			return;
+			return row.id;
 		}
 	}
 }
@@ -653,6 +1169,95 @@ function list(value: string): string[] | null {
 		.map((item) => item.trim())
 		.filter(Boolean);
 	return items.length > 0 ? items : null;
+}
+
+/** Newline-separated text as its lines, blanks dropped: a product's usage steps. */
+function lines(value: string): string[] {
+	return value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean);
+}
+
+/**
+ * `Label: value` per line, as a storefront's spec rows. A line with no colon
+ * is a value with no label — which is how a kit lists what is in the box —
+ * and a label with nothing after it is dropped, because the value is the
+ * spec and the label is the optional half.
+ */
+function specRows(value: string): { label: string; value: string }[] {
+	return lines(value).flatMap((line) => {
+		const at = line.indexOf(':');
+		if (at === -1) return [{ label: '', value: line }];
+		const spec = { label: line.slice(0, at).trim(), value: line.slice(at + 1).trim() };
+		return spec.value === '' ? [] : [spec];
+	});
+}
+
+/**
+ * A product's `metadata` bag, built whole from the form's storefront fields.
+ *
+ * Rebuilt rather than merged, for the reason every field on every form is:
+ * blank means empty, so a badge the writer deleted has to go. The form holds
+ * every key a shop reads (`productRecordSchema` says so), which is what makes
+ * that safe — a key a storefront starts reading becomes a field there in the
+ * same change, or the next edit drops it.
+ *
+ * `compareAtCents` is the one derived key: the writer types a compare-at
+ * price into the `msrp` column, and this writes the cents the storefront
+ * reads, so the fact still has exactly one home and one field.
+ */
+function storefrontMetadata(data: ProductRecordValues): Json {
+	const bag = {
+		slug: data.slug,
+		tagline: data.tagline,
+		art: data.art,
+		accent: data.accent,
+		badges: list(data.badges) ?? [],
+		rating: data.rating === '' ? null : Number(data.rating),
+		reviewCount: data.review_count === '' ? null : Number(data.review_count),
+		ingredients: data.ingredients,
+		usage: lines(data.usage),
+		specs: specRows(data.specs),
+		featured: data.featured === 'true',
+		bestSeller: data.best_seller === 'true',
+		compareAtCents: data.msrp === '' ? null : Math.round(Number(data.msrp) * 100)
+	} satisfies Record<string, Json>;
+	return Object.fromEntries(Object.entries(bag).filter(([, value]) => worthKeeping(value)));
+}
+
+/** Absent and empty say the same thing to a shop, so only real values are written. */
+function worthKeeping(value: Json): boolean {
+	if (value === null || value === '' || value === false) return false;
+	return !(Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * The same bag on its way back into the form, read through
+ * `storefrontMetadataSchema` — the boundary where untyped jsonb becomes values
+ * with a contract, so nothing below has to ask what shape it got.
+ */
+function storefrontFormValues(metadata: Json): RecordFormValues {
+	const bag = storefrontMetadataSchema.parse(metadata);
+	return {
+		slug: bag.slug,
+		tagline: bag.tagline,
+		art: bag.art,
+		accent: bag.accent,
+		badges: bag.badges.join(', '),
+		rating: bag.rating === null ? '' : String(bag.rating),
+		review_count: bag.reviewCount === null ? '' : String(bag.reviewCount),
+		ingredients: bag.ingredients,
+		usage: bag.usage.join('\n'),
+		specs: bag.specs.map(specLine).join('\n'),
+		featured: String(bag.featured),
+		best_seller: String(bag.bestSeller)
+	};
+}
+
+/** The mirror of `specRows()`: one spec row as the line the textarea shows. */
+function specLine(spec: { label: string; value: string }): string {
+	return spec.label === '' ? spec.value : `${spec.label}: ${spec.value}`;
 }
 
 /** A whole number as typed, or null when the field was left blank. */

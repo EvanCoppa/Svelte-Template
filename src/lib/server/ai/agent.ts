@@ -1,7 +1,9 @@
 import { isStepCount, ToolLoopAgent, type LanguageModel } from 'ai';
 import type { AssistantToolContext } from './context';
 import { buildInstructions } from './prompts';
+import { openaiCallOptions } from './provider';
 import { activeToolNames, assistantTools, TOOL_APPROVAL, toolsContextFor } from './tools';
+import { recordKindAccess } from './tools/access';
 
 /**
  * Steps per turn. Each step is one model call that ends in text or in tool
@@ -15,6 +17,8 @@ export type AssistantAgentOptions = {
 	model: LanguageModel;
 	/** The request: client, org (feature modes, grants) and caller. */
 	context: AssistantToolContext;
+	/** The thread, so a provider that routes its prompt cache by key keeps one per thread. */
+	conversationId?: string | undefined;
 	/** The caller's IANA time zone, so "today" resolves where the user is. */
 	timeZone?: string | undefined;
 	userName?: string | undefined;
@@ -36,6 +40,7 @@ export type AssistantAgentOptions = {
 export function createAssistantAgent({
 	model,
 	context,
+	conversationId,
 	timeZone,
 	userName
 }: AssistantAgentOptions) {
@@ -48,7 +53,11 @@ export function createAssistantAgent({
 			tierName: activeOrg.tierName,
 			role: activeOrg.role,
 			userName,
-			timeZone
+			timeZone,
+			// The kinds of record this caller may read, in the industry's words —
+			// the kind-addressed tools take the kind, and the model must not ask
+			// for one the org, its tier or its industry does not have.
+			kinds: recordKindAccess(context.org)
 		}),
 		tools: assistantTools,
 		toolsContext: toolsContextFor(context),
@@ -56,6 +65,8 @@ export function createAssistantAgent({
 		// feature is enabled for the org and whose level the caller holds.
 		activeTools: activeToolNames(context.org),
 		toolApproval: TOOL_APPROVAL,
+		// The summary is what makes the thinking block have anything to show.
+		providerOptions: { openai: openaiCallOptions({ conversationId, reasoningSummary: true }) },
 		stopWhen: isStepCount(MAX_STEPS),
 		prepareStep: ({ stepNumber }) =>
 			stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : undefined,

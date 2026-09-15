@@ -47,13 +47,14 @@ the catalog's scheme (`b0000000-0000-0000-00II-0000000000RR`); crm..beverage occ
 | `tickets`                     | yes | **Support cases** / case ⚠️        | Chargeback, missing deposit, terminal down. Has a thread, a priority and an assignee already. Q15.                       |
 | `staff`                       | yes | **Team** ⚠️                        | The roster and invitations. Its name is the least of the questions it raises — see Q6 and Gap 1.                         |
 | `notes`, `assistant`          | yes | default                            | Every industry has them.                                                                                                 |
-| `merchant-map` **(new view)** | yes | Merchants, on a map                | A company view with `layouts {map,table}`. Territory work for a canvassing rep — the geocoder and MapLibre are wired.    |
 | `prospects` **(new view)**    | yes | Prospects                          | A company view filtered `status in (lead, prospect)`. One row; no route.                                                 |
 | `referral-partners` **(new)** | yes | Referral partners                  | A company view filtered `relationship in (partner)` — banks, associations, ISVs, VARs that send deals.                   |
 
-Three of those are **views**, which is the cheapest thing we ship: a `views` row plus a
+Both of those are **views**, which is the cheapest thing we ship: a `views` row plus a
 `features` row at `/views/<id>` and the nav, the gate, the title and the grants all come
-for free (`docs/views.md`). No route, no load, no component.
+for free (`docs/views.md`). No route, no load, no component. Territory work for a
+canvassing rep — "Merchants, on a map" — needs neither: it is the table/map toggle on
+the Merchants page itself now, not a third view (see the closing note below).
 
 ### What they explicitly do not get
 
@@ -62,7 +63,8 @@ for free (`docs/views.md`). No route, no load, no component.
 | `invoices`, `ledger` ⚠️        | **An ISO does not bill its merchants.** The processor deducts fees from the merchant's own deposits; nothing is ever owed to the ISO on an invoice. Ship them only if they resell equipment on terms — that is Q13. Meanwhile the money question they actually have is the mirror image: what the processor owes _them_ (Gap 3). |
 | `suppliers` view               | They buy terminals from a distributor, but one or two of them, forever. A company with `relationship = supplier` covers it without a nav entry. Revisit if Q11 says they hold real inventory.                                                                                                                                    |
 | `partner-contacts` view        | Superseded by `referral-partners`: the referral relationship is with the **bank or the association**, and the person moves. Their view is over companies, not contacts.                                                                                                                                                          |
-| `patient-map`                  | Dentistry's. `merchant-map` is the same mechanism for this vertical.                                                                                                                                                                                                                                                             |
+| `patient-map`                  | Dentistry's. This vertical's own map is the toggle on the Merchants page, not a second view.                                                                                                                                                                                                                                     |
+| `merchant-map` view            | Shipped, then folded into the Merchants page's own table/map toggle — see the closing note below. A separate view filtered to `relationship = customer` read as a second "Merchants" link, not a distinct page.                                                                                                                  |
 | `components`, `best-practices` | Template pages. They are our scaffolding, not a customer's product; no real vertical should ship them.                                                                                                                                                                                                                           |
 
 Hiding is the absence of a row, not a flag — `resolveFeatures()` answers `hidden` for a
@@ -80,8 +82,7 @@ a rep opens the app to see what is in flight, not to browse a database.
 General   Assistant 100 · Notes 200 · Team 300          (inherited)
 
 CRM       Applications      100   what is in flight right now
-          Merchants         200   the book
-          Merchants (map)   300   a cut of the book, for territory work
+          Merchants         200   the book — table or map, from its own toggle
           Prospects         400   a cut of the book, not yet signed
           Referral partners 500   where the deals come from
           Merchant contacts 600   the people inside all of it
@@ -351,3 +352,21 @@ centre** with AI search grounded strictly in their own approved material, a
 **cadence engine**, and **call transcript storage** — and, ahead of all of them, four
 columns on `deals` (next action, its due date, last activity, source) without which
 their one non-negotiable rule cannot be expressed at all.
+
+## The merchant map folded into the Merchants page
+
+Using the real org, GSP's sidebar showed "Merchants" and "Merchant map" back to back —
+`/companies` (every company) and `/views/merchant-map` (companies whose relationship is
+customer, with `layouts {map,table}`) — and since a GSP company is always a merchant
+(never a partner in the fixtures), the two links opened on the same book. Two links,
+one thing.
+
+The `merchant_map_folds_into_companies` migration removes the `merchant-map` feature
+(and everything `on delete cascade` hangs off it — its `industry_features`,
+`list_fields`, `pages`, `tier_features` and `role_permissions` rows, and the `views` row
+itself), and `src/routes/(app)/companies/` grows the table/map toggle a view already
+had — `SegmentedControl` + `MapView` + `pinsFor()`, the exact mechanism
+`docs/views.md` describes, on the Merchants page itself rather than a second page. This
+is a general capability, not an industry conditional: every industry's Companies page
+can now switch to a map of the same rows, the way `suppliers` already lets CRM do it
+through a view.

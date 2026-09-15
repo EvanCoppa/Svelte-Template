@@ -21,11 +21,26 @@ describe('createAssistantAgent', () => {
 		const sent = (model.doStreamCalls[0]?.tools ?? []).map((tool) => tool.name).sort();
 		expect(sent).toEqual([...activeToolNames(org)].sort());
 		expect(sent).toEqual([
+			// Writing tasks brings the whole task family, the kind-addressed
+			// writers (a note and a record hang off any kind), and the roster,
+			// because putting someone on a task means naming them first.
+			'addNote',
+			'assignTask',
 			'completeTask',
+			'createRecord',
 			'createTask',
+			'findRecords',
 			'getCompany',
+			'getRecord',
+			'linkRecords',
+			'listMembers',
+			'listRecordFields',
+			'listRecords',
+			'listRelationshipTypes',
 			'listTasks',
-			'searchCompanies'
+			'searchCompanies',
+			'unassignTask',
+			'updateRecord'
 		]);
 	});
 
@@ -58,12 +73,57 @@ describe('createAssistantAgent', () => {
 		const prompt = model.doStreamCalls[0]?.prompt ?? [];
 		const system = prompt.filter((message) => message.role === 'system');
 		expect(system).toHaveLength(2);
-		expect(system[0]?.providerOptions).toEqual({
-			anthropic: { cacheControl: { type: 'ephemeral' } }
-		});
+		expect(system[0]?.content).toContain('You are the assistant built into this workspace');
 		expect(system[1]?.content).toContain('Organization: Acme Inc (Pro plan)');
 		expect(system[1]?.content).toContain('User: evan@example.com (owner)');
 		expect(system[1]?.content).toContain('Time zone: Europe/Paris');
+	});
+
+	it('tells the model which kinds of record this caller may use, in the org’s words', async () => {
+		const model = streamingModel('Hi');
+		const agent = createAssistantAgent({
+			model,
+			context: toolContext(
+				orgContext({ role: 'member', grants: { contacts: 'manage', deals: 'read' } })
+			)
+		});
+
+		await (
+			await agent.stream({ prompt: 'Hi' })
+		).text;
+
+		const session = String(
+			model.doStreamCalls[0]?.prompt.find(
+				(m) => m.role === 'system' && String(m.content).includes('<session_context>')
+			)?.content
+		);
+		expect(session).toContain('- contact — contacts (one: contact) — read, create, update');
+		expect(session).toContain('- deal — deals (one: deal) — read');
+		expect(session).not.toContain('- company');
+		expect(session).not.toContain('- task');
+	});
+
+	it('asks OpenAI not to store the turn, to cache per thread, and to summarise its thinking', async () => {
+		const model = streamingModel('Hi');
+		const agent = createAssistantAgent({
+			model,
+			context: toolContext(),
+			conversationId: 'c0000000-0000-0000-0000-000000000009'
+		});
+
+		await (
+			await agent.stream({ prompt: 'Hi' })
+		).text;
+
+		// Without `reasoningSummary` the Responses API streams no reasoning text
+		// at all, and the assistant's thinking block has nothing to show.
+		expect(model.doStreamCalls[0]?.providerOptions).toEqual({
+			openai: {
+				store: false,
+				promptCacheKey: 'c0000000-0000-0000-0000-000000000009',
+				reasoningSummary: 'auto'
+			}
+		});
 	});
 
 	it('caps the tool loop', () => {

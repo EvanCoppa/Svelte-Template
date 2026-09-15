@@ -19,6 +19,8 @@ export type Database = {
           entity_id: string | null
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
           id: string
+          is_system: boolean | null
+          metadata: Json | null
           occurred_at: string
           org_id: string
           subject: string | null
@@ -34,6 +36,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id: string
           subject?: string | null
@@ -49,6 +53,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id?: string
           subject?: string | null
@@ -599,6 +605,62 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          discount_type: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value: number
+          ends_on: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          starts_on: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          discount_type?: Database["public"]["Enums"]["coupon_discount_type"]
+          discount_value?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_field_definitions: {
         Row: {
           allowed_values: Json | null
@@ -906,6 +968,96 @@ export type Database = {
           },
         ]
       }
+      featured_group_products: {
+        Row: {
+          created_at: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          featured_group_id: string
+          org_id: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          featured_group_id?: string
+          org_id?: string
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_group_products_featured_group_id_org_id_fkey"
+            columns: ["featured_group_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "featured_groups"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "featured_group_products_product_id_org_id_fkey"
+            columns: ["product_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      featured_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       features: {
         Row: {
           category: string | null
@@ -1095,6 +1247,73 @@ export type Database = {
             foreignKeyName: "industry_list_fields_industry_id_fkey"
             columns: ["industry_id"]
             isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_pipeline_stages: {
+        Row: {
+          created_at: string
+          group_label: string | null
+          industry_id: string
+          name: string
+          outcome: Database["public"]["Enums"]["stage_outcome"]
+          probability: number | null
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          group_label?: string | null
+          industry_id: string
+          name: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          group_label?: string | null
+          industry_id?: string
+          name?: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipeline_stages_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_pipelines: {
+        Row: {
+          created_at: string
+          description: string | null
+          industry_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          industry_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          industry_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipelines_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: true
             referencedRelation: "industries"
             referencedColumns: ["id"]
           },
@@ -1328,6 +1547,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      leases: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          ends_on: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day: number
+          security_deposit: number | null
+          starts_on: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          property_id: string
+          rent_amount: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          ends_on?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          property_id?: string
+          rent_amount?: number
+          rent_due_day?: number
+          security_deposit?: number | null
+          starts_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leases_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "leases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leases_property_id_org_id_fkey"
+            columns: ["property_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -1675,7 +1977,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           notes?: string | null
-          number: string
+          number?: string
           org_id: string
           placed_at?: string | null
           ship_to_snapshot?: Json | null
@@ -1888,6 +2190,7 @@ export type Database = {
           id: string
           industry_id: string
           name: string
+          storefront_enabled: boolean
           tier_id: string
           updated_at: string
         }
@@ -1896,6 +2199,7 @@ export type Database = {
           id?: string
           industry_id?: string
           name: string
+          storefront_enabled?: boolean
           tier_id?: string
           updated_at?: string
         }
@@ -1904,6 +2208,7 @@ export type Database = {
           id?: string
           industry_id?: string
           name?: string
+          storefront_enabled?: boolean
           tier_id?: string
           updated_at?: string
         }
@@ -2045,9 +2350,55 @@ export type Database = {
           },
         ]
       }
+      pipeline_stage_groups: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          org_id?: string
+          pipeline_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stage_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_groups_pipeline_id_org_id_fkey"
+            columns: ["pipeline_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           created_at: string
+          group_id: string | null
           id: string
           name: string
           org_id: string
@@ -2059,6 +2410,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name: string
           org_id: string
@@ -2070,6 +2422,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name?: string
           org_id?: string
@@ -2080,6 +2433,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_group_id_pipeline_id_fkey"
+            columns: ["group_id", "pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stage_groups"
+            referencedColumns: ["id", "pipeline_id"]
+          },
           {
             foreignKeyName: "pipeline_stages_org_id_fkey"
             columns: ["org_id"]
@@ -2319,6 +2679,87 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      properties: {
+        Row: {
+          acquired_on: string | null
+          bathrooms: number | null
+          bedrooms: number | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          disposed_on: string | null
+          id: string
+          identifier: string | null
+          market_rent: number | null
+          name: string
+          org_id: string
+          parent_id: string | null
+          property_type: string | null
+          purchase_price: number | null
+          square_feet: number | null
+          status: Database["public"]["Enums"]["property_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name: string
+          org_id: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          disposed_on?: string | null
+          id?: string
+          identifier?: string | null
+          market_rent?: number | null
+          name?: string
+          org_id?: string
+          parent_id?: string | null
+          property_type?: string | null
+          purchase_price?: number | null
+          square_feet?: number | null
+          status?: Database["public"]["Enums"]["property_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_parent_id_org_id_fkey"
+            columns: ["parent_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
       }
       proposal_events: {
         Row: {
@@ -2752,7 +3193,7 @@ export type Database = {
           freight?: number
           id?: string
           notes?: string | null
-          number: string
+          number?: string
           ordered_at?: string | null
           org_id: string
           paid_at?: string | null
@@ -2997,6 +3438,73 @@ export type Database = {
             columns: ["relationship_type_id"]
             isOneToOne: false
             referencedRelation: "relationship_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rmas: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          number: string
+          org_id: string
+          reason: string | null
+          requested_on: string
+          resolution: string | null
+          status: Database["public"]["Enums"]["rma_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: string
+          org_id?: string
+          reason?: string | null
+          requested_on?: string
+          resolution?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rmas_company_id_org_id_fkey"
+            columns: ["company_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_contact_id_org_id_fkey"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "rmas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3782,12 +4290,132 @@ export type Database = {
           },
         ]
       }
+      visit_outcomes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          org_id: string
+          result: Database["public"]["Enums"]["visit_result"]
+          sort_order: number
+          tone: Database["public"]["Enums"]["badge_tone"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          org_id: string
+          result: Database["public"]["Enums"]["visit_result"]
+          sort_order?: number
+          tone?: Database["public"]["Enums"]["badge_tone"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          org_id?: string
+          result?: Database["public"]["Enums"]["visit_result"]
+          sort_order?: number
+          tone?: Database["public"]["Enums"]["badge_tone"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visit_outcomes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id: string
+          latitude: number | null
+          location_accuracy_m: number | null
+          longitude: number | null
+          notes: string | null
+          occurred_at: string | null
+          org_id: string
+          outcome_id: string | null
+          scheduled_for: string | null
+          source: string
+          status: Database["public"]["Enums"]["visit_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          latitude?: number | null
+          location_accuracy_m?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string | null
+          org_id: string
+          outcome_id?: string | null
+          scheduled_for?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["visit_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["crm_entity_type"]
+          id?: string
+          latitude?: number | null
+          location_accuracy_m?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string | null
+          org_id?: string
+          outcome_id?: string | null
+          scheduled_for?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["visit_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_outcome_id_org_id_fkey"
+            columns: ["outcome_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "visit_outcomes"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       create_default_pipeline: { Args: { org: string }; Returns: string }
+      create_default_visit_outcomes: {
+        Args: { org: string }
+        Returns: undefined
+      }
       create_industry_custom_fields: {
         Args: { org: string }
         Returns: undefined
@@ -3795,7 +4423,15 @@ export type Database = {
     }
     Enums: {
       activity_direction: "inbound" | "outbound"
-      activity_type: "note" | "call" | "email" | "meeting" | "sms" | "other"
+      activity_type:
+        | "note"
+        | "call"
+        | "email"
+        | "meeting"
+        | "sms"
+        | "other"
+        | "stage_changed"
+        | "owner_changed"
       address_kind: "primary" | "billing" | "shipping" | "service" | "other"
       asset_status: "active" | "inactive" | "retired"
       badge_tone:
@@ -3810,22 +4446,28 @@ export type Database = {
         | "rose"
         | "indigo"
       company_relationship: "customer" | "supplier" | "partner" | "other"
+      coupon_discount_type: "percent" | "amount"
       crm_entity_type:
         | "asset"
         | "billable"
         | "company"
         | "contact"
+        | "coupon"
         | "deal"
         | "member"
         | "invoice"
+        | "lease"
         | "order"
         | "product"
+        | "property"
         | "proposal"
         | "proposal_option"
         | "purchase"
+        | "rma"
         | "shipment"
         | "task"
         | "ticket"
+        | "visit"
       custom_field_value_type: "text" | "numeric" | "boolean" | "select"
       duration_unit: "visits" | "days" | "weeks" | "months" | "sec"
       execution_type:
@@ -3861,6 +4503,7 @@ export type Database = {
       permission_level: "read" | "manage" | "delete"
       priority: "low" | "normal" | "high" | "urgent"
       product_kind: "good" | "service"
+      property_status: "active" | "inactive" | "sold"
       proposal_event_type:
         | "sent"
         | "viewed"
@@ -3881,6 +4524,7 @@ export type Database = {
         | "partially_received"
         | "received"
         | "cancelled"
+      rma_status: "requested" | "approved" | "received" | "closed" | "rejected"
       shipment_delivery_status:
         | "preparing"
         | "pending"
@@ -3896,6 +4540,8 @@ export type Database = {
       stage_outcome: "open" | "won" | "lost"
       task_status: "todo" | "in_progress" | "blocked" | "in_review" | "done"
       ticket_status: "open" | "pending" | "resolved" | "closed"
+      visit_result: "engaged" | "no_contact" | "declined"
+      visit_status: "planned" | "completed" | "missed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4024,7 +4670,16 @@ export const Constants = {
   public: {
     Enums: {
       activity_direction: ["inbound", "outbound"],
-      activity_type: ["note", "call", "email", "meeting", "sms", "other"],
+      activity_type: [
+        "note",
+        "call",
+        "email",
+        "meeting",
+        "sms",
+        "other",
+        "stage_changed",
+        "owner_changed",
+      ],
       address_kind: ["primary", "billing", "shipping", "service", "other"],
       asset_status: ["active", "inactive", "retired"],
       badge_tone: [
@@ -4040,22 +4695,28 @@ export const Constants = {
         "indigo",
       ],
       company_relationship: ["customer", "supplier", "partner", "other"],
+      coupon_discount_type: ["percent", "amount"],
       crm_entity_type: [
         "asset",
         "billable",
         "company",
         "contact",
+        "coupon",
         "deal",
         "member",
         "invoice",
+        "lease",
         "order",
         "product",
+        "property",
         "proposal",
         "proposal_option",
         "purchase",
+        "rma",
         "shipment",
         "task",
         "ticket",
+        "visit",
       ],
       custom_field_value_type: ["text", "numeric", "boolean", "select"],
       duration_unit: ["visits", "days", "weeks", "months", "sec"],
@@ -4095,6 +4756,7 @@ export const Constants = {
       permission_level: ["read", "manage", "delete"],
       priority: ["low", "normal", "high", "urgent"],
       product_kind: ["good", "service"],
+      property_status: ["active", "inactive", "sold"],
       proposal_event_type: [
         "sent",
         "viewed",
@@ -4118,6 +4780,7 @@ export const Constants = {
         "received",
         "cancelled",
       ],
+      rma_status: ["requested", "approved", "received", "closed", "rejected"],
       shipment_delivery_status: [
         "preparing",
         "pending",
@@ -4134,6 +4797,8 @@ export const Constants = {
       stage_outcome: ["open", "won", "lost"],
       task_status: ["todo", "in_progress", "blocked", "in_review", "done"],
       ticket_status: ["open", "pending", "resolved", "closed"],
+      visit_result: ["engaged", "no_contact", "declined"],
+      visit_status: ["planned", "completed", "missed"],
     },
   },
 } as const

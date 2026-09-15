@@ -27,6 +27,15 @@ export interface SecurityHeaderOptions {
 	 * `connect-src`, and never a wildcard.
 	 */
 	imageOrigins?: readonly string[];
+	/**
+	 * Where a voice call's WebSocket goes — derived from the realtime
+	 * endpoint by `realtimeOrigins()` in `$lib/ai/realtime`, the way the map's
+	 * origins are derived from its style URLs. A call connects to the provider
+	 * directly with a short-lived secret this server minted, which is a socket
+	 * `connect-src` has to admit; nothing else about the provider is reachable
+	 * from the browser.
+	 */
+	realtimeOrigins?: readonly string[];
 }
 
 /**
@@ -48,13 +57,18 @@ export function imageOrigins(value: string | undefined): string[] {
 
 export function buildContentSecurityPolicy(
 	supabaseUrl: string,
-	{ dev = false, mapOrigins = [], imageOrigins: images = [] }: SecurityHeaderOptions = {}
+	{
+		dev = false,
+		mapOrigins = [],
+		imageOrigins: images = [],
+		realtimeOrigins: realtime = []
+	}: SecurityHeaderOptions = {}
 ): string {
 	const supabase = new URL(supabaseUrl).origin;
 	// Supabase Realtime connects over a websocket on the same host.
 	const supabaseWs = supabase.replace(/^https:/, 'wss:');
 
-	const connectSrc = ["'self'", 'blob:', supabase, supabaseWs, ...mapOrigins];
+	const connectSrc = ["'self'", 'blob:', supabase, supabaseWs, ...mapOrigins, ...realtime];
 	// Vite's dev server and HMR use websockets and dynamic origins.
 	if (dev) connectSrc.push('ws:', 'http:', 'https:');
 	const imgSrc = [
@@ -96,6 +110,9 @@ export function applySecurityHeaders(
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+	// The microphone is the app's own: dictation in the assistant's composer
+	// and, on a voice call, the audio the call is made of. Same-origin only —
+	// no embedded frame inherits it, and camera and location stay refused.
+	response.headers.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
 	return response;
 }

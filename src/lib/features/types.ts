@@ -26,7 +26,20 @@ export const FEATURE_IDS = [
 	'quick-plans',
 	'invoices',
 	'ledger',
+	// Commerce: what a customer asked for, what you shelve, what you knock off
+	// it, and what comes back.
+	'orders',
+	'shipments',
+	'featured-groups',
+	'categories',
+	'coupons',
+	'purchases',
+	'rmas',
 	'assets',
+	// The rental portfolio (the properties_and_leases migration). Real-estate
+	// only — every other industry resolves both `hidden` for want of a row.
+	'properties',
+	'leases',
 	'notes',
 	'tasks',
 	'tickets',
@@ -38,12 +51,14 @@ export const FEATURE_IDS = [
 	'graph',
 	// The whiteboard — one canvas, kept on the device (the whiteboard migration).
 	'whiteboard',
+	// Where people went and what came of it (the visits migration). Hidden for
+	// the verticals the customer comes TO.
+	'visits',
 	// Views — each a features row at /views/<id> (the views migration).
 	'suppliers',
 	'partner-contacts',
 	'patient-map',
 	'homeowner-map',
-	'merchant-map',
 	'prospects',
 	'referral-partners'
 ] as const;

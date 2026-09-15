@@ -21,19 +21,39 @@ function messagesOf(result: { error?: { issues: { message: string }[] } }) {
 
 /** Something the field would legally hold, so a whole form can be filled in. */
 function sampleFor(field: RecordField): string {
+	// Every picker holds a row id, so they are answered together rather than
+	// case by case — a kind added to RECORD_PICKER_KINDS is covered here
+	// without a second edit, which is the bug this line exists to stop.
+	// SAFETY: widening a `readonly PickerKind[]` to `readonly string[]` to ask
+	// `includes` about an arbitrary field type. Widening only — no value is
+	// created or narrowed by it.
+	if ((RECORD_PICKER_KINDS as readonly string[]).includes(field.type)) {
+		// The one picker whose value is not a bare id: a visit's subject is a
+		// kind AND a row, because the link it writes is two columns
+		// ($lib/crm/visits, `visitSubjectKey`).
+		return field.type === 'subject'
+			? 'company:20000000-0000-0000-0000-000000000001'
+			: '20000000-0000-0000-0000-000000000001';
+	}
 	switch (field.type) {
+		case 'geo':
+			// A point and the radius the device reported, as `formatFix()`
+			// writes it.
+			return '51.5,-0.12,8';
 		case 'select':
 			return field.options?.[0]?.value ?? '';
 		case 'email':
 			return 'someone@example.com';
+		case 'url':
+			return 'https://cdn.example.com/product.png';
 		case 'number':
-			return '1200.50';
+			// Valid for every `number` field in the registry — a coupon's
+			// percentage and a product's out-of-five rating included. The
+			// sample only has to parse, so it is the one that parses
+			// everywhere rather than the biggest.
+			return '4.50';
 		case 'integer':
 			return '30';
-		case 'company':
-		case 'contact':
-		case 'stage':
-			return '20000000-0000-0000-0000-000000000001';
 		case 'date':
 			return '2026-09-10';
 		case 'datetime':
@@ -68,6 +88,38 @@ describe('the record registry', () => {
 				if (!isPickerKind(field.type)) continue;
 				// The picker's column is the id of the row it points at, named
 				// after the kind: `company_id`, `contact_id`, `stage_id`.
+				//
+				// A form that picks its OWN kind is the exception, and the
+				// column says the ROLE instead: a property's `parent_id` is
+				// the building it is a unit of. Calling that `property_id` on
+				// a property form would name the record itself rather than
+				// the one it points at — so the rule there is only that it is
+				// an id column, and the schema test above already proves it
+				// matches the schema key.
+				if (field.type === type) {
+					expect(field.name).toMatch(/_id$/);
+					continue;
+				}
+				// A visit's subject is the second exception, and for the
+				// opposite reason: its value is not an id at all but a
+				// `<kind>:<id>` pair, because the link it fills in is two
+				// columns rather than one. Calling it `subject_id` would name
+				// it after something it does not hold.
+				if (field.type === 'subject') {
+					expect(field.name).toBe('subject');
+					continue;
+				}
+				// A member is the third, and for the `parent_id` reason: one
+				// record can name several people who work here, each in a
+				// different role — a proposal's presenter and its responsible
+				// member are two columns — so the name says the ROLE the
+				// person plays (`assigned_to`), never which table they came
+				// from. `member_id` would say the one thing that is never in
+				// question.
+				if (field.type === 'member') {
+					expect(field.name).not.toBe('member_id');
+					continue;
+				}
 				expect(field.name).toBe(`${field.type}_id`);
 			}
 		}

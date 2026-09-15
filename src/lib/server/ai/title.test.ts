@@ -27,6 +27,14 @@ describe('generateConversationTitle', () => {
 		).resolves.toBe('Renewal quote timing');
 	});
 
+	it('switches reasoning off and asks OpenAI not to store the call', async () => {
+		const model = modelSaying('Renewal timing');
+		await generateConversationTitle(model, 'When is the renewal due?');
+		const call = model.doGenerateCalls[0];
+		expect(call?.reasoning).toBe('none');
+		expect(call?.providerOptions).toEqual({ openai: { store: false } });
+	});
+
 	it('does not call the model for an empty opening message', async () => {
 		const model = modelSaying('Whatever');
 		await expect(generateConversationTitle(model, '   ')).resolves.toBeNull();

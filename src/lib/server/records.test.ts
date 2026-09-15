@@ -10,8 +10,10 @@ import {
 	deleteRecord,
 	isEditableRecordType,
 	loadCreateRecord,
+	insertRecord,
 	loadDeleteRecord,
 	loadEditRecord,
+	patchRecord,
 	updateRecord
 } from './records';
 import type { UserAccess } from './roles';
@@ -61,6 +63,7 @@ function submit(
 }
 
 const RECORD_ID = '40000000-0000-0000-0000-000000000001';
+const CATEGORY_ID = '50000000-0000-0000-0000-000000000001';
 
 function save(
 	supabase: SupabaseClient<Database>,
@@ -304,6 +307,80 @@ describe('createRecord', () => {
 		expect(from).not.toHaveBeenCalled();
 	});
 
+	// A product is the one record that is also a page on a website, so its form
+	// carries the shop's copy as well as the catalog's numbers — and all of it
+	// lands in one jsonb column. What is worth pinning is the folding: the
+	// lists the textareas hold, and that a blank field leaves its key out
+	// rather than writing an empty one.
+	it("folds a product's storefront copy into one metadata bag", async () => {
+		const shop = supabaseMock({ data: { id: 'product' } });
+		await submit(shop.supabase, OWNER, 'product', {
+			name: 'Enamel Guard Toothpaste',
+			category_id: CATEGORY_ID,
+			sku: 'gt-paste-01',
+			unit_price: '14',
+			msrp: '19',
+			long_description: 'Fluoride and hydroxyapatite, in one tube.',
+			slug: 'enamel-guard-toothpaste',
+			tagline: 'Coastal mint',
+			art: 'tube',
+			accent: '#1668d9',
+			badges: 'Best seller, Dentist formulated',
+			rating: '4.8',
+			review_count: '2417',
+			specs: 'Size: 4.0 oz / 113 g\nFluoride: 1450 ppm\nRefillable case',
+			usage: 'Brush for two minutes.\n\nSpit, do not rinse.',
+			featured: 'true'
+		});
+
+		expect(shop.from).toHaveBeenCalledWith('products');
+		expect(shop.builder.insert).toHaveBeenCalledWith({
+			name: 'Enamel Guard Toothpaste',
+			kind: 'good',
+			category_id: CATEGORY_ID,
+			sku: 'gt-paste-01',
+			unit_price: 14,
+			unit_cost: null,
+			unit: null,
+			msrp: 19,
+			is_active: true,
+			description: null,
+			long_description: 'Fluoride and hydroxyapatite, in one tube.',
+			image_url: null,
+			metadata: {
+				slug: 'enamel-guard-toothpaste',
+				tagline: 'Coastal mint',
+				art: 'tube',
+				accent: '#1668d9',
+				badges: ['Best seller', 'Dentist formulated'],
+				rating: 4.8,
+				reviewCount: 2417,
+				// A spec line with no colon is a value with no label — how a kit
+				// lists what is in the box.
+				specs: [
+					{ label: 'Size', value: '4.0 oz / 113 g' },
+					{ label: 'Fluoride', value: '1450 ppm' },
+					{ label: '', value: 'Refillable case' }
+				],
+				usage: ['Brush for two minutes.', 'Spit, do not rinse.'],
+				featured: true,
+				// The compare-at price is typed once, into the msrp column; the
+				// key a shop reads is derived from it rather than kept beside it.
+				compareAtCents: 1900
+			},
+			org_id: ORG_ID
+		});
+
+		// A product an org keeps for its proposals has no shop copy at all, and
+		// writes an empty bag rather than a dozen empty keys. With no slug in
+		// it, no storefront will show the row either.
+		const internal = supabaseMock({ data: { id: 'product' } });
+		await submit(internal.supabase, OWNER, 'product', { name: 'Standard installation' });
+		expect(internal.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ metadata: {}, msrp: null, is_active: true })
+		);
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 
@@ -360,6 +437,67 @@ describe('loadEditRecord', () => {
 			website: ''
 		});
 		// What the record already says is not a list of mistakes.
+		expect(editForm.errors).toEqual({});
+	});
+
+	// The other half of the fold above. The bag is jsonb, so it is parsed on
+	// the way back rather than trusted: a key of the wrong type reads as blank
+	// instead of putting a number where the form wants a string.
+	it("reads a product's storefront bag back into the form's fields", async () => {
+		// Two reads, in this order: the record, then the categories behind its picker.
+		const { supabase } = supabaseMockSequence([
+			{
+				data: {
+					id: RECORD_ID,
+					name: 'Enamel Guard Toothpaste',
+					kind: 'good',
+					category_id: CATEGORY_ID,
+					sku: 'gt-paste-01',
+					unit_price: 14,
+					unit_cost: null,
+					unit: null,
+					msrp: 19,
+					is_active: true,
+					description: null,
+					long_description: 'Fluoride and hydroxyapatite, in one tube.',
+					image_url: null,
+					metadata: {
+						slug: 'enamel-guard-toothpaste',
+						badges: ['Best seller', 'Dentist formulated'],
+						rating: 4.8,
+						reviewCount: 2417,
+						specs: [
+							{ label: 'Size', value: '4.0 oz / 113 g' },
+							{ label: '', value: 'Refillable case' }
+						],
+						usage: ['Brush for two minutes.'],
+						featured: true,
+						// Written by something other than this form — read as blank
+						// rather than allowed to break the edit form.
+						tagline: 42
+					}
+				}
+			},
+			{ data: [{ id: CATEGORY_ID, name: 'Toothpaste', parent_id: null }] }
+		]);
+
+		const { editForm } = await loadEditRecord(localsFor(supabase, OWNER), 'product', RECORD_ID);
+		expect(editForm.data).toMatchObject({
+			name: 'Enamel Guard Toothpaste',
+			category_id: CATEGORY_ID,
+			msrp: '19',
+			is_active: 'true',
+			slug: 'enamel-guard-toothpaste',
+			badges: 'Best seller, Dentist formulated',
+			rating: '4.8',
+			review_count: '2417',
+			specs: 'Size: 4.0 oz / 113 g\nRefillable case',
+			usage: 'Brush for two minutes.',
+			featured: 'true',
+			best_seller: 'false',
+			tagline: '',
+			accent: ''
+		});
 		expect(editForm.errors).toEqual({});
 	});
 
@@ -568,5 +706,170 @@ describe('deleteRecord', () => {
 			'data.form.message',
 			'Company was not deleted: it does not exist, or you are not allowed to.'
 		);
+	});
+});
+
+describe('patchRecord', () => {
+	const row = {
+		id: RECORD_ID,
+		name: 'Sunrise Smoothie Bar',
+		relationship: 'customer',
+		status: 'lead',
+		email: 'hi@sunrise.example',
+		phone: null,
+		website: 'sunrise.example'
+	};
+
+	it('changes only the named fields and writes the whole row through the form’s switch', async () => {
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: row },
+			{ data: { id: RECORD_ID } }
+		]);
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, {
+				status: 'active',
+				phone: '+1 555 0100'
+			})
+		).resolves.toEqual({ saved: true });
+
+		expect(builder.update).toHaveBeenCalledWith({
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'active',
+			email: 'hi@sunrise.example',
+			phone: '+1 555 0100',
+			website: 'sunrise.example'
+		});
+		expect(builder.eq).toHaveBeenCalledWith('id', RECORD_ID);
+	});
+
+	it('hands back the schema’s issues instead of writing', async () => {
+		const { supabase, builder } = supabaseMockSequence([{ data: row }]);
+
+		const result = await patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { name: '  ' });
+
+		expect(result).toEqual({ saved: false, issues: ['name: Name is required.'] });
+		expect(builder.update).not.toHaveBeenCalled();
+	});
+
+	it('refuses a field the kind does not have, and a record that is not there', async () => {
+		const { supabase, from } = supabaseMockSequence([{ data: null }]);
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { colour: 'teal' })
+		).rejects.toThrow(/no field named colour/);
+		expect(from).not.toHaveBeenCalled();
+
+		await expect(
+			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { status: 'active' })
+		).rejects.toThrow(/no company with id/);
+	});
+});
+
+describe('insertRecord', () => {
+	it('writes a record from the fields it was given, and answers with its id', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await expect(
+			insertRecord(supabase, ORG_ID, 'company', { name: 'Sunrise Smoothie Bar' })
+		).resolves.toEqual({ created: true, id: RECORD_ID });
+
+		expect(from).toHaveBeenCalledWith('companies');
+		// A field left out is the schema's default, exactly as an untouched
+		// input on the form would be — blank text becoming a null column.
+		expect(builder.insert).toHaveBeenCalledWith({
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'lead',
+			email: null,
+			phone: null,
+			website: null,
+			org_id: ORG_ID
+		});
+	});
+
+	it('hands back the form’s own sentences instead of writing', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: RECORD_ID } });
+
+		// Missing altogether, not blank: a writer that is not a form leaves a
+		// field out, and the message has to read the same either way.
+		await expect(insertRecord(supabase, ORG_ID, 'company', {})).resolves.toEqual({
+			created: false,
+			issues: ['name: Name is required.']
+		});
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('refuses a field the kind does not have, naming the ones it does', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await expect(
+			insertRecord(supabase, ORG_ID, 'company', { name: 'Acme', colour: 'teal' })
+		).rejects.toThrow(/A company has no field named colour/);
+		expect(from).not.toHaveBeenCalled();
+	});
+});
+
+describe('who a record is for, and who is on it', () => {
+	it('writes a deal’s party and its assignee as the three columns they are', async () => {
+		// An unplaced deal reads the org's default board first, then inserts.
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: { id: 'p1', pipeline_stages: [{ id: 's1' }] } },
+			{ data: { id: RECORD_ID } }
+		]);
+		const dana = '00000000-0000-0000-0000-0000000000d1';
+		const companyId = '20000000-0000-0000-0000-000000000001';
+		const contactId = '30000000-0000-0000-0000-000000000001';
+
+		await submit(supabase, OWNER, 'deal', {
+			title: 'Annual renewal',
+			company_id: companyId,
+			contact_id: contactId,
+			assigned_to: dana,
+			stage_id: '',
+			amount: '',
+			expected_close_date: ''
+		});
+
+		expect(builder.insert).toHaveBeenCalledWith({
+			title: 'Annual renewal',
+			// Who it is with…
+			company_id: companyId,
+			contact_id: contactId,
+			// …and whose it is. Two different links, three columns.
+			assigned_to: dana,
+			amount: null,
+			expected_close_date: null,
+			pipeline_id: 'p1',
+			stage_id: 's1',
+			org_id: ORG_ID
+		});
+	});
+
+	it('links a task to a party and gives it no assignee, because that is a relationship', async () => {
+		const { supabase, builder } = supabaseMock({ data: { id: RECORD_ID } });
+		const contactId = '30000000-0000-0000-0000-000000000001';
+
+		await submit(supabase, OWNER, 'task', {
+			title: 'Call back about the quote',
+			priority: 'high',
+			company_id: '',
+			contact_id: contactId,
+			due_at: '',
+			details: ''
+		});
+
+		const [columns] = builder.insert.mock.calls[0];
+		expect(columns).toEqual({
+			title: 'Call back about the quote',
+			priority: 'high',
+			company_id: null,
+			contact_id: contactId,
+			due_at: null,
+			details: null,
+			org_id: ORG_ID
+		});
+		expect(columns).not.toHaveProperty('assigned_to');
 	});
 });

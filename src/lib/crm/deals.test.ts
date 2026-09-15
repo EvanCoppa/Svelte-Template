@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	buildDealColumns,
 	closeLabel,
 	dealIsSlipping,
 	groupDealsByStage,
@@ -48,6 +49,81 @@ describe('the funnel’s columns', () => {
 	it('adds a column up, counting a deal with no figure as nothing', () => {
 		expect(stageTotal([{ amount: 12000 }, { amount: null }, { amount: 500 }])).toBe(12500);
 		expect(stageTotal([])).toBe(0);
+	});
+});
+
+/** An ungrouped open or closed stage — the shape every stage had before groups existed. */
+function stage(
+	id: string,
+	name: string,
+	outcome: 'open' | 'won' | 'lost',
+	probability: number,
+	group: { groupId: string; groupLabel: string | null } | null = null
+) {
+	return {
+		id,
+		name,
+		outcome,
+		probability,
+		groupId: group?.groupId ?? null,
+		groupLabel: group?.groupLabel ?? null
+	};
+}
+
+describe('the funnel’s columns, grouped', () => {
+	it('gives every open stage its own column, one status each', () => {
+		const columns = buildDealColumns([
+			stage('lead', 'Lead', 'open', 10),
+			stage('proposal', 'Proposal', 'open', 60)
+		]);
+
+		expect(columns.map((column) => column.id)).toEqual(['lead', 'proposal']);
+		expect(columns[0].statuses).toEqual([
+			{ value: 'lead', label: 'Lead', tone: 'info', fill: 0.1 }
+		]);
+	});
+
+	it('folds every closed stage into one Closed column, split into a zone each', () => {
+		const columns = buildDealColumns([
+			stage('lead', 'Lead', 'open', 10),
+			stage('won', 'Won', 'won', 100),
+			stage('lost', 'Lost', 'lost', 0)
+		]);
+
+		expect(columns.map((column) => column.id)).toEqual(['lead', 'closed']);
+		const closed = columns[1];
+		expect(closed.label).toBe('Closed');
+		expect(closed.statuses.map((status) => status.value)).toEqual(['won', 'lost']);
+		expect(closed.statuses.map((status) => status.fill)).toEqual(['done', 'stopped']);
+	});
+
+	it('draws no Closed column at all when a board has no closed stage', () => {
+		const columns = buildDealColumns([stage('lead', 'Lead', 'open', 10)]);
+		expect(columns.map((column) => column.id)).toEqual(['lead']);
+	});
+
+	it('shares one column between open stages carrying the same group, zoned by stage', () => {
+		const prospecting = { groupId: 'g1', groupLabel: 'Prospecting' };
+		const columns = buildDealColumns([
+			stage('prospect', 'Prospect', 'open', 5, prospecting),
+			stage('contacted', 'Contacted', 'open', 10, prospecting),
+			stage('underwriting', 'Underwriting', 'open', 80)
+		]);
+
+		// The group's column lands at its first member's position; the
+		// ungrouped stage keeps its own column exactly as before.
+		expect(columns.map((column) => column.id)).toEqual(['g1', 'underwriting']);
+		expect(columns[0].label).toBe('Prospecting');
+		expect(columns[0].statuses.map((status) => status.value)).toEqual(['prospect', 'contacted']);
+	});
+
+	it('falls back to the first member’s name when a group carries no label', () => {
+		const group = { groupId: 'g1', groupLabel: null };
+		const columns = buildDealColumns([
+			stage('a', 'Stage A', 'open', 10, group),
+			stage('b', 'Stage B', 'open', 20, group)
+		]);
+		expect(columns[0].label).toBe('Stage A');
 	});
 });
 

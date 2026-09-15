@@ -76,7 +76,9 @@ npm run format         # prettier (svelte + tailwind plugins)
 - The service-role client (`src/lib/supabase.server.ts`) bypasses RLS: create it per
   request in server files only. RLS stays enabled on every table regardless.
 - Every response carries the security headers from
-  `src/lib/server/security-headers.ts`. The CSP's origins derive from
+  `src/lib/server/security-headers.ts`. `Permissions-Policy` grants the microphone to
+  this origin and nothing else (`microphone=(self)`) — dictation and the assistant's
+  voice call are the app's own; camera and location stay refused. The CSP's origins derive from
   `PUBLIC_SUPABASE_URL` — when adding an external service, add its origin there
   as a parameter or documented constant, never a hardcoded project ref. Hosts
   that only serve **images** (a product's `image_url` on a storefront CDN) are the
@@ -216,10 +218,28 @@ application data is scoped to an organization, never to a bare user. The
   that names another kind links only when `passesFeatureGate()` says the reader
   may open it; otherwise it is plain text or not fetched at all. The page has no
   `pages` row (its title is the record's name) and no nav entry. **A kind that
-  needs its own screen adds `(app)/<kind>/[id]/`** — a static segment outranks the
-  matcher, so the specific page wins and the generic one stays the default for
-  the rest; compose it from the same `RecordDetail` and the `detail/` parts rather
-  than a second renderer. A new list page joins by adding its kind to
+  needs its own screen adds `(app)/<kind>/[id=guid]/`** — a static segment outranks
+  the matcher, so the specific page wins and the generic one stays the default for
+  the rest. **What a record page IS lives in `src/lib/server/record-page.ts`, not
+  in either route**: `loadRecordPage()` is the whole load (the record, its
+  activities, tags, addresses, photos, custom fields, notes, thread, related
+  groups, relationships and the generic edit form) and `recordPageActions(kindOf)`
+  the actions that write them, so a specific page spreads both and adds only what
+  is its own — and the two pages can never drift on what a record page shows.
+  The markup is the same story: the header, the rail, the timeline, the notes and
+  a related group are `detail/` parts both routes compose. A specific page also
+  needs its own `relationship-options/+server.ts` over the shared
+  `relationshipOptions()`, because the Relationships card fetches that path
+  relative to the page it is on. `(app)/companies/[id=guid]/` is the worked
+  example — the ego graph, the people, the account and the map it adds are what a
+  kind earns a page FOR; never a second renderer, a second record load or a second
+  relationship card. `(app)/products/[id=guid]/` is the second: its picture is the
+  header tile (`Detail.Identity image`), Overview leads with the Media card and what
+  the storefront says, and the rail opens with Sales performance and Inventory —
+  figures folded in the browser from the order lines that cite it (`salesSummary()`
+  / `allocatedQuantity()` in `$lib/crm/products`), each shown only when the
+  `orders` grant lets this session read them, and the Orders and Purchases tabs
+  are those lines listed. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
@@ -240,7 +260,11 @@ application data is scoped to an organization, never to a bare user. The
   another record or a member wears a chip (`Detail.Value`), so a rail row reads
   as a thing rather than a sentence. A new section is a tab, drawn only while
   active; a new fact about the record is a row in the rail; never a card
-  outside the two.
+  outside the two. A kind with its own page keeps that shape and may fill the
+  frames differently where it has more to say — the company page puts the
+  Relationships card on a tab of its own under an ego map, and lists every field
+  in the rail rather than holding the `link` ones back, because the rail is the
+  attribute panel the Edit button opens.
 - **A view is a query with a page** (`views` migration + `src/lib/views/` +
   `src/lib/server/crm/views.ts` + `(app)/views/[view=view]/`; docs/views.md). A
   `views` row names a source (`company` | `contact`), a JSON filter validated by
@@ -493,7 +517,12 @@ features, access }` on `locals.org` — the hook gates the route on it, and
     relationships between them, named through each kind's own list module (so the gate
     applies kind by kind, and a member is on the map only where a relationship names
     one), its legend in the industry's words (`recordTerms()` per kind, the `graph_member` term for
-    people who work here) and its edges labelled by their types. Nothing per industry is
+    people who work here) and its edges labelled by their types. **One record's
+    corner of it is the same map, narrowed** — `egoGraph()` in `$lib/crm/graph.ts`
+    is a pure fold beside `filterGraph()` and `neighbourhoodOf()`, taking the map
+    `describeGraph()` described and keeping what is within N hops of one node plus
+    every edge among them, legend recounted. The company page draws it; a kind
+    that wants one calls the same fold, never a second server read. Nothing per industry is
     stored for it; a kind or a type joins the map by existing. A proposal's presenter,
     responsible member and parent link are drawn too, even though they stay plain
     columns on `proposals` — `describeGraph()` reads them directly and synthesizes
@@ -516,7 +545,9 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   membership like `deals.assigned_to`. Every Date in `$lib/calendar.ts` is local and
   the server never draws the grid: `fetchWindow()` pads in UTC, the page draws its own
   zone's grid after hydration, and forms carry instants behind wall-clock inputs.
-  Booking, editing and deleting are superforms actions; **a drag posts the `move`
+  Booking, editing and deleting are superforms actions (and the assistant's
+  `createEvent` / `updateEvent` / `deleteEvent` tools take the same three grants
+  through the same module); **a drag posts the `move`
   action from the page's script** (`fetch('?/move')` + `deserialize`, the two changed
   columns only) with an optimistic `pending` overlay until `QUERY.calendar` reloads —
   the road for a JS-born mutation that belongs to the page it lives on. The feature
@@ -571,6 +602,70 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   whenever the load supplies `data.billing` — the thread's data-presence rule. Every
   payment form carries an idempotency key the load minted, so a double submit collides
   on the table instead of recording money twice.
+- **Commerce is three small features, and each one says what it left out**
+  (`featured_groups`, `coupons` and `rmas` migrations + `src/lib/server/crm/featured-groups.ts`,
+  `coupons.ts`, `rmas.ts`). A **featured group** is a named, ordered set of products put
+  in front of a buyer together — editorial, never a fact about a product — so it is the
+  `quick_plans` shape exactly (a row plus join rows, always read and written together)
+  and keeps its own page for the same reason: its one interesting field is a
+  multi-select the generic record form cannot render. A **coupon** is a code, what it
+  takes off (`percent` or `amount`, read together by `couponDiscountText()` in
+  `$lib/crm/coupons.ts` — the one place, so the list cell and the record page agree) and
+  the window it is good for; it is a record kind, so the generic form creates and edits
+  it. An **RMA** is a numbered return from a party — `company_id` and `contact_id` both
+  nullable with at least one set, the ledger's rule — climbing
+  `requested → approved → received → closed`, with `rejected` as the end that never
+  started; `closed` is the one finished state whatever the outcome was, because WHAT was
+  done is `resolution` in words (the task board's `cancelled` reasoning), and its number
+  comes from a sequence and a trigger like an invoice's, with the column defaulting to
+  `''` so an insert can leave it out. **What each one left out is the point**: a coupon
+  has no `max_redemptions` or `times_redeemed`, and an RMA has no `order_id` and no line
+  items — a limit nothing counts against reads as enforced, a column nothing writes is
+  dead weight, and a return line that claimed to restock would be the defect the orders
+  migration already names about `quantity_reserved`. They arrive with the redemption
+  table and inventory movement respectively; a credit for a return is a `refund`
+  payment on the ledger, never a second copy of an amount. **An RMA's `order_id` stays
+  absent now that Orders exists**, on its own merits rather than for want of a table: a
+  return is a fact about goods, and plenty of them are for goods this org never wrote an
+  order for. It lands when something actually reads it — a restock, or a credit that
+  must find the invoice — not because the target now exists. All three are `hidden` for
+  the verticals that quote work rather than ship goods — a vertical joins with one
+  `industry_features` row.
+- **The supply spine is four documents, and each says what it derives** (the
+  `orders_and_shipments` and `vendors_and_purchasing` migrations + their `*_feature`
+  migrations + `src/lib/server/crm/orders.ts`, `shipments.ts`, `purchases.ts`,
+  `product-categories.ts`). An **order** is what a customer asked for, a **shipment** a
+  box against one order, a **purchase** what the org buys from a vendor, and
+  **categories** the tree the catalog hangs on. Each of the first three is a DOCUMENT,
+  so each takes its own record page under `(app)/<kind>/[id=guid]/` — the list, the
+  header form and the row menu stay generic, and only what the generic page has no
+  frame for is written by hand.
+  **A status is either an act or derived, never both.** Confirming, cancelling and
+  placing are acts, each scoped to the state it is legal from so a second click reports
+  a refusal rather than success over nothing. Everything else falls out:
+  `orders.fulfillment_status` from its lines, a purchase's
+  `ordered → partially_received → received` from what has arrived, and an order line's
+  `shipped` / `delivered` from the carrier status of the box carrying it. So a receive
+  is a line write, and the one write that reaches an order is a shipment's
+  `delivery_status` — never a status typed onto the header.
+  **The carrier owns two of a line's states and a person owns the rest**
+  (`LINE_FULFILLMENT_STATUSES` in `$lib/crm/orders.ts`): a scan never overwrites a
+  `cancelled` or `returned` a person decided, and no form offers `shipped` or
+  `delivered`, because typing one would claim a box moved.
+  **A partial shipment is a line SPLIT.** A packing row carries no quantity — a line is
+  in the box or it is not — so four of ten cases going out is `splitOrderLine()` making
+  a four and a six, each with the original's snapshots. One line lives in one box, so
+  `packableLines()` offers only what is in no box yet rather than what the unique index
+  would refuse, and moving a line is an unpack and a pack.
+  **A shipment is the one kind the generic record form cannot create**: `order_id` is
+  not null and insert-only, so "Ship this order" on the order's page is the one door —
+  taking the `shipments` grant, not the order's. It is a `RECORD_KIND` and a
+  `ListKind` without being a `RecordType`, which is what that distinction is for.
+  A **category tree is not a table**, so `/categories` is indented rows rather than a
+  `DataTable`, with no `list_fields`: PostgREST cannot embed a self-referencing
+  composite foreign key, so the tree is one flat read and a pure fold (`categoryTree()`
+  in `$lib/crm/categories.ts`) that surfaces a cycle or an orphan as a root rather than
+  dropping it.
 
 ## Platform administration — the one surface outside the tenant
 
@@ -717,7 +812,13 @@ answer:
   only place that shape is known; the Relationships card draws the result, so
   `describeTask()` has **no "Assigned to" field** — never add a second copy of a
   relationship as a record field. `deals.assigned_to` and `calendar_events.assigned_to`
-  stay columns on purpose: each is genuinely one person.
+  stay columns on purpose: each is genuinely one person — a deal's and a ticket's are
+  a `member` **picker field** on the generic form (below), so one person is picked the
+  way a stage is. **Assigning is not linking, and a record often does both**: the
+  assignee is the colleague who will do the work, while `company_id` / `contact_id`
+  are the party it is FOR. Never answer one with the other — a contact is not an
+  assignee, and a colleague is not the customer. The assistant says the same thing in
+  the same words (docs/assistant.md, "Assigning is not linking").
 - **Priority is one vocabulary** — the `public.priority` enum (renamed from
   `ticket_priority` when tasks became its second table), its options named once in
   `PRIORITY_OPTIONS` (`src/lib/schemas/records.ts`) and toned once in `PRIORITY_TONE`
@@ -777,8 +878,8 @@ Every field posts a **string** — that is what lets one component render them a
 amount → a number, a wall-clock pick → an ISO instant, re-parsed with the concrete
 schema so the enum unions come back without a cast), with `recordFormValues()` its
 mirror on the way back into the form. A record that points at another row — an
-invoice's customer, a deal's stage — uses the `company` / `contact` / `stage` **picker
-field types**: still a
+invoice's customer, a deal's stage, a ticket's assignee — uses the `company` /
+`contact` / `stage` / `member` **picker field types**: still a
 string (the row's id), rendered as a `Combobox` whose options `loadCreateRecord()`
 reads per request and ships as `createPickers` — never a second modal for "the same
 form plus a customer". Adding a kind of record = a schema, a `RECORD_FORMS` entry and
@@ -828,9 +929,19 @@ The assistant (`/assistant`, feature id `assistant`) is built on the Vercel AI S
 SDK's docs ship inside the package (`node_modules/ai/docs/`) and match the installed
 version; read them before the website. The full account is `docs/assistant.md`.
 
-- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`), the only file that
-  imports a provider package. Config is env-only (`ANTHROPIC_API_KEY`, `AI_MODEL`); when
-  unconfigured the page says so and the endpoint answers 503, never a crash.
+- **Models** come from `src/lib/server/ai/provider.ts` (`chatModel()`, `realtimeToken()`),
+  which is the only **server** file that imports a provider package — `@ai-sdk/openai`,
+  over the Responses API. Config is env-only (`OPENAI_API_KEY`, `AI_MODEL`; the default
+  model is `gpt-5.6-luna`); when unconfigured the page says so and the endpoint answers
+  503, never a crash. What the API is asked for on a call — `store: false`, the
+  per-thread `promptCacheKey` — is the SDK's namespaced `providerOptions`, spelled once in
+  `openaiCallOptions()` (`provider.ts`) and set on the agent and the title call; reasoning
+  is the SDK's portable `reasoning` setting, never a provider option. The one browser
+  exception is `realtimeModel()` in `src/lib/ai/realtime.svelte.ts`: a realtime model's
+  other half parses the provider's events and serialises ours **in the browser**, so it
+  cannot live on the server the way `chatModel()` does. It is loaded only when a call
+  starts, its key is a placeholder that is never used, and it is the only client module
+  allowed to name the vendor.
 - **The agent** is the SDK's `ToolLoopAgent` in `src/lib/server/ai/agent.ts` — model,
   instructions, tools, `stopWhen`, `prepareStep`, `toolApproval`, `toolsContext`,
   `activeTools` live there, not in the endpoint.
@@ -841,7 +952,19 @@ version; read them before the website. The full account is `docs/assistant.md`.
   features**: `activeToolNames()` keeps a tool only when the feature is `enabled` for the
   org and the caller holds the level, and every tool re-checks with
   `requireToolContext()`. Destructive tools go in `TOOL_APPROVAL`. Adding a tool = the
-  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts`.
+  file + one line in each map in `tools/index.ts` + a label in `src/lib/ai/labels.ts` + a
+  case in `sourcesOf()`. **A tool about a kind of record is addressed by kind, never a
+  file per kind**: `findRecords`, `getRecord`, `listRecordFields`, `createRecord`,
+  `updateRecord`, `addNote`, `linkRecords` and `exploreGraph` serve every kind with a
+  page through the generic record layer (`getRecord()`, `insertRecord()`,
+  `patchRecord()`, `getRelationships()`), their `ToolAccess` is `anyOf`
+  the kinds' features, each call re-checks the kind it names with `recordAccess()`, and
+  the session block lists the kinds this caller may read in the industry's words, with
+  what it may do to each — read, create, update (`recordKindAccess()`) —
+  docs/assistant.md, "Tools addressed by kind". **A kind whose creation is special is
+  special for the assistant too**: `createRecord` writes every kind the generic form
+  creates but a task, because `createTask` writes the row AND the people on it in one
+  call, exactly as the tasks page's modal does.
 - **The message type** is `AssistantUIMessage` (`src/lib/ai/types.ts`), inferred from the
   tool set. Render by `part.type`; never sniff a field on a payload. UI that is not a tool
   result is a data part; a message-level fact is metadata (`messageMetadataSchema`).
@@ -851,6 +974,30 @@ version; read them before the website. The full account is `docs/assistant.md`.
   only its approval decisions are merged.
 - **Model text is untrusted**: `Assistant.Markdown` renders it to components with raw
   HTML disabled, never `{@html}`.
+- **Talking to it is the same assistant** (`docs/assistant.md`, "The call"). The
+  composer's commit button is whatever there is to commit — Send with something written,
+  Stop while an answer streams, and **Call** with an empty box — and pressing Call opens
+  `Assistant.Call` over the SDK's `Experimental_AbstractRealtimeSession`, bound to runes
+  in `src/lib/ai/realtime.svelte.ts` because `@ai-sdk/svelte` ships no realtime binding
+  yet. The key never reaches the browser: `/assistant/realtime/token` mints a short-lived
+  client secret with the session already decided (`voiceSessionConfig()`), because a
+  `session.update` only changes the fields it carries — so instructions and voice are the
+  server's and the browser states only how it listens. A tool call comes back through
+  `/assistant/realtime/tool` and `runVoiceTool()`, gated exactly as a typed turn is; the
+  browser is a relay, not the thing with the permissions. A call offers one tool fewer
+  than a thread — anything in `TOOL_APPROVAL` is withheld, because a spoken "yes" is not
+  an approval this app can evidence. `Assistant.Orb` is what you talk to, and it knows
+  only how loud and how fast. **A call hangs up on its own, twice over**, because an
+  open socket with a live microphone is metered: after two minutes of dead air
+  (`IDLE_LIMIT_MS`) and after thirty minutes however lively it is (`MAX_CALL_MS`),
+  each warning first. `callLimit()` is the one decision — never a check per limit —
+  so the nearer deadline is the one said out loud and the words live beside the
+  numbers; `isConversationEvent()` says what keeps a call alive by naming what does
+  not, so an event type a later SDK maps counts as talking rather than cutting a call
+  off mid-sentence. A running tool holds off the idle limit and never the length one.
+  The secret is minted with a two-minute life as the server-side half of the same
+  bound. The transcript is not
+  saved: a thread you want to keep is the typed one.
 - **The assistant is its own shell**, like settings: under `/assistant` the `(app)` layout
   swaps `AppSidebar` for `AssistantSidebar`, whose nav is the member's threads
   (`page.data.conversations`) with New chat, Home and a "Chats" label that gives
@@ -865,6 +1012,18 @@ version; read them before the website. The full account is `docs/assistant.md`.
   `Assistant.Aura`, then travelling to the foot of the page once the thread starts. A tool call the reader must answer keeps
   its `Assistant.ToolCall` card; every other one collapses into the `Assistant.Activity`
   line. See docs/assistant.md, "The screen"; never build a second thread rail.
+- **An artifact is a tool result drawn as a component** (docs/assistant.md, "Artifacts"):
+  `Assistant.Message` renders `tool-getRecord`, `tool-listRecords`, `tool-exploreGraph`,
+  `tool-findOpenSlots` and `tool-packableLines` in place once `output-available`, and
+  `tool-updateRecord`'s approval card shows the change field by field (`Assistant.Diff`,
+  from `recordSnapshots()` over the thread). The tool's `outputSchema` is the artifact's
+  data — no data part, nothing streamed beside the message — and **an artifact is an
+  existing app component inside the `Assistant.Artifact` frame, never a bespoke chat
+  widget** (`createListTable()` + `DataTable`, `RelationshipGraph.Root`, the record
+  page's header). One that writes posts a form action on the assistant page through a
+  hidden form (`book`, `pack`; schemas in `$lib/schemas/assistant.ts`), the calendar's
+  drag-to-move road — never a `fetch` of its own — and its tool says whether the caller
+  holds the grant (`canBook`, `canPack`) so no card offers a button the action refuses.
 - Freshness is `QUERY.assistant`; rename and delete are superforms actions on the page,
   opened from the sidebar through `$lib/assistant.svelte` — the `showUpgrade()` pattern.
   Every module under `src/lib/server/ai/` has a test beside it; the endpoint test drives
@@ -1030,14 +1189,16 @@ and it breaks rule 1 by introducing a second way to do a solved job.
   Moving works from the keyboard as well as under a pointer (Space to grab, ← → to move one
   status at a time **across column boundaries**, Escape to drop), so never build a drag-only board
   and never leave a status the arrows cannot reach. `/tasks` is the worked example and
-  `/components` → Boards & grouped lists the reference. **`/deals` is the same board with
-  one column per state** (docs/deals.md): a funnel's columns are `pipeline_stages` rows, so
-  a stage IS the state a deal is in and every column holds exactly one — the drop zones are
-  for a column that groups several states, not for every board. It draws one pipeline at a
-  time (a stage only means something inside its own board, so which one is in the query
-  string like the ledger's account filter), the stage's `probability` as the ring's fill,
-  and `$lib/crm/deals.ts` answers what a column holds and adds up to the way
-  `$lib/crm/tasks.ts` does for the task board.
+  `/components` → Boards & grouped lists the reference. **`/deals` is the same board, with
+  `pipeline_stages` rows as its columns** (docs/deals.md): an open stage IS the state a deal
+  is in, so it gets a column of its own and a release lands straight away — but every stage
+  whose outcome closes the deal (`won`, `lost`, and any more an org adds) shares one `Closed`
+  column, split into a drop zone per stage exactly like a grouped task column, so the funnel
+  does not grow a column per terminal stage. `buildDealColumns()` (`$lib/crm/deals.ts`) is the
+  one place that groups them. It draws one pipeline at a time (a stage only means something
+  inside its own board, so which one is in the query string like the ledger's account filter),
+  the stage's `probability` as the ring's fill, and `$lib/crm/deals.ts` answers what a column
+  holds and adds up to the way `$lib/crm/tasks.ts` does for the task board.
 - **A strip of open things is `TabStrip`** (`src/lib/components/tab-strip/`), and it is
   not `ui/tabs`. `ui/tabs` switches between panels of one screen (an ARIA tablist);
   `TabStrip` is the browser's tab bar — each tab is a **document the reader opened** and

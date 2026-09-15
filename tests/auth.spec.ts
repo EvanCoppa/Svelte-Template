@@ -205,6 +205,19 @@ test.describe('the app shell', () => {
 		await expect(page).toHaveURL('/staff');
 	});
 
+	test('keeps Settings and Staff together across shell sidebars', async ({ page }) => {
+		for (const path of ['/settings/profile', '/assistant']) {
+			await page.goto(path);
+
+			const trigger = page.locator('[data-slot="sidebar-footer"]').getByRole('button').first();
+			await clickWhenLive(trigger, () => expect(page.getByRole('menu')).toBeVisible());
+
+			const items = page.getByRole('menu').getByRole('menuitem');
+			await expect(items.nth(0)).toHaveText('Settings');
+			await expect(items.nth(1)).toHaveText('Staff');
+		}
+	});
+
 	test('marks a feature outside the plan as locked and opens the upgrade prompt', async ({
 		page
 	}) => {
@@ -438,31 +451,44 @@ test.describe('the record page', () => {
 		await page.goto(`/companies/${WAYNE}`);
 
 		await expect(page).toHaveTitle('Wayne Enterprises');
-		// Lifecycle as pills beside the name, the rest as labelled fields.
-		await expect(page.getByText('Customer', { exact: true })).toBeVisible();
+		// Lifecycle as pills beside the name — the column's own words, so
+		// `relationship` reads exactly as the enum stores it.
+		const pills = page.locator('[data-slot="status-badge"]');
+		await expect(pills.filter({ hasText: 'customer' }).first()).toBeVisible();
+		// A way to reach it, as a chip under the name.
 		await expect(page.getByRole('link', { name: 'hello@wayne.example.com' })).toHaveAttribute(
 			'href',
 			'mailto:hello@wayne.example.com'
 		);
-		// The shared entity link: a tag, a billing address and a logged note.
+		// The shared entity link: a tag and a note kept about the record. Both
+		// are always on screen — the tag beside the name, the note in the rail.
 		await expect(page.getByText('VIP', { exact: true })).toBeVisible();
-		await expect(page.getByText('1007 Mountain Drive').first()).toBeVisible();
 		await expect(page.getByText(/Prefers email over phone/)).toBeVisible();
+
+		// The address is a tab of its own; the street is behind it, with the
+		// city already summarized in the header.
+		await clickWhenLive(page.getByRole('tab', { name: /Addresses/ }), () =>
+			expect(page.getByText('1007 Mountain Drive').first()).toBeVisible()
+		);
 	});
 
 	test('lists related records only for the kinds the reader may open', async ({ page }) => {
 		await page.goto(`/companies/${WAYNE}`);
 
-		// seed.sql: Support reads contacts and tickets, so the person at Wayne
-		// and the ticket about it are listed and link onward…
-		await expect(page.getByRole('link', { name: 'Lucius Fox' })).toHaveAttribute(
+		// seed.sql: Support reads contacts, so the person at Wayne is named on
+		// the overview and links onward…
+		await expect(page.getByRole('link', { name: 'Lucius Fox' }).first()).toHaveAttribute(
 			'href',
 			`/contacts/${LUCIUS}`
 		);
-		await expect(page.getByRole('link', { name: 'Cannot export invoices' })).toBeVisible();
+		// …and tickets, so that group has a tab of its own that links onward…
+		await clickWhenLive(page.getByRole('tab', { name: /Tickets/ }), () =>
+			expect(page.getByRole('link', { name: 'Cannot export invoices' })).toBeVisible()
+		);
 		// …while the deal against Wayne is behind a feature Support holds no
 		// grant on, so it is neither shown nor linked — the same answer /deals
-		// gives this user.
+		// gives this user. Not even a tab for it.
+		await expect(page.getByRole('tab', { name: /Deals/ })).toHaveCount(0);
 		await expect(page.getByText('Annual support contract')).toHaveCount(0);
 	});
 
@@ -504,6 +530,78 @@ test.describe('the record page', () => {
 		// record is refused exactly like the deals list is.
 		const response = await page.goto('/deals/40000000-0000-0000-0000-000000000001');
 		expect(response?.status()).toBe(403);
+	});
+});
+
+/**
+ * The company page is the one kind with a page of its own
+ * (`(app)/companies/[id=guid]`), so these are the things it has and the
+ * generic page does not: the people who work there on the overview, this
+ * record's corner of the relationship graph as a tab, and the account.
+ */
+test.describe('the company page', () => {
+	test.beforeEach(async ({ page }) => {
+		await signIn(page);
+		await expect(page).toHaveURL('/');
+	});
+
+	const WAYNE = '20000000-0000-0000-0000-000000000001';
+
+	test('takes over /companies/<id> from the generic record page', async ({ page }) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		// A static segment outranks `[kind=record]`, so this is the specific
+		// page — which the Relationships tab is the proof of. The generic page
+		// keeps its relationships on the overview and has no such tab.
+		await expect(page).toHaveTitle('Wayne Enterprises');
+		await expect(page.getByRole('tab', { name: /Relationships/ })).toBeVisible();
+		// Still a record page: the way back, and the trail naming it.
+		await expect(page.getByRole('link', { name: /All / })).toHaveAttribute('href', '/companies');
+		const trail = page.getByRole('navigation', { name: 'breadcrumb' });
+		await expect(trail.locator('[data-slot="breadcrumb-page"]')).toHaveText('Wayne Enterprises');
+	});
+
+	test('names the people who work there, on the overview', async ({ page }) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		// The overview is the default tab, so the roster needs no click.
+		const people = page.locator('[data-slot="card"]', {
+			has: page.getByRole('link', { name: 'Lucius Fox' })
+		});
+		await expect(people.first()).toBeVisible();
+	});
+
+	test('gives the relationships a tab, with the card that writes to them', async ({ page }) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		// The generic page keeps this card at the foot of the overview; here it
+		// is a tab of its own, with the map above it.
+		await clickWhenLive(page.getByRole('tab', { name: /Relationships/ }), () =>
+			expect(page.locator('[data-slot="detail-relationships"]')).toBeVisible()
+		);
+		// How far out to look — the control the whole-org map has no need of.
+		await expect(page.getByRole('radiogroup', { name: 'How far out' })).toBeVisible();
+		// Support may read companies but not manage them, so the write side is
+		// absent while the way out to the whole map is not.
+		await expect(page.getByRole('button', { name: 'Add relationship' })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: 'Open in graph' })).toBeVisible();
+	});
+
+	test('draws the map through the same per-kind gate the rest of the page uses', async ({
+		page
+	}) => {
+		await page.goto(`/companies/${WAYNE}`);
+
+		await clickWhenLive(page.getByRole('tab', { name: /Relationships/ }), () =>
+			expect(page.locator('[data-slot="detail-relationships"]')).toBeVisible()
+		);
+
+		// seed.sql: Wayne's one relationship is to the box truck, and the
+		// `assets` grant derives from `products`, which Support does not hold.
+		// So the asset is not on the map at all — the neighbourhood is Wayne
+		// alone, and the page says so rather than drawing a dot with no edges.
+		await expect(page.getByText('Nothing connected yet')).toBeVisible();
+		await expect(page.getByText('Box truck')).toHaveCount(0);
 	});
 });
 

@@ -18,9 +18,19 @@ describe('the tool registry', () => {
 		expect([...TOOL_NAMES].sort()).toEqual(names);
 	});
 
-	it('asks the user before the destructive tool runs', () => {
-		expect(TOOL_APPROVAL).toEqual({ deleteTask: 'user-approval' });
+	it('asks the user before a destructive tool runs, and before an edit lands', () => {
+		expect(TOOL_APPROVAL).toEqual({
+			deleteTask: 'user-approval',
+			deleteEvent: 'user-approval',
+			updateRecord: 'user-approval'
+		});
 		expect(TOOL_ACCESS.deleteTask.level).toBe('delete');
+		expect(TOOL_ACCESS.deleteEvent.level).toBe('delete');
+		expect(TOOL_ACCESS.updateRecord.level).toBe('manage');
+		// A create adds rather than replaces, so it runs when the model calls
+		// it — the same reason createTask never paused.
+		expect(TOOL_APPROVAL).not.toHaveProperty('createRecord');
+		expect(TOOL_APPROVAL).not.toHaveProperty('createEvent');
 	});
 
 	it('hands every tool the same request context, keyed by tool name', () => {
@@ -55,18 +65,148 @@ describe('activeToolNames — tools are linked to features', () => {
 	);
 
 	it('gives a member only what their grants reach', () => {
-		expect(activeToolNames(orgContext({ role: 'member', grants: { companies: 'read' } }))).toEqual([
-			'searchCompanies',
-			'getCompany'
+		expect(
+			activeToolNames(orgContext({ role: 'member', grants: { companies: 'read' } })).sort()
+		).toEqual([
+			'findRecords',
+			'getCompany',
+			'getRecord',
+			'listRecords',
+			'listRelationshipTypes',
+			'searchCompanies'
 		]);
 	});
 
 	it('walks the ladder: manage includes read, delete includes both', () => {
 		const manage = activeToolNames(orgContext({ role: 'member', grants: { tasks: 'manage' } }));
-		expect(manage.sort()).toEqual(['completeTask', 'createTask', 'listTasks']);
+		expect(manage.sort()).toEqual([
+			'addNote',
+			'assignTask',
+			'completeTask',
+			'createRecord',
+			'createTask',
+			'findRecords',
+			'getRecord',
+			'linkRecords',
+			'listMembers',
+			'listRecordFields',
+			'listRecords',
+			'listRelationshipTypes',
+			'listTasks',
+			'unassignTask',
+			'updateRecord'
+		]);
 
 		const del = activeToolNames(orgContext({ role: 'member', grants: { tasks: 'delete' } }));
-		expect(del.sort()).toEqual(['completeTask', 'createTask', 'deleteTask', 'listTasks']);
+		expect(del.sort()).toEqual([
+			'addNote',
+			'assignTask',
+			'completeTask',
+			'createRecord',
+			'createTask',
+			'deleteTask',
+			'findRecords',
+			'getRecord',
+			'linkRecords',
+			'listMembers',
+			'listRecordFields',
+			'listRecords',
+			'listRelationshipTypes',
+			'listTasks',
+			'unassignTask',
+			'updateRecord'
+		]);
+	});
+
+	it('offers a kind-addressed tool while any kind of record is open, and withdraws it when none is', () => {
+		// Every record kind off for the org: the generic tools go with them,
+		// while a tool about a feature that is not a kind (the calendar) stays.
+		const kindsOff = activeToolNames(
+			orgContext({
+				modes: {
+					companies: 'disabled',
+					contacts: 'hidden',
+					deals: 'locked_visible',
+					tasks: 'disabled',
+					tickets: 'disabled',
+					orders: 'disabled',
+					shipments: 'disabled'
+				}
+			})
+		);
+		expect(kindsOff).not.toContain('findRecords');
+		expect(kindsOff).not.toContain('getRecord');
+		expect(kindsOff).not.toContain('updateRecord');
+		expect(kindsOff).not.toContain('linkRecords');
+		expect(kindsOff).not.toContain('listRelationshipTypes');
+		expect(kindsOff).not.toContain('listRecords');
+		expect(kindsOff).not.toContain('createRecord');
+		expect(kindsOff).not.toContain('listRecordFields');
+		expect(kindsOff).not.toContain('addNote');
+		expect(kindsOff).toContain('listEvents');
+		// The roster is not a record kind: naming a colleague survives every
+		// kind being off, because the calendar still books time against one.
+		expect(kindsOff).toContain('listMembers');
+
+		// Reading tickets alone is enough to be offered the reading tools, not the writing ones.
+		const reader = activeToolNames(orgContext({ role: 'member', grants: { tickets: 'read' } }));
+		expect(reader.sort()).toEqual([
+			'findRecords',
+			'getRecord',
+			'listMembers',
+			'listRecords',
+			'listRelationshipTypes',
+			'listTickets'
+		]);
+	});
+
+	it('walks the calendar’s ladder: reading, booking, then emptying it', () => {
+		const reader = activeToolNames(orgContext({ role: 'member', grants: { calendar: 'read' } }));
+		expect(reader).toContain('listEvents');
+		expect(reader).toContain('findOpenSlots');
+		expect(reader).not.toContain('createEvent');
+
+		const manager = activeToolNames(orgContext({ role: 'member', grants: { calendar: 'manage' } }));
+		expect(manager).toContain('createEvent');
+		expect(manager).toContain('updateEvent');
+		// Managing the calendar is not emptying it: cancelling takes `delete`,
+		// the grant the page's own remove action takes.
+		expect(manager).not.toContain('deleteEvent');
+
+		expect(
+			activeToolNames(orgContext({ role: 'member', grants: { calendar: 'delete' } }))
+		).toContain('deleteEvent');
+
+		// The whole family goes when the org switches the feature off.
+		const off = activeToolNames(orgContext({ modes: { calendar: 'disabled' } }));
+		for (const name of ['listEvents', 'findOpenSlots', 'createEvent', 'updateEvent', 'deleteEvent'])
+			expect(off).not.toContain(name);
+	});
+
+	it('links the graph walk to the graph feature and the calendar tool to the calendar', () => {
+		expect(TOOL_ACCESS.exploreGraph).toEqual({ feature: 'graph', level: 'read' });
+		expect(TOOL_ACCESS.listEvents).toEqual({ feature: 'calendar', level: 'read' });
+		expect(activeToolNames(orgContext({ modes: { graph: 'disabled' } }))).not.toContain(
+			'exploreGraph'
+		);
+		expect(activeToolNames(orgContext({ modes: { calendar: 'hidden' } }))).not.toContain(
+			'listEvents'
+		);
+	});
+
+	it('links the artifact tools to the features their cards act on', () => {
+		expect(TOOL_ACCESS.findOpenSlots).toEqual({ feature: 'calendar', level: 'read' });
+		expect(TOOL_ACCESS.packableLines).toEqual({ feature: 'shipments', level: 'manage' });
+		expect(activeToolNames(orgContext({ modes: { calendar: 'hidden' } }))).not.toContain(
+			'findOpenSlots'
+		);
+		expect(activeToolNames(orgContext({ modes: { shipments: 'disabled' } }))).not.toContain(
+			'packableLines'
+		);
+		// The card opens a box, so reading shipments is not enough to be offered it.
+		expect(
+			activeToolNames(orgContext({ role: 'member', grants: { shipments: 'read', orders: 'read' } }))
+		).not.toContain('packableLines');
 	});
 
 	it('gives a member with no grants no tools at all', () => {

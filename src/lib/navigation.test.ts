@@ -134,6 +134,15 @@ describe('nav surfaces', () => {
 		expect(userMenuNav(nav).map((i) => i.featureId)).toEqual(['staff']);
 	});
 
+	it('keeps workspace entries gated by the same nav visibility filter', () => {
+		const hiddenStaff = buildNav(
+			map([['staff', 'enabled', { category: 'workspace' }]]),
+			() => false
+		);
+
+		expect(userMenuNav(hiddenStaff)).toEqual([]);
+	});
+
 	it('still groups every surface for the palette, which lists them all', () => {
 		expect(groupNav(nav).map((g) => g.label)).toEqual(['General', 'CRM', 'Workspace']);
 	});

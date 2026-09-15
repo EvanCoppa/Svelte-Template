@@ -27,12 +27,20 @@ export const RECORD_KINDS = [
 	'billable',
 	'company',
 	'contact',
+	'coupon',
 	'product',
+	'property',
+	'lease',
 	'deal',
 	'proposal',
 	'invoice',
+	'order',
+	'shipment',
+	'purchase',
+	'rma',
 	'task',
-	'ticket'
+	'ticket',
+	'visit'
 ] as const satisfies readonly Enums<'crm_entity_type'>[];
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
@@ -53,13 +61,31 @@ export const RECORD_KIND_META = {
 	billable: { feature: 'billables', segment: 'billables' },
 	company: { feature: 'companies', segment: 'companies' },
 	contact: { feature: 'contacts', segment: 'contacts' },
+	coupon: { feature: 'coupons', segment: 'coupons' },
 	product: { feature: 'products', segment: 'products' },
+	// A unit is a `properties` row with a parent, so both levels of the
+	// portfolio open under the same route — there is no separate units list.
+	property: { feature: 'properties', segment: 'properties' },
+	lease: { feature: 'leases', segment: 'leases' },
 	deal: { feature: 'deals', segment: 'deals' },
 	proposal: { feature: 'proposals', segment: 'proposals' },
 	invoice: { feature: 'invoices', segment: 'invoices' },
+	order: { feature: 'orders', segment: 'orders' },
+	// A shipment is the one kind the generic record form cannot create: its
+	// `order_id` is not null and insert-only, so a box is packed on the order
+	// it ships — the "creation is genuinely special" exception in CLAUDE.md.
+	shipment: { feature: 'shipments', segment: 'shipments' },
+	purchase: { feature: 'purchases', segment: 'purchases' },
+	rma: { feature: 'rmas', segment: 'rmas' },
 	task: { feature: 'tasks', segment: 'tasks' },
-	ticket: { feature: 'tickets', segment: 'tickets' }
+	ticket: { feature: 'tickets', segment: 'tickets' },
+	visit: { feature: 'visits', segment: 'visits' }
 } as const satisfies Record<RecordKind, RecordKindMeta>;
+
+/** Whether a string names a record kind — an entity type read off a row, say. */
+export function isRecordKind(value: string): value is RecordKind {
+	return RECORD_KINDS.some((kind) => kind === value);
+}
 
 /** A path segment the `[kind=record]` matcher accepts: one kind's list route. */
 export type RecordSegment = (typeof RECORD_KIND_META)[RecordKind]['segment'];

@@ -70,6 +70,7 @@
 	} from '$lib/components/enhanced/index.js';
 	import { MAX_CRUMBS } from '$lib/breadcrumbs.svelte';
 	import { mapConfig } from '$lib/map';
+	import * as Assistant from '$lib/components/assistant/index.js';
 	import * as DataTable from '$lib/components/data-table/index.js';
 	import * as GroupList from '$lib/components/group-list/index.js';
 	import * as Kanban from '$lib/components/kanban/index.js';
@@ -1244,6 +1245,12 @@
 	}
 	let wizardIndex = $state(0);
 	let wizardDone = $state(false);
+	/** The orb's three moods, as the call screen drives them. */
+	const ORB_STATES = [
+		{ label: 'Listening', level: 0.35, speed: 1 },
+		{ label: 'Looking it up', level: 0, speed: 2.4 },
+		{ label: 'Speaking', level: 0, speed: 1.6 }
+	];
 </script>
 
 <div class="mx-auto max-w-5xl space-y-6">
@@ -1674,6 +1681,37 @@
 						<Skeleton class="h-3 w-32" />
 						<Skeleton class="h-3 w-24" />
 					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title>Assistant orb</Card.Title>
+				<Card.Description>
+					The assistant as something to look at while you talk to it — six conic gradients turning
+					behind a blur and a contrast curve, grained with a dot grid in the page's own colour, and
+					painted from the theme's primary so it follows the light and dark toggle. It knows how
+					loud (<code>level</code>) and how fast (<code>speed</code>) and nothing else; the call
+					screen owns what those mean. Every measurement scales off <code>size</code>, because the
+					effect does not survive being resized on its own — which is why the small ones are not the
+					big one shrunk.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-wrap items-end justify-center gap-x-10 gap-y-8 py-6">
+				{#each ORB_STATES as orb (orb.label)}
+					<div class="flex flex-col items-center gap-3">
+						<Assistant.Orb size={140} level={orb.level} speed={orb.speed} />
+						<p class="text-muted-foreground text-xs">{orb.label}</p>
+					</div>
+				{/each}
+				<div class="flex flex-col items-center gap-3">
+					<Assistant.Orb size={72} />
+					<p class="text-muted-foreground text-xs">Beside a heading</p>
+				</div>
+				<div class="flex flex-col items-center gap-3">
+					<Assistant.Orb size={28} />
+					<p class="text-muted-foreground text-xs">As an avatar</p>
 				</div>
 			</Card.Content>
 		</Card.Root>

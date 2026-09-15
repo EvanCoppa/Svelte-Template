@@ -29,10 +29,22 @@ export const ASSET_STATUS_TONE = {
 	retired: 'warning'
 } satisfies Record<Enums<'asset_status'>, BadgeTone>;
 
+export const PROPERTY_STATUS_TONE = {
+	active: 'success',
+	inactive: 'neutral',
+	sold: 'info'
+} satisfies Record<Enums<'property_status'>, BadgeTone>;
+
 export const PRODUCT_KIND_TONE = {
 	good: 'cyan',
 	service: 'violet'
 } satisfies Record<Enums<'product_kind'>, BadgeTone>;
+
+/** The two ways a coupon says "less": a share of the price, or a sum off it. */
+export const COUPON_DISCOUNT_TYPE_TONE = {
+	percent: 'violet',
+	amount: 'cyan'
+} satisfies Record<Enums<'coupon_discount_type'>, BadgeTone>;
 
 /**
  * Stages are org-defined rows, so their names are not a union to key a
@@ -61,6 +73,31 @@ export const TICKET_STATUS_TONE = {
 	resolved: 'success',
 	closed: 'neutral'
 } satisfies Record<Enums<'ticket_status'>, BadgeTone>;
+
+/**
+ * How far back a return is. `closed` is the one finished state whatever the
+ * outcome was — what was done is the RMA's `resolution`, in words (the rmas
+ * migration says why) — and `rejected` is the end that never started.
+ */
+export const RMA_STATUS_TONE = {
+	requested: 'info',
+	approved: 'violet',
+	received: 'cyan',
+	closed: 'success',
+	rejected: 'error'
+} satisfies Record<Enums<'rma_status'>, BadgeTone>;
+
+/**
+ * Where a visit sits. `completed` is pinned to `occurred_at` by trigger (the
+ * visits migration), so a logged visit and a completed one are the same row
+ * in the same state. `missed` is the planned visit that was not made — there
+ * is no second unmade state, because WHY is a sentence in the notes.
+ */
+export const VISIT_STATUS_TONE = {
+	planned: 'info',
+	completed: 'success',
+	missed: 'warning'
+} satisfies Record<Enums<'visit_status'>, BadgeTone>;
 
 export const PRIORITY_TONE = {
 	low: 'neutral',
@@ -191,6 +228,82 @@ export const INVOICE_STATUS_TONE = {
 	issued: 'info',
 	void: 'warning'
 } satisfies Record<Enums<'invoice_status'>, BadgeTone>;
+
+/**
+ * Where a customer's order stands with the people who took it. All three are
+ * acts: an order is written, committed to, or called off. How much of it has
+ * SHIPPED is the other axis (`FULFILLMENT_STATE_TONE`), and how much has been
+ * paid is a fact about its invoices rather than a third column.
+ */
+export const ORDER_STATUS_TONE = {
+	draft: 'neutral',
+	confirmed: 'info',
+	cancelled: 'error'
+} satisfies Record<Enums<'order_status'>, BadgeTone>;
+
+/**
+ * The fulfillment axis of an order, a second pill beside the status — folded
+ * from its lines by `refresh_order_fulfillment()`, never written. Shaped like
+ * `PAYMENT_STATE_TONE` because it answers the same question about a different
+ * thing: how much of what was asked for has arrived.
+ */
+export const FULFILLMENT_STATE_TONE = {
+	unfulfilled: 'warning',
+	partial: 'info',
+	fulfilled: 'success'
+} satisfies Record<Enums<'fulfillment_state'>, BadgeTone>;
+
+/**
+ * Where one line of an order stands. `shipped` and `delivered` are the
+ * carrier's — a scan on the shipment carrying the line writes them — and the
+ * rest are a person's, which a late scan never overwrites (the
+ * orders_and_shipments migration's decision 3). `backordered` is a
+ * distributor's normal case, not an exception.
+ */
+export const LINE_FULFILLMENT_TONE = {
+	pending: 'neutral',
+	processing: 'info',
+	backordered: 'warning',
+	shipped: 'info',
+	delivered: 'success',
+	cancelled: 'error',
+	returned: 'rose'
+} satisfies Record<Enums<'line_fulfillment_status'>, BadgeTone>;
+
+/**
+ * Where the carrier last saw the box. Mirrors what carrier APIs actually
+ * report, unhappy paths included — a shipment that failed or went back to
+ * sender is a thing that happens, and having no value for it is how one ends
+ * up `unknown` forever. `preparing` is the one value that is ours: the box
+ * exists in the warehouse before any carrier has heard of it.
+ */
+export const SHIPMENT_DELIVERY_TONE = {
+	preparing: 'neutral',
+	pending: 'neutral',
+	pre_transit: 'info',
+	in_transit: 'info',
+	out_for_delivery: 'info',
+	available_for_pickup: 'warning',
+	delivered: 'success',
+	return_to_sender: 'warning',
+	failed: 'error',
+	cancelled: 'error',
+	unknown: 'neutral'
+} satisfies Record<Enums<'shipment_delivery_status'>, BadgeTone>;
+
+/**
+ * What a purchase order is doing. Only two of these are acts a person takes —
+ * placing it and cancelling it; the three in between are DERIVED from how
+ * much of each line has arrived (`refresh_purchase_rollups()`), which is why
+ * receiving is a line write and never a status write.
+ */
+export const PURCHASE_STATUS_TONE = {
+	draft: 'neutral',
+	ordered: 'info',
+	partially_received: 'warning',
+	received: 'success',
+	cancelled: 'error'
+} satisfies Record<Enums<'purchase_status'>, BadgeTone>;
 
 /**
  * The money axis of an invoice (and later an order), a second pill beside

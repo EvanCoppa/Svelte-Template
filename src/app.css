@@ -163,6 +163,41 @@ html.dark {
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--shadow-skeuomorphic: var(--skeuomorphic);
+
+	/*
+	 * ── Motion ──
+	 * The shared vocabulary for anything that moves, so a component picks a
+	 * band rather than inventing a number. `--ease-*` is one of Tailwind's own
+	 * namespaces, so these three arrive as the `ease-out-strong`,
+	 * `ease-in-out-strong` and `ease-link` utilities — reach for one rather
+	 * than writing a `cubic-bezier()` inline.
+	 *
+	 * Duration is **not** a Tailwind namespace, so the five below stay plain
+	 * custom properties: compose them into an `animate-[…]` shorthand as
+	 * `var(--duration-enter)`, and use the numeric `duration-300` utilities,
+	 * which are the same numbers, for a bare transition.
+	 *
+	 * The built-in easings are too weak over short distances. These reach most
+	 * of the way in the first third of their time, so a thing *arrives*
+	 * somewhere instead of drifting there.
+	 */
+	--ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+	--ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+	--ease-link: cubic-bezier(0.16, 1, 0.3, 1);
+
+	/*
+	 * Durations are named for what is moving, not for how long they are:
+	 *   hover   — a dense row under the pointer; felt, never watched
+	 *   control — a button, a border, a colour. The default.
+	 *   reveal  — something appearing or swapping where it already stands
+	 *   enter   — something travelling into place, or a box resizing
+	 *   page    — a whole message or panel arriving
+	 */
+	--duration-hover: 120ms;
+	--duration-control: 150ms;
+	--duration-reveal: 200ms;
+	--duration-enter: 300ms;
+	--duration-page: 450ms;
 }
 
 @layer base {
@@ -263,6 +298,103 @@ html.dark .nav-active {
 	.scrollbar-hide::-webkit-scrollbar {
 		display: none;
 	}
+}
+
+/* ── Shared motion ──────────────────────────────────────────────────────────
+   These keyframes live here rather than in a component's `<style>` because
+   Svelte scopes a scoped keyframe by renaming it, which makes it unusable by
+   anything else by construction. An animation more than one surface plays has
+   to be global to be shared at all.
+
+   Travel is deliberately tiny — 8px, and a 5% scale. Motion is felt, not
+   watched, and a longer distance only makes a short duration read as slow.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@keyframes fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+/* A label that is working, rather than a spinner beside a label that is not:
+   the motion *is* the status. Clipped to the text, so the sweep travels
+   through the letterforms themselves. */
+@keyframes shimmer-text {
+	from {
+		background-position: 150% center;
+	}
+	to {
+		background-position: -50% center;
+	}
+}
+
+.shimmer-text {
+	background-image: linear-gradient(
+		90deg,
+		var(--muted-foreground) 35%,
+		var(--foreground) 50%,
+		var(--muted-foreground) 65%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	/* `linear` on purpose: an eased sweep visibly pulses at the loop seam. */
+	animation: shimmer-text 1.4s linear infinite;
+	/* A gradient clipped to text re-maps per line box, so a label that wrapped
+	   would break into two sweeps. It also keeps the working/done swap from
+	   reflowing the line. */
+	white-space: nowrap;
+}
+
+/* ── Reduced motion ──
+   The backstop for everything above. `animation-delay` is reset alongside the
+   durations: without that a staggered entrance still waits out its delay
+   before appearing, so the stagger survives as dead time — which is the one
+   part of it a reader who asked for less motion would actually notice. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-delay: 0ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+
+	/* Frozen mid-sweep the clipped gradient is just dim text; give the label
+	   back a solid colour instead. */
+	.shimmer-text {
+		background-image: none;
+		-webkit-text-fill-color: var(--muted-foreground);
+		color: var(--muted-foreground);
+	}
+}
+
+/* Browsers give `<button>` the default arrow, so a control only invites the
+   click it accepts once something says so. Doing it once here rather than
+   per-component is what keeps it true of every button in the app. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+a[href] {
+	cursor: pointer;
 }
 
 /* Scrollbar */

@@ -12,7 +12,7 @@
 		onEdit,
 		onDelete
 	}: {
-		/** The bundle this row is about — it names the trigger for screen readers. */
+		/** The record this row is about — it names the trigger for screen readers. */
 		name: string;
 		canEdit?: boolean;
 		canDelete?: boolean;
@@ -21,7 +21,14 @@
 	} = $props();
 </script>
 
-<!-- A reader with neither permission gets no menu at all rather than an empty one. -->
+<!--
+	The Edit / Delete menu at the end of a row on a page that keeps its own
+	forms rather than the generic record modal — the quick plans and featured
+	groups pages. The page owns the data and every handler; this part takes what
+	it shows as a prop, the staff roster's shape.
+
+	A reader with neither permission gets no menu at all rather than an empty one.
+-->
 {#if canEdit || canDelete}
 	<div class="flex justify-end">
 		<DropdownMenu.Root>
