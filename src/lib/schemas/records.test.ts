@@ -44,11 +44,14 @@ function sampleFor(field: RecordField): string {
 			return field.options?.[0]?.value ?? '';
 		case 'email':
 			return 'someone@example.com';
+		case 'url':
+			return 'https://cdn.example.com/product.png';
 		case 'number':
-			// Valid for every `number` field in the registry, a coupon's
-			// percentage included — the sample only has to parse, so it is the
-			// one that parses everywhere rather than the biggest.
-			return '20.50';
+			// Valid for every `number` field in the registry — a coupon's
+			// percentage and a product's out-of-five rating included. The
+			// sample only has to parse, so it is the one that parses
+			// everywhere rather than the biggest.
+			return '4.50';
 		case 'integer':
 			return '30';
 		case 'date':

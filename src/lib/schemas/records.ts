@@ -95,6 +95,8 @@ export const RECORD_PICKER_KINDS = [
 	'subject',
 	/** An org's own `visit_outcomes` rows, like a deal's stage. */
 	'outcome',
+	/** The org's own catalog tree — a product is filed under one of its nodes. */
+	'category',
 	/**
 	 * Someone who works here, from the org's roster — who a record that
 	 * carries an `assigned_to` column belongs to. A membership is not a
@@ -131,6 +133,7 @@ export type RecordField = {
 		| 'text'
 		| 'email'
 		| 'tel'
+		| 'url'
 		| 'number'
 		| 'integer'
 		| 'date'
@@ -217,6 +220,37 @@ const optionalInteger = z
 	.regex(/^$|^\d{1,4}$/, 'Enter a whole number.')
 	.default('');
 
+/**
+ * A tally that can run past a few thousand — how many people reviewed a
+ * product. `optionalInteger` caps at four digits because the things it counts
+ * (days of terms, bedrooms) genuinely are small; a review count is not.
+ */
+const optionalCount = z
+	.string()
+	.trim()
+	.regex(/^$|^\d{1,7}$/, 'Enter a whole number.')
+	.default('');
+
+/** A star rating out of five, or blank for unrated. */
+const optionalRating = z
+	.string()
+	.trim()
+	.regex(/^$|^[0-5](\.\d{1,2})?$/, 'Enter a rating from 0 to 5, like 4.8')
+	.default('');
+
+/**
+ * A full URL, or blank. Longer than `optionalText` allows because a CDN path
+ * with a signature on it routinely runs past 200 characters.
+ */
+const optionalUrl = z
+	.string()
+	.trim()
+	.max(2000, 'Must be 2000 characters or fewer.')
+	.refine((value) => value === '' || z.url().safeParse(value).success, {
+		error: 'Enter a full URL, starting with https://'
+	})
+	.default('');
+
 /** A row picked from a party picker, or blank for none. */
 const optionalPick = z.guid().or(z.literal('')).default('');
 
@@ -294,15 +328,106 @@ export const dealRecordSchema = z.object({
 	expected_close_date: optionalDate
 });
 
+/**
+ * The catalog row, and the storefront copy that hangs off it.
+ *
+ * The fields below `long_description` are the `metadata` bag — everything a
+ * public shop shows that does not warrant a column of its own (the storefront
+ * fields migration says why). They are flat strings here like every other
+ * field, and `writeRecord()` folds them into the jsonb.
+ *
+ * **The form holds the whole bag.** An edit rewrites `metadata` from these
+ * fields rather than merging into what was there, because merging would mean
+ * a badge you deleted quietly staying put — the rule every other field on
+ * every other form follows. The cost is that a key a storefront starts
+ * reading has to become a field here in the same change, or the first edit
+ * after that drops it.
+ */
 export const productRecordSchema = z.object({
 	name: requiredText('Name'),
 	kind: z.enum(['good', 'service']).default('good'),
+	category_id: optionalPick,
 	sku: optionalText,
 	unit_price: optionalAmount,
 	unit_cost: optionalAmount,
 	unit: optionalText,
-	description: optionalLongText
+	/**
+	 * The list price struck through beside `unit_price` when the shop runs a
+	 * promotion. The column is the one home for that fact; the storefront
+	 * reads it as `metadata.compareAtCents`, which `writeRecord()` derives —
+	 * so there is still one field to edit and one place it is typed.
+	 */
+	msrp: optionalAmount,
+	/** Still sold. A shop shows active products and nothing else. */
+	is_active: z.enum(['true', 'false']).default('true'),
+	description: optionalLongText,
+	long_description: optionalLongText,
+	image_url: optionalUrl,
+	/** The shop's URL for this product — and, being that, its publish switch. */
+	slug: optionalText,
+	tagline: optionalText,
+	/** Which illustration the shop draws. The storefront owns that vocabulary. */
+	art: optionalText,
+	accent: optionalText,
+	/** Comma-separated, like a billable's unit choices. */
+	badges: optionalText,
+	rating: optionalRating,
+	review_count: optionalCount,
+	ingredients: optionalLongText,
+	/** One step per line. */
+	usage: optionalLongText,
+	/** One `Label: value` per line; a line with no colon is a value on its own. */
+	specs: optionalLongText,
+	featured: z.enum(['true', 'false']).default('false'),
+	best_seller: z.enum(['true', 'false']).default('false')
 });
+
+export type ProductRecordValues = z.infer<typeof productRecordSchema>;
+
+/**
+ * The storefront bag as it is stored, for reading one back into the form.
+ *
+ * `metadata` is jsonb: this app writes it, but Postgres does not type it and a
+ * row can have been edited by hand or by an older version of this form. So it
+ * is parsed rather than trusted, and every key falls back instead of throwing
+ * — the rule a user preference follows (docs/user-preferences.md). A bag that
+ * is not an object at all reads as a product with no storefront copy.
+ *
+ * `writeRecord()` is what fills it; the keys here are exactly the fields
+ * `productRecordSchema` holds, which is what keeps an edit from dropping one.
+ */
+const storefrontBag = z.object({
+	slug: z.string().catch(''),
+	tagline: z.string().catch(''),
+	art: z.string().catch(''),
+	accent: z.string().catch(''),
+	badges: z.array(z.string()).catch([]),
+	rating: z.number().nullable().catch(null),
+	reviewCount: z.number().nullable().catch(null),
+	ingredients: z.string().catch(''),
+	usage: z.array(z.string()).catch([]),
+	specs: z.array(z.object({ label: z.string().catch(''), value: z.string() })).catch([]),
+	featured: z.boolean().catch(false),
+	bestSeller: z.boolean().catch(false)
+});
+
+/** A product with no storefront copy — what an absent or unreadable bag reads as. */
+const noStorefront = (): z.infer<typeof storefrontBag> => ({
+	slug: '',
+	tagline: '',
+	art: '',
+	accent: '',
+	badges: [],
+	rating: null,
+	reviewCount: null,
+	ingredients: '',
+	usage: [],
+	specs: [],
+	featured: false,
+	bestSeller: false
+});
+
+export const storefrontMetadataSchema = storefrontBag.catch(noStorefront);
 
 export const billableRecordSchema = z.object({
 	name: requiredText('Name'),
@@ -672,6 +797,11 @@ export const RECORD_FORMS: RecordFormRegistry = {
 			{ name: 'expected_close_date', label: 'Expected close', type: 'date' }
 		]
 	},
+	// The longest form in the registry, and deliberately so: a product an org
+	// sells to the public is the one record that is also a page on a website,
+	// so it carries the shop's copy as well as the catalog's numbers. Keeping
+	// both here is what stops a storefront's words being editable only in SQL.
+	// Catalog first, then everything a shop reads.
 	product: {
 		feature: 'products',
 		query: QUERY.products,
@@ -686,11 +816,75 @@ export const RECORD_FORMS: RecordFormRegistry = {
 					{ value: 'service', label: 'Service' }
 				]
 			},
+			{ name: 'category_id', label: 'Category', type: 'category' },
 			{ name: 'sku', label: 'SKU', type: 'text', placeholder: 'INST-001' },
 			{ name: 'unit_price', label: 'Unit price', type: 'number', placeholder: '499.00' },
 			{ name: 'unit_cost', label: 'Unit cost', type: 'number', placeholder: '250.00' },
 			{ name: 'unit', label: 'Unit', type: 'text', placeholder: 'each' },
-			{ name: 'description', label: 'Description', type: 'textarea', wide: true }
+			{ name: 'msrp', label: 'Compare-at price', type: 'number', placeholder: '119.00' },
+			{
+				name: 'is_active',
+				label: 'Status',
+				type: 'select',
+				options: [
+					{ value: 'true', label: 'Active' },
+					{ value: 'false', label: 'Inactive' }
+				]
+			},
+			{ name: 'description', label: 'Description', type: 'textarea', wide: true },
+			{ name: 'image_url', label: 'Image URL', type: 'url', wide: true },
+			{
+				name: 'slug',
+				label: 'Storefront slug',
+				type: 'text',
+				placeholder: 'enamel-guard-toothpaste — blank keeps it out of the shop'
+			},
+			{ name: 'tagline', label: 'Tagline', type: 'text', placeholder: 'One line under the name' },
+			{ name: 'art', label: 'Artwork', type: 'text', placeholder: 'tube, brush, floss, kit…' },
+			{ name: 'accent', label: 'Accent colour', type: 'text', placeholder: '#1668d9' },
+			{ name: 'badges', label: 'Badges', type: 'text', placeholder: 'Best seller, Enamel safe' },
+			{ name: 'rating', label: 'Rating', type: 'number', placeholder: '4.8' },
+			{ name: 'review_count', label: 'Reviews', type: 'integer', placeholder: '2417' },
+			{
+				name: 'long_description',
+				label: 'Storefront body',
+				type: 'textarea',
+				placeholder: 'Blank lines separate paragraphs.',
+				wide: true
+			},
+			{
+				name: 'specs',
+				label: 'Specs',
+				type: 'textarea',
+				placeholder: 'One per line — Size: 4.0 oz / 113 g',
+				wide: true
+			},
+			{
+				name: 'usage',
+				label: 'How to use',
+				type: 'textarea',
+				placeholder: 'One step per line.',
+				wide: true
+			},
+			{ name: 'ingredients', label: 'Ingredients', type: 'textarea', wide: true },
+			{
+				name: 'featured',
+				label: 'Featured',
+				type: 'select',
+				options: [
+					{ value: 'false', label: 'Not featured' },
+					{ value: 'true', label: 'Featured on the home page' }
+				]
+			},
+			{
+				name: 'best_seller',
+				label: 'Best seller',
+				type: 'select',
+				options: [
+					{ value: 'false', label: 'No' },
+					{ value: 'true', label: 'Yes' }
+				]
+			}
 		]
 	},
 	billable: {

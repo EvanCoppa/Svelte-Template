@@ -2117,6 +2117,7 @@ export type Database = {
           id: string
           industry_id: string
           name: string
+          storefront_enabled: boolean
           tier_id: string
           updated_at: string
         }
@@ -2125,6 +2126,7 @@ export type Database = {
           id?: string
           industry_id?: string
           name: string
+          storefront_enabled?: boolean
           tier_id?: string
           updated_at?: string
         }
@@ -2133,6 +2135,7 @@ export type Database = {
           id?: string
           industry_id?: string
           name?: string
+          storefront_enabled?: boolean
           tier_id?: string
           updated_at?: string
         }

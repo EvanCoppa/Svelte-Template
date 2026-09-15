@@ -63,6 +63,7 @@ function submit(
 }
 
 const RECORD_ID = '40000000-0000-0000-0000-000000000001';
+const CATEGORY_ID = '50000000-0000-0000-0000-000000000001';
 
 function save(
 	supabase: SupabaseClient<Database>,
@@ -306,6 +307,80 @@ describe('createRecord', () => {
 		expect(from).not.toHaveBeenCalled();
 	});
 
+	// A product is the one record that is also a page on a website, so its form
+	// carries the shop's copy as well as the catalog's numbers — and all of it
+	// lands in one jsonb column. What is worth pinning is the folding: the
+	// lists the textareas hold, and that a blank field leaves its key out
+	// rather than writing an empty one.
+	it("folds a product's storefront copy into one metadata bag", async () => {
+		const shop = supabaseMock({ data: { id: 'product' } });
+		await submit(shop.supabase, OWNER, 'product', {
+			name: 'Enamel Guard Toothpaste',
+			category_id: CATEGORY_ID,
+			sku: 'gt-paste-01',
+			unit_price: '14',
+			msrp: '19',
+			long_description: 'Fluoride and hydroxyapatite, in one tube.',
+			slug: 'enamel-guard-toothpaste',
+			tagline: 'Coastal mint',
+			art: 'tube',
+			accent: '#1668d9',
+			badges: 'Best seller, Dentist formulated',
+			rating: '4.8',
+			review_count: '2417',
+			specs: 'Size: 4.0 oz / 113 g\nFluoride: 1450 ppm\nRefillable case',
+			usage: 'Brush for two minutes.\n\nSpit, do not rinse.',
+			featured: 'true'
+		});
+
+		expect(shop.from).toHaveBeenCalledWith('products');
+		expect(shop.builder.insert).toHaveBeenCalledWith({
+			name: 'Enamel Guard Toothpaste',
+			kind: 'good',
+			category_id: CATEGORY_ID,
+			sku: 'gt-paste-01',
+			unit_price: 14,
+			unit_cost: null,
+			unit: null,
+			msrp: 19,
+			is_active: true,
+			description: null,
+			long_description: 'Fluoride and hydroxyapatite, in one tube.',
+			image_url: null,
+			metadata: {
+				slug: 'enamel-guard-toothpaste',
+				tagline: 'Coastal mint',
+				art: 'tube',
+				accent: '#1668d9',
+				badges: ['Best seller', 'Dentist formulated'],
+				rating: 4.8,
+				reviewCount: 2417,
+				// A spec line with no colon is a value with no label — how a kit
+				// lists what is in the box.
+				specs: [
+					{ label: 'Size', value: '4.0 oz / 113 g' },
+					{ label: 'Fluoride', value: '1450 ppm' },
+					{ label: '', value: 'Refillable case' }
+				],
+				usage: ['Brush for two minutes.', 'Spit, do not rinse.'],
+				featured: true,
+				// The compare-at price is typed once, into the msrp column; the
+				// key a shop reads is derived from it rather than kept beside it.
+				compareAtCents: 1900
+			},
+			org_id: ORG_ID
+		});
+
+		// A product an org keeps for its proposals has no shop copy at all, and
+		// writes an empty bag rather than a dozen empty keys. With no slug in
+		// it, no storefront will show the row either.
+		const internal = supabaseMock({ data: { id: 'product' } });
+		await submit(internal.supabase, OWNER, 'product', { name: 'Standard installation' });
+		expect(internal.builder.insert).toHaveBeenCalledWith(
+			expect.objectContaining({ metadata: {}, msrp: null, is_active: true })
+		);
+	});
+
 	it('hands a database refusal back as a form message, not a 500', async () => {
 		const { supabase } = supabaseMock({ error: { message: 'duplicate key value' } });
 
@@ -362,6 +437,67 @@ describe('loadEditRecord', () => {
 			website: ''
 		});
 		// What the record already says is not a list of mistakes.
+		expect(editForm.errors).toEqual({});
+	});
+
+	// The other half of the fold above. The bag is jsonb, so it is parsed on
+	// the way back rather than trusted: a key of the wrong type reads as blank
+	// instead of putting a number where the form wants a string.
+	it("reads a product's storefront bag back into the form's fields", async () => {
+		// Two reads, in this order: the record, then the categories behind its picker.
+		const { supabase } = supabaseMockSequence([
+			{
+				data: {
+					id: RECORD_ID,
+					name: 'Enamel Guard Toothpaste',
+					kind: 'good',
+					category_id: CATEGORY_ID,
+					sku: 'gt-paste-01',
+					unit_price: 14,
+					unit_cost: null,
+					unit: null,
+					msrp: 19,
+					is_active: true,
+					description: null,
+					long_description: 'Fluoride and hydroxyapatite, in one tube.',
+					image_url: null,
+					metadata: {
+						slug: 'enamel-guard-toothpaste',
+						badges: ['Best seller', 'Dentist formulated'],
+						rating: 4.8,
+						reviewCount: 2417,
+						specs: [
+							{ label: 'Size', value: '4.0 oz / 113 g' },
+							{ label: '', value: 'Refillable case' }
+						],
+						usage: ['Brush for two minutes.'],
+						featured: true,
+						// Written by something other than this form — read as blank
+						// rather than allowed to break the edit form.
+						tagline: 42
+					}
+				}
+			},
+			{ data: [{ id: CATEGORY_ID, name: 'Toothpaste', parent_id: null }] }
+		]);
+
+		const { editForm } = await loadEditRecord(localsFor(supabase, OWNER), 'product', RECORD_ID);
+		expect(editForm.data).toMatchObject({
+			name: 'Enamel Guard Toothpaste',
+			category_id: CATEGORY_ID,
+			msrp: '19',
+			is_active: 'true',
+			slug: 'enamel-guard-toothpaste',
+			badges: 'Best seller, Dentist formulated',
+			rating: '4.8',
+			review_count: '2417',
+			specs: 'Size: 4.0 oz / 113 g\nRefillable case',
+			usage: 'Brush for two minutes.',
+			featured: 'true',
+			best_seller: 'false',
+			tagline: '',
+			accent: ''
+		});
 		expect(editForm.errors).toEqual({});
 	});
 

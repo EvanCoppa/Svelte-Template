@@ -141,6 +141,8 @@
 				return 'email' as const;
 			case 'tel':
 				return 'tel' as const;
+			case 'url':
+				return 'url' as const;
 			case 'number':
 			case 'integer':
 				return 'number' as const;
