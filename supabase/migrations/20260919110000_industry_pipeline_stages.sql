@@ -55,6 +55,12 @@ create table public.industry_pipeline_stages (
 	sort_order integer not null,
 	outcome public.stage_outcome not null default 'open',
 	probability numeric(5, 2),
+	-- Which visual column this stage shares with others, if any — the deal
+	-- board's answer to the task board's `TASK_STATUS_GROUPS`, as data rather
+	-- than a JS constant because a stage set is org-definable and a status set
+	-- is not (see the pipeline_stage_groups migration). Null groups a stage
+	-- with nobody: it draws as a column of its own, same as today.
+	group_label text,
 	created_at timestamptz not null default now(),
 	primary key (industry_id, sort_order),
 	unique (industry_id, name),
@@ -136,26 +142,31 @@ insert into public.industry_pipelines (industry_id, name, description) values
 	('real-estate', 'Acquisitions', 'A building you have looked at, to a building you own.')
 on conflict (industry_id) do nothing;
 
-insert into public.industry_pipeline_stages (industry_id, name, sort_order, outcome, probability) values
-	('merchant-services', 'Prospect', 10, 'open', 5),
-	('merchant-services', 'Contacted', 20, 'open', 10),
-	('merchant-services', 'Waiting on Statements', 30, 'open', 20),
-	('merchant-services', 'Presentation Scheduled', 40, 'open', 35),
-	('merchant-services', 'Proposal Sent', 50, 'open', 50),
-	('merchant-services', 'Application Sent', 60, 'open', 70),
-	('merchant-services', 'Underwriting', 70, 'open', 80),
-	('merchant-services', 'Approved', 80, 'open', 90),
-	('merchant-services', 'Installed / Live', 90, 'won', 100),
-	('merchant-services', 'Lost', 100, 'lost', 0),
+insert into public.industry_pipeline_stages
+	(industry_id, name, sort_order, outcome, probability, group_label) values
+	-- Grouped three-wide (Prospecting / Qualification / Underwriting) so the
+	-- board reads in four columns rather than eight-plus-Closed — the funnel
+	-- from the build brief is still all ten stages, just not all ten columns.
+	('merchant-services', 'Prospect', 10, 'open', 5, 'Prospecting'),
+	('merchant-services', 'Contacted', 20, 'open', 10, 'Prospecting'),
+	('merchant-services', 'Waiting on Statements', 30, 'open', 20, 'Qualification'),
+	('merchant-services', 'Presentation Scheduled', 40, 'open', 35, 'Qualification'),
+	('merchant-services', 'Proposal Sent', 50, 'open', 50, 'Qualification'),
+	('merchant-services', 'Application Sent', 60, 'open', 70, 'Qualification'),
+	('merchant-services', 'Underwriting', 70, 'open', 80, 'Underwriting'),
+	('merchant-services', 'Approved', 80, 'open', 90, 'Underwriting'),
+	('merchant-services', 'Installed / Live', 90, 'won', 100, null),
+	('merchant-services', 'Lost', 100, 'lost', 0, null),
 
-	-- Real estate — buying the next building (also moved from seed.sql).
-	('real-estate', 'Identified', 10, 'open', 5),
-	('real-estate', 'Offer made', 20, 'open', 25),
-	('real-estate', 'Under contract', 30, 'open', 50),
-	('real-estate', 'Due diligence', 40, 'open', 70),
-	('real-estate', 'Financing', 50, 'open', 85),
-	('real-estate', 'Closed', 60, 'won', 100),
-	('real-estate', 'Passed', 70, 'lost', 0)
+	-- Real estate — buying the next building (also moved from seed.sql). Five
+	-- open stages already fits without grouping; ungrouped is the default.
+	('real-estate', 'Identified', 10, 'open', 5, null),
+	('real-estate', 'Offer made', 20, 'open', 25, null),
+	('real-estate', 'Under contract', 30, 'open', 50, null),
+	('real-estate', 'Due diligence', 40, 'open', 70, null),
+	('real-estate', 'Financing', 50, 'open', 85, null),
+	('real-estate', 'Closed', 60, 'won', 100, null),
+	('real-estate', 'Passed', 70, 'lost', 0, null)
 on conflict (industry_id, name) do nothing;
 
 -- No backfill loop here, deliberately — see the header comment. Keystone

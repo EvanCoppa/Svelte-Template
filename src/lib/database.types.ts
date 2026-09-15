@@ -1255,6 +1255,7 @@ export type Database = {
       industry_pipeline_stages: {
         Row: {
           created_at: string
+          group_label: string | null
           industry_id: string
           name: string
           outcome: Database["public"]["Enums"]["stage_outcome"]
@@ -1263,6 +1264,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_label?: string | null
           industry_id: string
           name: string
           outcome?: Database["public"]["Enums"]["stage_outcome"]
@@ -1271,6 +1273,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_label?: string | null
           industry_id?: string
           name?: string
           outcome?: Database["public"]["Enums"]["stage_outcome"]
@@ -2344,9 +2347,55 @@ export type Database = {
           },
         ]
       }
+      pipeline_stage_groups: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          org_id?: string
+          pipeline_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stage_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_groups_pipeline_id_org_id_fkey"
+            columns: ["pipeline_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           created_at: string
+          group_id: string | null
           id: string
           name: string
           org_id: string
@@ -2358,6 +2407,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name: string
           org_id: string
@@ -2369,6 +2419,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name?: string
           org_id?: string
@@ -2379,6 +2430,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_group_id_pipeline_id_fkey"
+            columns: ["group_id", "pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stage_groups"
+            referencedColumns: ["id", "pipeline_id"]
+          },
           {
             foreignKeyName: "pipeline_stages_org_id_fkey"
             columns: ["org_id"]

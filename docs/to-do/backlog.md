@@ -83,9 +83,26 @@ existing org's board is its own from the moment it exists, exactly as
       Keystone Payments, Cobalt Merchant Services, Ironwood Property Group and
       Larkspur Rentals is gone — the trigger now produces the same board on
       insert.
-- [ ] **Not done**: opening this as its own PR (it's bundled into the deal
-      timeline PR, #162, for now — pull it out if that PR should stay
-      narrower). Not run through a live `db:reset` in this session (see the
+- [x] **Column grouping, added on top**: eight open stages was still eight
+      columns, and a board should read in a handful, not one per stage.
+      `pipeline_stage_groups` (`20260919120000_pipeline_stage_groups.sql`) is
+      the task board's `TASK_STATUS_GROUPS` as rows rather than a JS constant
+      (a pipeline's stages are rows, so its groups have to be too) —
+      `pipeline_stages.group_id` points an OPEN stage at the column it shares
+      with others, and `buildDealColumns()` folds them into one `Kanban.Zones`
+      column the same way Closed already works. Merchant services' ten stages
+      seed with `group_label`s (Prospecting / Qualification / Underwriting),
+      so the funnel now draws in four columns total, not nine. Real estate's
+      five open stages are left ungrouped — there was no established grouping
+      for them to reuse, and inventing one wasn't this session's call to make.
+      No settings screen exists to shape groups from the app yet, matching
+      pipelines/pipeline_stages themselves.
+- [ ] **Not done**: a settings screen for an org to create/edit its own
+      groups (today: migration or direct SQL only, same as stages). Grouping
+      real estate's stages, if that vertical also ends up with a wide-enough
+      board to want it. Opening this as its own PR — it's bundled into the
+      deal timeline PR, #162, for now; pull it out if that PR should stay
+      narrower. Not run through a live `db:reset` in this session (see the
       same Docker caveat on §2.3) — verify before merging.
 
 ### 2.2 Deal object fields — **Idea**

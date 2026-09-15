@@ -11,7 +11,9 @@ describe('pipelines data access', () => {
 
 		await expect(listPipelines(supabase, ORG_ID)).resolves.toEqual(rows);
 		expect(from).toHaveBeenCalledWith('pipelines');
-		expect(builder.select).toHaveBeenCalledWith('*, pipeline_stages(*)');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, pipeline_stages(*, pipeline_stage_groups(label))'
+		);
 		expect(builder.order).toHaveBeenCalledWith('sort_order');
 		expect(builder.order).toHaveBeenCalledWith('sort_order', {
 			referencedTable: 'pipeline_stages'
