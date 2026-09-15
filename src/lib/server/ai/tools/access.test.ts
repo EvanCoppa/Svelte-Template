@@ -90,8 +90,8 @@ describe('kind-addressed access', () => {
 			orgContext({ role: 'member', grants: { contacts: 'manage', deals: 'read' } })
 		);
 		expect(kinds).toEqual([
-			{ kind: 'contact', name: 'contacts', noun: 'contact', canManage: true },
-			{ kind: 'deal', name: 'deals', noun: 'deal', canManage: false }
+			{ kind: 'contact', name: 'contacts', noun: 'contact', canCreate: true, canUpdate: true },
+			{ kind: 'deal', name: 'deals', noun: 'deal', canCreate: false, canUpdate: false }
 		]);
 		expect(recordKindAccess(orgContext({ role: 'member' }))).toEqual([]);
 		expect(recordKindAccess(orgContext()).map((kind) => kind.kind)).toEqual([

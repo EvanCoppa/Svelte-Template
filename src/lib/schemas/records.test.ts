@@ -109,6 +109,17 @@ describe('the record registry', () => {
 					expect(field.name).toBe('subject');
 					continue;
 				}
+				// A member is the third, and for the `parent_id` reason: one
+				// record can name several people who work here, each in a
+				// different role — a proposal's presenter and its responsible
+				// member are two columns — so the name says the ROLE the
+				// person plays (`assigned_to`), never which table they came
+				// from. `member_id` would say the one thing that is never in
+				// question.
+				if (field.type === 'member') {
+					expect(field.name).not.toBe('member_id');
+					continue;
+				}
 				expect(field.name).toBe(`${field.type}_id`);
 			}
 		}

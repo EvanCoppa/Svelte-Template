@@ -10,6 +10,7 @@ import {
 	deleteRecord,
 	isEditableRecordType,
 	loadCreateRecord,
+	insertRecord,
 	loadDeleteRecord,
 	loadEditRecord,
 	patchRecord,
@@ -763,5 +764,112 @@ describe('patchRecord', () => {
 		await expect(
 			patchRecord(supabase, ORG_ID, 'company', RECORD_ID, { status: 'active' })
 		).rejects.toThrow(/no company with id/);
+	});
+});
+
+describe('insertRecord', () => {
+	it('writes a record from the fields it was given, and answers with its id', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await expect(
+			insertRecord(supabase, ORG_ID, 'company', { name: 'Sunrise Smoothie Bar' })
+		).resolves.toEqual({ created: true, id: RECORD_ID });
+
+		expect(from).toHaveBeenCalledWith('companies');
+		// A field left out is the schema's default, exactly as an untouched
+		// input on the form would be — blank text becoming a null column.
+		expect(builder.insert).toHaveBeenCalledWith({
+			name: 'Sunrise Smoothie Bar',
+			relationship: 'customer',
+			status: 'lead',
+			email: null,
+			phone: null,
+			website: null,
+			org_id: ORG_ID
+		});
+	});
+
+	it('hands back the form’s own sentences instead of writing', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: RECORD_ID } });
+
+		// Missing altogether, not blank: a writer that is not a form leaves a
+		// field out, and the message has to read the same either way.
+		await expect(insertRecord(supabase, ORG_ID, 'company', {})).resolves.toEqual({
+			created: false,
+			issues: ['name: Name is required.']
+		});
+		expect(from).not.toHaveBeenCalled();
+	});
+
+	it('refuses a field the kind does not have, naming the ones it does', async () => {
+		const { supabase, from } = supabaseMock({ data: { id: RECORD_ID } });
+
+		await expect(
+			insertRecord(supabase, ORG_ID, 'company', { name: 'Acme', colour: 'teal' })
+		).rejects.toThrow(/A company has no field named colour/);
+		expect(from).not.toHaveBeenCalled();
+	});
+});
+
+describe('who a record is for, and who is on it', () => {
+	it('writes a deal’s party and its assignee as the three columns they are', async () => {
+		// An unplaced deal reads the org's default board first, then inserts.
+		const { supabase, builder } = supabaseMockSequence([
+			{ data: { id: 'p1', pipeline_stages: [{ id: 's1' }] } },
+			{ data: { id: RECORD_ID } }
+		]);
+		const dana = '00000000-0000-0000-0000-0000000000d1';
+		const companyId = '20000000-0000-0000-0000-000000000001';
+		const contactId = '30000000-0000-0000-0000-000000000001';
+
+		await submit(supabase, OWNER, 'deal', {
+			title: 'Annual renewal',
+			company_id: companyId,
+			contact_id: contactId,
+			assigned_to: dana,
+			stage_id: '',
+			amount: '',
+			expected_close_date: ''
+		});
+
+		expect(builder.insert).toHaveBeenCalledWith({
+			title: 'Annual renewal',
+			// Who it is with…
+			company_id: companyId,
+			contact_id: contactId,
+			// …and whose it is. Two different links, three columns.
+			assigned_to: dana,
+			amount: null,
+			expected_close_date: null,
+			pipeline_id: 'p1',
+			stage_id: 's1',
+			org_id: ORG_ID
+		});
+	});
+
+	it('links a task to a party and gives it no assignee, because that is a relationship', async () => {
+		const { supabase, builder } = supabaseMock({ data: { id: RECORD_ID } });
+		const contactId = '30000000-0000-0000-0000-000000000001';
+
+		await submit(supabase, OWNER, 'task', {
+			title: 'Call back about the quote',
+			priority: 'high',
+			company_id: '',
+			contact_id: contactId,
+			due_at: '',
+			details: ''
+		});
+
+		const [columns] = builder.insert.mock.calls[0];
+		expect(columns).toEqual({
+			title: 'Call back about the quote',
+			priority: 'high',
+			company_id: null,
+			contact_id: contactId,
+			due_at: null,
+			details: null,
+			org_id: ORG_ID
+		});
+		expect(columns).not.toHaveProperty('assigned_to');
 	});
 });
