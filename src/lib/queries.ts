@@ -60,5 +60,23 @@ export const QUERY = {
 	/** One CRM record of any kind, as the generic record page shows it. */
 	record: (kind: string, id: string) => `app:records:${kind}:${id}` as const,
 	/** The signed-in member's assistant conversations — the history rail and a thread's title. */
-	assistant: 'app:assistant'
+	assistant: 'app:assistant',
+	/**
+	 * The platform area's organization directory and detail page
+	 * (docs/platform-administration.md) — changed by the one mutation there,
+	 * moving an organization to another plan. Its own `admin:` domain: this
+	 * is platform data, read outside any tenant, and nothing under `app:`
+	 * depends on it.
+	 */
+	adminOrganizations: 'admin:organizations',
+	/**
+	 * The platform's reference catalogs as the platform area edits them: the
+	 * plans, the verticals and the feature registry. One key for the three
+	 * because they are one graph — moving a feature between plans changes
+	 * what every directory of them reads — and because only an operator ever
+	 * looks at them. The tenant side has its own key for the resolved answer
+	 * (`features`), which a catalog edit changes on the org's next request,
+	 * not in this browser.
+	 */
+	adminCatalog: 'admin:catalog'
 } as const;

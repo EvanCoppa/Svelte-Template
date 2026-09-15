@@ -15,16 +15,19 @@ import {
 import {
 	createInvite,
 	inviteUrl,
+	listCompensation,
 	listInvites,
 	listStaff,
 	removeMember,
-	revokeInvite
+	revokeInvite,
+	setCompensation
 } from '$lib/server/staff';
 import {
 	assignRoleSchema,
 	inviteLinkSchema,
 	inviteSchema,
 	removeMemberSchema,
+	setPaySchema,
 	unassignRoleSchema,
 	revokeInviteSchema
 } from './schema';
@@ -65,7 +68,8 @@ const FORM_IDS = {
 	assignRole: 'assign-role',
 	unassignRole: 'unassign-role',
 	revokeInvite: 'revoke-invite',
-	removeMember: 'remove-member'
+	removeMember: 'remove-member',
+	setPay: 'set-pay'
 } as const;
 
 /**
@@ -107,45 +111,58 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	requirePermission(access, 'staff');
 
 	const manages = can(access, 'staff', 'manage');
+	// Pay follows the role editor's gate, not the staff feature's: the
+	// staff_compensation policies accept owners and admins only, the same
+	// boundary member_roles already draws.
+	const managesPay = canAssignRoles(access);
 
 	const [
 		staff,
 		roles,
 		invites,
+		compensation,
 		inviteForm,
 		inviteLinkForm,
 		assignForm,
 		unassignForm,
 		revokeForm,
-		removeForm
+		removeForm,
+		setPayForm
 	] = await Promise.all([
 		listStaff(supabase, orgId),
 		listRoles(supabase, industryId),
 		// Invite rows carry join tokens; only a manager may see them, and RLS
 		// would return zero rows anyway.
 		manages ? listInvites(supabase, orgId) : [],
+		// Pay is not roster data; RLS would return zero rows for anyone else, but
+		// there is no reason to ask.
+		managesPay ? listCompensation(supabase, orgId) : new Map(),
 		superValidate(zod4(inviteSchema), { id: FORM_IDS.invite }),
 		superValidate(zod4(inviteLinkSchema), { id: FORM_IDS.inviteLink }),
 		superValidate(zod4(assignRoleSchema), { id: FORM_IDS.assignRole }),
 		superValidate(zod4(unassignRoleSchema), { id: FORM_IDS.unassignRole }),
 		superValidate(zod4(revokeInviteSchema), { id: FORM_IDS.revokeInvite }),
-		superValidate(zod4(removeMemberSchema), { id: FORM_IDS.removeMember })
+		superValidate(zod4(removeMemberSchema), { id: FORM_IDS.removeMember }),
+		superValidate(zod4(setPaySchema), { id: FORM_IDS.setPay })
 	]);
 
 	return {
 		staff,
 		roles,
 		invites,
+		compensation,
 		/** What the screen may offer — the load already proved `read`. */
 		canManage: manages,
 		canAssignRoles: canAssignRoles(access),
+		canManagePay: managesPay,
 		canRemove: can(access, 'staff', 'delete'),
 		inviteForm,
 		inviteLinkForm,
 		assignForm,
 		unassignForm,
 		revokeForm,
-		removeForm
+		removeForm,
+		setPayForm
 	};
 };
 
@@ -262,6 +279,29 @@ export const actions: Actions = {
 			await unassignRole(locals.supabase, orgId, form.data.user_id, form.data.role_id);
 		} catch (err) {
 			return message(form, err instanceof Error ? err.message : 'Could not remove the role.', {
+				status: 400
+			});
+		}
+
+		return { form };
+	},
+
+	setPay: async ({ locals, request }) => {
+		const { orgId, access } = accessFor(locals);
+		const form = await superValidate(request, zod4(setPaySchema), { id: FORM_IDS.setPay });
+		if (!form.valid) return fail(400, { form });
+		if (!canAssignRoles(access)) {
+			return message(form, 'Only owners and admins can set pay.', { status: 403 });
+		}
+
+		try {
+			await setCompensation(locals.supabase, orgId, form.data.user_id, {
+				hourlyWage: form.data.hourly_wage === '' ? null : Number(form.data.hourly_wage),
+				commissionPercent:
+					form.data.commission_percent === '' ? null : Number(form.data.commission_percent)
+			});
+		} catch (err) {
+			return message(form, err instanceof Error ? err.message : 'Could not save pay.', {
 				status: 400
 			});
 		}

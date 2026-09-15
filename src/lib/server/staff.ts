@@ -21,6 +21,9 @@ import { ensure, unwrap, unwrapDeleted } from './crm/unwrap';
 
 export type Invite = Tables<'organization_invites'>;
 
+/** A member's pay, keyed by user id — absent means nothing has been entered yet. */
+export type Compensation = { hourlyWage: number | null; commissionPercent: number | null };
+
 /** One roster row: the membership joined with identity and held roles. */
 export type StaffMember = {
 	userId: string;
@@ -141,6 +144,53 @@ export async function removeMember(
 			.eq('user_id', userId)
 			.select('id:user_id'),
 		'Member'
+	);
+}
+
+/**
+ * Every member's pay, keyed by user id. RLS backs this independently of the
+ * caller's own owner/admin check (`staff_compensation` migration) — a member
+ * who somehow reached this function would simply get zero rows back, not
+ * someone else's wage.
+ */
+export async function listCompensation(
+	supabase: SupabaseClient<Database>,
+	orgId: string
+): Promise<Map<string, Compensation>> {
+	const rows = unwrap(
+		await supabase
+			.from('staff_compensation')
+			.select('user_id, hourly_wage, commission_percent')
+			.eq('org_id', orgId)
+	);
+
+	return new Map(
+		rows.map((row) => [
+			row.user_id,
+			{ hourlyWage: row.hourly_wage, commissionPercent: row.commission_percent }
+		])
+	);
+}
+
+/**
+ * Set a member's pay, one column at a time — a blank field clears it rather
+ * than leaving the previous value in place, the generic record form's rule
+ * for what a blank field means. Upserted rather than updated: the row does
+ * not exist until pay is entered for the first time.
+ */
+export async function setCompensation(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	userId: string,
+	pay: Compensation
+): Promise<void> {
+	ensure(
+		await supabase.from('staff_compensation').upsert({
+			org_id: orgId,
+			user_id: userId,
+			hourly_wage: pay.hourlyWage,
+			commission_percent: pay.commissionPercent
+		})
 	);
 }
 

@@ -40,3 +40,21 @@ export const unassignRoleSchema = z.object({
 export const removeMemberSchema = z.object({
 	user_id: z.guid()
 });
+
+/**
+ * Pay, typed as text and parsed in the action — the generic form's money
+ * rule. Blank clears the field rather than leaving the previous value.
+ */
+export const setPaySchema = z.object({
+	user_id: z.guid(),
+	hourly_wage: z
+		.string()
+		.trim()
+		.regex(/^$|^\d{1,8}(\.\d{1,2})?$/, 'Enter a wage like 18 or 18.50.')
+		.default(''),
+	commission_percent: z
+		.string()
+		.trim()
+		.regex(/^$|^(100(\.0{1,2})?|\d{1,2}(\.\d{1,2})?)$/, 'Enter a percentage from 0 to 100.')
+		.default('')
+});

@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, RequestEvent } from '@sveltejs/kit';
-import { message, superValidate } from 'sveltekit-superforms/server';
+import { message, superValidate, withFiles } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { RECORD_KIND_META, recordListHref, recordTerms, type RecordKind } from '$lib/crm/records';
 import { graphNodeId } from '$lib/crm/graph';
@@ -521,7 +521,11 @@ export function recordPageActions(kindOf: RecordKindOf): Actions {
 			const form = await superValidate(event.request, zod4(imageUploadSchema), {
 				id: RECORD_FORM_IDS.image
 			});
-			if (!form.valid) return fail(400, { form });
+			// `form.data.file` is a `File`, which devalue cannot serialise — an
+			// action returning one answers 500 however well the upload went.
+			// Every exit that carries this form goes through `withFiles()`,
+			// which drops it; `message()` already does the same on its own.
+			if (!form.valid) return fail(400, withFiles({ form }));
 
 			try {
 				await createEntityImage(supabase, orgId, entity, {
@@ -533,7 +537,7 @@ export function recordPageActions(kindOf: RecordKindOf): Actions {
 					status: 400
 				});
 			}
-			return { form };
+			return withFiles({ form });
 		},
 
 		removeImage: async (event) => {

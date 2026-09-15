@@ -37,7 +37,8 @@ function context(role: 'owner' | 'member'): OrgContext {
 			},
 			secret: { feature: feature('secret'), mode: 'hidden' }
 		},
-		access: { role, roles: [], grants: new Map() }
+		access: { role, roles: [], grants: new Map() },
+		systemAdmin: false
 	};
 }
 

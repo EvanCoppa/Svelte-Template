@@ -325,3 +325,35 @@ export async function splitOrderLine(
 
 	return { line: await updateOrderLine(supabase, orgId, lineId, { quantity }), remainder };
 }
+
+/** An order line with the order it is on — what a product's page lists under Orders. */
+export type ProductOrderLine = OrderLineItem & {
+	orders: Pick<
+		Order,
+		'id' | 'number' | 'status' | 'fulfillment_status' | 'created_at' | 'confirmed_at' | 'currency'
+	> & { companies: Customer; contacts: Buyer };
+};
+
+/**
+ * Every order line that cites one product, newest order first — the rows a
+ * product's page folds into its sales figures (`salesSummary()` in
+ * `$lib/crm/products`) and its allocated stock, and lists under Orders.
+ * `product_id` is provenance, so a line whose product was later deleted is
+ * simply not here; a line typed in without picking a product never was.
+ */
+export async function listOrderLinesForProduct(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	productId: string
+): Promise<ProductOrderLine[]> {
+	return unwrap(
+		await supabase
+			.from('order_line_items')
+			.select(
+				`*, orders!inner(id, number, status, fulfillment_status, created_at, confirmed_at, currency, ${PARTY})`
+			)
+			.eq('org_id', orgId)
+			.eq('product_id', productId)
+			.order('created_at', { ascending: false })
+	);
+}

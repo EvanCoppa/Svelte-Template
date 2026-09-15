@@ -50,7 +50,7 @@
 		<div class="flex items-center justify-between gap-1">
 			{#if activeOrg}
 				<div class="min-w-0">
-					<TeamSwitcher {organizations} {activeOrg} />
+					<TeamSwitcher {organizations} {activeOrg} systemAdmin={page.data.systemAdmin ?? false} />
 				</div>
 			{/if}
 			<Sidebar.Trigger class="text-sidebar-foreground/70 shrink-0" />

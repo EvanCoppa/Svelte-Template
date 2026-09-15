@@ -4,11 +4,13 @@ import {
 	acceptanceFor,
 	createInvite,
 	inviteUrl,
+	listCompensation,
 	listInvites,
 	listStaff,
 	lookupInvite,
 	removeMember,
-	revokeInvite
+	revokeInvite,
+	setCompensation
 } from './staff';
 import { ORG_ID, supabaseMock, supabaseMockSequence } from './crm/test-support';
 
@@ -134,6 +136,66 @@ describe('revokeInvite and removeMember', () => {
 		await expect(removeMember(empty.supabase, ORG_ID, USER_ID)).rejects.toThrow(
 			'Member was not deleted'
 		);
+	});
+});
+
+describe('listCompensation', () => {
+	it('keys pay by user id, from whatever rows RLS returned', async () => {
+		const { supabase, from, builder } = supabaseMock({
+			data: [
+				{ user_id: USER_ID, hourly_wage: 18.5, commission_percent: 5 },
+				{ user_id: OTHER_USER_ID, hourly_wage: null, commission_percent: null }
+			]
+		});
+
+		const compensation = await listCompensation(supabase, ORG_ID);
+		expect(from).toHaveBeenCalledWith('staff_compensation');
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(compensation.get(USER_ID)).toEqual({ hourlyWage: 18.5, commissionPercent: 5 });
+		expect(compensation.get(OTHER_USER_ID)).toEqual({ hourlyWage: null, commissionPercent: null });
+	});
+
+	it('is empty for a member the policies let query but not read — never asked', async () => {
+		const { supabase } = supabaseMock({ data: [] });
+
+		expect(await listCompensation(supabase, ORG_ID)).toEqual(new Map());
+	});
+});
+
+describe('setCompensation', () => {
+	it('upserts both figures, so a first entry and an update take the same path', async () => {
+		const { supabase, builder } = supabaseMock({ data: null });
+
+		await setCompensation(supabase, ORG_ID, USER_ID, {
+			hourlyWage: 22.75,
+			commissionPercent: 4
+		});
+		expect(builder.upsert).toHaveBeenCalledWith({
+			org_id: ORG_ID,
+			user_id: USER_ID,
+			hourly_wage: 22.75,
+			commission_percent: 4
+		});
+	});
+
+	it('clears a figure by writing null, rather than leaving the old value', async () => {
+		const { supabase, builder } = supabaseMock({ data: null });
+
+		await setCompensation(supabase, ORG_ID, USER_ID, { hourlyWage: null, commissionPercent: null });
+		expect(builder.upsert).toHaveBeenCalledWith({
+			org_id: ORG_ID,
+			user_id: USER_ID,
+			hourly_wage: null,
+			commission_percent: null
+		});
+	});
+
+	it('throws when RLS refuses the write', async () => {
+		const { supabase } = supabaseMock({ error: { message: 'not owner or admin' } });
+
+		await expect(
+			setCompensation(supabase, ORG_ID, USER_ID, { hourlyWage: 10, commissionPercent: null })
+		).rejects.toThrow('not owner or admin');
 	});
 });
 

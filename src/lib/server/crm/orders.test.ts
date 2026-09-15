@@ -7,6 +7,7 @@ import {
 	deleteOrder,
 	deleteOrderLine,
 	getOrder,
+	listOrderLinesForProduct,
 	listOrders,
 	splitOrderLine,
 	updateOrder,
@@ -227,5 +228,21 @@ describe('splitting a line', () => {
 		await expect(splitOrderLine(supabase, ORG_ID, LINE_ID, 4)).rejects.toThrow(
 			'Line was not split'
 		);
+	});
+});
+
+describe('listOrderLinesForProduct', () => {
+	it('reads every line citing the product with the order it is on, newest first', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [] });
+		const productId = 'b2000000-0000-0000-0000-000000000001';
+
+		await expect(listOrderLinesForProduct(supabase, ORG_ID, productId)).resolves.toEqual([]);
+		expect(from).toHaveBeenCalledWith('order_line_items');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, orders!inner(id, number, status, fulfillment_status, created_at, confirmed_at, currency, companies(id, name), contacts(id, name))'
+		);
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('product_id', productId);
+		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
 	});
 });

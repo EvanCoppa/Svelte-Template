@@ -3773,6 +3773,38 @@ export type Database = {
           },
         ]
       }
+      staff_compensation: {
+        Row: {
+          commission_percent: number | null
+          hourly_wage: number | null
+          org_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          commission_percent?: number | null
+          hourly_wage?: number | null
+          org_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          commission_percent?: number | null
+          hourly_wage?: number | null
+          org_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_compensation_org_id_user_id_fkey"
+            columns: ["org_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "organization_members"
+            referencedColumns: ["org_id", "user_id"]
+          },
+        ]
+      }
       slide_decks: {
         Row: {
           created_at: string

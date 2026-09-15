@@ -233,7 +233,13 @@ application data is scoped to an organization, never to a bare user. The
   relative to the page it is on. `(app)/companies/[id=guid]/` is the worked
   example — the ego graph, the people, the account and the map it adds are what a
   kind earns a page FOR; never a second renderer, a second record load or a second
-  relationship card. A new list page joins by adding its kind to
+  relationship card. `(app)/products/[id=guid]/` is the second: its picture is the
+  header tile (`Detail.Identity image`), Overview leads with the Media card and what
+  the storefront says, and the rail opens with Sales performance and Inventory —
+  figures folded in the browser from the order lines that cite it (`salesSummary()`
+  / `allocatedQuantity()` in `$lib/crm/products`), each shown only when the
+  `orders` grant lets this session read them, and the Orders and Purchases tabs
+  are those lines listed. A new list page joins by adding its kind to
   `RECORD_KINDS`, a branch to `getRecord()`, and `DataTable.linkCell()` on its
   primary column. What a kind is called — the eyebrow, "All quotes", the related
   cards, the 404 — comes from `recordTerms()`, never from `RECORD_KIND_META`.
@@ -353,7 +359,8 @@ application data is scoped to an organization, never to a bare user. The
   visibility, never a membership row — copy that when a new surface needs
   "may this user act in this org". A user can only read their own
   `system_admins` row, so nothing can list operators. Locally,
-  `evancoppa@gmail.com` is the seeded operator.
+  `evancoppa@gmail.com` is the seeded operator. What an operator does with
+  that access has one home — "Platform administration" below.
 - **Staff management is the reference gated page** (`staff_management`
   migration + `src/lib/server/staff.ts` + `src/routes/(app)/staff/`). It uses
   all three levels: `read` shows the roster, `manage` invites people and
@@ -678,6 +685,78 @@ features, access }` on `locals.org` — the hook gates the route on it, and
   composite foreign key, so the tree is one flat read and a pure fold (`categoryTree()`
   in `$lib/crm/categories.ts`) that surfaces a cycle or an orphan as a root rather than
   dropping it.
+
+## Platform administration — the one surface outside the tenant
+
+`/admin` is where the product itself is administered, as opposed to the
+organizations using it: the `(admin)` route group, `$lib/admin/` and
+`$lib/server/admin/`. The full account is `docs/platform-administration.md`;
+the rules that must not drift:
+
+- **It is not a tenant surface.** No active organization, no industry
+  vocabulary, no tier, no feature registry, no role grants —
+  `hooks.server.ts` skips `loadOrgContext()` for `/admin` entirely, so
+  nothing there can read or repair the active-org cookie. An operator's
+  workspace in the app stays exactly where they left it while they work in
+  the console.
+- **The way in is the org picker's own Platform section**, drawn from the
+  `systemAdmin` flag the `(app)` layout ships (`loadOrgContext()` already
+  looked it up). It is a destination, not a workspace: no check mark, its own
+  label behind a separator, and selecting it switches no organization. Never
+  add platform administration to `navigation.ts`, the sidebar, the ⌘K palette
+  or the feature registry.
+- **That flag authorizes nothing.** Every admin page, action and endpoint
+  calls `requireSystemAdmin()` (`$lib/server/admin/guard`) for itself — the
+  layout load covers pages, and each action repeats it because a POST reaches
+  an action with no load in front of it. A non-operator gets **404, not 403**,
+  for the reason a hidden feature does: a 403 confirms the console is real.
+- **It owns its shell and its names.** The `(admin)` layout is one inverted
+  bar with the area's identity, its pages and the way back; titles and nav
+  labels both come from the hand-kept `adminNav` in `$lib/admin/nav.ts`
+  (like `settingsNav`, and for the same reason — these pages are not
+  features). Adding an admin page = the route plus one entry there. No
+  migration: `/admin` is outside `features` and outside `pages` on purpose.
+- **Every write proves the operator, then the target, then writes** — the
+  shape `setTier` set and every action copies: `requireSystemAdmin()` first
+  (a POST reaches an action with no load in front of it), then the target
+  looked up through the CALLER's own client so "does it exist" is answered by
+  the same RLS that decides whether this caller may see it, then the
+  referenced catalog row checked for a readable message with the foreign key
+  as the backstop, and only then the write.
+- **Which client a write takes is decided by the grants, never by
+  convenience.** `renameOrganization()` goes through the caller's client:
+  `name` is the one column `authenticated` may update and an operator is
+  `owner` everywhere, so RLS is a real boundary and is left in the path. The
+  tier, the industry, the per-org feature overrides and every reference
+  catalog take the service-role client, because no policy can let those
+  through. A parameter named `admin` is a service-role client, and its
+  function is reachable only from an action that has already proved
+  `requireSystemAdmin()`.
+- **What is editable, and what stays a migration.** Editable: an
+  organization's name, plan, vertical and feature overrides; a plan's name
+  and what it unlocks; a vertical's name, what it includes and what it calls
+  each of those; a feature row's default name, noun, description, icon,
+  section and order. Deliberately not: a feature's `id` and `route` — both
+  facts about the CODE, since a route naming no page is a feature whose every
+  click 404s — creating or deleting a feature row, roles, and system-admin
+  management. An audit TABLE is still deferred; until there is one every
+  write logs a `[platform-admin]` line carrying the operator, the target and
+  the value it left.
+- **Set membership is written as a diff, never delete-all-then-insert.** An
+  `industry_features` row is not a bare join row: it also carries that
+  vertical's own name, noun and sidebar position for the feature, so
+  rewriting the set wholesale would silently throw all of it away for every
+  feature that was only passing through. `membershipDiff()` is the one place
+  that is decided, and `tier_features` goes through it too.
+- **A catalog edit changes nothing in this browser.** Freshness in the area
+  is `QUERY.adminOrganizations` and `QUERY.adminCatalog`, its own `admin:`
+  domain; what a tenant sees is re-resolved on that organization's next
+  request. Never invalidate a tenant key from `/admin`, and never read one.
+- Reuse from the app is limited to organization-agnostic primitives (`ui/`,
+  `DataTable`, `PageHeader`, `iconFor`, `isPathUnder`, `titleFor`) and data
+  modules that already take an explicit org id (`listStaff()`). Never reach
+  for a tenant-context-bound service, and never use the active organization
+  as a surrogate for an admin target.
 
 ## Database
 
