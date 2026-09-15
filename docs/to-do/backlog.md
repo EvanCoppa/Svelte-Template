@@ -41,26 +41,69 @@ Fixed in #153: `SettingsSidebar` and `AssistantSidebar` now derive
 The largest cluster. Order matters: stages, then fields, then history, then the
 AI tools that read the history.
 
-### 2.1 Payment-processing pipeline stages — **Drafted**
+### 2.1 Payment-processing pipeline stages — **Drafted** (mechanism built; not yet a live PR)
 
-A migration exists in a separate worktree but was never opened as a PR. Agreed
-grouping:
+Turned into a general mechanism rather than a one-off migration, once it
+became clear the seed data already hand-built this exact funnel per org
+(`supabase/seed.sql`, before this) — org-by-org replacement was always meant
+to be a fixture's workaround, not the shape.
 
-- **Prospecting** — Prospect, Contacted
-- **Qualification** — Waiting on Statements, Presentation Scheduled, Proposal
-  Sent, Application Sent
-- **Underwriting** — Underwriting, Approved, Denied
-- **Closed Won** — Installed, Live
-- **Closed Lost** — Lost
+`industry_pipelines` (name/description) and `industry_pipeline_stages`
+(`20260919110000_industry_pipeline_stages.sql`) are the `industry_custom_fields`
+shape applied to pipelines: an industry ships a funnel, and `create_default_pipeline()`
+copies it in at org creation instead of the generic six-stage board — falling
+back to that same generic board for an industry that ships none. Shipped for
+`merchant-services` (the ten stages below) and, as a second proof the
+mechanism generalizes, `real-estate` (the seven stages `seed.sql` already had
+for Ironwood/Larkspur). **Deliberately create-time only, no backfill and no
+re-apply on an industry switch** — a deal already sitting in a stage is not
+something a later industry-catalog change may silently move or orphan; an
+existing org's board is its own from the moment it exists, exactly as
+`pipelines` being rows rather than an enum already implied.
 
-- [ ] Recover the drafted migration and open it as a PR.
-- [ ] Verify it preserves orgs that already customized their board rather than
-      overwriting their `pipeline_stages`.
-- [ ] Check the grouping against `buildDealColumns()` — every terminal stage
-      (`won`/`lost` outcome) shares the one Closed column with a drop zone each,
-      so Installed / Live / Denied / Lost must not each grow a column.
-- [ ] Set `probability` per stage so the Kanban ring reads correctly.
-- [ ] Seed data + `npm run db:reset` round trip + regenerate types.
+- **Prospect** (open) → **Contacted** (open) → **Waiting on Statements**
+  (open) → **Presentation Scheduled** (open) → **Proposal Sent** (open) →
+  **Application Sent** (open) → **Underwriting** (open) → **Approved** (open)
+  → **Installed / Live** (won) / **Lost** (lost)
+
+- [x] Migration: `industry_pipelines` + `industry_pipeline_stages` tables,
+      `create_default_pipeline()` rewritten to read them (falling back to the
+      original six stages), seeded for `merchant-services` and `real-estate`.
+- [x] Preserves orgs that already customized their board — the function only
+      runs once, at org creation; no backfill loop, no trigger on `industry_id`
+      changing.
+- [x] Matches `buildDealColumns()` already: `Installed / Live` and `Lost` are
+      the only two terminal stages here (won/lost respectively), so they share
+      the one Closed column with a drop zone each — no separate `Denied` stage
+      (a denied application is `Lost`), and `Installed`/`Live` merged into one
+      stage rather than two, matching what `seed.sql` had already proven out
+      rather than the finer 12-stage split first discussed.
+- [x] `probability` set per stage (5 → 90 climbing through the open stages).
+- [x] `seed.sql` simplified: the old per-org rename/replace/delete dance for
+      Keystone Payments, Cobalt Merchant Services, Ironwood Property Group and
+      Larkspur Rentals is gone — the trigger now produces the same board on
+      insert.
+- [x] **Column grouping, added on top**: eight open stages was still eight
+      columns, and a board should read in a handful, not one per stage.
+      `pipeline_stage_groups` (`20260919120000_pipeline_stage_groups.sql`) is
+      the task board's `TASK_STATUS_GROUPS` as rows rather than a JS constant
+      (a pipeline's stages are rows, so its groups have to be too) —
+      `pipeline_stages.group_id` points an OPEN stage at the column it shares
+      with others, and `buildDealColumns()` folds them into one `Kanban.Zones`
+      column the same way Closed already works. Merchant services' ten stages
+      seed with `group_label`s (Prospecting / Qualification / Underwriting),
+      so the funnel now draws in four columns total, not nine. Real estate's
+      five open stages are left ungrouped — there was no established grouping
+      for them to reuse, and inventing one wasn't this session's call to make.
+      No settings screen exists to shape groups from the app yet, matching
+      pipelines/pipeline_stages themselves.
+- [ ] **Not done**: a settings screen for an org to create/edit its own
+      groups (today: migration or direct SQL only, same as stages). Grouping
+      real estate's stages, if that vertical also ends up with a wide-enough
+      board to want it. Opening this as its own PR — it's bundled into the
+      deal timeline PR, #162, for now; pull it out if that PR should stay
+      narrower. Not run through a live `db:reset` in this session (see the
+      same Docker caveat on §2.3) — verify before merging.
 
 ### 2.2 Deal object fields — **Idea**
 
@@ -68,13 +111,13 @@ Discussed as a list; still needs sorting into real columns vs. custom fields vs.
 relationships. Proposed classification to confirm:
 
 - **Relationships, not columns** — rep and owner are both members. `assigned_to`
-  stays a column only if genuinely single-valued; a rep *and* an owner means two
+  stays a column only if genuinely single-valued; a rep _and_ an owner means two
   named roles, which is the `proposals` presenter/responsible pattern
   (composite key onto the membership) rather than two ad-hoc columns.
 - **Universal columns** — next action (text), next action due date, last
   activity date, expected close date, projected value (noun renamed per industry
   through `terms`, so it is not "monthly revenue" everywhere).
-- **Source** — points at a contact *or* a company, so it is a relationship, not
+- **Source** — points at a contact _or_ a company, so it is a relationship, not
   an `owner_id`-shaped column that has to pick a kind.
 - **Payment-processing custom fields** — current processor, current POS/gateway,
   main objection, statement status, proposal status, application status. These
@@ -92,23 +135,36 @@ Tasks:
 - [ ] Decide which of these become list columns (`list_fields` /
       `industry_list_fields`) for the deals list.
 
-### 2.3 Unified deal timeline — **Planned**
+### 2.3 Unified deal timeline — **Drafted** (stage/owner slice built; the rest is not)
 
 Plan: [`unified-deal-timeline-plan.md`](./unified-deal-timeline-plan.md).
 
-Settled shape: `activities` keeps human interactions (notes, calls, emails,
-meetings, texts — author-editable); a **separate append-only event stream**
-records system facts. One screen shows both, sorted chronologically.
+Settled shape: no second table. The timeline **is** `activities` — system facts
+(stage change, owner change, document events, proposal/application milestones,
+promotion, cadence steps) are logged as `activities` rows with a system `type`,
+the acting member still as `author_id` for attribution — `is_system`
+(generated from `type`) is what makes a row uneditable, not a missing author.
+`Detail.Activity` already renders it; no combined reader across two tables.
 
-- [ ] Migration for the append-only event table: actor, timestamp, event type,
-      related record/document id, structured metadata. No update or delete
-      grants — insert only.
-- [ ] Emit events for: stage change, owner change, document uploaded/linked/
-      removed, proposal sent, application sent, promotion into onboarding,
-      cadence step fired, key status changes.
-- [ ] Render both sources in the record page's Activity tab as one timeline.
-- [ ] Make sure the polymorphic entity link is reused
-      (`crm_entity_type` + `private.crm_entity_exists()`), not a deals-only table.
+- [x] Extended `activities.type` with `stage_changed` / `owner_changed`; added
+      a `metadata jsonb` column and a generated `is_system` column
+      (`20260919100000_deal_activity_types.sql`,
+      `20260919100100_deal_timeline_system_activities.sql`). Written without a
+      local Docker/Postgres, so `src/lib/database.types.ts` was hand-edited to
+      match — CI's `database` job (`db:lint` + `db:types:check --local`) has
+      since replayed both migrations against a real disposable Postgres and
+      passed, confirming the hand-edit is correct.
+- [x] `updateDeal()` (`src/lib/server/crm/deals.ts`) logs a `stage_changed` /
+      `owner_changed` activity itself when those columns change, so the move
+      action and the generic edit form both get it for free.
+- [x] `Detail.Activity` (`src/lib/components/detail/detail-activity.svelte`)
+      draws the two new kinds with their own icon and label.
+- [x] Unit tests for the new logging (`deals.test.ts`), `logSystemActivity()`
+      (`activities.test.ts`) and `getStageName()` (`pipelines.test.ts`).
+- [ ] Document uploaded/linked/removed, proposal sent, application sent,
+      promotion into onboarding, cadence step fired — each is its own
+      `logSystemActivity()` call at the write that already exists (or, for
+      promotion/cadence, at the write §2.4/§4.1 add), not built yet.
 
 ### 2.4 Deals without a party, and promotion — **Idea**
 
@@ -152,7 +208,7 @@ lifecycle from onboarding; the cadence engine (§4.1) schedules the work but doe
 not own it.
 
 - [ ] Plan doc section defining the boundary between onboarding and follow-up.
-- [ ] Decide what a follow-up record *is* — a lifecycle on the customer, or
+- [ ] Decide what a follow-up record _is_ — a lifecycle on the customer, or
       scheduled occurrences with no record of their own.
 
 ---

@@ -19,6 +19,8 @@ export type Database = {
           entity_id: string | null
           entity_type: Database["public"]["Enums"]["crm_entity_type"] | null
           id: string
+          is_system: boolean | null
+          metadata: Json | null
           occurred_at: string
           org_id: string
           subject: string | null
@@ -34,6 +36,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id: string
           subject?: string | null
@@ -49,6 +53,8 @@ export type Database = {
           entity_id?: string | null
           entity_type?: Database["public"]["Enums"]["crm_entity_type"] | null
           id?: string
+          is_system?: boolean | null
+          metadata?: Json | null
           occurred_at?: string
           org_id?: string
           subject?: string | null
@@ -1246,6 +1252,73 @@ export type Database = {
           },
         ]
       }
+      industry_pipeline_stages: {
+        Row: {
+          created_at: string
+          group_label: string | null
+          industry_id: string
+          name: string
+          outcome: Database["public"]["Enums"]["stage_outcome"]
+          probability: number | null
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          group_label?: string | null
+          industry_id: string
+          name: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          group_label?: string | null
+          industry_id?: string
+          name?: string
+          outcome?: Database["public"]["Enums"]["stage_outcome"]
+          probability?: number | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipeline_stages_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_pipelines: {
+        Row: {
+          created_at: string
+          description: string | null
+          industry_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          industry_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          industry_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_pipelines_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: true
+            referencedRelation: "industries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_terms: {
         Row: {
           created_at: string
@@ -2277,9 +2350,55 @@ export type Database = {
           },
         ]
       }
+      pipeline_stage_groups: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          org_id: string
+          pipeline_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          org_id?: string
+          pipeline_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stage_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_groups_pipeline_id_org_id_fkey"
+            columns: ["pipeline_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           created_at: string
+          group_id: string | null
           id: string
           name: string
           org_id: string
@@ -2291,6 +2410,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name: string
           org_id: string
@@ -2302,6 +2422,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_id?: string | null
           id?: string
           name?: string
           org_id?: string
@@ -2312,6 +2433,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_group_id_pipeline_id_fkey"
+            columns: ["group_id", "pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stage_groups"
+            referencedColumns: ["id", "pipeline_id"]
+          },
           {
             foreignKeyName: "pipeline_stages_org_id_fkey"
             columns: ["org_id"]
@@ -4295,7 +4423,15 @@ export type Database = {
     }
     Enums: {
       activity_direction: "inbound" | "outbound"
-      activity_type: "note" | "call" | "email" | "meeting" | "sms" | "other"
+      activity_type:
+        | "note"
+        | "call"
+        | "email"
+        | "meeting"
+        | "sms"
+        | "other"
+        | "stage_changed"
+        | "owner_changed"
       address_kind: "primary" | "billing" | "shipping" | "service" | "other"
       asset_status: "active" | "inactive" | "retired"
       badge_tone:
@@ -4534,7 +4670,16 @@ export const Constants = {
   public: {
     Enums: {
       activity_direction: ["inbound", "outbound"],
-      activity_type: ["note", "call", "email", "meeting", "sms", "other"],
+      activity_type: [
+        "note",
+        "call",
+        "email",
+        "meeting",
+        "sms",
+        "other",
+        "stage_changed",
+        "owner_changed",
+      ],
       address_kind: ["primary", "billing", "shipping", "service", "other"],
       asset_status: ["active", "inactive", "retired"],
       badge_tone: [

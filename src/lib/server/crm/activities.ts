@@ -18,8 +18,11 @@ import { unwrap, unwrapDeleted } from './unwrap';
 export type Activity = Tables<'activities'>;
 export type ActivityType = Enums<'activity_type'>;
 
+/** The system-generated kinds — never user-editable once logged (see the migration). */
+export type SystemActivityType = Extract<ActivityType, 'stage_changed' | 'owner_changed'>;
+
 type ActivityColumn =
-	'type' | 'direction' | 'subject' | 'body' | 'occurred_at' | 'duration_minutes';
+	'type' | 'direction' | 'subject' | 'body' | 'occurred_at' | 'duration_minutes' | 'metadata';
 
 export async function listActivities(
 	supabase: SupabaseClient<Database>,
@@ -61,6 +64,38 @@ export async function createActivity(
 			})
 			.select()
 			.single()
+	);
+}
+
+/**
+ * Logs a system-generated timeline entry — the unified deal timeline
+ * (docs/to-do/unified-deal-timeline-plan.md) is `activities` itself, so a
+ * fact the app computed (a stage or owner change) is a row here like any
+ * other, written through the caller's own client so `author_id` still fills
+ * in as whoever's action caused it. What makes it a SYSTEM row is `type`,
+ * which the database's generated `is_system` column derives on its own —
+ * never editable afterward, by its author or by an owner/admin.
+ */
+export async function logSystemActivity(
+	supabase: SupabaseClient<Database>,
+	orgId: string,
+	entity: CrmEntityRef,
+	values: {
+		type: SystemActivityType;
+		subject: string;
+		metadata?: TablesInsert<'activities'>['metadata'];
+	}
+): Promise<Activity> {
+	return createActivity(
+		supabase,
+		orgId,
+		{
+			type: values.type,
+			subject: values.subject,
+			occurred_at: new Date().toISOString(),
+			metadata: values.metadata ?? null
+		},
+		entity
 	);
 }
 
