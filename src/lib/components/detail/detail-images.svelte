@@ -61,6 +61,8 @@
 	});
 	const file = fileProxy(form, 'file');
 
+	const file = fileProxy(form, 'file');
+
 	const {
 		message: removeMessage,
 		submitting: deleting,
@@ -173,6 +175,7 @@
 								accept="image/jpeg,image/png,image/webp,image/gif"
 								bind:files={$file}
 								aria-invalid={$errors.file ? 'true' : undefined}
+								bind:files={$file}
 							/>
 							{#if $errors.file}
 								<p class="text-destructive text-sm">{$errors.file}</p>
