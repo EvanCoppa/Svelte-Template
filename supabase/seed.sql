@@ -1329,59 +1329,13 @@ insert into public.member_roles (org_id, user_id, role_id) values
 		'b0000000-0000-0000-0007-000000000001')
 on conflict (org_id, user_id, role_id) do nothing;
 
--- The boarding funnel — the ten stages a real ISO named in its build brief
--- (docs/discovery/gsp-brief-gap-analysis.md), not a funnel we invented. Every
--- org is born with the generic "Sales" board (`create_default_pipeline`,
--- called by a trigger), which is the wrong six words for this vertical, so
--- the board is renamed and its stages replaced with the walk from a cold call
--- to a merchant's first batch. This is the point of pipelines being rows: the
--- funnel is data, and it is the customer's — but it is per-ORG data, which is
--- why it lives here rather than in the industry's migration, and why a real
--- org onboarded tomorrow still starts on the generic board.
-update public.pipelines
-set name = 'Merchant boarding',
-	description = 'Cold lead to first batch.'
-where org_id in ('10000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000016')
-	and is_default;
-
---
--- An UPSERT, not an insert: the trigger's board already contains 'Lost', so
--- conflict-skipping would leave it wherever the generic board put it — at 60,
--- colliding with 'Approved'. The stage's position and outcome are what this
--- fixture is asserting, so they are what the conflict updates.
-insert into public.pipeline_stages (org_id, pipeline_id, name, sort_order, outcome, probability)
-select p.org_id, p.id, s.name, s.sort_order, s.outcome::public.stage_outcome, s.probability
-from (values
-	('10000000-0000-0000-0000-000000000015'::uuid), ('10000000-0000-0000-0000-000000000016')
-) as o (org_id)
-join public.pipelines p on p.org_id = o.org_id and p.is_default
-cross join (values
-	('Prospect', 10, 'open', 5),
-	('Contacted', 20, 'open', 10),
-	('Waiting on Statements', 30, 'open', 20),
-	('Presentation Scheduled', 40, 'open', 35),
-	('Proposal Sent', 50, 'open', 50),
-	('Application Sent', 60, 'open', 70),
-	('Underwriting', 70, 'open', 80),
-	('Approved', 80, 'open', 90),
-	('Installed / Live', 90, 'won', 100),
-	('Lost', 100, 'lost', 0)
-) as s (name, sort_order, outcome, probability)
-on conflict (pipeline_id, name) do update
-	set sort_order = excluded.sort_order,
-		outcome = excluded.outcome,
-		probability = excluded.probability;
-
--- The six stages the trigger made, now that the ten above have replaced
--- them. Guarded on nothing referencing them, so a re-run (where the deals
--- below already point at the new stages) deletes nothing and errors on
--- nothing.
-delete from public.pipeline_stages s
-where s.org_id in ('10000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000016')
-	and s.name not in ('Prospect', 'Contacted', 'Waiting on Statements',
-		'Presentation Scheduled', 'Proposal Sent', 'Application Sent', 'Underwriting',
-		'Approved', 'Installed / Live', 'Lost')
-	and not exists (select 1 from public.deals d where d.stage_id = s.id);
+-- The boarding funnel — the twelve stages a real ISO named in its build brief
+-- (docs/discovery/gsp-brief-gap-analysis.md) plus the underwriting outcomes
+-- the template's own user asked to see. This used to be a per-org rename and
+-- stage replacement fixed up here in seed.sql; the industry_default_pipelines
+-- migration made it what `create_default_pipeline()` writes for any
+-- merchant-services org on creation, this fixture pair included, so there is
+-- nothing left to override.
 
 -- MID, MCC, average ticket and current processor — the four things a rep
 -- looks up about a merchant — are the industry's custom fields on `company`
