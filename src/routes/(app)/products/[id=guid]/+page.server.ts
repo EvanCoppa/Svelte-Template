@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { message, superValidate } from 'sveltekit-superforms/server';
+import { message, superValidate, withFiles } from 'sveltekit-superforms/server';
 import { z } from 'zod';
 import type { Json } from '$lib/database.types';
 import { zod4 } from 'sveltekit-superforms/adapters';
@@ -116,7 +116,11 @@ export const actions: Actions = {
 		const form = await superValidate(request, zod4(productImageUploadSchema), {
 			id: PRODUCT_IMAGE_FORM_IDS.upload
 		});
-		if (!form.valid) return fail(400, { form });
+		// `form.data.file` is a `File`, which devalue cannot serialise — an
+		// action returning one answers 500 however well the upload went. Every
+		// exit that carries this form goes through `withFiles()`, which drops
+		// it; `message()` already does the same on its own.
+		if (!form.valid) return fail(400, withFiles({ form }));
 
 		try {
 			await setProductImage(supabase, activeOrgId, params.id, form.data.file);
@@ -125,7 +129,7 @@ export const actions: Actions = {
 				status: 400
 			});
 		}
-		return { form };
+		return withFiles({ form });
 	},
 
 	removeProductImage: async (event) => {
