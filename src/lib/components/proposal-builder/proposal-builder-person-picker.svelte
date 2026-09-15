@@ -59,7 +59,7 @@
 		{#if selected}
 			<Button
 				variant="ghost"
-				class="h-auto rounded px-2 py-1 text-sm text-red-500 hover:bg-transparent hover:text-red-700"
+				class="text-destructive hover:text-destructive/80 h-auto rounded px-2 py-1 text-sm hover:bg-transparent"
 				onclick={() => (value = '')}
 				aria-label="Clear {label.toLowerCase()} selection"
 			>

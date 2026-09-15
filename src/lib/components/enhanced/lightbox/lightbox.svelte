@@ -646,7 +646,7 @@
 	>
 		<div
 			aria-hidden="true"
-			class="absolute inset-0 bg-black/80"
+			class="absolute inset-0 bg-black/80 dark:bg-black/80"
 			{@attach motionTo(() => ({
 				keyframes: { opacity: veil },
 				transition: leaving ? { duration: 0.3, ease: EASE } : { type: 'spring', ...VEIL }

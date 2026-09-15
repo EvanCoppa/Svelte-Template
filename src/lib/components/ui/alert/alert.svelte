@@ -13,7 +13,7 @@
 				// Success has no semantic token in app.css; emerald matches the
 				// `success` tone in ui/badge/badge-tones.ts so one hue means one thing.
 				success:
-					'border-emerald-600/30 bg-emerald-600/10 text-emerald-700 *:data-[slot=alert-description]:text-current dark:text-emerald-400'
+					'border-emerald-600/30 dark:border-emerald-600/30 bg-emerald-600/10 dark:bg-emerald-600/10 text-emerald-700 *:data-[slot=alert-description]:text-current dark:text-emerald-400'
 			}
 		},
 		defaultVariants: {

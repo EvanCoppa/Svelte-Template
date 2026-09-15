@@ -36,9 +36,12 @@
 
 	const TONES = {
 		none: { bar: 'bg-muted-foreground/50', text: 'text-muted-foreground' },
-		danger: { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' },
-		caution: { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
-		safe: { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' }
+		danger: { bar: 'bg-red-500 dark:bg-red-500', text: 'text-red-600 dark:text-red-400' },
+		caution: { bar: 'bg-amber-500 dark:bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+		safe: {
+			bar: 'bg-emerald-500 dark:bg-emerald-500',
+			text: 'text-emerald-600 dark:text-emerald-400'
+		}
 	} satisfies Record<'none' | 'danger' | 'caution' | 'safe', Tone>;
 
 	function toneFor(score: number, max: number): Tone {
@@ -200,7 +203,7 @@
 						class="border-border text-card relative grid size-[14px] shrink-0 place-items-center rounded-[4px] border"
 					>
 						<span
-							class="absolute inset-0 rounded-[3px] bg-emerald-500"
+							class="absolute inset-0 rounded-[3px] bg-emerald-500 dark:bg-emerald-500"
 							{@attach motionTo(() => ({
 								keyframes: { opacity: rule.met ? 1 : 0 },
 								transition: CROSSFADE

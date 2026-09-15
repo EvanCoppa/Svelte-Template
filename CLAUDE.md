@@ -34,7 +34,7 @@ extend the rules rather than fighting them.
 npm run dev            # db:start + db:env + db:reset (when owed) + vite dev
 npm run build          # production build (Vercel adapter)
 npm run check          # svelte-check (strict types, a11y, unused CSS) — keep at ZERO
-npm run lint           # prettier --check + eslint (flat config) — keep at ZERO
+npm run lint           # prettier --check + eslint (flat config + tools/eslint/design-system) — keep at ZERO
 npm run lint:oxlint    # oxlint + vendored anti-slop rules (tools/oxlint/anti-slop) — keep at ZERO
 npm run knip           # unused files / exports / dependencies (knip.jsonc) — keep at ZERO
 npm test               # vitest (server-side unit tests)
@@ -1312,11 +1312,39 @@ screen rather than mixing them. A further skin follows the same rule: `variant="
   honoured. Never call Motion's `animate` straight from a component.
 - These paint from the same `src/app.css` tokens as `ui/`, so they follow the light/dark toggle
   with no extra wiring. A new one must too — no hardcoded greys, and any raw palette colour
-  (`emerald-500`, `amber-600`) needs its `dark:` pair.
+  (`emerald-500`, `amber-600`) needs its `dark:` pair. **That sentence is a lint rule**
+  (`design-system/require-dark-variant`, below), so a class list painted light-mode-only
+  fails `npm run lint` rather than shipping and being noticed in the dark.
 - To add another: port the folder from Solid Core, point its imports at `$lib/utils.js` and
   `$lib/motion.js`, add the two lines to the folder's `index.ts` and the barrel, and give it a
   card on `/components`. Keep the file naming this repo uses (`<name>/<name>.svelte`), not Solid
   Core's PascalCase.
+
+### The UI rules that are lint rules
+
+`tools/eslint/design-system/` is the sibling of `tools/oxlint/anti-slop`: this repo's own
+conventions, made checkable instead of only written down. It is an ESLint plugin rather
+than an oxlint one for a single reason — its rules read Svelte **markup**, and oxlint
+parses JS and TS only, while `eslint.config.js` already runs `svelte-eslint-parser` over
+every `.svelte` file. Rules live at `error` in `src/**`, so `npm run lint` is the gate.
+
+- **`require-dark-variant`** — a raw Tailwind palette colour (`text-gray-700`, `bg-white`,
+  `bg-black/50`) must say what it does in dark mode. A "class list" is one element's `class`
+  attribute or one `cn()` / `tv()` call, taken whole, so a ternary arm that sets `dark:`
+  answers for the arm that sets the light value. Pairing is matched **per utility** and is
+  satisfied by any `dark:` class for that property, so `text-gray-700 dark:text-foreground`
+  passes — a theme token is a perfectly good dark half. Three ways to satisfy it, in order of
+  preference: use a theme token (`text-destructive`, `bg-primary`) and need no pair at all;
+  write the pair (`bg-blue-100 dark:bg-blue-950`); or, when the colour genuinely is the same in
+  both themes — a scrim, white ink on a saturated fill, a status dot at its saturated step —
+  **restate it** (`bg-black/50 dark:bg-black/50`), which is the idiom `src/lib/calendar.ts`
+  already used for event dots. The third is not a workaround: it turns an assumption into a
+  fact the next reader can check. The rule's message names the tokens `src/app.css` actually
+  defines, read from that file rather than hardcoded, so it cannot drift when a token is added.
+
+Adding a rule = a file in `rules/`, a line in `index.js`, a test beside it, and one bullet
+here. `vitest.config.ts` includes `tools/**` for that test: a rule that has stopped firing is
+as broken as a helper that has stopped working.
 
 ## Compound components — the preferred shape for reusable multi-part UI
 

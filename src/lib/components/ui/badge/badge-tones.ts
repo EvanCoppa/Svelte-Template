@@ -37,18 +37,22 @@ export const BADGE_TONE_CLASSES = {
 		'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-800'
 } satisfies Record<BadgeTone, string>;
 
-/** Dot color for StatusBadge — a solid saturated fill that reads on both themes. */
+/**
+ * Dot color for StatusBadge — a solid saturated fill that reads on both themes,
+ * so each tone restates itself under `dark:` rather than leaving the light value
+ * to carry over by default (the idiom `src/lib/calendar.ts` uses for event dots).
+ */
 export const BADGE_TONE_DOT_CLASSES = {
-	neutral: 'bg-slate-400',
-	success: 'bg-emerald-500',
-	info: 'bg-blue-500',
-	warning: 'bg-amber-500',
-	error: 'bg-red-500',
-	violet: 'bg-violet-500',
-	orange: 'bg-orange-500',
-	cyan: 'bg-cyan-500',
-	rose: 'bg-rose-500',
-	indigo: 'bg-indigo-500'
+	neutral: 'bg-slate-400 dark:bg-slate-400',
+	success: 'bg-emerald-500 dark:bg-emerald-500',
+	info: 'bg-blue-500 dark:bg-blue-500',
+	warning: 'bg-amber-500 dark:bg-amber-500',
+	error: 'bg-red-500 dark:bg-red-500',
+	violet: 'bg-violet-500 dark:bg-violet-500',
+	orange: 'bg-orange-500 dark:bg-orange-500',
+	cyan: 'bg-cyan-500 dark:bg-cyan-500',
+	rose: 'bg-rose-500 dark:bg-rose-500',
+	indigo: 'bg-indigo-500 dark:bg-indigo-500'
 } satisfies Record<BadgeTone, string>;
 
 export const BADGE_TONES =
@@ -62,14 +66,14 @@ export const BADGE_TONES =
  * above, so a ring, a dot and a pill of one tone are one colour.
  */
 export const BADGE_TONE_TEXT_CLASSES = {
-	neutral: 'text-slate-400',
-	success: 'text-emerald-500',
-	info: 'text-blue-500',
-	warning: 'text-amber-500',
-	error: 'text-red-500',
-	violet: 'text-violet-500',
-	orange: 'text-orange-500',
-	cyan: 'text-cyan-500',
-	rose: 'text-rose-500',
-	indigo: 'text-indigo-500'
+	neutral: 'text-slate-400 dark:text-slate-400',
+	success: 'text-emerald-500 dark:text-emerald-500',
+	info: 'text-blue-500 dark:text-blue-500',
+	warning: 'text-amber-500 dark:text-amber-500',
+	error: 'text-red-500 dark:text-red-500',
+	violet: 'text-violet-500 dark:text-violet-500',
+	orange: 'text-orange-500 dark:text-orange-500',
+	cyan: 'text-cyan-500 dark:text-cyan-500',
+	rose: 'text-rose-500 dark:text-rose-500',
+	indigo: 'text-indigo-500 dark:text-indigo-500'
 } satisfies Record<BadgeTone, string>;

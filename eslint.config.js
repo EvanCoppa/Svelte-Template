@@ -1,4 +1,5 @@
 import { includeIgnoreFile } from '@eslint/compat';
+import { designSystem } from './tools/eslint/design-system/index.js';
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import svelte from 'eslint-plugin-svelte';
@@ -40,6 +41,16 @@ export default ts.config(
 			// $app/paths is a no-op; the rule only earns its keep with a
 			// configured base path. Re-enable it if you set kit.paths.base.
 			'svelte/no-navigation-without-resolve': 'off'
+		}
+	},
+	{
+		// This repo's own UI conventions, made checkable. It lives here rather
+		// than in `tools/oxlint/anti-slop` because its rules read Svelte markup,
+		// and oxlint parses JS and TS only.
+		files: ['src/**/*.{svelte,ts,js}'],
+		plugins: { 'design-system': designSystem },
+		rules: {
+			'design-system/require-dark-variant': 'error'
 		}
 	},
 	{

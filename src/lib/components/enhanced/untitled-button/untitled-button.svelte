@@ -46,7 +46,7 @@
 					'bg-primary text-primary-foreground shadow-skeuomorphic ring-1 ring-transparent ring-inset',
 					'hover:bg-primary/90 data-loading:bg-primary/90',
 					// Inner border, faded out downward, so only the top edge catches light.
-					'before:absolute before:inset-px before:border before:border-white/12 before:[mask-image:linear-gradient(to_bottom,#000,transparent)]'
+					'before:absolute before:inset-px before:border before:border-white/12 dark:before:border-white/12 before:[mask-image:linear-gradient(to_bottom,#000,transparent)]'
 				],
 				secondary: [
 					'bg-background text-foreground shadow-skeuomorphic ring-border ring-1 ring-inset',
@@ -57,9 +57,9 @@
 				'primary-destructive': [
 					// `dark:bg-destructive/60` is `ui/button`'s own destructive treatment: the
 					// dark token is a light red that white text cannot sit on at full strength.
-					'bg-destructive dark:bg-destructive/60 shadow-skeuomorphic outline-destructive text-white ring-1 ring-transparent ring-inset',
+					'bg-destructive dark:bg-destructive/60 shadow-skeuomorphic outline-destructive text-white dark:text-white ring-1 ring-transparent ring-inset',
 					'hover:bg-destructive/90 data-loading:bg-destructive/90',
-					'before:absolute before:inset-px before:border before:border-white/12 before:[mask-image:linear-gradient(to_bottom,#000,transparent)]'
+					'before:absolute before:inset-px before:border before:border-white/12 dark:before:border-white/12 before:[mask-image:linear-gradient(to_bottom,#000,transparent)]'
 				],
 				'secondary-destructive': [
 					'bg-background text-destructive shadow-skeuomorphic ring-destructive/30 outline-destructive ring-1 ring-inset',

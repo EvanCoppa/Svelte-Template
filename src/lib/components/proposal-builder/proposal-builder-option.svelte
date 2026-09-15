@@ -17,7 +17,7 @@
 		type ProposalBuilderOption
 	} from '$lib/schemas/proposal-builder';
 	import { capitalize } from '$lib/utils.js';
-	import { builderCaption, builderInput } from './classes.js';
+	import { builderCaption, builderError, builderInput } from './classes.js';
 	import Units from './proposal-builder-units.svelte';
 
 	/**
@@ -204,7 +204,7 @@
 				class={builderInput}
 			/>
 			{#if errors?.label}
-				<p class="mt-1 text-sm font-normal text-red-500">{errors.label}</p>
+				<p class={builderError}>{errors.label}</p>
 			{/if}
 		</label>
 
@@ -221,7 +221,7 @@
 				class="{builderInput} sm:w-32"
 			/>
 			{#if errors?.fee_override}
-				<p class="mt-1 text-sm font-normal text-red-500">{errors.fee_override}</p>
+				<p class={builderError}>{errors.fee_override}</p>
 			{/if}
 		</label>
 
@@ -239,7 +239,7 @@
 				class="{builderInput} sm:w-32"
 			/>
 			{#if errors?.discount_pct}
-				<p class="mt-1 text-sm font-normal text-red-500">{errors.discount_pct}</p>
+				<p class={builderError}>{errors.discount_pct}</p>
 			{/if}
 		</label>
 	</div>
@@ -248,14 +248,14 @@
 		<label class="dark:text-foreground inline-flex items-center gap-2 font-semibold text-gray-700">
 			<span>Show Financing:</span>
 			<Switch
-				class="h-6 w-11 data-[state=checked]:bg-blue-600 [&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-6 [&_[data-slot=switch-thumb]]:data-[state=unchecked]:translate-x-1"
+				class="h-6 w-11 [&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-6 [&_[data-slot=switch-thumb]]:data-[state=unchecked]:translate-x-1"
 				bind:checked={() => option.financing_available, (on) => set('financing_available', on)}
 			/>
 		</label>
 		<label class="dark:text-foreground inline-flex items-center gap-2 font-semibold text-gray-700">
 			<span>Recommended:</span>
 			<Switch
-				class="h-6 w-11 data-[state=checked]:bg-blue-600 [&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-6 [&_[data-slot=switch-thumb]]:data-[state=unchecked]:translate-x-1"
+				class="h-6 w-11 [&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-6 [&_[data-slot=switch-thumb]]:data-[state=unchecked]:translate-x-1"
 				bind:checked={() => option.is_recommended, (on) => set('is_recommended', on)}
 			/>
 		</label>
@@ -313,7 +313,7 @@
 						{billable?.code ?? line.label}
 						<Button
 							variant="ghost"
-							class="ml-1 h-auto p-0 text-blue-500 hover:bg-transparent hover:text-blue-700"
+							class="text-primary hover:text-primary/80 ml-1 h-auto p-0 hover:bg-transparent"
 							onclick={() => removeBillable(line.billable_id)}
 							aria-label="Remove {line.label}"
 						>
@@ -335,7 +335,7 @@
 				>
 					<Checkbox
 						id="option-{index}-item-{billable.id}"
-						class="size-5 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white"
+						class="size-5"
 						checked={has(billable.id)}
 						onCheckedChange={() => toggleBillable(billable)}
 					/>
@@ -359,7 +359,7 @@
 					onchange={(next) => setBillable(j, next)}
 				/>
 				{#if errors?.billables?.[j]?.detail}
-					<p class="mt-1 text-sm font-normal text-red-500">{errors.billables[j]?.detail}</p>
+					<p class={builderError}>{errors.billables[j]?.detail}</p>
 				{/if}
 			</div>
 		{/each}
@@ -402,12 +402,12 @@
 									step="1"
 									aria-invalid={errors?.products?.[k]?.quantity ? 'true' : undefined}
 									bind:value={() => line.quantity, (quantity) => setProductQuantity(k, quantity)}
-									class="dark:border-input mt-0 h-auto w-16 border-gray-300 px-2 py-1 focus-visible:border-blue-500/70 focus-visible:ring-[1.5px] focus-visible:ring-blue-500/65"
+									class="dark:border-input focus-visible:border-ring focus-visible:ring-ring/65 mt-0 h-auto w-16 border-gray-300 px-2 py-1 focus-visible:ring-[1.5px]"
 								/>
 							</label>
 							<Button
 								variant="ghost"
-								class="h-auto text-sm font-medium text-red-600 hover:bg-transparent hover:text-red-800"
+								class="text-destructive hover:text-destructive/80 h-auto text-sm font-medium hover:bg-transparent"
 								onclick={() => removeProduct(line.product_id)}
 								aria-label="Remove {line.label}"
 							>

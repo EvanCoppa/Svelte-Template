@@ -34,7 +34,9 @@
 				</dt>
 				<dd class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
 					{#if row.before !== null}
-						<span class="text-muted-foreground truncate line-through decoration-red-400/70">
+						<span
+							class="text-muted-foreground truncate line-through decoration-red-400/70 dark:decoration-red-400/70"
+						>
 							{row.before}
 						</span>
 						<ArrowRightIcon class="text-muted-foreground size-3 shrink-0" />
