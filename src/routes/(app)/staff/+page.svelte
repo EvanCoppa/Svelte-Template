@@ -4,6 +4,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { page } from '$app/state';
+	import BanknoteIcon from '@lucide/svelte/icons/banknote';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
@@ -24,7 +25,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { StaffMember } from '$lib/server/staff';
 	import { capitalize } from '$lib/utils.js';
-	import { inviteSchema } from './schema';
+	import { inviteSchema, setPaySchema } from './schema';
 
 	let { data } = $props();
 
@@ -52,6 +53,15 @@
 
 	function formatDate(value: string): string {
 		return dateFormat.format(new Date(value));
+	}
+
+	/**
+	 * A `type="number"` input hands the binding a number, or null once cleared;
+	 * every field here is a string (the schema's rule), so the setter puts the
+	 * text back — the same binding the ledger's payment form uses.
+	 */
+	function asText(value: string | number | null | undefined): string {
+		return value === null || value === undefined ? '' : String(value);
 	}
 
 	/**
@@ -153,13 +163,15 @@
 				renderComponent(Staff.RowActions, {
 					name: Staff.memberName(row.original),
 					canAssignRoles: data.canAssignRoles,
+					canManagePay: data.canManagePay,
 					canRemove: canRemoveMember(row.original),
 					onManage: () => (managingId = row.original.userId),
+					onManagePay: () => openPay(row.original),
 					onRemove: () => (removingId = row.original.userId)
 				})
 			)
 		]);
-		if (data.canAssignRoles || data.canRemove) return defs;
+		if (data.canAssignRoles || data.canManagePay || data.canRemove) return defs;
 		return defs.filter((def) => def.id !== 'actions');
 	});
 
@@ -180,8 +192,10 @@
 	 */
 	let managingId = $state<string | null>(null);
 	let removingId = $state<string | null>(null);
+	let payingId = $state<string | null>(null);
 	const managing = $derived(data.staff.find((member) => member.userId === managingId) ?? null);
 	const removing = $derived(data.staff.find((member) => member.userId === removingId) ?? null);
+	const paying = $derived(data.staff.find((member) => member.userId === payingId) ?? null);
 
 	/** Which role the manage dialog's picker has selected. */
 	let roleChoice = $state('');
@@ -277,6 +291,35 @@
 			toast.success('Member removed');
 		}
 	});
+
+	const {
+		form: payFormData,
+		errors: payErrors,
+		message: payMessage,
+		submitting: savingPay,
+		enhance: payEnhance
+	} = superForm(data.setPayForm, {
+		id: 'set-pay',
+		validators: zod4Client(setPaySchema),
+		resetForm: false,
+		onUpdated({ form }) {
+			if (!form.valid) return;
+			payingId = null;
+			toast.success('Pay updated');
+		}
+	});
+
+	/** Open the pay dialog for a member, seeding the form from their current pay. */
+	function openPay(member: StaffMember) {
+		const compensation = data.compensation.get(member.userId) ?? {
+			hourlyWage: null,
+			commissionPercent: null
+		};
+		$payFormData.user_id = member.userId;
+		$payFormData.hourly_wage = asText(compensation.hourlyWage);
+		$payFormData.commission_percent = asText(compensation.commissionPercent);
+		payingId = member.userId;
+	}
 </script>
 
 {#snippet stat(label: string, value: number, tone: BadgeTone | null = null)}
@@ -535,6 +578,90 @@
 					</form>
 				</Modal.Body>
 			</Modal.Card>
+		{/if}
+	</Modal.Content>
+</Modal.Root>
+
+<!-- Manage pay — owner/admin only, what the staff_compensation policies accept. -->
+<Modal.Root
+	open={paying !== null}
+	onOpenChange={(open) => {
+		if (!open) payingId = null;
+	}}
+>
+	<Modal.Content>
+		{#if paying}
+			<form method="POST" action="?/setPay" use:payEnhance>
+				<input type="hidden" name="user_id" value={paying.userId} />
+				<Modal.Card>
+					<Modal.Header>
+						<Modal.Title><BanknoteIcon /> Pay for {Staff.memberName(paying)}</Modal.Title>
+						<Modal.Description>
+							Visible to owners and admins only — never to the person themselves through the roster.
+						</Modal.Description>
+					</Modal.Header>
+					<Modal.Body>
+						<FormAlert message={$payMessage} class="mb-0" />
+
+						<div class="grid gap-2">
+							<Label for="staff-pay-hourly-wage">Hourly wage</Label>
+							<Input
+								id="staff-pay-hourly-wage"
+								name="hourly_wage"
+								type="number"
+								step="0.01"
+								min="0"
+								placeholder="18.50"
+								aria-invalid={$payErrors.hourly_wage ? 'true' : undefined}
+								aria-describedby={$payErrors.hourly_wage
+									? 'staff-pay-hourly-wage-error'
+									: undefined}
+								bind:value={
+									() => $payFormData.hourly_wage,
+									(value) => ($payFormData.hourly_wage = asText(value))
+								}
+							/>
+							{#if $payErrors.hourly_wage}
+								<p id="staff-pay-hourly-wage-error" class="text-destructive text-sm">
+									{$payErrors.hourly_wage}
+								</p>
+							{/if}
+						</div>
+
+						<div class="grid gap-2">
+							<Label for="staff-pay-commission">Commission %</Label>
+							<Input
+								id="staff-pay-commission"
+								name="commission_percent"
+								type="number"
+								step="0.01"
+								min="0"
+								max="100"
+								placeholder="5"
+								aria-invalid={$payErrors.commission_percent ? 'true' : undefined}
+								aria-describedby={$payErrors.commission_percent
+									? 'staff-pay-commission-error'
+									: undefined}
+								bind:value={
+									() => $payFormData.commission_percent,
+									(value) => ($payFormData.commission_percent = asText(value))
+								}
+							/>
+							{#if $payErrors.commission_percent}
+								<p id="staff-pay-commission-error" class="text-destructive text-sm">
+									{$payErrors.commission_percent}
+								</p>
+							{/if}
+						</div>
+					</Modal.Body>
+				</Modal.Card>
+				<Modal.Footer>
+					<Modal.Cancel>Cancel</Modal.Cancel>
+					<Modal.Action type="submit" disabled={$savingPay}>
+						{$savingPay ? 'Saving…' : 'Save pay'}
+					</Modal.Action>
+				</Modal.Footer>
+			</form>
 		{/if}
 	</Modal.Content>
 </Modal.Root>

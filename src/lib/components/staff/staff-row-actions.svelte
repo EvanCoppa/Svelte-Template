@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BanknoteIcon from '@lucide/svelte/icons/banknote';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import UserCogIcon from '@lucide/svelte/icons/user-cog';
 	import UserMinusIcon from '@lucide/svelte/icons/user-minus';
@@ -8,22 +9,27 @@
 	let {
 		name,
 		canAssignRoles = false,
+		canManagePay = false,
 		canRemove = false,
 		onManage,
+		onManagePay,
 		onRemove
 	}: {
 		/** The member this row is about — it names the trigger for screen readers. */
 		name: string;
 		/** Owner/admin only — what the member_roles policies accept. */
 		canAssignRoles?: boolean;
+		/** Owner/admin only — what the staff_compensation policies accept. */
+		canManagePay?: boolean;
 		canRemove?: boolean;
 		onManage: () => void;
+		onManagePay: () => void;
 		onRemove: () => void;
 	} = $props();
 </script>
 
-<!-- A reader with neither permission gets no menu at all rather than an empty one. -->
-{#if canAssignRoles || canRemove}
+<!-- A reader with none of these permissions gets no menu at all rather than an empty one. -->
+{#if canAssignRoles || canManagePay || canRemove}
 	<div class="flex justify-end">
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -41,8 +47,14 @@
 						Manage roles
 					</DropdownMenu.Item>
 				{/if}
+				{#if canManagePay}
+					<DropdownMenu.Item onclick={onManagePay}>
+						<BanknoteIcon />
+						Manage pay
+					</DropdownMenu.Item>
+				{/if}
 				{#if canRemove}
-					{#if canAssignRoles}
+					{#if canAssignRoles || canManagePay}
 						<DropdownMenu.Separator />
 					{/if}
 					<DropdownMenu.Item variant="destructive" onclick={onRemove}>

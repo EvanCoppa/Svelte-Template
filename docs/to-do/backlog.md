@@ -21,18 +21,34 @@ Fixed in #153: `SettingsSidebar` and `AssistantSidebar` now derive
 `NavUser`, same as `AppSidebar`. Covered by `navigation.test.ts` and
 `tests/auth.spec.ts`.
 
-### 1.2 Hourly wage and commission percentage on staff — **Ready**
+### 1.2 Hourly wage and commission percentage on staff — **Done**
 
-- [ ] Migration adding `hourly_wage numeric` and `commission_percent numeric` to
-      the member/staff record, with check constraints (wage `>= 0`, percent
-      `0–100`).
-- [ ] Decide the read boundary: pay is not roster data. Gate both columns behind
-      owner/admin (or a dedicated level) with column-level grants, so a member
-      reading the roster never receives them.
-- [ ] `npm run db:types` and commit the regenerated `src/lib/database.types.ts`.
-- [ ] Surface them on the staff page and in the record form; money renders
-      through the existing `money` field type.
-- [ ] Tests for the new policies and for the form action.
+Built as a separate `staff_compensation` table
+(`20260921090000_staff_compensation.sql`) rather than columns on
+`organization_members`: column-level grants are a database-role boundary
+(`authenticated` vs `anon`, shared by every signed-in user), not a per-row
+one, so they cannot draw "owner/admin only" the way `organizations.tier_id`
+draws "service-role only" — a policy that admits a row exposes every column
+of it (the storefront migration's own reasoning). RLS on the new table
+restricts select/insert/update/delete to `private.org_role(org_id) in
+('owner','admin')`, matching the role editor's own gate.
+
+- [x] Migration: `staff_compensation` (`org_id`, `user_id`, `hourly_wage`,
+      `commission_percent`), check constraints (wage `>= 0`, percent
+      `0–100`), FK onto `organization_members`, RLS owner/admin only.
+- [x] `src/lib/database.types.ts` hand-edited to match (no local Docker in
+      this session, the §2.3 precedent) — CI's `database` job replays the
+      migration and checks the type; verify before merging.
+- [x] `listCompensation()` / `setCompensation()` in `$lib/server/staff.ts`;
+      loaded only for owner/admin viewers, never joined into `listStaff()`'s
+      roster query.
+- [x] "Manage pay" row action and modal on `/staff` (owner/admin only, same
+      gate as "Manage roles"), posting `?/setPay` — money typed as a string
+      and parsed server-side, the generic form's rule, blank clears a figure.
+- [x] Tests: `staff.test.ts` (`listCompensation`, `setCompensation`) and
+      `staff/page.server.test.ts` (the `setPay` action's permission check and
+      blank-clears-the-value behavior). RLS itself needs a live Postgres to
+      exercise, same as every other policy in this repo.
 
 ---
 
