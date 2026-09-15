@@ -106,11 +106,11 @@ the acting member still as `author_id` for attribution — `is_system`
 - [x] Extended `activities.type` with `stage_changed` / `owner_changed`; added
       a `metadata jsonb` column and a generated `is_system` column
       (`20260919100000_deal_activity_types.sql`,
-      `20260919100100_deal_timeline_system_activities.sql`). **Not yet run
-      through a local `db:reset` round trip or `db:types` regeneration against
-      a live database** — this session had no Docker to boot the stack, so
-      `src/lib/database.types.ts` was hand-edited to match. Verify both before
-      this ships.
+      `20260919100100_deal_timeline_system_activities.sql`). Written without a
+      local Docker/Postgres, so `src/lib/database.types.ts` was hand-edited to
+      match — CI's `database` job (`db:lint` + `db:types:check --local`) has
+      since replayed both migrations against a real disposable Postgres and
+      passed, confirming the hand-edit is correct.
 - [x] `updateDeal()` (`src/lib/server/crm/deals.ts`) logs a `stage_changed` /
       `owner_changed` activity itself when those columns change, so the move
       action and the generic edit form both get it for free.

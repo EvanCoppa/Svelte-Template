@@ -75,14 +75,15 @@ policies, the grant).
 5. ~~Tests: ordering, permissions, and that a system row is never editable.~~
    Unit tests cover the write side (`deals.test.ts`, `activities.test.ts`,
    `pipelines.test.ts`) — a change is logged, an unchanged tracked column logs
-   nothing, and the exact row shape `logSystemActivity()` inserts. **Not
-   covered**: the RLS policies themselves. This repo has no pgTAP suite, so
-   there is nothing that exercises "an owner/admin still cannot update or
-   delete a system row" against a real Postgres — that only gets proven the
-   first time `npm run db:reset` runs the two migrations, which this session
-   could not do (no Docker in the environment). Run that round trip, and
-   `npm run db:types` to regenerate `src/lib/database.types.ts` for real
-   (it was hand-edited here to match the SQL), before this ships.
+   nothing, and the exact row shape `logSystemActivity()` inserts. The two
+   migrations themselves were hand-written without a local Postgres (no
+   Docker in that session, so `database.types.ts` was hand-edited to match)
+   — CI's `database` job has since replayed both against a real disposable
+   Postgres and confirmed `db:lint` and `db:types:check` both pass, so the
+   hand-edited types file is now known to match the schema exactly. Still not
+   covered by anything in this repo (no pgTAP suite): a positive assertion
+   that an owner/admin cannot update or delete a system row — CI proves the
+   migrations apply and the types match, not that the policies behave.
 
 ## Design guardrails
 
