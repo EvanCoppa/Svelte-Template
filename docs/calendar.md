@@ -141,6 +141,18 @@ An event may only be booked _for_ a record the caller could open — the same
 `passesFeatureGate()` the record page uses — and the check runs before the database is
 asked, so a refusal never confirms an id exists.
 
+**The assistant books through the same rules, not around them.** `createEvent`,
+`updateEvent` and `deleteEvent` (`src/lib/server/ai/tools/`) call the same
+`crm/calendar.ts` functions with the request client, take the same three grants, and
+answer with the event described the one way `listEvents` describes one. Two things are
+worth knowing about them: the record end is gated by `canOpenFor()`, which is the rule
+above said from a tool context; and there is no separate move tool, because a tool that
+writes only the fields it was named already has what `move` exists to guarantee — it
+reads the event first so the `ends_after_start` check runs against what the row will say
+rather than against the one end the call happened to mention. `findOpenSlots` stays the
+card the user picks from; the assistant books directly only when they named a time
+(docs/assistant.md, "The calendar").
+
 ## The parts
 
 `src/lib/components/calendar/` is a compound: structural parts, two interactive views,

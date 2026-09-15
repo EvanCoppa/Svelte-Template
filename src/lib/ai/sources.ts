@@ -56,6 +56,9 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 		case 'tool-listEvents':
 			// An event has no page of its own; the record it is about does.
 			return part.output.events.flatMap((event) => (event.about ? [event.about] : []));
+		case 'tool-createEvent':
+		case 'tool-updateEvent':
+			return part.output.event.about ? [part.output.event.about] : [];
 		case 'tool-findRecords':
 			return part.output.records.map((record) => ({
 				kind: part.output.kind,
@@ -77,6 +80,7 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 				)
 			];
 		}
+		case 'tool-createRecord':
 		case 'tool-updateRecord':
 			return part.output.record ? [part.output.record] : [];
 		case 'tool-exploreGraph':
@@ -97,12 +101,21 @@ function sourcesOfPart(part: AssistantToolUIPart): Source[] {
 		// longer has one to open — neither belongs in a list of things to read.
 		// A relationship type is reference data, and a link's two ends were
 		// found by the tools that named them.
-		// A free slot is time, not a record.
+		// A free slot is time, not a record. A form is a description of a kind
+		// rather than anything to open, and a member has no record page — the
+		// staff roster is where a person who works here is read, which is also
+		// why putting someone on a task names neither: the task was named by
+		// the tool that found it.
 		case 'tool-addNote':
 		case 'tool-deleteTask':
+		case 'tool-deleteEvent':
 		case 'tool-listRelationshipTypes':
 		case 'tool-linkRecords':
 		case 'tool-findOpenSlots':
+		case 'tool-listRecordFields':
+		case 'tool-listMembers':
+		case 'tool-assignTask':
+		case 'tool-unassignTask':
 			return [];
 	}
 }

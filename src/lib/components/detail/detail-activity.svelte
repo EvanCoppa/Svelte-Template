@@ -1,9 +1,11 @@
 <script lang="ts">
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import PhoneIcon from '@lucide/svelte/icons/phone';
 	import StickyNoteIcon from '@lucide/svelte/icons/sticky-note';
+	import UserCogIcon from '@lucide/svelte/icons/user-cog';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import type { Activity } from '$lib/server/crm/activities';
 
@@ -26,14 +28,29 @@
 		email: MailIcon,
 		meeting: UsersIcon,
 		sms: MessageSquareIcon,
-		other: CircleDashedIcon
+		other: CircleDashedIcon,
+		stage_changed: ArrowRightIcon,
+		owner_changed: UserCogIcon
 	} satisfies Record<Activity['type'], typeof MailIcon>;
+
+	// System kinds get a word rather than their snake_case column value; every
+	// human kind still falls out of the type itself, capitalized.
+	function labelFor(type: Activity['type']): string {
+		switch (type) {
+			case 'stage_changed':
+				return 'Stage changed';
+			case 'owner_changed':
+				return 'Owner changed';
+			default:
+				return type.charAt(0).toUpperCase() + type.slice(1);
+		}
+	}
 
 	// Fixed locale, like every date on a page — see the staff page.
 	const datetime = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
 	const Icon = $derived(ICONS[activity.type]);
-	const kind = $derived(activity.type.charAt(0).toUpperCase() + activity.type.slice(1));
+	const kind = $derived(labelFor(activity.type));
 	// "Call · outbound · 18 min · Dev User" — whichever of those this entry has.
 	const byline = $derived(
 		[

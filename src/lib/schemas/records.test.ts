@@ -44,11 +44,14 @@ function sampleFor(field: RecordField): string {
 			return field.options?.[0]?.value ?? '';
 		case 'email':
 			return 'someone@example.com';
+		case 'url':
+			return 'https://cdn.example.com/product.png';
 		case 'number':
-			// Valid for every `number` field in the registry, a coupon's
-			// percentage included — the sample only has to parse, so it is the
-			// one that parses everywhere rather than the biggest.
-			return '20.50';
+			// Valid for every `number` field in the registry — a coupon's
+			// percentage and a product's out-of-five rating included. The
+			// sample only has to parse, so it is the one that parses
+			// everywhere rather than the biggest.
+			return '4.50';
 		case 'integer':
 			return '30';
 		case 'date':
@@ -104,6 +107,17 @@ describe('the record registry', () => {
 				// it after something it does not hold.
 				if (field.type === 'subject') {
 					expect(field.name).toBe('subject');
+					continue;
+				}
+				// A member is the third, and for the `parent_id` reason: one
+				// record can name several people who work here, each in a
+				// different role — a proposal's presenter and its responsible
+				// member are two columns — so the name says the ROLE the
+				// person plays (`assigned_to`), never which table they came
+				// from. `member_id` would say the one thing that is never in
+				// question.
+				if (field.type === 'member') {
+					expect(field.name).not.toBe('member_id');
 					continue;
 				}
 				expect(field.name).toBe(`${field.type}_id`);

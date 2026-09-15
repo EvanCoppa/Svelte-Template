@@ -24,11 +24,12 @@ const lucius: RecordSnapshot = {
 	createdAt: '2026-09-01T09:00:00Z',
 	updatedAt: '2026-09-01T09:00:00Z',
 	editableFields: [
-		{ name: 'title', label: 'Title', type: 'text' },
+		{ name: 'title', label: 'Title', type: 'text', required: false },
 		{
 			name: 'status',
 			label: 'Status',
 			type: 'select',
+			required: false,
 			options: [
 				{ value: 'active', label: 'Active' },
 				{ value: 'inactive', label: 'Inactive' }

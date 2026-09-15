@@ -71,7 +71,11 @@ export const load: PageServerLoad = async ({ locals, depends, url }) => {
 			// Carried so that a card held optimistically in a stage it has just been
 			// dropped on describes that stage whole, rather than wearing the position
 			// of the one it left.
-			sortOrder: stage.sort_order
+			sortOrder: stage.sort_order,
+			// Which column this open stage shares with others, if any
+			// (`buildDealColumns()`) — null groups it with nobody.
+			groupId: stage.group_id,
+			groupLabel: stage.pipeline_stage_groups?.label ?? null
 		}))
 	}));
 

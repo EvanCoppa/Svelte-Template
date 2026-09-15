@@ -3,6 +3,8 @@ import { visibleTerms } from '$lib/features/terms';
 import type { FeatureId } from '$lib/features/types';
 import type { CanOpen } from '$lib/server/crm/records';
 import type { OrgContext } from '$lib/server/org-context';
+import { isEditableRecordType } from '$lib/server/records';
+import { isRecordType } from '$lib/schemas/records';
 import { hasGrant, type PermissionLevel } from '$lib/server/roles';
 import type { AssistantToolContext } from '../context';
 
@@ -22,7 +24,16 @@ import type { AssistantToolContext } from '../context';
  */
 export type ToolAccess =
 	| { feature: FeatureId; level: PermissionLevel }
-	| { anyOf: readonly FeatureId[]; level: PermissionLevel };
+	| {
+			anyOf: readonly FeatureId[];
+			level: PermissionLevel;
+			/**
+			 * What the tool is about, for the refusal the model reads. Without
+			 * it a refusal can only name the features, which reads as a list of
+			 * keys rather than a sentence.
+			 */
+			subject?: string;
+	  };
 
 /** The access one call on a kind-addressed tool needs: that kind's feature, at the level. */
 export function recordAccess(kind: RecordKind, level: PermissionLevel): ToolAccess {
@@ -31,7 +42,11 @@ export function recordAccess(kind: RecordKind, level: PermissionLevel): ToolAcce
 
 /** A kind-addressed tool's own access: offered while any record kind is open at the level. */
 export function anyRecordAccess(level: PermissionLevel): ToolAccess {
-	return { anyOf: RECORD_KINDS.map((kind) => RECORD_KIND_META[kind].feature), level };
+	return {
+		anyOf: RECORD_KINDS.map((kind) => RECORD_KIND_META[kind].feature),
+		level,
+		subject: 'any kind of record'
+	};
 }
 
 /**
@@ -61,7 +76,8 @@ export function requireToolContext(
 	access: ToolAccess
 ): AssistantToolContext {
 	if (!isToolActive(context.org, access)) {
-		const subject = 'anyOf' in access ? 'any kind of record' : access.feature;
+		const subject =
+			'anyOf' in access ? (access.subject ?? access.anyOf.join(', ')) : access.feature;
 		throw new Error(
 			`This organization or your role does not allow "${access.level}" on ${subject}.`
 		);
@@ -87,7 +103,14 @@ export type RecordKindAccess = {
 	name: string;
 	/** One of them: "patient". */
 	noun: string;
-	canManage: boolean;
+	/**
+	 * Whether `createRecord` (or, for a task, `createTask`) can write one:
+	 * `manage`, and a form in the registry. A kind with a page but no form —
+	 * a proposal, a shipment — is not created by the assistant at all.
+	 */
+	canCreate: boolean;
+	/** Whether `updateRecord` can change one: `manage`, and a kind the generic form edits. */
+	canUpdate: boolean;
 };
 
 /**
@@ -102,6 +125,15 @@ export function recordKindAccess(org: OrgContext): RecordKindAccess[] {
 	return RECORD_KINDS.flatMap((kind): RecordKindAccess[] => {
 		if (!canOpen(kind) || !terms[RECORD_KIND_META[kind].feature]?.noun) return [];
 		const { name, noun } = recordTerms(terms, kind);
-		return [{ kind, name, noun, canManage: isToolActive(org, recordAccess(kind, 'manage')) }];
+		const canManage = isToolActive(org, recordAccess(kind, 'manage'));
+		return [
+			{
+				kind,
+				name,
+				noun,
+				canCreate: canManage && isRecordType(kind),
+				canUpdate: canManage && isEditableRecordType(kind)
+			}
+		];
 	});
 }

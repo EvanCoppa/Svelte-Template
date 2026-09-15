@@ -27,11 +27,20 @@ import type { Tables } from '$lib/database.types';
 /** A stage as a column needs it — never the whole row. */
 export type StageLike = Pick<Tables<'pipeline_stages'>, 'outcome' | 'probability'>;
 
-/** A stage as the board's columns are built from — enough to name and tone it. */
+/**
+ * A stage as the board's columns are built from — enough to name and tone it,
+ * plus which column it shares with other OPEN stages, if any
+ * (`pipeline_stage_groups` — the deal board's `TASK_STATUS_GROUPS`, as rows).
+ * `groupLabel` is present exactly when `groupId` is; a null group draws the
+ * stage as a column of its own, same as every stage has always had.
+ */
 export type StageColumn = Pick<
 	Tables<'pipeline_stages'>,
 	'id' | 'name' | 'outcome' | 'probability'
->;
+> & {
+	groupId: string | null;
+	groupLabel: string | null;
+};
 
 /** One status inside a column, with the hue and ring its own drop zone draws. */
 export type DealColumnStatus = KanbanStatus & { tone: BadgeTone; fill: KanbanRingFill };
@@ -49,33 +58,65 @@ export type DealColumn = {
 /** The one column every closed stage shares, whatever an org calls its stages. */
 const CLOSED_COLUMN_ID = 'closed';
 
+/** One stage, as the status a column's drop zone draws. */
+function statusOf(stage: StageColumn): DealColumnStatus {
+	return {
+		value: stage.id,
+		label: stage.name,
+		tone: STAGE_OUTCOME_TONE[stage.outcome],
+		fill: stageFill(stage)
+	};
+}
+
 /**
- * The funnel's columns, built from one board's stages: every open stage is its
- * own column — a release lands straight away — and every stage whose outcome
- * closes the deal (won, lost, and any more an org adds) is folded into one
- * `Closed` column, split into a drop zone per stage exactly the way the task
- * board's grouped columns work (CLAUDE.md, "A board is `Kanban`"). Grouping by
- * outcome rather than listing every closed stage keeps the funnel the same
- * width regardless of how many an org defines.
+ * The funnel's columns, built from one board's stages. Two groupings apply,
+ * and they answer different questions:
+ *
+ *  - Every stage whose outcome closes the deal (won, lost, and any more an
+ *    org adds) is folded into one `Closed` column, split into a drop zone per
+ *    stage — outcome is the only thing that matters there, so the funnel is
+ *    the same width regardless of how many terminal stages an org defines.
+ *  - Among the OPEN stages, one carrying the same `groupId` as another shares
+ *    ITS column too (`pipeline_stage_groups` — the same `Kanban.Zones`
+ *    grouped-column pattern the task board uses, as rows rather than a JS
+ *    constant because a pipeline's stages are rows). An ungrouped open stage
+ *    is a column of its own, exactly as every stage has always been — a board
+ *    nobody has grouped renders exactly as it did before this existed.
+ *
+ * Column order follows `stages`' own order (sort_order): a group's column
+ * takes the position of its first member.
  */
 export function buildDealColumns(stages: readonly StageColumn[]): DealColumn[] {
 	const open = stages.filter((stage) => stage.outcome === 'open');
 	const closed = stages.filter((stage) => stage.outcome !== 'open');
 
-	const columns: DealColumn[] = open.map((stage) => ({
-		id: stage.id,
-		label: stage.name,
-		tone: STAGE_OUTCOME_TONE[stage.outcome],
-		fill: stageFill(stage),
-		statuses: [
-			{
-				value: stage.id,
+	const columns: DealColumn[] = [];
+	const groupsSeen = new Set<string>();
+
+	for (const stage of open) {
+		if (stage.groupId === null) {
+			columns.push({
+				id: stage.id,
 				label: stage.name,
 				tone: STAGE_OUTCOME_TONE[stage.outcome],
-				fill: stageFill(stage)
-			}
-		]
-	}));
+				fill: stageFill(stage),
+				statuses: [statusOf(stage)]
+			});
+			continue;
+		}
+		if (groupsSeen.has(stage.groupId)) continue;
+		groupsSeen.add(stage.groupId);
+
+		const members = open.filter((candidate) => candidate.groupId === stage.groupId);
+		const [first] = members;
+		columns.push({
+			id: stage.groupId,
+			label: stage.groupLabel ?? first.name,
+			tone: STAGE_OUTCOME_TONE[first.outcome],
+			fill: stageFill(first),
+			statuses: members.map(statusOf)
+		});
+	}
 
 	if (closed.length > 0) {
 		const [first] = closed;
@@ -84,12 +125,7 @@ export function buildDealColumns(stages: readonly StageColumn[]): DealColumn[] {
 			label: 'Closed',
 			tone: STAGE_OUTCOME_TONE[first.outcome],
 			fill: stageFill(first),
-			statuses: closed.map((stage) => ({
-				value: stage.id,
-				label: stage.name,
-				tone: STAGE_OUTCOME_TONE[stage.outcome],
-				fill: stageFill(stage)
-			}))
+			statuses: closed.map(statusOf)
 		});
 	}
 
