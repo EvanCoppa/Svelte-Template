@@ -14,26 +14,12 @@ migration exists somewhere but is not merged) · **Idea** (discussed only) ·
 
 Small, self-contained, no dependency on anything else in this list.
 
-### 1.1 Staff and Settings must appear together in the user menu — **Ready**
+### 1.1 Staff and Settings must appear together in the user menu — **Done**
 
-The bottom-left user menu shows Settings on every screen but Staff only inside
-the main app shell. Verified cause: `AppSidebar` passes the filtered feature
-entries down (`src/lib/components/app-sidebar.svelte:93`), while
-`SettingsSidebar` (`settings-sidebar.svelte:90`) and `AssistantSidebar`
-(`assistant-sidebar.svelte:237`) mount `<NavUser {user} />` with no `items`, so
-`userMenuNav()`'s entries — Staff being the only one today — vanish in those two
-shells.
-
-- [ ] Move the `userMenuNav(page.data.nav ?? [])` read **into** `NavUser` so the
-      menu composes itself identically wherever it is mounted, instead of
-      depending on three call sites agreeing.
-- [ ] Drop the now-unused `items` prop and the `userMenuItems` derivation in
-      `AppSidebar`.
-- [ ] Extend `src/lib/navigation.test.ts` to cover the menu contents, and add an
-      E2E assertion that the menu is the same on `/`, `/settings` and
-      `/assistant`.
-- [ ] Confirm a locked Staff feature still opens the upgrade prompt rather than
-      navigating, in all three shells.
+Fixed in #153: `SettingsSidebar` and `AssistantSidebar` now derive
+`userMenuItems` from `userMenuNav(page.data.nav ?? [])` and pass it to
+`NavUser`, same as `AppSidebar`. Covered by `navigation.test.ts` and
+`tests/auth.spec.ts`.
 
 ### 1.2 Hourly wage and commission percentage on staff — **Ready**
 
