@@ -890,12 +890,18 @@ describe('listRelatedRecords', () => {
 				}
 			]
 		};
-		const { supabase, from, builders } = supabaseTablesMock({ proposals: { data: [unpriced] } });
+		const { supabase, from, builders } = supabaseTablesMock({
+			proposals: { data: [unpriced] },
+			// No `related_to` links to this deal: the graph is queried, comes
+			// back empty, and the task group is dropped rather than fetched.
+			relationships: { data: [] }
+		});
 
 		const groups = await listRelatedRecords(supabase, ORG_ID, 'deal', contract.id, openAll);
 
 		expect(groups.map((g) => g.kind)).toEqual(['proposal']);
-		expect(from).toHaveBeenCalledTimes(1);
+		expect(from).toHaveBeenCalledWith('relationships');
+		expect(from).not.toHaveBeenCalledWith('tasks');
 		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_type', 'deal');
 		expect(builders.proposals.eq).toHaveBeenCalledWith('entity_id', contract.id);
 		// Nothing recommended: the meta says how many there are to choose from.
@@ -903,6 +909,54 @@ describe('listRelatedRecords', () => {
 			pill: { label: 'Draft', tone: 'neutral' },
 			meta: '1 option'
 		});
+	});
+
+	it("lists a deal's to-do list — the tasks the graph names it, either direction", async () => {
+		const link = {
+			id: 'r1000000-0000-0000-0000-000000000001',
+			org_id: ORG_ID,
+			relationship_type_id: 'f0000000-0000-0000-0000-000000000022',
+			from_type: 'task',
+			from_id: renewal.id,
+			to_type: 'deal',
+			to_id: contract.id,
+			ended_on: null,
+			...STAMPS,
+			relationship_types: {
+				id: 'f0000000-0000-0000-0000-000000000022',
+				forward_label: 'related to',
+				inverse_label: 'related to'
+			}
+		};
+		const { supabase, from, builders } = supabaseTablesMock({
+			proposals: { data: [] },
+			relationships: { data: [link] },
+			tasks: { data: [renewal] }
+		});
+
+		const groups = await listRelatedRecords(supabase, ORG_ID, 'deal', contract.id, openAll);
+
+		expect(builders.relationships.eq).toHaveBeenCalledWith(
+			'relationship_type_id',
+			'f0000000-0000-0000-0000-000000000022'
+		);
+		expect(builders.relationships.is).toHaveBeenCalledWith('ended_on', null);
+		expect(builders.tasks.in).toHaveBeenCalledWith('id', [renewal.id]);
+		expect(groups.map((g) => g.kind)).toEqual(['task']);
+		expect(groups[0].records[0]).toMatchObject({
+			id: renewal.id,
+			pill: { label: 'To do', tone: 'neutral' }
+		});
+	});
+
+	it("never reaches the graph for a deal's tasks when the reader may not open them", async () => {
+		const { supabase, from } = supabaseTablesMock({ proposals: { data: [] } });
+		const canOpenNoTasks = vi.fn((kind: string) => kind !== 'task');
+
+		await listRelatedRecords(supabase, ORG_ID, 'deal', contract.id, canOpenNoTasks);
+
+		expect(from).not.toHaveBeenCalledWith('relationships');
+		expect(from).not.toHaveBeenCalledWith('tasks');
 	});
 
 	it('has nothing to list for a kind nothing points at', async () => {

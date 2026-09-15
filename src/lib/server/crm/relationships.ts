@@ -52,7 +52,8 @@ export const RELATIONSHIP_TYPE = {
 	// inserted and these two constants resolved to the wrong labels.
 	presents: 'f0000000-0000-0000-0000-000000000033',
 	proposedTo: 'f0000000-0000-0000-0000-000000000034',
-	attendedBy: 'f0000000-0000-0000-0000-000000000041'
+	attendedBy: 'f0000000-0000-0000-0000-000000000041',
+	relatedTo: 'f0000000-0000-0000-0000-000000000022'
 } as const;
 
 export type RelationshipType = Tables<'relationship_types'>;

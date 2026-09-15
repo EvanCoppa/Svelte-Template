@@ -66,6 +66,7 @@ export async function listTasks(
 		contactId?: string;
 		openOnly?: boolean;
 		status?: Enums<'task_status'>;
+		ids?: readonly string[];
 	} = {}
 ): Promise<Task[]> {
 	let query = supabase
@@ -78,6 +79,7 @@ export async function listTasks(
 	if (filter.contactId) query = query.eq('contact_id', filter.contactId);
 	if (filter.status) query = query.eq('status', filter.status);
 	if (filter.openOnly) query = query.is('completed_at', null);
+	if (filter.ids) query = query.in('id', [...filter.ids]);
 	return unwrap(await query);
 }
 

@@ -76,6 +76,13 @@ describe('tasks data access', () => {
 		expect(builder.is).toHaveBeenCalledWith('completed_at', null);
 	});
 
+	it('narrows to a set of ids, for a caller reading a graph of them', async () => {
+		const { supabase, builder } = supabaseMock({ data: [] });
+
+		await listTasks(supabase, ORG_ID, { ids: [TASK_ID] });
+		expect(builder.in).toHaveBeenCalledWith('id', [TASK_ID]);
+	});
+
 	it('reads assignees as assigned_to relationships, named from profiles', async () => {
 		const { supabase, builders } = supabaseTablesMock({
 			relationships: { data: [assignment()] },
