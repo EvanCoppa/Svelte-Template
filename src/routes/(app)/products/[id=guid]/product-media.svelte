@@ -4,7 +4,7 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
-	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
+	import { fileProxy, superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { invalidate } from '$app/navigation';
 	import { BlurUpImage, Lightbox } from '$lib/components/enhanced/index.js';
@@ -54,7 +54,7 @@
 	const pictures = $derived([...(imageUrl ? [imageUrl] : []), ...gallery]);
 	const empty = $derived(pictures.length === 0);
 
-	const { errors, message, submitting, enhance, reset } = superForm(uploadForm, {
+	const { form, errors, message, submitting, enhance, reset } = superForm(uploadForm, {
 		id: 'product-image',
 		validators: zod4Client(productImageUploadSchema),
 		invalidateAll: false,
@@ -66,6 +66,8 @@
 			invalidate(queryKey);
 		}
 	});
+
+	const file = fileProxy(form, 'file');
 
 	const {
 		message: removeMessage,
@@ -190,6 +192,7 @@
 							type="file"
 							accept="image/jpeg,image/png,image/webp,image/gif"
 							aria-invalid={$errors.file ? 'true' : undefined}
+							bind:files={$file}
 						/>
 						{#if $errors.file}
 							<p class="text-destructive text-sm">{$errors.file}</p>
