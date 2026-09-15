@@ -6,6 +6,7 @@ import {
 	deletePurchase,
 	deletePurchaseLine,
 	getPurchase,
+	listPurchaseLinesForProduct,
 	listPurchases,
 	placePurchase,
 	updatePurchase,
@@ -164,5 +165,21 @@ describe('the lines', () => {
 		await expect(deletePurchaseLine(filtered.supabase, ORG_ID, LINE_ID)).rejects.toThrow(
 			'Line was not deleted'
 		);
+	});
+});
+
+describe('listPurchaseLinesForProduct', () => {
+	it('reads every line citing the product with the purchase it is on, newest first', async () => {
+		const { supabase, from, builder } = supabaseMock({ data: [] });
+		const productId = 'b2000000-0000-0000-0000-000000000001';
+
+		await expect(listPurchaseLinesForProduct(supabase, ORG_ID, productId)).resolves.toEqual([]);
+		expect(from).toHaveBeenCalledWith('purchase_line_items');
+		expect(builder.select).toHaveBeenCalledWith(
+			'*, purchases!inner(id, number, status, created_at, ordered_at, currency, companies(id, name))'
+		);
+		expect(builder.eq).toHaveBeenCalledWith('org_id', ORG_ID);
+		expect(builder.eq).toHaveBeenCalledWith('product_id', productId);
+		expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false });
 	});
 });
