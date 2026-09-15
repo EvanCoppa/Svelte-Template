@@ -33,7 +33,14 @@ type ProductColumn =
 	| 'unit'
 	| 'is_active'
 	| 'track_inventory'
-	| 'quantity_on_hand';
+	| 'quantity_on_hand'
+	// The storefront half of a catalog row: the body a shop renders, its
+	// picture, the compare-at price and the open bag of everything else it
+	// shows. Writable through the same generic form as the columns above.
+	| 'long_description'
+	| 'image_url'
+	| 'msrp'
+	| 'metadata';
 
 export async function listProducts(
 	supabase: SupabaseClient<Database>,

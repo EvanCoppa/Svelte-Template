@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { message, superValidate } from 'sveltekit-superforms/server';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { SuperValidated } from 'sveltekit-superforms';
-import type { Database } from '$lib/database.types';
+import type { Database, Json } from '$lib/database.types';
 import { RECORD_KIND_META, type RecordKind } from '$lib/crm/records';
 import {
 	formatFix,
@@ -35,6 +35,8 @@ import {
 	RECORD_PICKER_KINDS,
 	RECORD_SCHEMAS,
 	RECORD_TYPES,
+	storefrontMetadataSchema,
+	type ProductRecordValues,
 	type RecordFieldOption,
 	type RecordFormValues,
 	type RecordPickerKind,
@@ -62,7 +64,13 @@ import { createDeal, dealPlacement, deleteDeal, getDeal, updateDeal } from './cr
 import { createInvoice } from './crm/invoices';
 import { createLease, deleteLease, getLease, updateLease } from './crm/leases';
 import { listPipelines } from './crm/pipelines';
-import { createProduct, deleteProduct, getProduct, updateProduct } from './crm/products';
+import {
+	createProduct,
+	deleteProduct,
+	getProduct,
+	listProductCategories,
+	updateProduct
+} from './crm/products';
 import { createOrder, deleteOrder, getOrder, updateOrder } from './crm/orders';
 import { createPurchase, deletePurchase, getPurchase, updatePurchase } from './crm/purchases';
 import { deleteShipment } from './crm/shipments';
@@ -228,6 +236,18 @@ export async function pickerOptions(
 				value: outcome.id,
 				label: outcome.name
 			}));
+		case 'category': {
+			// The catalog tree, flat — a node is shown under its parent so two
+			// "Accessories" tell apart, the properties picker's rule. One pass
+			// builds the name index, so the sublabel costs no extra query.
+			const rows = await listProductCategories(supabase, orgId);
+			const names = new Map(rows.map((row) => [row.id, row.name]));
+			return rows.map((row) => ({
+				value: row.id,
+				label: row.name,
+				sublabel: row.parent_id ? (names.get(row.parent_id) ?? undefined) : undefined
+			}));
+		}
 	}
 }
 
@@ -551,11 +571,17 @@ async function recordFormValues(
 				? {
 						name: row.name,
 						kind: row.kind,
+						category_id: str(row.category_id),
 						sku: str(row.sku),
 						unit_price: str(row.unit_price),
 						unit_cost: str(row.unit_cost),
 						unit: str(row.unit),
-						description: str(row.description)
+						msrp: str(row.msrp),
+						is_active: String(row.is_active),
+						description: str(row.description),
+						long_description: str(row.long_description),
+						image_url: str(row.image_url),
+						...storefrontFormValues(row.metadata)
 					}
 				: {};
 		}
@@ -804,11 +830,17 @@ async function writeRecord(
 			const columns = {
 				name: data.name,
 				kind: data.kind,
+				category_id: text(data.category_id),
 				sku: text(data.sku),
 				unit_price: price(data.unit_price),
 				unit_cost: amount(data.unit_cost),
 				unit: text(data.unit),
-				description: text(data.description)
+				msrp: amount(data.msrp),
+				is_active: data.is_active === 'true',
+				description: text(data.description),
+				long_description: text(data.long_description),
+				image_url: text(data.image_url),
+				metadata: storefrontMetadata(data)
 			};
 			await (id
 				? updateProduct(supabase, orgId, id, columns)
@@ -1047,6 +1079,95 @@ function list(value: string): string[] | null {
 		.map((item) => item.trim())
 		.filter(Boolean);
 	return items.length > 0 ? items : null;
+}
+
+/** Newline-separated text as its lines, blanks dropped: a product's usage steps. */
+function lines(value: string): string[] {
+	return value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean);
+}
+
+/**
+ * `Label: value` per line, as a storefront's spec rows. A line with no colon
+ * is a value with no label — which is how a kit lists what is in the box —
+ * and a label with nothing after it is dropped, because the value is the
+ * spec and the label is the optional half.
+ */
+function specRows(value: string): { label: string; value: string }[] {
+	return lines(value).flatMap((line) => {
+		const at = line.indexOf(':');
+		if (at === -1) return [{ label: '', value: line }];
+		const spec = { label: line.slice(0, at).trim(), value: line.slice(at + 1).trim() };
+		return spec.value === '' ? [] : [spec];
+	});
+}
+
+/**
+ * A product's `metadata` bag, built whole from the form's storefront fields.
+ *
+ * Rebuilt rather than merged, for the reason every field on every form is:
+ * blank means empty, so a badge the writer deleted has to go. The form holds
+ * every key a shop reads (`productRecordSchema` says so), which is what makes
+ * that safe — a key a storefront starts reading becomes a field there in the
+ * same change, or the next edit drops it.
+ *
+ * `compareAtCents` is the one derived key: the writer types a compare-at
+ * price into the `msrp` column, and this writes the cents the storefront
+ * reads, so the fact still has exactly one home and one field.
+ */
+function storefrontMetadata(data: ProductRecordValues): Json {
+	const bag = {
+		slug: data.slug,
+		tagline: data.tagline,
+		art: data.art,
+		accent: data.accent,
+		badges: list(data.badges) ?? [],
+		rating: data.rating === '' ? null : Number(data.rating),
+		reviewCount: data.review_count === '' ? null : Number(data.review_count),
+		ingredients: data.ingredients,
+		usage: lines(data.usage),
+		specs: specRows(data.specs),
+		featured: data.featured === 'true',
+		bestSeller: data.best_seller === 'true',
+		compareAtCents: data.msrp === '' ? null : Math.round(Number(data.msrp) * 100)
+	} satisfies Record<string, Json>;
+	return Object.fromEntries(Object.entries(bag).filter(([, value]) => worthKeeping(value)));
+}
+
+/** Absent and empty say the same thing to a shop, so only real values are written. */
+function worthKeeping(value: Json): boolean {
+	if (value === null || value === '' || value === false) return false;
+	return !(Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * The same bag on its way back into the form, read through
+ * `storefrontMetadataSchema` — the boundary where untyped jsonb becomes values
+ * with a contract, so nothing below has to ask what shape it got.
+ */
+function storefrontFormValues(metadata: Json): RecordFormValues {
+	const bag = storefrontMetadataSchema.parse(metadata);
+	return {
+		slug: bag.slug,
+		tagline: bag.tagline,
+		art: bag.art,
+		accent: bag.accent,
+		badges: bag.badges.join(', '),
+		rating: bag.rating === null ? '' : String(bag.rating),
+		review_count: bag.reviewCount === null ? '' : String(bag.reviewCount),
+		ingredients: bag.ingredients,
+		usage: bag.usage.join('\n'),
+		specs: bag.specs.map(specLine).join('\n'),
+		featured: String(bag.featured),
+		best_seller: String(bag.bestSeller)
+	};
+}
+
+/** The mirror of `specRows()`: one spec row as the line the textarea shows. */
+function specLine(spec: { label: string; value: string }): string {
+	return spec.label === '' ? spec.value : `${spec.label}: ${spec.value}`;
 }
 
 /** A whole number as typed, or null when the field was left blank. */
