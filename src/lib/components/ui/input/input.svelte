@@ -31,7 +31,6 @@
 		)}
 		type="file"
 		bind:files
-		bind:value
 		spellcheck="true"
 		{...restProps}
 	/>
